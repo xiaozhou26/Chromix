@@ -14,10 +14,11 @@ target needs a build machine of that OS:
 | macOS arm64 | Apple Silicon Mac | Xcode + CLT | ~100 GB, several hours |
 | macOS x64 | Intel Mac (or arm64 cross to x64) | Xcode + CLT | ~100 GB, several hours |
 
-GitHub's hosted `windows-latest` / `macos-latest` runners are too small/slow for a full Chromium
-build — use a **large self-hosted runner** or a beefy cloud VM (Windows VM; Mac via MacStadium /
-AWS EC2 Mac / a local Mac). The `.github/workflows/build-fortress.yml` matrix is wired for
-self-hosted runners.
+GitHub's hosted `windows-latest` / `macos-latest` runners are too small/slow for a single-job
+Chromium build. For Windows x64, `.github/workflows/build-win-x64-github.yml` chains 12 staged
+jobs that hand the build tree off via artifacts (ungoogled-chromium-windows style). For macOS,
+use a **large self-hosted runner** or a beefy cloud VM (Mac via MacStadium / AWS EC2 Mac / a
+local Mac).
 
 ## Windows
 ```powershell
