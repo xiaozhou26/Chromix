@@ -72,7 +72,9 @@ function Invoke-Tracked {
     }
   }
   if (Test-Path $err) { Get-Content $err -Tail 5 | ForEach-Object { Write-Host "  ! | $_" } }
-  return $p.ExitCode
+  $code = $p.ExitCode
+  if ($null -eq $code) { $code = 1 }
+  return $code
 }
 
 function Get-FreeGB { [math]::Round((Get-PSDrive C).Free / 1GB, 1) }
@@ -150,6 +152,9 @@ Write-OutVar upload_parts false
 Free-Disk
 Install-Debuggers
 git config --global core.longpaths true
+# depot_tools (after its first self-update) refuses to run when a global
+# gitconfig exists unless this flag is set.
+git config --global depot-tools.allowGlobalGitConfig true
 
 New-Item -ItemType Directory -Force -Path $Root | Out-Null
 if (-not (Test-Path "$Root\depot_tools\gclient.bat")) {
@@ -178,39 +183,34 @@ if ($FromArtifact -and (Test-Path "C:\restore\tree.7z.001")) {
 
 # ---------------------------------------------------------------- fetch + sync
 if (-not (Test-Path "$Src\.chromix-synced")) {
-  if (-not (Test-Path $Src)) {
-    New-Item -ItemType Directory -Force -Path $Chromium | Out-Null
-    $rc = 1
-    for ($i = 1; $i -le 3; $i++) {
-      Write-Host "==> fetch chromium (no hooks, no history), attempt $i"
-      $rc = Invoke-Tracked -File "cmd.exe" -ArgList "/c fetch --nohooks --no-history chromium" -Cwd $Chromium -TimeoutSec 3600
-      if ($rc -eq 0) { break }
-      Start-Sleep -Seconds 30
-    }
-    if ($rc -ne 0) { throw "fetch chromium failed (exit $rc)" }
+  # Hand-written .gclient: clone src from the GitHub mirror, which is fast and
+  # reliable from Azure runner IPs (googlesource rate-limits them hard; it
+  # killed the initial 2 GB src clone ~10 min in on the first CI attempt).
+  # DEPS dependencies still come from googlesource via the retry loop below.
+  if (-not (Test-Path "$Chromium\.gclient")) {
+    @'
+solutions = [
+  {
+    "name": "src",
+    "url": "https://github.com/chromium/chromium.git",
+    "custom_deps": {},
+    "custom_vars": {},
+  },
+]
+'@ | Set-Content -Path "$Chromium\.gclient" -Encoding ASCII
   }
-  Push-Location $Src
-  try {
-    Write-Host "==> checkout tag $ChromiumVersion"
-    for ($i = 1; $i -le 3; $i++) {
-      & git fetch --depth 1 origin "refs/tags/${ChromiumVersion}:refs/tags/${ChromiumVersion}"
-      if ($LASTEXITCODE -eq 0) { break }
-      Write-Host "  git fetch tag attempt $i failed (exit $LASTEXITCODE); retrying"; Start-Sleep -Seconds 30
-    }
-    if ($LASTEXITCODE -ne 0) { throw "git fetch tag failed (exit $LASTEXITCODE)" }
-    & git checkout -f "tags/$ChromiumVersion"
-    if ($LASTEXITCODE -ne 0) { throw "git checkout tag failed (exit $LASTEXITCODE)" }
-  } finally { Pop-Location }
 
-  # gclient sync: googlesource rate-limits (HTTP 429) transiently, so retry
-  # within the remaining budget; partial syncs resume where they left off.
+  # gclient sync pinned to the tag: googlesource rate-limits (HTTP 429)
+  # transiently, so retry within the remaining budget; already-cloned deps are
+  # skipped on re-run, so partial syncs resume where they left off.
   $syncOk = $false
+  $attempt = 0
   while ((Get-RemainingMin) -gt ($PackReserveMin + 60)) {
-    $attempt = $attempt + 1
+    $attempt++
     $budgetSec = ((Get-RemainingMin) - ($PackReserveMin + 45)) * 60
     if ($budgetSec -lt 300) { break }
     Write-Host "==> gclient sync attempt $attempt (budget $([int]($budgetSec/60)) min)"
-    $rc = Invoke-Tracked -File "cmd.exe" -ArgList "/c gclient sync -D --no-history --reset --jobs 8" -Cwd $Src -TimeoutSec $budgetSec
+    $rc = Invoke-Tracked -File "cmd.exe" -ArgList "/c gclient sync --revision src@$ChromiumVersion -D --no-history --reset --jobs 8" -Cwd $Chromium -TimeoutSec $budgetSec
     if ($rc -eq 0) { $syncOk = $true; break }
     Write-Host "  sync attempt failed (exit $rc); retrying in 60s"
     Start-Sleep -Seconds 60
@@ -221,6 +221,13 @@ if (-not (Test-Path "$Src\.chromix-synced")) {
     . "$PSScriptRoot\ci-parts.ps1" -Root $Root -PartsDir $PartsDir
     return
   }
+  # gclient leaves src detached at the pinned revision; verify before marking.
+  Push-Location $Src
+  try {
+    $head = & git rev-parse HEAD
+    $want = & git rev-parse "refs/tags/$ChromiumVersion^{commit}"
+    if ($head -ne $want) { throw "src is at $head, expected tag $ChromiumVersion ($want)" }
+  } finally { Pop-Location }
   Set-Content -Path "$Src\.chromix-synced" -Value $ChromiumVersion
 
   # Apply Fortress patches (only after a fully synced tree at the pinned tag).
