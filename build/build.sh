@@ -1,22 +1,22 @@
 #!/usr/bin/env bash
-# Fortress full build: fetch depot_tools, sync Chromium to the pinned tag,
+# Chromix full build: fetch depot_tools, sync Chromium to the pinned tag,
 # apply patches, configure, and compile the stripped official binary.
 #
 # Usage:  build/build.sh [workdir]
-#   workdir defaults to ./.fortress-build  (needs ~100GB free + many hours)
+#   workdir defaults to ./.chromix-build  (needs ~100GB free + many hours)
 #
 # Env:  CHROMIUM_VERSION  (defaults to the CHROMIUM_VERSION file)
 #       TMPDIR            (point at a real disk; /tmp tmpfs will fill and fail)
 set -euo pipefail
 REPO="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-WORK="${1:-$REPO/.fortress-build}"
+WORK="${1:-$REPO/.chromix-build}"
 ARGS_FILE="$REPO/build/args.gn"
-OUT="Fortress"
+OUT="Chromix"
 VER="${CHROMIUM_VERSION:-$(cat "$REPO/CHROMIUM_VERSION")}"
 export TMPDIR="${TMPDIR:-$WORK/tmp}"
 mkdir -p "$WORK" "$TMPDIR"
 
-echo "==> Fortress build | Chromium $VER | out/$OUT | workdir $WORK"
+echo "==> Chromix build | Chromium $VER | out/$OUT | workdir $WORK"
 
 # 1. depot_tools
 if [ ! -d "$WORK/depot_tools" ]; then
@@ -37,7 +37,7 @@ gclient sync -D --no-history --with_branch_heads --reset
 # 3. install build deps (first run; harmless to repeat)
 ./build/install-build-deps.sh --no-prompt || true
 
-# 4. apply Fortress patches
+# 4. apply Chromix patches
 "$REPO/build/apply-patches.sh" "$WORK/chromium/src"
 
 # 5. configure + build

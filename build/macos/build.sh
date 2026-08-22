@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
-# Fortress native macOS build.
+# Chromix native macOS build.
 #
-# Prereqs (see docs/BUILD_NATIVE.md):
+# Prereqs: Xcode + command line tools, depot_tools on PATH
 #   - Xcode + `xcode-select --install`
 #   - ~100 GB free disk, long build time
 #   - git, python3
@@ -10,12 +10,12 @@
 #   build/macos/build.sh [workdir] [arm64|x64]
 set -euo pipefail
 REPO="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
-WORK="${1:-$REPO/.fortress-build-mac}"
+WORK="${1:-$REPO/.chromix-build-mac}"
 ARCH="${2:-arm64}"
 VER="${CHROMIUM_VERSION:-$(cat "$REPO/CHROMIUM_VERSION")}"
 mkdir -p "$WORK"
 
-echo "==> Fortress macOS build | Chromium $VER | $ARCH | $WORK"
+echo "==> Chromix macOS build | Chromium $VER | $ARCH | $WORK"
 
 # 1. depot_tools
 if [ ! -d "$WORK/depot_tools" ]; then
@@ -32,13 +32,13 @@ git fetch --depth 1 origin "refs/tags/$VER:refs/tags/$VER"
 git checkout -f "tags/$VER"
 gclient sync -D --no-history --reset
 
-# 3. apply Fortress patches
+# 3. apply Chromix patches
 "$REPO/build/apply-patches.sh" "$WORK/chromium/src"
 
 # 4. configure (override target_cpu for Intel) + build
 ARGS="$(cat "$REPO/build/args.macos.gn")"
 [ "$ARCH" = "x64" ] && ARGS="${ARGS/target_cpu = \"arm64\"/target_cpu = \"x64\"}"
-gn gen out/Fortress --args="$ARGS"
-autoninja -C out/Fortress chrome
+gn gen out/Chromix --args="$ARGS"
+autoninja -C out/Chromix chrome
 
-echo "==> Done: $WORK/chromium/src/out/Fortress/Chromium.app"
+echo "==> Done: $WORK/chromium/src/out/Chromix/Chromium.app"

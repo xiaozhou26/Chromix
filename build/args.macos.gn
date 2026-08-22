@@ -1,6 +1,6 @@
-# Fortress — official max-stealth Chromium build args for macOS (GN).
+# Chromix — official max-stealth Chromium build args for macOS (GN).
 # Used by build/macos/build.sh. Set target_cpu to "arm64" (Apple Silicon) or "x64" (Intel).
-# Requires: Xcode + command line tools, set up per docs/BUILD_NATIVE.md.
+# Requires: Xcode + command line tools
 
 is_official_build = true
 is_component_build = false

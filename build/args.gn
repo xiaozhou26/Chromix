@@ -1,5 +1,5 @@
-# Fortress — official, max-stealth Chromium build args (GN)
-# Used by build/build.sh:  gn gen out/Fortress --args="$(cat build/args.gn)"
+# Chromix — official, max-stealth Chromium build args (GN)
+# Used by build/build.sh:  gn gen out/Chromix --args="$(cat build/args.gn)"
 
 # Official, optimized, single-binary (NOT a component/dev build).
 is_official_build = true

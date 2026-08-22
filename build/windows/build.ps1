@@ -1,18 +1,18 @@
 <#
-  Fortress native Windows build.
+  Chromix native Windows build.
 
-  Prereqs (see docs/BUILD_NATIVE.md):
+  Prereqs:
     - Visual Studio 2022 with "Desktop development with C++" + Windows 11 SDK (with Debugging Tools)
     - depot_tools on PATH, set DEPOT_TOOLS_WIN_TOOLCHAIN=0
     - ~100 GB free disk, long build time
     - git, python3
 
   Usage (from a Developer PowerShell):
-    pwsh build\windows\build.ps1 -WorkDir D:\fortress-build
+    pwsh build\windows\build.ps1 -WorkDir D:\chromix-build
 #>
 [CmdletBinding()]
 param(
-  [string]$WorkDir = "$PSScriptRoot\..\..\.fortress-build-win",
+  [string]$WorkDir = "$PSScriptRoot\..\..\.chromix-build-win",
   [string]$ChromiumVersion = "",
   [switch]$Resume,
   [int]$Jobs = 8
@@ -22,7 +22,7 @@ $Repo = (Resolve-Path "$PSScriptRoot\..\..").Path
 if (-not $ChromiumVersion) { $ChromiumVersion = (Get-Content "$Repo\CHROMIUM_VERSION").Trim() }
 New-Item -ItemType Directory -Force -Path $WorkDir | Out-Null
 
-Write-Host "==> Fortress Windows build | Chromium $ChromiumVersion | $WorkDir"
+Write-Host "==> Chromix Windows build | Chromium $ChromiumVersion | $WorkDir"
 if ($Resume) { Write-Host "==> Resume mode: skipping fetch/checkout/sync/patches (tree already prepared)" }
 
 # 1. depot_tools
@@ -73,7 +73,7 @@ if (-not $Resume) {
   }
   if ($LASTEXITCODE -ne 0) { throw "gclient sync failed after $maxSyncAttempts attempts (exit $LASTEXITCODE)" }
 
-  # 3. apply Fortress patches (git apply works cross-platform)
+  # 3. apply Chromix patches (git apply works cross-platform)
   foreach ($rel in Get-Content "$Repo\patches\series") {
     if (-not $rel.Trim()) { continue }
     $p = Join-Path $Repo $rel
@@ -94,12 +94,12 @@ else {
 
 # 4. configure + build
 $gnArgs = (Get-Content "$Repo\build\args.windows.gn") -join "`n"
-gn gen out\Fortress --args="$gnArgs"
+gn gen out\Chromix --args="$gnArgs"
 # Cap parallel jobs: an explicit -j overrides autoninja's all-cores default,
 # which saturates CPU and can OOM the linker on RAM-constrained machines.
-autoninja -C out\Fortress -j $Jobs chrome
+autoninja -C out\Chromix -j $Jobs chrome
 if ($LASTEXITCODE -ne 0) { Pop-Location; throw "autoninja failed (exit $LASTEXITCODE)" }
 
 Pop-Location
-Write-Host "==> Done: $WorkDir\chromium\src\out\Fortress\chrome.exe"
-& "$WorkDir\chromium\src\out\Fortress\chrome.exe" --version
+Write-Host "==> Done: $WorkDir\chromium\src\out\Chromix\chrome.exe"
+& "$WorkDir\chromium\src\out\Chromix\chrome.exe" --version

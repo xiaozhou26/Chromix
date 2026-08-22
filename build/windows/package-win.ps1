@@ -1,16 +1,15 @@
 <#
-  Package the native Windows Fortress build into a portable tilion-fortress\ bundle + zip + SHA256.
-  Usage: pwsh build\windows\package-win.ps1 -Out <out\Fortress dir> -Dest <dist dir>
+  Package the native Windows Chromix build into a portable chromix\ bundle + zip + SHA256.
+  Usage: pwsh build\windows\package-win.ps1 -Out <out\Chromix dir> -Dest <dist dir>
 #>
 param(
   [Parameter(Mandatory)] [string]$Out,
   [Parameter(Mandatory)] [string]$Dest
 )
 $ErrorActionPreference = "Stop"
-$Repo = (Resolve-Path "$PSScriptRoot\..\..").Path
-$B = Join-Path $Dest "tilion-fortress"
+$B = Join-Path $Dest "chromix"
 Remove-Item -Recurse -Force $B -ErrorAction SilentlyContinue
-New-Item -ItemType Directory -Force $B | Out-Null
+New-Item -ItemType Directory -Force -Path $B | Out-Null
 
 # Windows runtime set (the files chrome.exe needs at runtime; the rest of out\ is build junk).
 $runtime = @(
@@ -24,16 +23,14 @@ foreach ($f in $runtime) {
   $src = Join-Path $Out $f
   if (Test-Path $src) { Copy-Item $src (Join-Path $B $f) }
 }
-# version dir (e.g. 151.0.7922.138) carries more dlls in official builds
+# version dir (e.g. 151.0.7922.174) carries more dlls in official builds
 Get-ChildItem $Out -Directory | Where-Object { $_.Name -match '^\d+\.\d+\.\d+\.\d+$' } |
   ForEach-Object { Copy-Item $_.FullName (Join-Path $B $_.Name) -Recurse }
 Copy-Item (Join-Path $Out "locales") (Join-Path $B "locales") -Recurse
 
-Copy-Item (Join-Path $Repo "packaging\tilion.cmd") (Join-Path $B "tilion.cmd")
-
-$asset = Join-Path $Dest "tilion-fortress-win-x64.zip"
+$asset = Join-Path $Dest "chromix-win-x64.zip"
 Remove-Item $asset -ErrorAction SilentlyContinue
 Compress-Archive -Path $B -DestinationPath $asset
 $hash = (Get-FileHash $asset -Algorithm SHA256).Hash.ToLower()
-"$hash  tilion-fortress-win-x64.zip" | Out-File -Append -Encoding ascii (Join-Path $Dest "SHA256SUMS")
+"$hash  chromix-win-x64.zip" | Out-File -Append -Encoding ascii (Join-Path $Dest "SHA256SUMS")
 Write-Host "==> $asset  sha256=$hash"

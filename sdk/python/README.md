@@ -1,79 +1,79 @@
-<p align="center">
-  <img src="https://raw.githubusercontent.com/tiliondev/fortress/main/docs/assets/dockerhub-banner.png" width="100%" alt="Fortress — stealth Chromium engine">
-</p>
+# chromix (Python)
 
-<h1 align="center">tilion-fortress</h1>
+Drive the Chromix stealth Chromium engine with a **CloakBrowser-compatible API** —
+function names, keyword arguments, return types (Playwright `Browser` / `BrowserContext`)
+and `CLOAKBROWSER_*` env-var names all match the [`cloakbrowser`](https://github.com/CloakHQ/CloakBrowser)
+wrapper, so existing CloakBrowser scripts run on Chromix by changing only the import:
 
-<p align="center"><b>Drive the Fortress stealth Chromium engine with one line — no build, no Chromium source.</b></p>
+```diff
+- from cloakbrowser import launch
++ from chromix import launch
+```
 
-<p align="center">
-  <a href="https://pypi.org/project/tilion-fortress/"><img src="https://img.shields.io/pypi/v/tilion-fortress?logo=pypi&logoColor=white" alt="PyPI"></a>
-  <a href="https://pypi.org/project/tilion-fortress/"><img src="https://img.shields.io/pypi/pyversions/tilion-fortress?logo=python&logoColor=white" alt="Python"></a>
-  <a href="https://hub.docker.com/r/tilion/fortress"><img src="https://img.shields.io/docker/pulls/tilion/fortress?logo=docker&logoColor=white&label=docker%20pulls" alt="Docker Pulls"></a>
-  <a href="https://github.com/tiliondev/fortress"><img src="https://img.shields.io/github/stars/tiliondev/fortress?style=social" alt="Stars"></a>
-  <a href="https://github.com/tiliondev/fortress/blob/main/LICENSE"><img src="https://img.shields.io/badge/license-BSD--3--Clause-blue" alt="License"></a>
-</p>
+```python
+from chromix import launch
 
----
-
-**Stop getting blocked — without `puppeteer-stealth`.** JavaScript stealth patches self-reveal: a detector checks whether a getter is native code and catches the override. Fortress compiles the fingerprint correction into Chromium's **C++**, so a page inspecting itself sees stock Chrome. It clears **CreepJS**, **Sannysoft**, **BrowserScan**, and live **Cloudflare** as a normal Chrome install.
+browser = launch(proxy="http://user:pass@proxy:8080", geoip=True, humanize=True)
+page = browser.new_page()
+page.goto("https://example.com")
+browser.close()
+```
 
 ## Install
 
 ```bash
-pip install tilion-fortress
+pip install ./sdk/python playwright
 ```
 
-On first use it downloads the prebuilt Fortress binary for your platform from the official GitHub Release (SHA-256 verified) and caches it. No Chromium source, no compilation.
+On first launch the stealth Chromium binary is downloaded from this repo's GitHub
+Release, SHA256-verified, and cached under `~/.cache/chromix`. Point
+`CLOAKBROWSER_BINARY_PATH` at a local build (e.g. your own `chrome.exe`) to skip
+the download.
 
-## Quick start
+## API
 
-```python
-from tilion_fortress import Fortress
-from playwright.sync_api import sync_playwright
-
-with Fortress() as f:                                   # launches the stealth engine on a CDP endpoint
-    with sync_playwright() as p:
-        browser = p.chromium.connect_over_cdp(f.cdp_url)
-        page = browser.new_page()
-        page.goto("https://bot.sannysoft.com")
-        page.screenshot(path="all-green.png")
-```
-
-Keep your existing Playwright / Puppeteer / CDP code — just point it at `f.cdp_url`. Works the same under **browser-use**, **Crawl4AI**, **Stagehand**, and **LangChain**.
-
-## Verified against live detectors
-
-| Suite | Result |
+| Function | Description |
 |---|---|
-| **CreepJS** | 0% headless · 0% stealth |
-| **bot.sannysoft.com** | 0 failed · all green · WebGL = NVIDIA RTX 3060 / ANGLE D3D11 |
-| **browserscan.net** | "No bots detected, could be a human" |
-| **rebrowser bot-detector** | no `Runtime.enable` leak · `webdriver=false` |
-| **Cloudflare Turnstile** | cleared a live challenge |
+| `launch(**opts)` | Returns a Playwright `Browser` |
+| `launch_async(**opts)` | Async variant |
+| `launch_context(**opts)` | Returns a `BrowserContext` (viewport/locale/color_scheme pre-set) |
+| `launch_context_async(**opts)` | Async variant |
+| `launch_persistent_context(user_data_dir, **opts)` | Persistent profile |
+| `launch_persistent_context_async(user_data_dir, **opts)` | Async variant |
+| `build_args` / `get_default_stealth_args` | Arg assembly (random seed + platform claim) |
+| `maybe_resolve_geoip(geoip, proxy, tz, locale, args)` | Egress IP → (tz, locale, exit_ip) |
+| `ensure_binary` / `clear_cache` / `binary_info` / `check_for_update` | Binary management |
+| `HumanConfig` / `resolve_human_config` | Behavioral-layer config (`default` / `careful` presets) |
+| `ProxySettings` | Playwright-shaped proxy TypedDict |
 
-## Custom persona
+Options (`headless, proxy, args, stealth_args, timezone, locale, geoip, humanize,
+human_preset, human_config, extension_paths, license_key, browser_version,
+release_channel, user_agent, viewport, color_scheme`) match CloakBrowser
+name-for-name; `**kwargs` passes through to `playwright.chromium.launch()` /
+`browser.new_context()`.
 
-The default persona is a coherent Windows identity. Override any surface:
+## Env vars
 
-```python
-Fortress(
-    persona={"timezone": "America/Chicago", "languages": "en-GB,en",
-             "hw_concurrency": 16, "webgl_renderer": "ANGLE (NVIDIA, RTX 3060 ...)"},
-    extra_args=["--window-size=1280,800"],
-)
+- `CLOAKBROWSER_BINARY_PATH` — use a local chrome binary instead of downloading
+- `CLOAKBROWSER_VERSION` / `CLOAKBROWSER_RELEASE_CHANNEL` — pin a version/channel
+- `CLOAKBROWSER_GEOIP_TIMEOUT_SECONDS` — geoip lookup timeout
+- `CLOAKBROWSER_WIDEVINE_CDM` — explicit Widevine CDM dir (DRM); `CLOAKBROWSER_WIDEVINE=0` disables DRM
+- `CHROMIX_CACHE_DIR` / `CHROMIX_DOWNLOAD_HOST` — cache location / release host override
+
+## CLI
+
+```bash
+python -m chromix install      # pre-download the binary
+python -m chromix info         # binary / cache info
+python -m chromix widevine     # fetch the Widevine CDM (Linux x64)
+python -m chromix clear-cache
 ```
 
-## Platform support
+## Intentional differences from CloakBrowser
 
-Linux x64 has a native prebuilt binary. On macOS / Windows the package transparently runs Fortress via the official Docker image (`tilion/fortress`) — Docker is the cross-OS vehicle until native Win/Mac builds ship.
-
-> **Still blocked?** ~90% of the time it's your **IP**, not your fingerprint — datacenter ranges are flagged before any page script runs. Route egress through a residential or mobile proxy and retry.
-
-## Links
-
-- **Source & docs:** https://github.com/tiliondev/fortress
-- **Agent guide:** https://github.com/tiliondev/fortress/blob/main/AGENTS.md
-- **Docker image:** https://hub.docker.com/r/tilion/fortress
-
-BSD-3-Clause · reproducible from source · monthly Chromium rebase · **Blink · V8 · BoringSSL** patched in-tree.
+1. `license_key` is accepted and ignored (one open tier).
+2. `geoip` queries ip-api.com over HTTP instead of a local GeoLite2 database;
+   explicit `timezone=` / `locale=` always win.
+3. No `cloakbrowser/puppeteer` subpath — use the Playwright surface.
+4. Widevine is enabled automatically when a CDM is present (installed Chrome,
+   `CLOAKBROWSER_WIDEVINE_CDM`, or `python -m chromix widevine`).

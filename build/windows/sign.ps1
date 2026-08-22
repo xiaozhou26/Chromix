@@ -1,5 +1,5 @@
 <#
-  Authenticode-sign the Fortress Windows binaries.
+  Authenticode-sign the Chromix Windows binaries.
   Without signing, Windows SmartScreen warns users on first run.
 
   Requires:
@@ -7,7 +7,7 @@
     - signtool.exe (ships with the Windows SDK)
 
   Usage:
-    pwsh build\windows\sign.ps1 -ExeDir <out\Fortress dir> -Pfx <cert.pfx> -Password <pw>
+    pwsh build\windows\sign.ps1 -ExeDir <out\Chromix dir> -Pfx <cert.pfx> -Password <pw>
 #>
 param(
   [Parameter(Mandatory)] [string]$ExeDir,

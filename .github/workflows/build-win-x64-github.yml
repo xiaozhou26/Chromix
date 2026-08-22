@@ -74,8 +74,8 @@ jobs:
         if: steps.stage.outputs.finished == 'true'
         uses: actions/upload-artifact@v4
         with:
-          name: tilion-fortress-win-x64
-          path: C:\c\dist\tilion-fortress-win-x64.zip
+          name: chromix-win-x64
+          path: C:\c\dist\chromix-win-x64.zip
           if-no-files-found: error
           retention-days: 7
           compression-level: 0
@@ -139,8 +139,8 @@ jobs:
         if: steps.stage.outputs.finished == 'true'
         uses: actions/upload-artifact@v4
         with:
-          name: tilion-fortress-win-x64
-          path: C:\c\dist\tilion-fortress-win-x64.zip
+          name: chromix-win-x64
+          path: C:\c\dist\chromix-win-x64.zip
           if-no-files-found: error
           retention-days: 7
           compression-level: 0
@@ -204,8 +204,8 @@ jobs:
         if: steps.stage.outputs.finished == 'true'
         uses: actions/upload-artifact@v4
         with:
-          name: tilion-fortress-win-x64
-          path: C:\c\dist\tilion-fortress-win-x64.zip
+          name: chromix-win-x64
+          path: C:\c\dist\chromix-win-x64.zip
           if-no-files-found: error
           retention-days: 7
           compression-level: 0
@@ -269,8 +269,8 @@ jobs:
         if: steps.stage.outputs.finished == 'true'
         uses: actions/upload-artifact@v4
         with:
-          name: tilion-fortress-win-x64
-          path: C:\c\dist\tilion-fortress-win-x64.zip
+          name: chromix-win-x64
+          path: C:\c\dist\chromix-win-x64.zip
           if-no-files-found: error
           retention-days: 7
           compression-level: 0
@@ -334,8 +334,8 @@ jobs:
         if: steps.stage.outputs.finished == 'true'
         uses: actions/upload-artifact@v4
         with:
-          name: tilion-fortress-win-x64
-          path: C:\c\dist\tilion-fortress-win-x64.zip
+          name: chromix-win-x64
+          path: C:\c\dist\chromix-win-x64.zip
           if-no-files-found: error
           retention-days: 7
           compression-level: 0
@@ -399,8 +399,8 @@ jobs:
         if: steps.stage.outputs.finished == 'true'
         uses: actions/upload-artifact@v4
         with:
-          name: tilion-fortress-win-x64
-          path: C:\c\dist\tilion-fortress-win-x64.zip
+          name: chromix-win-x64
+          path: C:\c\dist\chromix-win-x64.zip
           if-no-files-found: error
           retention-days: 7
           compression-level: 0
@@ -464,8 +464,8 @@ jobs:
         if: steps.stage.outputs.finished == 'true'
         uses: actions/upload-artifact@v4
         with:
-          name: tilion-fortress-win-x64
-          path: C:\c\dist\tilion-fortress-win-x64.zip
+          name: chromix-win-x64
+          path: C:\c\dist\chromix-win-x64.zip
           if-no-files-found: error
           retention-days: 7
           compression-level: 0
@@ -529,8 +529,8 @@ jobs:
         if: steps.stage.outputs.finished == 'true'
         uses: actions/upload-artifact@v4
         with:
-          name: tilion-fortress-win-x64
-          path: C:\c\dist\tilion-fortress-win-x64.zip
+          name: chromix-win-x64
+          path: C:\c\dist\chromix-win-x64.zip
           if-no-files-found: error
           retention-days: 7
           compression-level: 0
@@ -594,8 +594,8 @@ jobs:
         if: steps.stage.outputs.finished == 'true'
         uses: actions/upload-artifact@v4
         with:
-          name: tilion-fortress-win-x64
-          path: C:\c\dist\tilion-fortress-win-x64.zip
+          name: chromix-win-x64
+          path: C:\c\dist\chromix-win-x64.zip
           if-no-files-found: error
           retention-days: 7
           compression-level: 0
@@ -659,8 +659,8 @@ jobs:
         if: steps.stage.outputs.finished == 'true'
         uses: actions/upload-artifact@v4
         with:
-          name: tilion-fortress-win-x64
-          path: C:\c\dist\tilion-fortress-win-x64.zip
+          name: chromix-win-x64
+          path: C:\c\dist\chromix-win-x64.zip
           if-no-files-found: error
           retention-days: 7
           compression-level: 0
@@ -724,8 +724,8 @@ jobs:
         if: steps.stage.outputs.finished == 'true'
         uses: actions/upload-artifact@v4
         with:
-          name: tilion-fortress-win-x64
-          path: C:\c\dist\tilion-fortress-win-x64.zip
+          name: chromix-win-x64
+          path: C:\c\dist\chromix-win-x64.zip
           if-no-files-found: error
           retention-days: 7
           compression-level: 0
@@ -789,8 +789,8 @@ jobs:
         if: steps.stage.outputs.finished == 'true'
         uses: actions/upload-artifact@v4
         with:
-          name: tilion-fortress-win-x64
-          path: C:\c\dist\tilion-fortress-win-x64.zip
+          name: chromix-win-x64
+          path: C:\c\dist\chromix-win-x64.zip
           if-no-files-found: error
           retention-days: 7
           compression-level: 0
@@ -805,6 +805,6 @@ jobs:
         run: |
           f="${{ join(needs.*.outputs.finished) }}"
           case "$f" in
-            *true*) echo "Build finished; tilion-fortress-win-x64 artifact uploaded." ;;
+            *true*) echo "Build finished; chromix-win-x64 artifact uploaded." ;;
             *) echo "Build did not finish within 12 stages."; exit 1 ;;
           esac

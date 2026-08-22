@@ -16,7 +16,7 @@ index e2b697b768..e449981c47 100644
    switch (result->status) {
 -    case mojom::blink::GetKeyboardLayoutMapStatus::kSuccess:
 +    case mojom::blink::GetKeyboardLayoutMapStatus::kSuccess: {
-+      // FORTRESS: inject a coherent en-US layout when the OS map is empty (headless
++      // UXR: inject a coherent en-US layout when the OS map is empty (headless
 +      // getLayoutMap()=={} is a sleeper tell leaking OS-locale absence).
 +      if (base::UxrConfig::GetInstance().Has("uxr-keyboard-layout")) {
 +        HashMap<String, String> p_map;

@@ -1,16 +1,10 @@
 #!/usr/bin/env node
-// CLI: `tilion-fortress` — launch Fortress and print the CDP URL.
-import { Fortress, VERSION } from "./index.js";
+// CLI: chromix — manage the stealth Chromium binary.
+import { VERSION, ensureBinary, binaryInfo, clearCache } from "./index.js";
 
-const args = process.argv.slice(2);
-if (args.includes("--version")) { console.log(`tilion-fortress ${VERSION}`); process.exit(0); }
-
-const portArg = args.indexOf("--port");
-const port = portArg >= 0 ? Number(args[portArg + 1]) : 9222;
-const headless = !args.includes("--no-headless");
-
-const f = await Fortress.launch({ port, headless });
-process.stderr.write(`Fortress up. CDP: ${f.cdpUrl}\n`);
-console.log(f.cdpUrl);
-process.on("SIGINT", async () => { await f.close(); process.exit(0); });
-setInterval(() => {}, 1 << 30);
+const [, , cmd] = process.argv;
+if (cmd === "--version" || cmd === "version") { console.log(`chromix ${VERSION}`); process.exit(0); }
+if (cmd === "install") { console.log(await ensureBinary()); process.exit(0); }
+if (cmd === "info") { console.log(JSON.stringify(binaryInfo(), null, 2)); process.exit(0); }
+if (cmd === "clear-cache") { clearCache(); console.log("cache cleared"); process.exit(0); }
+console.log("usage: chromix [--version | install | info | clear-cache]");

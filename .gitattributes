@@ -15,7 +15,6 @@
 *.json    text eol=lf
 *.gn      text eol=lf
 *.conf    text eol=lf
-tilion    text eol=lf
 series    text eol=lf
 Makefile  text eol=lf
 

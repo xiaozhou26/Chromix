@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """
-check_patches.py - integrity linter for the Fortress patch set.
+check_patches.py - integrity linter for the Chromix patch set.
 
-Fortress is a set of source patches applied to a pinned Chromium checkout
+Chromix is a set of source patches applied to a pinned Chromium checkout
 (see build/apply-patches.sh + patches/series). Several invariants are load-bearing
 but were only ever enforced by human review. This linter enforces them mechanically
 so CI can gate every PR:
@@ -179,7 +179,7 @@ def run_checks(patches_dir: Path, verbose: bool = False) -> Report:
 
 
 def main() -> int:
-    ap = argparse.ArgumentParser(description="Integrity linter for the Fortress patch set.")
+    ap = argparse.ArgumentParser(description="Integrity linter for the Chromix patch set.")
     ap.add_argument("-v", "--verbose", action="store_true")
     ap.add_argument("--patches-dir", type=Path, default=PATCHES,
                     help="directory holding the *.patch files and series (default: patches/)")
@@ -194,7 +194,7 @@ def main() -> int:
         where = patches_dir.resolve().relative_to(REPO)
     except ValueError:
         where = patches_dir
-    print(f"Fortress patch-set linter - {len(_patch_files(patches_dir))} patches in {where}/")
+    print(f"Chromix patch-set linter - {len(_patch_files(patches_dir))} patches in {where}/")
     rep = run_checks(patches_dir, args.verbose)
 
     print("-" * 60)

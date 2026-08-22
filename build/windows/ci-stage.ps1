@@ -10,8 +10,8 @@
   Layout (fixed absolute path so ninja build files stay valid across stages):
     C:\c\depot_tools            depot_tools checkout
     C:\c\chromium\.gclient      gclient config
-    C:\c\chromium\src           chromium source at CHROMIUM_VERSION + Fortress patches
-    C:\c\chromium\src\out\Fortress   build output
+    C:\c\chromium\src           chromium source at CHROMIUM_VERSION + Chromix patches
+    C:\c\chromium\src\out\Chromix   build output
     C:\parts\p1..p4             7z volumes distributed round-robin for upload
     C:\restore                  artifacts downloaded by the workflow step
 
@@ -34,7 +34,7 @@ $ChromiumVersion = (Get-Content "$Repo\CHROMIUM_VERSION").Trim()
 $Root = "C:\c"
 $Chromium = "$Root\chromium"
 $Src = "$Chromium\src"
-$OutDir = "$Src\out\Fortress"
+$OutDir = "$Src\out\Chromix"
 $PartsDir = "C:\parts"
 
 # Job-level timeout is 355 min; keep a hard margin inside it.
@@ -231,7 +231,7 @@ solutions = [
   } finally { Pop-Location }
   Set-Content -Path "$Src\.chromix-synced" -Value $ChromiumVersion
 
-  # Apply Fortress patches (only after a fully synced tree at the pinned tag).
+  # Apply Chromix patches (only after a fully synced tree at the pinned tag).
   Push-Location $Src
   try {
     foreach ($rel in Get-Content "$Repo\patches\series") {
@@ -254,7 +254,7 @@ if (-not (Test-Path "$OutDir\build.ninja")) {
   $gnArgs = (Get-Content "$Repo\build\args.windows.gn") -join "`n"
   Push-Location $Src
   try {
-    & gn gen out\Fortress --args="$gnArgs"
+    & gn gen out\Chromix --args="$gnArgs"
     if ($LASTEXITCODE -ne 0) { throw "gn gen failed (exit $LASTEXITCODE)" }
   } finally { Pop-Location }
 }
@@ -267,7 +267,7 @@ if ($ninjaBudget -lt 20) {
   return
 }
 Write-Host "==> autoninja budget: $ninjaBudget min"
-$rc = Invoke-Tracked -File "cmd.exe" -ArgList "/c autoninja -C out\Fortress -j 4 chrome" -Cwd $Src -TimeoutSec ($ninjaBudget * 60)
+$rc = Invoke-Tracked -File "cmd.exe" -ArgList "/c autoninja -C out\Chromix -j 4 chrome" -Cwd $Src -TimeoutSec ($ninjaBudget * 60)
 
 if ($rc -eq 0) {
   Write-Host "==> BUILD COMPLETE; packaging portable bundle"

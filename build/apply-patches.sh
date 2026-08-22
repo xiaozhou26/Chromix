@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Apply the Fortress patch series onto a Chromium src tree.
+# Apply the Chromix patch series onto a Chromium src tree.
 # Usage:  build/apply-patches.sh /path/to/chromium/src
 # Uses 3-way apply so that, after a Chromium version bump, patches that still
 # anchor cleanly apply automatically and only genuinely-moved ones are flagged.
@@ -31,4 +31,4 @@ if [ "$fail" -gt 0 ]; then
   echo "   git -C \"$SRC\" diff -- <file> > \"$REPO/<patch>\""
   exit 2
 fi
-echo "All Fortress patches applied cleanly."
+echo "All Chromix patches applied cleanly."

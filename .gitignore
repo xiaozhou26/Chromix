@@ -2,7 +2,8 @@
 out/
 src/
 depot_tools/
-.fortress-build-win/
+.chromix-build*/
+.fortress-build*/
 *.tar.gz
 *.deb
 *.AppImage

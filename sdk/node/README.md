@@ -1,79 +1,76 @@
-<p align="center">
-  <img src="https://raw.githubusercontent.com/tiliondev/fortress/main/docs/assets/dockerhub-banner.png" width="100%" alt="Fortress — stealth Chromium engine">
-</p>
+# chromix (Node)
 
-<h1 align="center">tilion-fortress</h1>
+Drive the Chromix stealth Chromium engine with a **CloakBrowser-compatible API** —
+function names, option names (camelCase), and return types (Playwright
+`Browser` / `BrowserContext` via `playwright-core`) all match the
+[`cloakbrowser`](https://github.com/CloakHQ/CloakBrowser) wrapper, so existing
+CloakBrowser scripts run on Chromix by changing only the import:
 
-<p align="center"><b>Drive the Fortress stealth Chromium engine with one line — no build, no Chromium source.</b></p>
+```diff
+- import { launch } from 'cloakbrowser';
++ import { launch } from 'chromix';
+```
 
-<p align="center">
-  <a href="https://www.npmjs.com/package/tilion-fortress"><img src="https://img.shields.io/npm/v/tilion-fortress?logo=npm" alt="npm"></a>
-  <a href="https://www.npmjs.com/package/tilion-fortress"><img src="https://img.shields.io/node/v/tilion-fortress?logo=node.js&logoColor=white" alt="node"></a>
-  <a href="https://hub.docker.com/r/tilion/fortress"><img src="https://img.shields.io/docker/pulls/tilion/fortress?logo=docker&logoColor=white&label=docker%20pulls" alt="Docker Pulls"></a>
-  <a href="https://github.com/tiliondev/fortress"><img src="https://img.shields.io/github/stars/tiliondev/fortress?style=social" alt="Stars"></a>
-  <a href="https://github.com/tiliondev/fortress/blob/main/LICENSE"><img src="https://img.shields.io/badge/license-BSD--3--Clause-blue" alt="License"></a>
-</p>
+```javascript
+import { launch } from 'chromix';
 
----
+const browser = await launch({
+  proxy: 'http://user:pass@residential-proxy:port',
+  geoip: true,       // match timezone + locale to proxy IP
+  headless: false,
+  humanize: true,    // human-like mouse, keyboard, scroll
+});
+const page = await browser.newPage();
+await page.goto('https://example.com');
+await browser.close();
+```
 
-**Stop getting blocked — without `puppeteer-stealth`.** JavaScript stealth patches self-reveal: a detector checks whether a getter is native code and catches the override. Fortress compiles the fingerprint correction into Chromium's **C++**, so a page inspecting itself sees stock Chrome. It clears **CreepJS**, **Sannysoft**, **BrowserScan**, and live **Cloudflare** as a normal Chrome install.
+Convenience wrappers:
+
+```javascript
+import { launchContext, launchPersistentContext } from 'chromix';
+
+const context = await launchContext({ userAgent: 'Custom UA', viewport: { width: 1920, height: 1080 } });
+const ctx = await launchPersistentContext({ userDataDir: './chrome-profile', headless: false });
+```
 
 ## Install
 
 ```bash
-npm install tilion-fortress
+npm install chromix playwright-core
 ```
 
-On first launch it fetches the prebuilt Fortress binary for your platform from the official GitHub Release (SHA-256 verified) and caches it. No Chromium source, no compilation.
+Requires `playwright-core` (or `playwright`) as a peer — the SDK itself has zero
+dependencies. On first launch the stealth Chromium binary is downloaded from this
+repo's GitHub Release, SHA256-verified, and cached under `~/.cache/chromix`.
+Point `CLOAKBROWSER_BINARY_PATH` at a local build to skip the download.
 
-## Quick start
+## Options
 
-```js
-import { Fortress } from "tilion-fortress";
-import puppeteer from "puppeteer-core";
+All CloakBrowser options work unchanged: `headless, proxy, args, stealthArgs,
+timezone, locale, geoip, humanize, humanPreset, humanConfig, userAgent, viewport,
+colorScheme, extensionPaths, browserVersion, releaseChannel, licenseKey,
+contextOptions, launchOptions, userDataDir` (+ `startMaximized`).
 
-const f = await Fortress.launch();                       // stealth engine on a CDP endpoint
-const browser = await puppeteer.connect({ browserURL: f.cdpUrl });
-const page = await browser.newPage();
-await page.goto("https://bot.sannysoft.com");
-await page.screenshot({ path: "all-green.png" });
-await browser.close();
-await f.close();
+Env vars: `CLOAKBROWSER_BINARY_PATH`, `CLOAKBROWSER_VERSION`,
+`CLOAKBROWSER_RELEASE_CHANNEL`, `CLOAKBROWSER_GEOIP_TIMEOUT_SECONDS`,
+`CLOAKBROWSER_WIDEVINE_CDM` / `CLOAKBROWSER_WIDEVINE=0` (DRM),
+`CHROMIX_CACHE_DIR` / `CHROMIX_DOWNLOAD_HOST` (cache / release host override).
+
+## Intentional differences from CloakBrowser
+
+1. `licenseKey` is accepted and ignored (one open tier).
+2. `geoip` queries ip-api.com instead of a local GeoLite2 database.
+3. No `cloakbrowser/puppeteer` subpath — use the Playwright surface.
+4. Widevine/DRM is enabled automatically when a CDM is present (installed
+   Chrome or `CLOAKBROWSER_WIDEVINE_CDM`); on Linux fetch one with
+   `python -m chromix widevine`.
+
+## CLI
+
+```bash
+npx chromix --version
+npx chromix install       # pre-download the binary
+npx chromix info          # binary / cache info
+npx chromix clear-cache
 ```
-
-Keep your existing Puppeteer / Playwright / CDP code — just point it at `f.cdpUrl`. Works the same under **browser-use**, **Crawl4AI**, **Stagehand**, and **LangChain**.
-
-## Verified against live detectors
-
-| Suite | Result |
-|---|---|
-| **CreepJS** | 0% headless · 0% stealth |
-| **bot.sannysoft.com** | 0 failed · all green · WebGL = NVIDIA RTX 3060 / ANGLE D3D11 |
-| **browserscan.net** | "No bots detected, could be a human" |
-| **rebrowser bot-detector** | no `Runtime.enable` leak · `webdriver=false` |
-| **Cloudflare Turnstile** | cleared a live challenge |
-
-## Custom persona
-
-The default persona is a coherent Windows identity. Override any surface:
-
-```js
-const f = await Fortress.launch({
-  persona: { timezone: "America/Chicago", languages: "en-GB,en", hwConcurrency: 16 },
-  extraArgs: ["--window-size=1280,800"],
-});
-```
-
-## Platform support
-
-Linux x64 has a native prebuilt binary. On macOS / Windows the package transparently runs Fortress via the official Docker image (`tilion/fortress`) — Docker is the cross-OS vehicle until native Win/Mac builds ship.
-
-> **Still blocked?** ~90% of the time it's your **IP**, not your fingerprint — datacenter ranges are flagged before any page script runs. Route egress through a residential or mobile proxy and retry.
-
-## Links
-
-- **Source & docs:** https://github.com/tiliondev/fortress
-- **Agent guide:** https://github.com/tiliondev/fortress/blob/main/AGENTS.md
-- **Docker image:** https://hub.docker.com/r/tilion/fortress
-
-BSD-3-Clause · reproducible from source · monthly Chromium rebase · **Blink · V8 · BoringSSL** patched in-tree.

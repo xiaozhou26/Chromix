@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Codesign + notarize the Fortress macOS app.
+# Codesign + notarize the Chromix macOS app.
 # Without notarization, Gatekeeper blocks the app on other Macs.
 #
 # Requires:
@@ -17,7 +17,7 @@ echo "==> codesign (deep, hardened runtime)"
 codesign --force --deep --options runtime --timestamp --sign "$IDENTITY" "$APP"
 
 echo "==> zip + submit to Apple notary service"
-ZIP="$(dirname "$APP")/fortress-notarize.zip"
+ZIP="$(dirname "$APP")/chromix-notarize.zip"
 ditto -c -k --keepParent "$APP" "$ZIP"
 xcrun notarytool submit "$ZIP" --keychain-profile "$PROFILE" --wait
 

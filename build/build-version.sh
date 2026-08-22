@@ -1,31 +1,24 @@
 #!/usr/bin/env bash
-# Build a specific Chromium version of Fortress into its OWN tree/out/bundle, so multiple
-# versions (e.g. 149 stable + 151 latest) coexist without clobbering each other.
+# Build a specific Chromium version of Chromix into its OWN tree/out, so
+# multiple versions (e.g. 149 stable + 151 latest) coexist without clobbering
+# each other.
 #
-# Usage:  build/build-version.sh <chromium-version> [platform]
-#   e.g.  build/build-version.sh 149.0.7827.200 linux-x64
-#         build/build-version.sh 151.0.7922.138   linux-x64
+# Usage:  build/build-version.sh <chromium-version>
+#   e.g.  build/build-version.sh 149.0.7827.200
+#         build/build-version.sh 151.0.7922.174
 #
-# Each version gets its own workdir  .fortress-build-<major>/  (each needs ~100GB + hours).
-# The patch series is 3-way applied; if a patch fails on an older/newer tree, re-anchor it
-# (see DUAL_VERSION_BUILD.md) and re-run.
+# Each version gets its own workdir  .chromix-build-<major>/  (each needs
+# ~100GB + hours). The patch series is 3-way applied; if a patch fails on an
+# older/newer tree, re-anchor it (see patches/README.md) and re-run.
 set -euo pipefail
 REPO="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-VER="${1:?usage: build-version.sh <chromium-version> [platform]}"
-PLATFORM="${2:-linux-x64}"
+VER="${1:?usage: build-version.sh <chromium-version>}"
 MAJOR="${VER%%.*}"
-WORK="$REPO/.fortress-build-$MAJOR"
+WORK="$REPO/.chromix-build-$MAJOR"
 
-echo "==> Fortress $MAJOR | Chromium $VER | workdir $WORK"
+echo "==> Chromix $MAJOR | Chromium $VER | workdir $WORK"
 
 # Build the versioned tree (build.sh reads CHROMIUM_VERSION from the env).
 CHROMIUM_VERSION="$VER" "$REPO/build/build.sh" "$WORK"
 
-# Bundle with a VERSION-TAGGED asset name so both majors can ship in one release:
-#   tilion-fortress-<major>-<platform>.tar.gz
-DEST="$WORK/dist"
-"$REPO/packaging/build-bundle.sh" "$WORK/chromium/src/out/Fortress" "$REPO/fonts" "$DEST" "$MAJOR-$PLATFORM"
-
-echo "==> built: $WORK/chromium/src/out/Fortress/chrome"
-echo "==> bundle: $DEST/tilion-fortress-$MAJOR-$PLATFORM.tar.gz"
-echo "==> verify:  python3 $REPO/tools/gauntlet.py --bundle $DEST/tilion-fortress"
+echo "==> built: $WORK/chromium/src/out/Chromix/chrome"
