@@ -14,7 +14,7 @@ index 891a81543b..8877525be3 100644
  const HeapVector<Member<SpeechSynthesisVoice>>& SpeechSynthesis::getVoices() {
    // Kick off initialization here to ensure voice list gets populated.
    std::ignore = TryEnsureMojomSynthesis();
-+  // FORTRESS: inject coherent OS voices when empty (headless getVoices()==[] tell).
++  // UXR: inject coherent OS voices when empty (headless getVoices()==[] tell).
 +  if (voice_list_.empty() &&
 +      base::UxrConfig::GetInstance().Has("uxr-voices")) {
 +    auto p_add = [&](const char* uri, const char* lang, bool def) {

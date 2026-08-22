@@ -6,7 +6,7 @@ index 19ae925ff8..22c9b8db34 100644
  
  #include "base/check.h"
  #include "base/check_deref.h"
-+#include "base/command_line.h"  // FORTRESS
++#include "base/command_line.h"  // UXR
  #include "base/functional/bind.h"
  #include "base/functional/callback.h"
  #include "base/functional/callback_helpers.h"
@@ -20,7 +20,7 @@ index 19ae925ff8..22c9b8db34 100644
    mouse_event->click_count = click_count.value_or(0);
    mouse_event->pointer_type = GetPointerType(pointer_type.value_or(""));
 -  mouse_event->force = force.value_or(0);
-+  // FORTRESS: a real mouse reports force 0.5 while a button is held (0 when
++  // UXR: a real mouse reports force 0.5 while a button is held (0 when
 +  // hovering); CDP's default of 0 on pressed events is a pointer-event tell.
 +  if (force.has_value()) {
 +    mouse_event->force = force.value();
@@ -36,7 +36,7 @@ index 19ae925ff8..22c9b8db34 100644
  
    mouse_event->SetPositionInWidget(CssPixelsToPointF(x, y, scale_factor));
 -  mouse_event->SetPositionInScreen(mouse_event->PositionInWidget());
-+  // FORTRESS: persona screen-space origin for CDP-synthesized mouse events.
++  // UXR: persona screen-space origin for CDP-synthesized mouse events.
 +  // Stock CDP sets screen == widget coords, so event.screenX === clientX —
 +  // a classic automation tell no real OS event produces (the OS places the
 +  // cursor in screen space including the window chrome). Offset by the persona

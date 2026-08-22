@@ -9,7 +9,7 @@ index 608bea5cb3..e0d4161875 100644
 -  if (base::CommandLine::ForCurrentProcess()->HasSwitch(kHeadless)) {
 -    product.insert(0, "Headless");
 -  }
-+  // FORTRESS patch #2: never prepend "Headless" to the product. Under --headless the
++  // UXR patch #2: never prepend "Headless" to the product. Under --headless the
 +  // stock code makes the UA "HeadlessChrome/...", a blatant automation tell. We keep
 +  // it as real "Chrome/...".
  
@@ -19,7 +19,7 @@ index 608bea5cb3..e0d4161875 100644
  }
  
  std::string GetUnifiedPlatform() {
-+  // FORTRESS: persona OS token for the (reduced) UA string. Fixes the C1 instant-flag
++  // UXR: persona OS token for the (reduced) UA string. Fixes the C1 instant-flag
 +  // where navigator.userAgent said Linux while platform/Sec-CH-UA-Platform said
 +  // Windows. Browser-process read; control plane passes the full unified form,
 +  // e.g. "Windows NT 10.0; Win64; x64". Must agree with --uxr-platform/-ua-platform.
@@ -38,12 +38,12 @@ index 608bea5cb3..e0d4161875 100644
    if (brand) {
      brand_version_list.emplace_back(brand.value(), version);
    }
-+  // FORTRESS Layer 2: add a "Google Chrome" brand for a Chrome persona (we build
++  // UXR Layer 2: add a "Google Chrome" brand for a Chrome persona (we build
 +  // Chromium, so the official brand is absent). Closes the brand-list incoherence
 +  // (UA says Chrome, brands said Chromium). Browser-process read, no whitelist.
 +  {
 +    const base::CommandLine* p_cmd = base::CommandLine::ForCurrentProcess();
-+    // FORTRESS: default to the "Google Chrome" brand (overridable). A stealth fork
++    // UXR: default to the "Google Chrome" brand (overridable). A stealth fork
 +    // must never advertise "Chromium"-only brands = a repackaged-Chromium signal.
 +    std::string p_brand = p_cmd->HasSwitch("uxr-ua-brand")
 +                              ? p_cmd->GetSwitchValueASCII("uxr-ua-brand")
@@ -60,7 +60,7 @@ index 608bea5cb3..e0d4161875 100644
  }
  
  std::string GetPlatformForUAMetadata() {
-+  // FORTRESS: persona-driven Sec-CH-UA-Platform (must match navigator.platform OS).
++  // UXR: persona-driven Sec-CH-UA-Platform (must match navigator.platform OS).
 +  {
 +    const base::CommandLine* cmd = base::CommandLine::ForCurrentProcess();
 +    if (cmd->HasSwitch("uxr-ua-platform"))
@@ -73,7 +73,7 @@ index 608bea5cb3..e0d4161875 100644
    metadata.bitness = GetCpuBitness();
    metadata.wow64 = IsWoW64();
    metadata.platform_version = GetPlatformVersion();
-+  // FORTRESS Layer 2: high-entropy Client Hints persona via cmdline (browser-process,
++  // UXR Layer 2: high-entropy Client Hints persona via cmdline (browser-process,
 +  // no renderer whitelist needed). Keeps userAgentData high-entropy values coherent
 +  // with the UA string + Sec-CH-UA (coherence rule C15).
 +  {

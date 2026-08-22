@@ -18,7 +18,7 @@ index 75cd346131..e9c630832f 100644
  }
  
  void NavigatorLanguage::EnsureUpdatedLanguage() {
-+  // FORTRESS Layer 2: persona languages (navigator.languages/language), coherent with
++  // UXR Layer 2: persona languages (navigator.languages/language), coherent with
 +  // timezone+locale (rule C5). Control plane should set the Accept-Language HEADER to
 +  // match (browser-process). Comma-separated, e.g. "en-US,en".
 +  {
@@ -27,9 +27,9 @@ index 75cd346131..e9c630832f 100644
 +      if (!p_langs.empty()) {
 +        languages_ = ParseAndSanitize(p_langs);
 +        languages_dirty_ = false;
-+        // FORTRESS: align ICU default locale + flush V8 so Intl/toLocaleString follow
++        // UXR: align ICU default locale + flush V8 so Intl/toLocaleString follow
 +        // the persona language (C5). The notification clears V8 cached Intl locale.
-+        // FORTRESS P0-E fix: icu::Locale::setDefault is process-global and NOT
++        // UXR P0-E fix: icu::Locale::setDefault is process-global and NOT
 +        // thread-safe; only touch it on the main thread (workers would race).
 +        if (!languages_.empty() && IsMainThread()) {
 +          base::i18n::SetICUDefaultLocale(languages_.front().Utf8());

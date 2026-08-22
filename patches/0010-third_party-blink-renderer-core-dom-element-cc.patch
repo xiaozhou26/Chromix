@@ -18,12 +18,12 @@ index 5227c6bdfc..7d03811787 100644
  }
  
 +namespace {
-+// FORTRESS: seeded sub-pixel DOMRect jitter. Single chokepoint Element::ClientQuads
++// UXR: seeded sub-pixel DOMRect jitter. Single chokepoint Element::ClientQuads
 +// covers getClientRects + getBoundingClientRect (both derive from these quads), so
 +// it is coherent by construction. <0.01px = invisible; stable per element+seed.
 +void UxrJitterQuads(Vector<gfx::QuadF>& quads) {
 +  uint32_t p_seed = 0u;
-+  // FORTRESS P1-F/P2-C: fail-closed (no golden-constant), and key jitter on each
++  // UXR P1-F/P2-C: fail-closed (no golden-constant), and key jitter on each
 +  // corner offset RELATIVE to p1 (scroll-invariant) so width/height stay constant
 +  // across scroll/transform while still being noised and stable per element shape.
 +  if (!base::StringToUint(
@@ -57,7 +57,7 @@ index 5227c6bdfc..7d03811787 100644
    if (element_layout_object->IsBoxModelObject() ||
        element_layout_object->IsBR()) {
      element_layout_object->AbsoluteQuads(quads);
-+    UxrJitterQuads(quads);  // FORTRESS
++    UxrJitterQuads(quads);  // UXR
    }
  }
  

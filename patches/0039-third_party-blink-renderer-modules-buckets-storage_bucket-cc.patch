@@ -6,9 +6,9 @@ index 7354bc72d6..c021bcba7e 100644
  
  #include "third_party/blink/renderer/modules/buckets/storage_bucket.h"
  
-+#include "base/strings/string_number_conversions.h"  // FORTRESS
++#include "base/strings/string_number_conversions.h"  // UXR
  #include "base/time/time.h"
-+#include "base/uxr_config.h"  // FORTRESS
++#include "base/uxr_config.h"  // UXR
  #include "third_party/blink/public/platform/task_type.h"
  #include "third_party/blink/renderer/bindings/core/v8/active_script_wrappable_creation_key.h"
  #include "third_party/blink/renderer/bindings/core/v8/script_promise_resolver.h"
@@ -16,7 +16,7 @@ index 7354bc72d6..c021bcba7e 100644
      return;
    }
  
-+  // FORTRESS: same persona quota normalization as StorageManager::DidGetEstimate
++  // UXR: same persona quota normalization as StorageManager::DidGetEstimate
 +  // (quota module) — per-bucket estimates must not re-leak the host's flat
 +  // ~10GB sandbox quota after navigator.storage.estimate() has been pinned.
 +  {

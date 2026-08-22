@@ -6,8 +6,8 @@ index ef1c723ac2..aeda2abf48 100644
  
  #include "third_party/blink/renderer/modules/quota/storage_manager.h"
  
-+#include "base/strings/string_number_conversions.h"  // FORTRESS
-+#include "base/uxr_config.h"                          // FORTRESS
++#include "base/strings/string_number_conversions.h"  // UXR
++#include "base/uxr_config.h"                          // UXR
 +
  #include "mojo/public/cpp/bindings/callback_helpers.h"
  #include "third_party/blink/public/mojom/permissions/permission_status.mojom-blink.h"
@@ -17,7 +17,7 @@ index ef1c723ac2..aeda2abf48 100644
    StorageEstimate* estimate = StorageEstimate::Create();
    estimate->setUsage(usage_in_bytes);
 +
-+  // FORTRESS: headless/sandbox reports a flat ~10GB quota — a fingerprint tell. Report a
++  // UXR: headless/sandbox reports a flat ~10GB quota — a fingerprint tell. Report a
 +  // realistic, non-round, disk-proportional quota: an explicit persona value if given,
 +  // else a stable value derived from the canvas seed (~128-223GB). Fail-closed: no seed
 +  // and no override -> leave the real value untouched.

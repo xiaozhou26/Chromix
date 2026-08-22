@@ -6,7 +6,7 @@ index e36c344035..8034c1d234 100644
  #include <memory>
  #include <utility>
  
-+#include "base/uxr_config.h"  // FORTRESS
++#include "base/uxr_config.h"  // UXR
  #include "base/metrics/histogram_functions.h"
  #include "third_party/blink/public/common/permissions/permission_utils.h"
  #include "third_party/blink/public/mojom/page/page.mojom-blink.h"
@@ -14,7 +14,7 @@ index e36c344035..8034c1d234 100644
        resolver->GetExecutionContext()->IsContextDestroyed())
      return;
  
-+  // FORTRESS: persona notification permission — the Permissions.query() side of
++  // UXR: persona notification permission — the Permissions.query() side of
 +  // the pair pinned by the notifications-module patch, so query() and
 +  // Notification.permission can never disagree.
 +  if (result && descriptor &&

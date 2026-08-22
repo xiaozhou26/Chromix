@@ -15,7 +15,7 @@ index 08db1e8620..9c8d2cce71 100644
      return 0;
    }
  
-+  {  // FORTRESS: persona outer height (fixes outerHeight===innerHeight headless tell)
++  {  // UXR: persona outer height (fixes outerHeight===innerHeight headless tell)
 +    int p_v = 0;
 +    if (base::UxrConfig::GetInstance().GetInt("uxr-outer-height", &p_v) && p_v > 0)
 +      return p_v;
@@ -28,7 +28,7 @@ index 08db1e8620..9c8d2cce71 100644
      return 0;
    }
  
-+  {  // FORTRESS: persona outer width
++  {  // UXR: persona outer width
 +    int p_v = 0;
 +    if (base::UxrConfig::GetInstance().GetInt("uxr-outer-width", &p_v) && p_v > 0)
 +      return p_v;
@@ -41,7 +41,7 @@ index 08db1e8620..9c8d2cce71 100644
      return 0.0;
    }
  
-+  if (base::UxrConfig::GetInstance().Has("uxr-device-pixel-ratio")) {  // FORTRESS
++  if (base::UxrConfig::GetInstance().Has("uxr-device-pixel-ratio")) {  // UXR
 +    double p_dpr = 0.0;
 +    if (base::StringToDouble(
 +            base::UxrConfig::GetInstance().Get("uxr-device-pixel-ratio"), &p_dpr) &&

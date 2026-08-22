@@ -6,18 +6,18 @@ index 05fa33e456..666154ddaa 100644
  #include "third_party/blink/renderer/core/dom/document.h"
  #include "third_party/blink/renderer/core/frame/local_dom_window.h"
  
-+#include <cmath>  // FORTRESS
-+#include <cstdlib>  // FORTRESS
-+#include "base/command_line.h"  // FORTRESS
-+#include "base/strings/string_number_conversions.h"  // FORTRESS
++#include <cmath>  // UXR
++#include <cstdlib>  // UXR
++#include "base/command_line.h"  // UXR
++#include "base/strings/string_number_conversions.h"  // UXR
 +#include "base/uxr_config.h"
 +
  namespace blink {
  
  float NavigatorDeviceMemory::deviceMemory() const {
-+  // FORTRESS Layer 2: persona-driven via renderer cmdline switch.
++  // UXR Layer 2: persona-driven via renderer cmdline switch.
 +  double v = 0.0;
-+  // FORTRESS P1-A: StringToDouble + snap to the web-exposed buckets {0.25..8}.
++  // UXR P1-A: StringToDouble + snap to the web-exposed buckets {0.25..8}.
 +  if (base::StringToDouble(
 +          base::UxrConfig::GetInstance().Get("uxr-device-memory"), &v) &&
 +      v > 0.0) {

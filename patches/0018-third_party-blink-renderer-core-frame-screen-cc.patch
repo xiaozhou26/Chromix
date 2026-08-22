@@ -6,9 +6,9 @@ index 69ffc2b05f..ed8e2ea806 100644
  #include "third_party/blink/renderer/core/frame/screen.h"
  
  #include "base/numerics/safe_conversions.h"
-+#include "base/command_line.h"  // FORTRESS
++#include "base/command_line.h"  // UXR
 +#include "base/uxr_config.h"
-+#include "base/strings/string_number_conversions.h"  // FORTRESS
++#include "base/strings/string_number_conversions.h"  // UXR
  #include "services/network/public/mojom/permissions_policy/permissions_policy_feature.mojom-blink.h"
  #include "third_party/blink/renderer/core/event_target_names.h"
  #include "third_party/blink/renderer/core/frame/local_dom_window.h"
@@ -17,7 +17,7 @@ index 69ffc2b05f..ed8e2ea806 100644
  namespace blink {
  
 +namespace {
-+// FORTRESS Layer 2: persona screen metrics via cmdline (avoid headless 800x600 default;
++// UXR Layer 2: persona screen metrics via cmdline (avoid headless 800x600 default;
 +// avail* fall back to screen dims so setting just width/height stays coherent).
 +bool UxrScreenInt(const char* sw, int* out) {
 +  if (!base::UxrConfig::GetInstance().Has(sw)) {
@@ -40,14 +40,14 @@ index 69ffc2b05f..ed8e2ea806 100644
  int Screen::height() const {
    if (!DomWindow())
      return 0;
-+  int p; if (UxrScreenInt("uxr-screen-height", &p)) return p;  // FORTRESS
++  int p; if (UxrScreenInt("uxr-screen-height", &p)) return p;  // UXR
    return GetRect(/*available=*/false).height();
  }
  
  int Screen::width() const {
    if (!DomWindow())
      return 0;
-+  int p; if (UxrScreenInt("uxr-screen-width", &p)) return p;  // FORTRESS
++  int p; if (UxrScreenInt("uxr-screen-width", &p)) return p;  // UXR
    return GetRect(/*available=*/false).width();
  }
  
@@ -55,7 +55,7 @@ index 69ffc2b05f..ed8e2ea806 100644
    if (!DomWindow()) {
      return unknown_color_depth;
    }
-+  int p; if (UxrScreenInt("uxr-screen-color-depth", &p))  // FORTRESS
++  int p; if (UxrScreenInt("uxr-screen-color-depth", &p))  // UXR
 +    return base::saturated_cast<unsigned>(p);
    return GetScreenInfo().depth == 0
               ? unknown_color_depth
@@ -66,12 +66,12 @@ index 69ffc2b05f..ed8e2ea806 100644
      return 0;
 +  int p;
 +  int tb;
-+  if (UxrScreenInt("uxr-taskbar-height", &tb)) {  // FORTRESS: explicit taskbar
++  if (UxrScreenInt("uxr-taskbar-height", &tb)) {  // UXR: explicit taskbar
 +    if (UxrScreenInt("uxr-screen-height", &p))
 +      return p > tb ? p - tb : p;
 +  }
-+  if (UxrScreenInt("uxr-screen-avail-height", &p)) return p;  // FORTRESS
-+  if (UxrScreenInt("uxr-screen-height", &p))  // FORTRESS: taskbar-aware avail
++  if (UxrScreenInt("uxr-screen-avail-height", &p)) return p;  // UXR
++  if (UxrScreenInt("uxr-screen-height", &p))  // UXR: taskbar-aware avail
 +    return p > 48 ? p - 48 : p;
    return GetRect(/*available=*/true).height();
  }
@@ -80,8 +80,8 @@ index 69ffc2b05f..ed8e2ea806 100644
    if (!DomWindow())
      return 0;
 +  int p;
-+  if (UxrScreenInt("uxr-screen-avail-width", &p)) return p;  // FORTRESS
-+  if (UxrScreenInt("uxr-screen-width", &p)) return p;  // FORTRESS
++  if (UxrScreenInt("uxr-screen-avail-width", &p)) return p;  // UXR
++  if (UxrScreenInt("uxr-screen-width", &p)) return p;  // UXR
    return GetRect(/*available=*/true).width();
  }
  

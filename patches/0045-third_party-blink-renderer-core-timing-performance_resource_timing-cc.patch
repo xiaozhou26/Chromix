@@ -6,8 +6,8 @@ index 5c4873cc68..ef4764f318 100644
  
  #include "base/containers/fixed_flat_set.h"
  #include "base/notreached.h"
-+#include "base/strings/string_number_conversions.h"  // FORTRESS
-+#include "base/uxr_config.h"  // FORTRESS
++#include "base/strings/string_number_conversions.h"  // UXR
++#include "base/uxr_config.h"  // UXR
  #include "services/network/public/mojom/service_worker_router_info.mojom-blink-forward.h"
  #include "third_party/blink/public/common/features_generated.h"
  #include "third_party/blink/public/mojom/fetch/fetch_api_request.mojom-blink.h"
@@ -16,7 +16,7 @@ index 5c4873cc68..ef4764f318 100644
    return fetch_initiator_type_names::kOther;
  }
 +
-+// FORTRESS: persona network-phase timing. Through an HTTP proxy the renderer
++// UXR: persona network-phase timing. Through an HTTP proxy the renderer
 +// never sees DNS or the inner TLS handshake, so resource timing collapses
 +// (dns == 0, secureConnectionStart == fetchStart) — a durable proxy tell that
 +// no real directly-connected Chrome produces. When uxr-net-timing is set we
@@ -87,7 +87,7 @@ index 5c4873cc68..ef4764f318 100644
    }
    if (!info_->timing || !info_->timing->connect_timing ||
        info_->timing->connect_timing->domain_lookup_start.is_null()) {
-+    if (!info_->did_reuse_connection) {  // FORTRESS: persona DNS phase
++    if (!info_->did_reuse_connection) {  // UXR: persona DNS phase
 +      PersonaNetPhases ph = ComputePersonaNetPhases(
 +          fetchStart(), requestStart(), name());
 +      if (ph.active) {
@@ -101,7 +101,7 @@ index 5c4873cc68..ef4764f318 100644
    }
    if (!info_->timing || !info_->timing->connect_timing ||
        info_->timing->connect_timing->domain_lookup_end.is_null()) {
-+    if (!info_->did_reuse_connection) {  // FORTRESS: persona DNS phase
++    if (!info_->did_reuse_connection) {  // UXR: persona DNS phase
 +      PersonaNetPhases ph = ComputePersonaNetPhases(
 +          fetchStart(), requestStart(), name());
 +      if (ph.active) {
@@ -115,7 +115,7 @@ index 5c4873cc68..ef4764f318 100644
          TimeOrigin(), info_->timing->connect_timing->ssl_start,
          info_->allow_negative_values, CrossOriginIsolatedCapability());
    }
-+  {  // FORTRESS: persona TLS phase (tunneled through a proxy -> ssl_start null)
++  {  // UXR: persona TLS phase (tunneled through a proxy -> ssl_start null)
 +    PersonaNetPhases ph =
 +        ComputePersonaNetPhases(fetchStart(), requestStart(), name());
 +    if (ph.active) {

@@ -6,8 +6,8 @@ index fce1a975e3..b0541d35e9 100644
  // Use of this source code is governed by a BSD-style license that can be
  // found in the LICENSE file.
  
-+#include "base/strings/string_number_conversions.h"  // FORTRESS
-+#include "base/uxr_config.h"  // FORTRESS
++#include "base/strings/string_number_conversions.h"  // UXR
++#include "base/uxr_config.h"  // UXR
  #include "third_party/blink/renderer/modules/screen_orientation/screen_orientation.h"
  
  #include <memory>
@@ -15,7 +15,7 @@ index fce1a975e3..b0541d35e9 100644
  }
  
  V8OrientationType ScreenOrientation::type() const {
-+  // FORTRESS: persona screen orientation. Desktop Chrome is landscape-primary
++  // UXR: persona screen orientation. Desktop Chrome is landscape-primary
 +  // with angle 0; a headless host reporting anything else contradicts the
 +  // desktop persona.
 +  std::string ph_o = base::UxrConfig::GetInstance().Get("uxr-screen-orientation");
@@ -35,7 +35,7 @@ index fce1a975e3..b0541d35e9 100644
  }
  
  uint16_t ScreenOrientation::angle() const {
-+  {  // FORTRESS: persona orientation angle (0 for any standard desktop layout)
++  {  // UXR: persona orientation angle (0 for any standard desktop layout)
 +    int ph_a = -1;
 +    if (base::StringToInt(
 +            base::UxrConfig::GetInstance().Get("uxr-screen-orientation-angle"),

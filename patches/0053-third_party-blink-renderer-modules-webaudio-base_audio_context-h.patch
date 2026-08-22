@@ -6,8 +6,8 @@ index 8f0e99ecc4..6a536ecc21 100644
  #ifndef THIRD_PARTY_BLINK_RENDERER_MODULES_WEBAUDIO_BASE_AUDIO_CONTEXT_H_
  #define THIRD_PARTY_BLINK_RENDERER_MODULES_WEBAUDIO_BASE_AUDIO_CONTEXT_H_
  
-+#include "base/strings/string_number_conversions.h"  // FORTRESS
-+#include "base/uxr_config.h"  // FORTRESS
++#include "base/strings/string_number_conversions.h"  // UXR
++#include "base/uxr_config.h"  // UXR
  #include "base/memory/raw_ptr.h"
  #include "base/memory/scoped_refptr.h"
  #include "third_party/blink/renderer/bindings/core/v8/active_script_wrappable.h"
@@ -17,7 +17,7 @@ index 8f0e99ecc4..6a536ecc21 100644
    AudioDestinationNode* destination() const;
 -  float sampleRate() const { return destination_handler_->SampleRate(); }
 +  float sampleRate() const {
-+    // FORTRESS: persona output-device sample rate. The host audio device (or
++    // UXR: persona output-device sample rate. The host audio device (or
 +    // headless fallback) leaks its sample rate here — Windows desktops run
 +    // 48000, some Macs 44100. Pin to the persona platform when set.
 +    double ph_r = 0.0;

@@ -6,7 +6,7 @@ index a7fa084424..7447c64eea 100644
    Vector<WebPointerEvent> pointer_coalesced_events;
    for (const WebMouseEvent& e : coalesced_events)
      pointer_coalesced_events.push_back(WebPointerEvent(event_type, e));
-+  // FORTRESS: real pointermove always carries >=1 coalesced sample; CDP-synthesized moves
++  // UXR: real pointermove always carries >=1 coalesced sample; CDP-synthesized moves
 +  // arrive with an empty coalesced batch, which getCoalescedEvents() exposes as an
 +  // automation tell. Synthesize one sample (the event itself) so the batch is non-empty.
 +  if (pointer_coalesced_events.empty() &&
@@ -20,7 +20,7 @@ index a7fa084424..7447c64eea 100644
    Vector<WebPointerEvent> pointer_coalesced_events;
    for (const WebMouseEvent& e : coalesced_events)
      pointer_coalesced_events.push_back(WebPointerEvent(event_type, e));
-+  // FORTRESS: real pointermove always carries >=1 coalesced sample; CDP-synthesized moves
++  // UXR: real pointermove always carries >=1 coalesced sample; CDP-synthesized moves
 +  // arrive with an empty coalesced batch, which getCoalescedEvents() exposes as an
 +  // automation tell. Synthesize one sample (the event itself) so the batch is non-empty.
 +  if (pointer_coalesced_events.empty() &&

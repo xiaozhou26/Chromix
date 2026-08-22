@@ -30,7 +30,7 @@ index 2a8abef097..abb5b9d422 100644
    // Propagate the following switches to the renderer command line (along
    // with any associated values) if present in the browser command line.
    static const char* const kSwitchNames[] = {
-+      // FORTRESS Layer 2: propagate persona switches to the renderer so renderer-side
++      // UXR Layer 2: propagate persona switches to the renderer so renderer-side
 +      // getters (navigator.*, WebGL) can read them. Web-undetectable: pages cannot
 +      // read /proc/cmdline, and the host is ours.
        switches::kDisableInProcessStackTraces,

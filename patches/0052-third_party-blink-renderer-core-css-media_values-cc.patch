@@ -6,7 +6,7 @@ index 0d60244742..a0920899d9 100644
  
  #include "third_party/blink/renderer/core/css/media_values.h"
  
-+#include "base/uxr_config.h"  // FORTRESS
++#include "base/uxr_config.h"  // UXR
 +
  #include "third_party/blink/public/common/css/scripting.h"
  #include "third_party/blink/renderer/core/css/css_resolution_units.h"
@@ -15,7 +15,7 @@ index 0d60244742..a0920899d9 100644
  bool MediaValues::CalculateDeviceSupportsHDR(LocalFrame* frame) {
    DCHECK(frame);
    DCHECK(frame->GetPage());
-+  {  // FORTRESS: persona HDR capability (dynamic-range media feature)
++  {  // UXR: persona HDR capability (dynamic-range media feature)
 +    std::string ph_v = base::UxrConfig::GetInstance().Get("uxr-hdr");
 +    if (!ph_v.empty()) {
 +      return ph_v == "true" || ph_v == "1";
@@ -28,7 +28,7 @@ index 0d60244742..a0920899d9 100644
  bool MediaValues::CalculateInvertedColors(LocalFrame* frame) {
    DCHECK(frame);
    DCHECK(frame->GetSettings());
-+  {  // FORTRESS: persona inverted-colors (OS display setting)
++  {  // UXR: persona inverted-colors (OS display setting)
 +    std::string ph_v = base::UxrConfig::GetInstance().Get("uxr-inverted-colors");
 +    if (!ph_v.empty()) {
 +      return ph_v == "true" || ph_v == "1";
@@ -41,7 +41,7 @@ index 0d60244742..a0920899d9 100644
      LocalFrame* frame) {
    DCHECK(frame);
    DCHECK(frame->GetSettings());
-+  {  // FORTRESS: persona prefers-color-scheme (OS theme reflects the host, not
++  {  // UXR: persona prefers-color-scheme (OS theme reflects the host, not
 +    // the persona — pin it so matchMedia agrees with the claimed machine).
 +    std::string ph_v = base::UxrConfig::GetInstance().Get("uxr-color-scheme");
 +    if (!ph_v.empty()) {
@@ -56,7 +56,7 @@ index 0d60244742..a0920899d9 100644
      LocalFrame* frame) {
    DCHECK(frame);
    DCHECK(frame->GetSettings());
-+  {  // FORTRESS: persona prefers-contrast
++  {  // UXR: persona prefers-contrast
 +    std::string ph_v = base::UxrConfig::GetInstance().Get("uxr-preferred-contrast");
 +    if (ph_v == "more") {
 +      return mojom::blink::PreferredContrast::kMore;
@@ -75,7 +75,7 @@ index 0d60244742..a0920899d9 100644
  bool MediaValues::CalculatePrefersReducedMotion(LocalFrame* frame) {
    DCHECK(frame);
    DCHECK(frame->GetSettings());
-+  {  // FORTRESS: persona prefers-reduced-motion (OS accessibility setting)
++  {  // UXR: persona prefers-reduced-motion (OS accessibility setting)
 +    std::string ph_v = base::UxrConfig::GetInstance().Get("uxr-reduced-motion");
 +    if (!ph_v.empty()) {
 +      return ph_v == "true" || ph_v == "1";
@@ -88,7 +88,7 @@ index 0d60244742..a0920899d9 100644
  bool MediaValues::CalculatePrefersReducedTransparency(LocalFrame* frame) {
    DCHECK(frame);
    DCHECK(frame->GetSettings());
-+  {  // FORTRESS: persona prefers-reduced-transparency
++  {  // UXR: persona prefers-reduced-transparency
 +    std::string ph_v =
 +        base::UxrConfig::GetInstance().Get("uxr-reduced-transparency");
 +    if (!ph_v.empty()) {
@@ -102,7 +102,7 @@ index 0d60244742..a0920899d9 100644
  ForcedColors MediaValues::CalculateForcedColors(LocalFrame* frame) {
    DCHECK(frame);
    DCHECK(frame->GetSettings());
-+  {  // FORTRESS: persona forced-colors (Windows high-contrast mode)
++  {  // UXR: persona forced-colors (Windows high-contrast mode)
 +    std::string ph_v = base::UxrConfig::GetInstance().Get("uxr-forced-colors");
 +    if (!ph_v.empty()) {
 +      return (ph_v == "true" || ph_v == "1" || ph_v == "active")

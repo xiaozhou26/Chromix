@@ -9,7 +9,7 @@ index 6e12beecb6..2a6df54317 100644
 +#include <string>
 +#include <vector>
 +
-+#include "base/uxr_config.h"  // FORTRESS
++#include "base/uxr_config.h"  // UXR
  #include "third_party/webrtc/api/candidate.h"
  #include "third_party/webrtc/p2p/base/p2p_constants.h"
  
@@ -17,7 +17,7 @@ index 6e12beecb6..2a6df54317 100644
        username_fragment_(std::move(username_fragment)),
        url_(std::move(url)) {
    PopulateFields();
-+  // FORTRESS: persona srflx address. A real Chrome with default WebRTC
++  // UXR: persona srflx address. A real Chrome with default WebRTC
 +  // settings gathers srflx candidates that expose the machine's public IP.
 +  // Behind a proxy we rewrite that connection address to the persona egress
 +  // IP (uxr-webrtc-ip) so the candidate list reads like a directly-connected

@@ -6,7 +6,7 @@ index 7d641391d1..56b5c18ea1 100644
  // found in the LICENSE file.
  
  #include "third_party/blink/renderer/modules/peerconnection/peer_connection_dependency_factory.h"
-+#include "base/command_line.h"  // FORTRESS
++#include "base/command_line.h"  // UXR
 +#include "base/uxr_config.h"
  
  #include <stddef.h>
@@ -15,7 +15,7 @@ index 7d641391d1..56b5c18ea1 100644
      }
    }
  
-+  // FORTRESS Layer 2: WebRTC IP-leak control via cmdline (coherence rule C11).
++  // UXR Layer 2: WebRTC IP-leak control via cmdline (coherence rule C11).
 +  // Host candidates are already mDNS-obfuscated; this lets the control plane pin
 +  // candidate gathering to the proxied path and suppress non-proxied srflx
 +  // (public-IP) candidates so a v4-only proxy can't leak the real v6, etc.

@@ -6,8 +6,8 @@ index 0f08bd3b9d..7854dac170 100644
  #ifndef THIRD_PARTY_BLINK_RENDERER_CORE_TIMING_MEMORY_INFO_H_
  #define THIRD_PARTY_BLINK_RENDERER_CORE_TIMING_MEMORY_INFO_H_
  
-+#include "base/strings/string_number_conversions.h"  // FORTRESS
-+#include "base/uxr_config.h"  // FORTRESS
++#include "base/strings/string_number_conversions.h"  // UXR
++#include "base/uxr_config.h"  // UXR
  #include "base/gtest_prod_util.h"
  #include "third_party/blink/renderer/core/core_export.h"
  #include "third_party/blink/renderer/platform/bindings/script_wrappable.h"
@@ -17,7 +17,7 @@ index 0f08bd3b9d..7854dac170 100644
    uint64_t usedJSHeapSize() const { return info_.used_js_heap_size; }
 -  uint64_t jsHeapSizeLimit() const { return info_.js_heap_size_limit; }
 +  uint64_t jsHeapSizeLimit() const {
-+    // FORTRESS: persona heap limit. Cross-checkable against the claimed
++    // UXR: persona heap limit. Cross-checkable against the claimed
 +    // bitness/device class (a 64-bit desktop Chrome reports ~4GiB, minus a
 +    // small non-round margin). uxr-js-heap-size-limit wins; otherwise a
 +    // uxr-ua-bitness=64 persona implies the desktop-64 value.

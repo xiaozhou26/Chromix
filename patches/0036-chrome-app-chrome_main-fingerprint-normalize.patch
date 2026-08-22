@@ -14,7 +14,7 @@ index b5cc00e4c8..3cc7963afa 100644
  
    base::CommandLine* command_line(base::CommandLine::ForCurrentProcess());
  
-+  // FORTRESS: normalize --fingerprint-* switches to --uxr-* equivalents so
++  // UXR: normalize --fingerprint-* switches to --uxr-* equivalents so
 +  // `chrome.exe --fingerprint-*` works directly without an SDK launcher.
 +  // Only the browser process (no --process-type) performs normalization;
 +  // child processes inherit the already-converted switches.

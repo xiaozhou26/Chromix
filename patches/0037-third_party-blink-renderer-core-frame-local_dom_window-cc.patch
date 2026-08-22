@@ -6,7 +6,7 @@ index 9c8d2cce71..77a8c4a043 100644
      return 0;
    }
  
-+  {  // FORTRESS: persona window position. Headless reports (0,0) — a maximized
++  {  // UXR: persona window position. Headless reports (0,0) — a maximized
 +  // desktop window sits at (0,<taskbar-free>) at most resolutions, and CDP-driven
 +  // synthetic input maps client coords to the screen via this origin.
 +    int p_v = 0;
@@ -21,7 +21,7 @@ index 9c8d2cce71..77a8c4a043 100644
      return 0;
    }
  
-+  {  // FORTRESS: persona window position (see screenX).
++  {  // UXR: persona window position (see screenX).
 +    int p_v = 0;
 +    if (base::UxrConfig::GetInstance().GetInt("uxr-window-y", &p_v) && p_v >= 0)
 +      return p_v;

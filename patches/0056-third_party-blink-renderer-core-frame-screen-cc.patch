@@ -6,7 +6,7 @@ index ed8e2ea806..a019e890fb 100644
  }
  
  bool Screen::isExtended() const {
-+  {  // FORTRESS: persona multi-monitor flag. Headless reports a single
++  {  // UXR: persona multi-monitor flag. Headless reports a single
 +    // display; a persona claiming a multi-screen desk can pin it here.
 +    std::string ph_v = base::UxrConfig::GetInstance().Get("uxr-screen-extended");
 +    if (!ph_v.empty()) {

@@ -6,8 +6,8 @@ index bc4c0c6ca0..f6e8ff99cf 100644
  #include "third_party/blink/renderer/platform/bindings/exception_state.h"
  #include "third_party/blink/renderer/platform/wtf/text/strcat.h"
  
-+#include "base/strings/string_number_conversions.h"  // FORTRESS
-+#include "base/command_line.h"  // FORTRESS
++#include "base/strings/string_number_conversions.h"  // UXR
++#include "base/command_line.h"  // UXR
 +#include "base/uxr_config.h"
 +
  namespace blink {

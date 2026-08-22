@@ -6,9 +6,9 @@ index c76f6553e1..ccf835340a 100644
  #include "third_party/blink/renderer/platform/graphics/image_data_buffer.h"
  
  #include "base/compiler_specific.h"
-+#include "base/command_line.h"  // FORTRESS
-+#include "base/strings/string_number_conversions.h"  // FORTRESS
-+#include "base/uxr_config.h"  // FORTRESS
++#include "base/command_line.h"  // UXR
++#include "base/strings/string_number_conversions.h"  // UXR
++#include "base/uxr_config.h"  // UXR
  #include "base/memory/ptr_util.h"
  #include "third_party/blink/renderer/platform/image-encoders/image_encoder_utils.h"
  #include "third_party/blink/renderer/platform/wtf/text/base64.h"
@@ -17,7 +17,7 @@ index c76f6553e1..ccf835340a 100644
  namespace blink {
  
 +namespace {
-+// FORTRESS: identical seeded canvas noise as getImageData (absolute coords, same
++// UXR: identical seeded canvas noise as getImageData (absolute coords, same
 +// fmix32) so toDataURL/toBlob and getImageData return pixel-identical results
 +// (closes the cross-path canvas tell). Operates on the encode COPY (pixmap_), not
 +// the source canvas. Skips alpha; same +-1 across RGB (byte-order-independent).
@@ -68,7 +68,7 @@ index c76f6553e1..ccf835340a 100644
        return;
      }
      MSAN_CHECK_MEM_IS_INITIALIZED(pixmap_.addr(), pixmap_.computeByteSize());
-+    UxrNoiseEncodeBuffer(pixmap_);  // FORTRESS: coherent with getImageData
++    UxrNoiseEncodeBuffer(pixmap_);  // UXR: coherent with getImageData
      retained_image_ = SkImages::RasterFromData(info, std::move(data), rowBytes);
    } else {
      retained_image_ = paint_image.GetSwSkImage();

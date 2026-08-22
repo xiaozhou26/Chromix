@@ -6,7 +6,7 @@ index 3b1a90dae1..cf4455f9e7 100644
  #include "base/timer/elapsed_timer.h"
  #include "base/trace_event/process_memory_dump.h"
  #include "base/trace_event/trace_event.h"
-+#include "base/uxr_config.h"  // FORTRESS
++#include "base/uxr_config.h"  // UXR
  #include "build/build_config.h"
  #include "skia/ext/font_utils.h"
  #include "third_party/blink/public/common/features.h"
@@ -15,7 +15,7 @@ index 3b1a90dae1..cf4455f9e7 100644
  namespace blink {
  
 +namespace {
-+// FORTRESS: persona font availability. Font-enumeration fingerprinting measures
++// UXR: persona font availability. Font-enumeration fingerprinting measures
 +// per-family glyph metrics to list the fonts the host actually has; a Linux
 +// host resolving "Ubuntu"/"Noto Color Emoji" contradicts a Windows persona.
 +// When uxr-font-whitelist is set (comma-separated, case-insensitive family
@@ -76,7 +76,7 @@ index 3b1a90dae1..cf4455f9e7 100644
      const FontDescription& font_description,
      const AtomicString& family,
      AlternateFontName altername_font_name) {
-+  if (UxrFontHidden(family)) {  // FORTRESS: persona font availability
++  if (UxrFontHidden(family)) {  // UXR: persona font availability
 +    return nullptr;
 +  }
    if (const FontPlatformData* platform_data = GetFontPlatformData(

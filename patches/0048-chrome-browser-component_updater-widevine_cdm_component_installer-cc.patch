@@ -6,12 +6,12 @@ index 198513af0e..8a5f52e680 100644
  #include <vector>
  
  #include "base/check.h"
-+#include "base/command_line.h"  // FORTRESS
++#include "base/command_line.h"  // UXR
  #include "base/files/file_path.h"
  #include "base/files/file_util.h"
  #include "base/functional/bind.h"
  #include "base/functional/callback.h"
-+#include "base/json/json_file_value_deserializer.h"  // FORTRESS
++#include "base/json/json_file_value_deserializer.h"  // UXR
  #include "base/logging.h"
  #include "base/memory/ref_counted.h"
  #include "base/native_library.h"
@@ -19,7 +19,7 @@ index 198513af0e..8a5f52e680 100644
  }
  
  void RegisterWidevineCdmComponent(ComponentUpdateService* cus) {
-+  // FORTRESS: opt-in local CDM preload (--uxr-widevine-cdm=<dir>). Registers
++  // UXR: opt-in local CDM preload (--uxr-widevine-cdm=<dir>). Registers
 +  // a pre-fetched Widevine CDM directly from disk — no component-updater
 +  // round trip, no Google API keys, works offline. The directory must mirror
 +  // the Chrome component layout: manifest.json plus

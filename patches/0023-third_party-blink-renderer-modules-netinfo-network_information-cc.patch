@@ -15,10 +15,10 @@ index 976a3c8c36..1ce616d597 100644
  
  uint32_t NetworkInformation::rtt() {
    MaybeShowWebHoldbackConsoleMsg();
-+  {  // FORTRESS: persona network rtt (avoid rtt==0 headless tell)
++  {  // UXR: persona network rtt (avoid rtt==0 headless tell)
 +    int p_v = 0;
 +    if (base::UxrConfig::GetInstance().GetInt("uxr-net-rtt", &p_v) && p_v >= 0)
-+      return GetNetworkStateNotifier().RoundRtt(  // FORTRESS P0-M: 50ms buckets
++      return GetNetworkStateNotifier().RoundRtt(  // UXR P0-M: 50ms buckets
 +          Host(), base::Milliseconds(p_v));
 +  }
    std::optional<base::TimeDelta> override_rtt =
@@ -28,12 +28,12 @@ index 976a3c8c36..1ce616d597 100644
  
  double NetworkInformation::downlink() {
    MaybeShowWebHoldbackConsoleMsg();
-+  if (base::UxrConfig::GetInstance().Has("uxr-net-downlink")) {  // FORTRESS
++  if (base::UxrConfig::GetInstance().Has("uxr-net-downlink")) {  // UXR
 +    double p_d = 0.0;
 +    if (base::StringToDouble(
 +            base::UxrConfig::GetInstance().Get("uxr-net-downlink"), &p_d) &&
 +        p_d >= 0.0) {
-+      return GetNetworkStateNotifier().RoundMbps(Host(), p_d);  // FORTRESS P0-M
++      return GetNetworkStateNotifier().RoundMbps(Host(), p_d);  // UXR P0-M
 +    }
 +  }
    std::optional<double> override_downlink_mbps =

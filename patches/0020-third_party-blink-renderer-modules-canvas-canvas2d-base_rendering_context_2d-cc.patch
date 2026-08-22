@@ -7,14 +7,14 @@ index fd13b97510..f740bf11b8 100644
  // found in the LICENSE file.
  
 +#ifdef UNSAFE_BUFFERS_BUILD
-+#pragma allow_unsafe_buffers  // FORTRESS: raw-pixel canvas-noise loop
++#pragma allow_unsafe_buffers  // UXR: raw-pixel canvas-noise loop
 +#endif
 +
  #include "third_party/blink/renderer/modules/canvas/canvas2d/base_rendering_context_2d.h"
  
-+#include <cstdlib>  // FORTRESS
-+#include "base/command_line.h"  // FORTRESS
-+#include "base/strings/string_number_conversions.h"  // FORTRESS
++#include <cstdlib>  // UXR
++#include "base/command_line.h"  // UXR
++#include "base/strings/string_number_conversions.h"  // UXR
 +#include "base/uxr_config.h"
 +
  #include <cmath>
@@ -24,11 +24,11 @@ index fd13b97510..f740bf11b8 100644
      }
    }
  
-+  // FORTRESS: seeded per-session canvas noise (+-1 on RGB, keyed to pixel pos).
++  // UXR: seeded per-session canvas noise (+-1 on RGB, keyed to pixel pos).
 +  // Defeats canvas fingerprinting; same seed -> same noise (per-session stable).
 +  if (image_data) {
 +    uint32_t ph_seed = 0u;
-+    // FORTRESS canvas noise (audit P0-G/I/J + P2-C): unified StringToUint parse,
++    // UXR canvas noise (audit P0-G/I/J + P2-C): unified StringToUint parse,
 +    // FAIL-CLOSED on invalid/zero (no golden-constant fingerprint), value-dependent
 +    // + per-channel (defeats the 2025 flat-field pixel-recovery), 8-bit-only.
 +    if (base::StringToUint(

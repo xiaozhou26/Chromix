@@ -1,5 +1,5 @@
 """
-humanize — wrapper-level human input simulation for Fortress pages.
+humanize — wrapper-level human input simulation for Chromix pages.
 
 Implements the behavioral half of stealth (the engine handles the static
 fingerprint): Bézier mouse trajectories with velocity easing and overshoot,

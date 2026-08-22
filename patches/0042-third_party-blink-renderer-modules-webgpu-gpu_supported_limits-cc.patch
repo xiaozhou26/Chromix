@@ -6,8 +6,8 @@ index c6f066cce4..621740b7f6 100644
  #include <algorithm>
  
  #include "base/numerics/checked_math.h"
-+#include "base/strings/string_number_conversions.h"  // FORTRESS
-+#include "base/uxr_config.h"  // FORTRESS
++#include "base/strings/string_number_conversions.h"  // UXR
++#include "base/uxr_config.h"  // UXR
  #include "third_party/blink/renderer/bindings/core/v8/v8_union_undefined_unsignedlonglongenforcerange.h"
  #include "third_party/blink/renderer/bindings/modules/v8/v8_gpu_extent_3d_dict.h"
  #include "third_party/blink/renderer/core/dom/dom_exception.h"
@@ -15,7 +15,7 @@ index c6f066cce4..621740b7f6 100644
  
  GPUSupportedLimits::GPUSupportedLimits(const ComboLimits& limits) {
    limits.UnlinkedCopyTo(&limits_);
-+  // FORTRESS: persona WebGPU limits. Dawn reports the host adapter's limits,
++  // UXR: persona WebGPU limits. Dawn reports the host adapter's limits,
 +  // which contradict the claimed persona GPU. Keys follow
 +  // uxr-webgpu-limit-<member> (e.g. uxr-webgpu-limit-maxTextureDimension2D);
 +  // an all-lowercase spelling is accepted as well. Only values explicitly set

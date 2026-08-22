@@ -6,17 +6,17 @@ index f5c0db2d1b..782fd4d61a 100644
  
  #include "base/system/sys_info.h"
  
-+#include <cstdlib>  // FORTRESS
-+#include "base/command_line.h"  // FORTRESS
++#include <cstdlib>  // UXR
++#include "base/command_line.h"  // UXR
 +#include "base/uxr_config.h"
 +#include "base/strings/string_number_conversions.h"
 +
  namespace blink {
  
  unsigned NavigatorConcurrentHardware::hardwareConcurrency() const {
-+  // FORTRESS Layer 2: persona-driven via renderer cmdline switch.
++  // UXR Layer 2: persona-driven via renderer cmdline switch.
 +  if (base::UxrConfig::GetInstance().Has("uxr-hw-concurrency")) {
-+    int v = 0;  // FORTRESS P1-A: StringToInt + clamp [1,128]
++    int v = 0;  // UXR P1-A: StringToInt + clamp [1,128]
 +    if (base::StringToInt(
 +            base::UxrConfig::GetInstance().Get("uxr-hw-concurrency"), &v) &&
 +        v > 0)
