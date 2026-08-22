@@ -187,6 +187,7 @@ if (-not (Test-Path "$Src\.chromix-synced")) {
   # reliable from Azure runner IPs (googlesource rate-limits them hard; it
   # killed the initial 2 GB src clone ~10 min in on the first CI attempt).
   # DEPS dependencies still come from googlesource via the retry loop below.
+  New-Item -ItemType Directory -Force -Path $Chromium | Out-Null
   if (-not (Test-Path "$Chromium\.gclient")) {
     @'
 solutions = [
