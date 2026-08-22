@@ -1,0 +1,28 @@
+diff --git a/third_party/blink/renderer/modules/plugins/dom_plugin_array.cc b/third_party/blink/renderer/modules/plugins/dom_plugin_array.cc
+index 534277a85a..f84e3744c2 100644
+--- a/third_party/blink/renderer/modules/plugins/dom_plugin_array.cc
++++ b/third_party/blink/renderer/modules/plugins/dom_plugin_array.cc
+@@ -20,6 +20,7 @@
+ 
+ #include "third_party/blink/renderer/modules/plugins/dom_plugin_array.h"
+ 
++#include "base/uxr_config.h"  // FORTRESS
+ #include "third_party/blink/public/common/features.h"
+ #include "third_party/blink/renderer/core/frame/local_dom_window.h"
+ #include "third_party/blink/renderer/core/frame/local_frame.h"
+@@ -135,6 +136,15 @@ HeapVector<Member<DOMMimeType>> DOMPluginArray::GetFixedMimeTypeArray() {
+ }
+ 
+ bool DOMPluginArray::IsPdfViewerAvailable() {
++  // FORTRESS: persona plugin shape. Every real desktop Chrome reports the
++  // spec'd five-entry PDF list; an empty navigator.plugins is the classic
++  // automation tell from configurations where the internal PDF viewer did not
++  // register (headless variants, stripped builds). With uxr-plugins=chrome the
++  // standard shape is presented regardless — this method also drives
++  // navigator.pdfViewerEnabled, so the surface stays coherent.
++  if (base::UxrConfig::GetInstance().Get("uxr-plugins") == "chrome") {
++    return true;
++  }
+   auto* data = GetPluginData();
+   if (!data)
+     return false;

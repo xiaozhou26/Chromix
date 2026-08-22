@@ -1,0 +1,49 @@
+diff --git a/third_party/blink/renderer/modules/webgpu/gpu_adapter.cc b/third_party/blink/renderer/modules/webgpu/gpu_adapter.cc
+index 44527d0a7b..45affa329c 100644
+--- a/third_party/blink/renderer/modules/webgpu/gpu_adapter.cc
++++ b/third_party/blink/renderer/modules/webgpu/gpu_adapter.cc
+@@ -5,6 +5,7 @@
+ #include "third_party/blink/renderer/modules/webgpu/gpu_adapter.h"
+ 
+ #include "services/metrics/public/cpp/ukm_builders.h"
++#include "base/uxr_config.h"  // FORTRESS
+ #include "third_party/blink/renderer/bindings/core/v8/script_promise_resolver.h"
+ #include "third_party/blink/renderer/bindings/core/v8/v8_object_builder.h"
+ #include "third_party/blink/renderer/bindings/modules/v8/v8_gpu_device_descriptor.h"
+@@ -34,6 +35,18 @@ GPUSupportedFeatures* MakeFeatureNameSet(wgpu::Adapter adapter) {
+   GPUSupportedFeatures* features = MakeGarbageCollected<GPUSupportedFeatures>();
+   DCHECK(features->FeatureNameSet().empty());
+ 
++  // FORTRESS: persona WebGPU feature allowlist. Dawn's feature set reflects
++  // the host adapter/backend; when uxr-webgpu-features is set (comma-separated
++  // feature names, e.g. "depth-clip-control,texture-compression-bc"), only
++  // listed features are exposed so the adapter stops contradicting the
++  // claimed GPU. Unset -> native set untouched.
++  std::string ph_allow_raw;
++  bool ph_filter = false;
++  {
++    ph_allow_raw = base::UxrConfig::GetInstance().Get("uxr-webgpu-features");
++    ph_filter = !ph_allow_raw.empty();
++  }
++
+   wgpu::SupportedFeatures supported_features;
+   adapter.GetFeatures(&supported_features);
+   // SAFETY: Required from caller
+@@ -43,9 +56,16 @@ GPUSupportedFeatures* MakeFeatureNameSet(wgpu::Adapter adapter) {
+     auto feature_name_enum_optional =
+         GPUSupportedFeatures::ToV8FeatureNameEnum(f);
+     if (feature_name_enum_optional) {
++      if (ph_filter) {
++        const V8GPUFeatureName ph_name(feature_name_enum_optional.value());
++        const std::string ph_str = std::string(ph_name.AsString().Utf8());
++        if (ph_allow_raw.find(ph_str) == std::string::npos) {
++          continue;  // persona does not advertise this feature
++        }
++      }
+       features->AddFeatureName(
+           V8GPUFeatureName(feature_name_enum_optional.value()));
+-      }
++    }
+   }
+   return features;
+ }

@@ -1,0 +1,62 @@
+{
+  "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
+  "name": "io.github.tiliondev/fortress",
+  "description": "Stealth browser for AI agents: fetch pages behind Cloudflare/DataDome/CAPTCHA, extract clean data.",
+  "version": "0.1.3",
+  "repository": {
+    "url": "https://github.com/tiliondev/fortress",
+    "source": "github"
+  },
+  "websiteUrl": "https://tilion.dev",
+  "packages": [
+    {
+      "registryType": "pypi",
+      "registryBaseUrl": "https://pypi.org",
+      "identifier": "tilion",
+      "version": "0.1.3",
+      "runtimeHint": "uvx",
+      "transport": {
+        "type": "stdio"
+      },
+      "packageArguments": [
+        {
+          "type": "positional",
+          "value": "tilion-mcp",
+          "valueHint": "console-script"
+        }
+      ],
+      "environmentVariables": [
+        {
+          "name": "TILION_MCP_PREWARM",
+          "description": "Boot the browser at startup so the first tool call is instant (default 1).",
+          "isRequired": false,
+          "isSecret": false
+        },
+        {
+          "name": "TILION_MCP_HEADLESS",
+          "description": "Set 0 to show a visible browser window (default 1).",
+          "isRequired": false,
+          "isSecret": false
+        },
+        {
+          "name": "TILION_ALLOW_PRIVATE_EGRESS",
+          "description": "Set 1 to allow tools to reach localhost / private IPs (SSRF guard off).",
+          "isRequired": false,
+          "isSecret": false
+        },
+        {
+          "name": "TILION_BASE_URL",
+          "description": "Run browsers on a hosted Tilion server instead of locally.",
+          "isRequired": false,
+          "isSecret": false
+        },
+        {
+          "name": "TILION_API_KEY",
+          "description": "Bearer key for the hosted Tilion server (cloud mode only).",
+          "isRequired": false,
+          "isSecret": true
+        }
+      ]
+    }
+  ]
+}

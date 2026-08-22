@@ -1,0 +1,61 @@
+diff --git a/chrome/browser/component_updater/widevine_cdm_component_installer.cc b/chrome/browser/component_updater/widevine_cdm_component_installer.cc
+index 198513af0e..8a5f52e680 100644
+--- a/chrome/browser/component_updater/widevine_cdm_component_installer.cc
++++ b/chrome/browser/component_updater/widevine_cdm_component_installer.cc
+@@ -14,10 +14,12 @@
+ #include <vector>
+ 
+ #include "base/check.h"
++#include "base/command_line.h"  // FORTRESS
+ #include "base/files/file_path.h"
+ #include "base/files/file_util.h"
+ #include "base/functional/bind.h"
+ #include "base/functional/callback.h"
++#include "base/json/json_file_value_deserializer.h"  // FORTRESS
+ #include "base/logging.h"
+ #include "base/memory/ref_counted.h"
+ #include "base/native_library.h"
+@@ -437,6 +439,43 @@ void WidevineCdmComponentInstallerPolicy::UpdateCdmPath(
+ }
+ 
+ void RegisterWidevineCdmComponent(ComponentUpdateService* cus) {
++  // FORTRESS: opt-in local CDM preload (--uxr-widevine-cdm=<dir>). Registers
++  // a pre-fetched Widevine CDM directly from disk — no component-updater
++  // round trip, no Google API keys, works offline. The directory must mirror
++  // the Chrome component layout: manifest.json plus
++  // _platform_specific/<os>_<arch>/<widevinecdm lib>. On Windows/macOS the
++  // CDM joins the registry for this run; on Linux the hint file is updated
++  // (the CDM is loaded before the zygote locks down, so it applies from the
++  // next launch — persistent profiles make that transparent).
++  {
++    const base::CommandLine* ph_cmd = base::CommandLine::ForCurrentProcess();
++    if (ph_cmd->HasSwitch("uxr-widevine-cdm")) {
++      const base::FilePath ph_dir =
++          ph_cmd->GetSwitchValuePath("uxr-widevine-cdm");
++      base::FilePath ph_error;
++      std::unique_ptr<base::Value> ph_value =
++          JSONFileValueDeserializer(
++              ph_dir.Append(FILE_PATH_LITERAL("manifest.json")))
++              .Deserialize(&ph_error);
++      const base::Value::Dict* ph_dict =
++          ph_value ? ph_value->GetIfDict() : nullptr;
++      media::CdmCapability ph_capability;
++      if (ph_dict && ParseCdmManifest(*ph_dict, &ph_capability) &&
++          IsCdmManifestCompatibleWithChrome(*ph_dict) &&
++          base::PathExists(GetCdmPathFromInstallDir(ph_dir))) {
++#if BUILDFLAG(IS_LINUX) || BUILDFLAG(IS_CHROMEOS)
++        UpdateHintFile(ph_dir);
++#else
++        RegisterWidevineCdmWithChrome(
++            ph_capability.version, GetCdmPathFromInstallDir(ph_dir),
++            ph_dict->Clone());
++#endif
++        VLOG(1) << "Registered local Widevine CDM from " << ph_dir.value();
++      } else {
++        VLOG(1) << "uxr-widevine-cdm dir invalid, ignoring: " << ph_dir.value();
++      }
++    }
++  }
+   auto installer = base::MakeRefCounted<ComponentInstaller>(
+       std::make_unique<WidevineCdmComponentInstallerPolicy>());
+   installer->Register(cus, base::OnceClosure());

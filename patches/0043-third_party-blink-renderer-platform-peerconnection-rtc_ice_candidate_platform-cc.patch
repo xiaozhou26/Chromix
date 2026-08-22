@@ -1,0 +1,58 @@
+diff --git a/third_party/blink/renderer/platform/peerconnection/rtc_ice_candidate_platform.cc b/third_party/blink/renderer/platform/peerconnection/rtc_ice_candidate_platform.cc
+index 6e12beecb6..2a6df54317 100644
+--- a/third_party/blink/renderer/platform/peerconnection/rtc_ice_candidate_platform.cc
++++ b/third_party/blink/renderer/platform/peerconnection/rtc_ice_candidate_platform.cc
+@@ -4,6 +4,10 @@
+ 
+ #include "third_party/blink/renderer/platform/peerconnection/rtc_ice_candidate_platform.h"
+ 
++#include <string>
++#include <vector>
++
++#include "base/uxr_config.h"  // FORTRESS
+ #include "third_party/webrtc/api/candidate.h"
+ #include "third_party/webrtc/p2p/base/p2p_constants.h"
+ 
+@@ -53,6 +57,42 @@ RTCIceCandidatePlatform::RTCIceCandidatePlatform(
+       username_fragment_(std::move(username_fragment)),
+       url_(std::move(url)) {
+   PopulateFields();
++  // FORTRESS: persona srflx address. A real Chrome with default WebRTC
++  // settings gathers srflx candidates that expose the machine's public IP.
++  // Behind a proxy we rewrite that connection address to the persona egress
++  // IP (uxr-webrtc-ip) so the candidate list reads like a directly-connected
++  // machine at the proxy's location and agrees with the site's view of the
++  // client IP. Host candidates stay mDNS-obfuscated (native behavior).
++  {
++    std::string ph_ip = base::UxrConfig::GetInstance().Get("uxr-webrtc-ip");
++    if (!ph_ip.empty() && type_ == "srflx") {
++      std::string ph_line = candidate_.Utf8();
++      std::vector<std::string> ph_tokens;
++      std::string ph_tok;
++      for (char ph_c : ph_line) {
++        if (ph_c == ' ') {
++          ph_tokens.push_back(ph_tok);
++          ph_tok.clear();
++        } else {
++          ph_tok += ph_c;
++        }
++      }
++      ph_tokens.push_back(ph_tok);
++      // "candidate:<foundation> <component> <transport> <priority> <address> <port> ..."
++      if (ph_tokens.size() > 5) {
++        ph_tokens[4] = ph_ip;
++        std::string ph_out;
++        for (size_t ph_i = 0; ph_i < ph_tokens.size(); ++ph_i) {
++          if (ph_i) {
++            ph_out += ' ';
++          }
++          ph_out += ph_tokens[ph_i];
++        }
++        candidate_ = String::FromUtf8(ph_out);
++        PopulateFields();
++      }
++    }
++  }
+ }
+ 
+ void RTCIceCandidatePlatform::PopulateFields() {

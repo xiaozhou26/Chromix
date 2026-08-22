@@ -1,0 +1,84 @@
+diff --git a/third_party/blink/renderer/platform/fonts/font_cache.cc b/third_party/blink/renderer/platform/fonts/font_cache.cc
+index 3b1a90dae1..cf4455f9e7 100644
+--- a/third_party/blink/renderer/platform/fonts/font_cache.cc
++++ b/third_party/blink/renderer/platform/fonts/font_cache.cc
+@@ -44,6 +44,7 @@
+ #include "base/timer/elapsed_timer.h"
+ #include "base/trace_event/process_memory_dump.h"
+ #include "base/trace_event/trace_event.h"
++#include "base/uxr_config.h"  // FORTRESS
+ #include "build/build_config.h"
+ #include "skia/ext/font_utils.h"
+ #include "third_party/blink/public/common/features.h"
+@@ -79,6 +80,61 @@
+ 
+ namespace blink {
+ 
++namespace {
++// FORTRESS: persona font availability. Font-enumeration fingerprinting measures
++// per-family glyph metrics to list the fonts the host actually has; a Linux
++// host resolving "Ubuntu"/"Noto Color Emoji" contradicts a Windows persona.
++// When uxr-font-whitelist is set (comma-separated, case-insensitive family
++// names), every non-generic family not on the list resolves to nullptr, so CSS
++// falls through to the next family exactly as on a machine without it.
++// Unset -> native font resolution untouched.
++bool UxrFontHidden(const AtomicString& family) {
++  if (family.empty()) {
++    return false;
++  }
++  static const char* const kGenerics[] = {
++      "serif",         "sans-serif",       "monospace",  "cursive",
++      "fantasy",       "system-ui",        "math",       "emoji",
++      "fangsong",      "ui-serif",         "ui-sans-serif", "ui-monospace",
++      "ui-rounded",    "ui-fangsong",      "-webkit-body",
++      "-webkit-pictograph", "-webkit-system-font", "-webkit-control"};
++  std::string ph_name = family.LowerASCII().Utf8();
++  for (const char* ph_g : kGenerics) {
++    if (ph_name == ph_g) {
++      return false;
++    }
++  }
++  const std::string ph_list =
++      base::UxrConfig::GetInstance().Get("uxr-font-whitelist");
++  if (ph_list.empty()) {
++    return false;
++  }
++  // Substring match on comma-separated entries, both sides lowercased and
++  // space-trimmed. A quoted family with commas would break this — acceptable:
++  // persona generators emit plain family names.
++  std::string ph_norm;
++  for (char ph_c : ph_list) {
++    if (ph_c == ' ' || ph_c == '\t') {
++      continue;
++    }
++    ph_norm += (ph_c >= 'A' && ph_c <= 'Z')
++                   ? static_cast<char>(ph_c - 'A' + 'a')
++                   : ph_c;
++  }
++  size_t ph_pos = 0;
++  while (ph_pos < ph_norm.size()) {
++    const size_t ph_comma = ph_norm.find(',', ph_pos);
++    const size_t ph_end =
++        ph_comma == std::string::npos ? ph_norm.size() : ph_comma;
++    if (ph_name == ph_norm.substr(ph_pos, ph_end - ph_pos)) {
++      return false;  // whitelisted: available
++    }
++    ph_pos = ph_comma == std::string::npos ? ph_norm.size() : ph_comma + 1;
++  }
++  return true;
++}
++}  // namespace
++
+ const char kColorEmojiLocale[] = "und-Zsye";
+ const char kMonoEmojiLocale[] = "und-Zsym";
+ 
+@@ -177,6 +233,9 @@ const SimpleFontData* FontCache::GetFontData(
+     const FontDescription& font_description,
+     const AtomicString& family,
+     AlternateFontName altername_font_name) {
++  if (UxrFontHidden(family)) {  // FORTRESS: persona font availability
++    return nullptr;
++  }
+   if (const FontPlatformData* platform_data = GetFontPlatformData(
+           font_description,
+           FontFaceCreationParams(

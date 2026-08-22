@@ -1,0 +1,30 @@
+# Smithery config for the Fortress stealth-browser MCP (local stdio server).
+# https://smithery.ai/docs
+startCommand:
+  type: stdio
+  configSchema:
+    type: object
+    properties:
+      prewarm:
+        type: boolean
+        default: true
+        description: Boot the stealth browser at startup so the first tool call is instant.
+      headless:
+        type: boolean
+        default: true
+        description: Run the browser headless (false shows a window).
+      allowPrivateEgress:
+        type: boolean
+        default: false
+        description: Allow tools to reach localhost / private IPs (turns off the SSRF guard).
+    required: []
+  commandFunction: |
+    (config) => ({
+      command: "tilion-mcp",
+      args: [],
+      env: {
+        TILION_MCP_PREWARM: config.prewarm === false ? "0" : "1",
+        TILION_MCP_HEADLESS: config.headless === false ? "0" : "1",
+        TILION_ALLOW_PRIVATE_EGRESS: config.allowPrivateEgress ? "1" : "0"
+      }
+    })

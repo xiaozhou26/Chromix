@@ -1,0 +1,35 @@
+diff --git a/third_party/blink/renderer/modules/permissions/permissions.cc b/third_party/blink/renderer/modules/permissions/permissions.cc
+index e36c344035..8034c1d234 100644
+--- a/third_party/blink/renderer/modules/permissions/permissions.cc
++++ b/third_party/blink/renderer/modules/permissions/permissions.cc
+@@ -7,6 +7,7 @@
+ #include <memory>
+ #include <utility>
+ 
++#include "base/uxr_config.h"  // FORTRESS
+ #include "base/metrics/histogram_functions.h"
+ #include "third_party/blink/public/common/permissions/permission_utils.h"
+ #include "third_party/blink/public/mojom/page/page.mojom-blink.h"
+@@ -276,6 +277,22 @@ void Permissions::TaskComplete(
+       resolver->GetExecutionContext()->IsContextDestroyed())
+     return;
+ 
++  // FORTRESS: persona notification permission — the Permissions.query() side of
++  // the pair pinned by the notifications-module patch, so query() and
++  // Notification.permission can never disagree.
++  if (result && descriptor &&
++      descriptor->name == mojom::blink::PermissionName::NOTIFICATIONS) {
++    std::string ph_np =
++        base::UxrConfig::GetInstance().Get("uxr-notification-permission");
++    if (ph_np == "granted") {
++      result->status = mojom::blink::PermissionStatus::GRANTED;
++    } else if (ph_np == "denied") {
++      result->status = mojom::blink::PermissionStatus::DENIED;
++    } else if (ph_np == "default" || ph_np == "ask") {
++      result->status = mojom::blink::PermissionStatus::ASK;
++    }
++  }
++
+   PermissionStatusListener* listener = GetOrCreatePermissionStatusListener(
+       std::move(result), std::move(descriptor));
+   if (listener)

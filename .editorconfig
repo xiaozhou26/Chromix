@@ -1,0 +1,27 @@
+# https://editorconfig.org — consistent formatting across editors.
+root = true
+
+[*]
+charset = utf-8
+end_of_line = lf
+insert_final_newline = true
+trim_trailing_whitespace = true
+indent_style = space
+indent_size = 2
+
+[*.py]
+indent_size = 4
+
+[*.{sh,gn}]
+indent_size = 2
+
+[Makefile]
+indent_style = tab
+
+# Patches are verbatim diffs — do not let an editor rewrite their whitespace.
+[*.patch]
+trim_trailing_whitespace = false
+insert_final_newline = false
+
+[*.{cmd,ps1}]
+end_of_line = crlf

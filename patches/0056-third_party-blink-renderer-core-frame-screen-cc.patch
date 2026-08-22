@@ -1,0 +1,18 @@
+diff --git a/third_party/blink/renderer/core/frame/screen.cc b/third_party/blink/renderer/core/frame/screen.cc
+index ed8e2ea806..a019e890fb 100644
+--- a/third_party/blink/renderer/core/frame/screen.cc
++++ b/third_party/blink/renderer/core/frame/screen.cc
+@@ -184,6 +184,13 @@ ExecutionContext* Screen::GetExecutionContext() const {
+ }
+ 
+ bool Screen::isExtended() const {
++  {  // FORTRESS: persona multi-monitor flag. Headless reports a single
++    // display; a persona claiming a multi-screen desk can pin it here.
++    std::string ph_v = base::UxrConfig::GetInstance().Get("uxr-screen-extended");
++    if (!ph_v.empty()) {
++      return ph_v == "true" || ph_v == "1";
++    }
++  }
+   if (!DomWindow()) {
+     return false;
+   }

@@ -1,0 +1,62 @@
+diff --git a/content/browser/devtools/protocol/input_handler.cc b/content/browser/devtools/protocol/input_handler.cc
+index 19ae925ff8..22c9b8db34 100644
+--- a/content/browser/devtools/protocol/input_handler.cc
++++ b/content/browser/devtools/protocol/input_handler.cc
+@@ -13,10 +13,12 @@
+ 
+ #include "base/check.h"
+ #include "base/check_deref.h"
++#include "base/command_line.h"  // FORTRESS
+ #include "base/functional/bind.h"
+ #include "base/functional/callback.h"
+ #include "base/functional/callback_helpers.h"
+ #include "base/memory/raw_ptr.h"
++#include "base/strings/string_number_conversions.h"
+ #include "base/strings/string_split.h"
+ #include "base/strings/stringprintf.h"
+ #include "base/strings/utf_string_conversions.h"
+@@ -496,14 +498,42 @@ CreateWebMouseEvent(const std::string& event_type,
+   mouse_event->button = event_button;
+   mouse_event->click_count = click_count.value_or(0);
+   mouse_event->pointer_type = GetPointerType(pointer_type.value_or(""));
+-  mouse_event->force = force.value_or(0);
++  // FORTRESS: a real mouse reports force 0.5 while a button is held (0 when
++  // hovering); CDP's default of 0 on pressed events is a pointer-event tell.
++  if (force.has_value()) {
++    mouse_event->force = force.value();
++  } else {
++    mouse_event->force =
++        (event_button == blink::WebPointerProperties::Button::kNoButton) ? 0.0f
++                                                                         : 0.5f;
++  }
+   mouse_event->tangential_pressure = tangential_pressure.value_or(0);
+   mouse_event->tilt_x = tilt_x.value_or(0);
+   mouse_event->tilt_y = tilt_y.value_or(0);
+   mouse_event->twist = twist.value_or(0);
+ 
+   mouse_event->SetPositionInWidget(CssPixelsToPointF(x, y, scale_factor));
+-  mouse_event->SetPositionInScreen(mouse_event->PositionInWidget());
++  // FORTRESS: persona screen-space origin for CDP-synthesized mouse events.
++  // Stock CDP sets screen == widget coords, so event.screenX === clientX —
++  // a classic automation tell no real OS event produces (the OS places the
++  // cursor in screen space including the window chrome). Offset by the persona
++  // window origin + browser top-bar height so screenX/screenY read like a
++  // real pointer inside a real window. blink derives movementX/Y from these
++  // screen positions, so movement deltas stay coherent too.
++  {
++    int ph_win_x = 0;
++    int ph_win_y = 0;
++    int ph_topbar = 87;
++    const base::CommandLine* ph_cmd = base::CommandLine::ForCurrentProcess();
++    base::StringToInt(ph_cmd->GetSwitchValueASCII("uxr-window-x"), &ph_win_x);
++    base::StringToInt(ph_cmd->GetSwitchValueASCII("uxr-window-y"), &ph_win_y);
++    base::StringToInt(
++        ph_cmd->GetSwitchValueASCII("uxr-chrome-topbar-height"), &ph_topbar);
++    gfx::PointF ph_screen = mouse_event->PositionInWidget();
++    ph_screen.Offset(static_cast<float>(ph_win_x),
++                     static_cast<float>(ph_win_y + ph_topbar));
++    mouse_event->SetPositionInScreen(ph_screen);
++  }
+ 
+   return mouse_event;
+ }

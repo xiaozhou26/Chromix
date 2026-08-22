@@ -1,0 +1,54 @@
+diff --git a/third_party/blink/renderer/core/frame/local_dom_window.cc b/third_party/blink/renderer/core/frame/local_dom_window.cc
+index 08db1e8620..9c8d2cce71 100644
+--- a/third_party/blink/renderer/core/frame/local_dom_window.cc
++++ b/third_party/blink/renderer/core/frame/local_dom_window.cc
+@@ -31,6 +31,8 @@
+ #include <utility>
+ 
+ #include "base/command_line.h"
++#include "base/uxr_config.h"
++#include "base/strings/string_number_conversions.h"
+ #include "base/metrics/histogram_macros.h"
+ #include "base/task/single_thread_task_runner.h"
+ #include "base/trace_event/trace_id_helper.h"
+@@ -1664,6 +1666,12 @@ int LocalDOMWindow::outerHeight() const {
+     return 0;
+   }
+ 
++  {  // FORTRESS: persona outer height (fixes outerHeight===innerHeight headless tell)
++    int p_v = 0;
++    if (base::UxrConfig::GetInstance().GetInt("uxr-outer-height", &p_v) && p_v > 0)
++      return p_v;
++  }
++
+   LocalFrame* frame = GetFrame();
+ 
+   // FencedFrames should return innerHeight to prevent passing
+@@ -1691,6 +1699,12 @@ int LocalDOMWindow::outerWidth() const {
+     return 0;
+   }
+ 
++  {  // FORTRESS: persona outer width
++    int p_v = 0;
++    if (base::UxrConfig::GetInstance().GetInt("uxr-outer-width", &p_v) && p_v > 0)
++      return p_v;
++  }
++
+   LocalFrame* frame = GetFrame();
+ 
+   // FencedFrames should return innerWidth to prevent passing
+@@ -1911,6 +1925,14 @@ double LocalDOMWindow::devicePixelRatio() const {
+     return 0.0;
+   }
+ 
++  if (base::UxrConfig::GetInstance().Has("uxr-device-pixel-ratio")) {  // FORTRESS
++    double p_dpr = 0.0;
++    if (base::StringToDouble(
++            base::UxrConfig::GetInstance().Get("uxr-device-pixel-ratio"), &p_dpr) &&
++        p_dpr > 0.0) {
++      return p_dpr;
++    }
++  }
+   return GetFrame()->DevicePixelRatio();
+ }
+ 

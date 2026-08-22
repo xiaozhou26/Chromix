@@ -1,0 +1,127 @@
+diff --git a/third_party/blink/renderer/core/timing/performance_resource_timing.cc b/third_party/blink/renderer/core/timing/performance_resource_timing.cc
+index 5c4873cc68..ef4764f318 100644
+--- a/third_party/blink/renderer/core/timing/performance_resource_timing.cc
++++ b/third_party/blink/renderer/core/timing/performance_resource_timing.cc
+@@ -33,6 +33,8 @@
+ 
+ #include "base/containers/fixed_flat_set.h"
+ #include "base/notreached.h"
++#include "base/strings/string_number_conversions.h"  // FORTRESS
++#include "base/uxr_config.h"  // FORTRESS
+ #include "services/network/public/mojom/service_worker_router_info.mojom-blink-forward.h"
+ #include "third_party/blink/public/common/features_generated.h"
+ #include "third_party/blink/public/mojom/fetch/fetch_api_request.mojom-blink.h"
+@@ -88,6 +90,71 @@ AtomicString GetFilteredInitiatorType(const AtomicString& initiator_type) {
+   }
+   return fetch_initiator_type_names::kOther;
+ }
++
++// FORTRESS: persona network-phase timing. Through an HTTP proxy the renderer
++// never sees DNS or the inner TLS handshake, so resource timing collapses
++// (dns == 0, secureConnectionStart == fetchStart) — a durable proxy tell that
++// no real directly-connected Chrome produces. When uxr-net-timing is set we
++// synthesize small, seed- and resource-derived phase offsets for exactly the
++// degenerate fallback paths (fresh connections only; reused connections
++// legitimately collapse in real Chrome and stay native). Phases are clamped to
++// the real requestStart so monotonic ordering always holds.
++struct PersonaNetPhases {
++  bool active = false;
++  double dns_start = 0.0;
++  double dns_end = 0.0;
++  double conn_start = 0.0;
++  double ssl_start = 0.0;
++};
++
++PersonaNetPhases ComputePersonaNetPhases(double fetch_start,
++                                         double request_start,
++                                         const String& resource_name) {
++  PersonaNetPhases ph;
++  // The phase getters fall back into each other (requestStart ->
++  // connectEnd -> connectStart -> domainLookupEnd -> ...), and our overrides
++  // call requestStart() for the budget. Guard against re-entry so a fully
++  // degenerate timing blob (e.g. cache hits) cannot recurse infinitely.
++  static thread_local bool ph_busy = false;
++  if (ph_busy) {
++    return ph;
++  }
++  ph_busy = true;
++  base::UxrConfig& ph_cfg = base::UxrConfig::GetInstance();
++  if (!ph_cfg.Has("uxr-net-timing")) {
++    ph_busy = false;
++    return ph;
++  }
++  uint32_t ph_seed = 0;
++  if (ph_cfg.Has("uxr-canvas-seed")) {
++    base::StringToUint(ph_cfg.Get("uxr-canvas-seed"), &ph_seed);
++  }
++  // Per-resource salt so timings vary naturally between resources.
++  uint32_t ph_salt = ph_seed;
++  const std::string ph_name = resource_name.Utf8();
++  for (char ph_c : ph_name) {
++    ph_salt = ph_salt * 31u + static_cast<unsigned char>(ph_c);
++  }
++  ph_salt ^= ph_salt >> 15;
++  ph_salt *= 0x2545f491u;
++  ph_salt ^= ph_salt >> 13;
++
++  const double ph_dns = 2.0 + (ph_salt % 13u);        // 2..14 ms
++  const double ph_tcp = 1.0 + ((ph_salt >> 6) % 4u);  // 1..4 ms
++  const double ph_ssl = 8.0 + ((ph_salt >> 10) % 28u); // 8..35 ms
++  const double ph_total = ph_dns + ph_tcp + ph_ssl + 2.0;
++  const double ph_budget = std::max(request_start - fetch_start - 2.0, 0.0);
++  const double ph_scale = ph_total > ph_budget && ph_total > 0.0
++                              ? ph_budget / ph_total
++                              : 1.0;
++  ph.active = true;
++  ph.dns_start = fetch_start + 1.0 * ph_scale;
++  ph.dns_end = ph.dns_start + ph_dns * ph_scale;
++  ph.conn_start = ph.dns_end + 0.5 * ph_scale;
++  ph.ssl_start = ph.conn_start + ph_tcp * ph_scale;
++  ph_busy = false;
++  return ph;
++}
+ }  // namespace
+ 
+ using network::mojom::blink::NavigationDeliveryType;
+@@ -341,6 +408,13 @@ DOMHighResTimeStamp PerformanceResourceTiming::domainLookupStart() const {
+   }
+   if (!info_->timing || !info_->timing->connect_timing ||
+       info_->timing->connect_timing->domain_lookup_start.is_null()) {
++    if (!info_->did_reuse_connection) {  // FORTRESS: persona DNS phase
++      PersonaNetPhases ph = ComputePersonaNetPhases(
++          fetchStart(), requestStart(), name());
++      if (ph.active) {
++        return ph.dns_start;
++      }
++    }
+     return fetchStart();
+   }
+ 
+@@ -355,6 +429,13 @@ DOMHighResTimeStamp PerformanceResourceTiming::domainLookupEnd() const {
+   }
+   if (!info_->timing || !info_->timing->connect_timing ||
+       info_->timing->connect_timing->domain_lookup_end.is_null()) {
++    if (!info_->did_reuse_connection) {  // FORTRESS: persona DNS phase
++      PersonaNetPhases ph = ComputePersonaNetPhases(
++          fetchStart(), requestStart(), name());
++      if (ph.active) {
++        return ph.dns_end;
++      }
++    }
+     return domainLookupStart();
+   }
+ 
+@@ -418,6 +499,13 @@ DOMHighResTimeStamp PerformanceResourceTiming::secureConnectionStart() const {
+         TimeOrigin(), info_->timing->connect_timing->ssl_start,
+         info_->allow_negative_values, CrossOriginIsolatedCapability());
+   }
++  {  // FORTRESS: persona TLS phase (tunneled through a proxy -> ssl_start null)
++    PersonaNetPhases ph =
++        ComputePersonaNetPhases(fetchStart(), requestStart(), name());
++    if (ph.active) {
++      return ph.ssl_start;
++    }
++  }
+   // We would add a DCHECK(false) here but this case may happen, for instance on
+   // SXG where the behavior has not yet been properly defined. See
+   // https://github.com/w3c/navigation-timing/issues/107. Therefore, we return

@@ -1,0 +1,39 @@
+# Normalize line endings so a Windows checkout can't corrupt the patch set.
+# `git apply` on patches/*.patch is whitespace-sensitive; CRLF creep silently breaks it.
+
+# Default: normalize text to LF in the repo, let git pick the working-tree ending.
+* text=auto
+
+# These MUST stay LF everywhere (scripts run under sh; patches are applied verbatim).
+*.patch   text eol=lf
+*.sh      text eol=lf
+*.py      text eol=lf
+*.js      text eol=lf
+*.mjs     text eol=lf
+*.yml     text eol=lf
+*.yaml    text eol=lf
+*.json    text eol=lf
+*.gn      text eol=lf
+*.conf    text eol=lf
+tilion    text eol=lf
+series    text eol=lf
+Makefile  text eol=lf
+
+# Windows-only helpers keep CRLF.
+*.cmd     text eol=crlf
+*.ps1     text eol=crlf
+
+# Binary assets — never touch.
+*.png     binary
+*.jpg     binary
+*.jpeg    binary
+*.gif     binary
+*.ico     binary
+*.ttf     binary
+*.otf     binary
+*.woff    binary
+*.woff2   binary
+*.dat     binary
+*.bin     binary
+*.tar.gz  binary
+*.zip     binary

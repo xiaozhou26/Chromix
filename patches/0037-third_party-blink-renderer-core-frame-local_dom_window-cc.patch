@@ -1,0 +1,32 @@
+diff --git a/third_party/blink/renderer/core/frame/local_dom_window.cc b/third_party/blink/renderer/core/frame/local_dom_window.cc
+index 9c8d2cce71..77a8c4a043 100644
+--- a/third_party/blink/renderer/core/frame/local_dom_window.cc
++++ b/third_party/blink/renderer/core/frame/local_dom_window.cc
+@@ -1784,6 +1784,14 @@ int LocalDOMWindow::screenX() const {
+     return 0;
+   }
+ 
++  {  // FORTRESS: persona window position. Headless reports (0,0) — a maximized
++  // desktop window sits at (0,<taskbar-free>) at most resolutions, and CDP-driven
++  // synthetic input maps client coords to the screen via this origin.
++    int p_v = 0;
++    if (base::UxrConfig::GetInstance().GetInt("uxr-window-x", &p_v) && p_v >= 0)
++      return p_v;
++  }
++
+   Page* page = frame->GetPage();
+   if (!page) {
+     return 0;
+@@ -1804,6 +1812,12 @@ int LocalDOMWindow::screenY() const {
+     return 0;
+   }
+ 
++  {  // FORTRESS: persona window position (see screenX).
++    int p_v = 0;
++    if (base::UxrConfig::GetInstance().GetInt("uxr-window-y", &p_v) && p_v >= 0)
++      return p_v;
++  }
++
+   Page* page = frame->GetPage();
+   if (!page) {
+     return 0;

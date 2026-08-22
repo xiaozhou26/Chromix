@@ -1,0 +1,37 @@
+diff --git a/third_party/blink/renderer/modules/notifications/notification.cc b/third_party/blink/renderer/modules/notifications/notification.cc
+index 643d833935..d09fbdb130 100644
+--- a/third_party/blink/renderer/modules/notifications/notification.cc
++++ b/third_party/blink/renderer/modules/notifications/notification.cc
+@@ -34,6 +34,7 @@
+ #include <utility>
+ 
+ #include "base/task/single_thread_task_runner.h"
++#include "base/uxr_config.h"  // FORTRESS
+ #include "base/unguessable_token.h"
+ #include "mojo/public/cpp/bindings/pending_remote.h"
+ #include "third_party/blink/public/common/notifications/notification_constants.h"
+@@ -433,6 +434,24 @@ V8NotificationPermission Notification::permission(ExecutionContext* context) {
+     }
+   }
+ 
++  // FORTRESS: persona notification permission. Historically headless builds
++  // answered "denied" here while Permissions.query said "default" — the
++  // mismatch is a documented headless tell. Pin both surfaces to the persona
++  // (see the permissions-module patch for the query() side).
++  {
++    std::string ph_np =
++        base::UxrConfig::GetInstance().Get("uxr-notification-permission");
++    if (!ph_np.empty()) {
++      if (ph_np == "granted") {
++        return V8NotificationPermission(V8NotificationPermission::Enum::kGranted);
++      }
++      if (ph_np == "denied") {
++        return V8NotificationPermission(V8NotificationPermission::Enum::kDenied);
++      }
++      return V8NotificationPermission(V8NotificationPermission::Enum::kDefault);
++    }
++  }
++
+   mojom::blink::PermissionStatus status =
+       NotificationManager::From(context)->GetPermissionStatus();
+ 

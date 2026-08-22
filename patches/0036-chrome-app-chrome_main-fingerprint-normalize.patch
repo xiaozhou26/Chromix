@@ -1,0 +1,117 @@
+diff --git a/chrome/app/chrome_main.cc b/chrome/app/chrome_main.cc
+index b5cc00e4c8..3cc7963afa 100644
+--- a/chrome/app/chrome_main.cc
++++ b/chrome/app/chrome_main.cc
+@@ -7,6 +7,7 @@
+ #include <stdint.h>
+ 
+ #include <iostream>
++#include <vector>
+ #include <memory>
+ #include <optional>
+ 
+@@ -161,6 +162,104 @@ int ChromeMain(int argc, const char** argv) {
+ 
+   base::CommandLine* command_line(base::CommandLine::ForCurrentProcess());
+ 
++  // FORTRESS: normalize --fingerprint-* switches to --uxr-* equivalents so
++  // `chrome.exe --fingerprint-*` works directly without an SDK launcher.
++  // Only the browser process (no --process-type) performs normalization;
++  // child processes inherit the already-converted switches.
++  if (!command_line->HasSwitch(switches::kProcessType)) {
++    struct Alias { const char* fp; const char* uxr; };
++    static constexpr Alias kAliases[] = {
++      {"fingerprint-gpu-vendor",          "uxr-webgl-vendor"},
++      {"fingerprint-gpu-renderer",         "uxr-webgl-renderer"},
++      {"fingerprint-hardware-concurrency", "uxr-hw-concurrency"},
++      {"fingerprint-device-memory",       "uxr-device-memory"},
++      {"fingerprint-screen-width",        "uxr-screen-width"},
++      {"fingerprint-screen-height",       "uxr-screen-height"},
++      {"fingerprint-brand",               "uxr-ua-brand"},
++      {"fingerprint-brand-version",        "uxr-ua-full-version"},
++      {"fingerprint-platform-version",    "uxr-ua-platform-version"},
++      {"fingerprint-timezone",            "uxr-timezone"},
++      {"fingerprint-storage-quota",        "uxr-storage-quota"},
++      {"fingerprint-taskbar-height",      "uxr-taskbar-height"},
++    };
++    for (const auto& a : kAliases) {
++      if (command_line->HasSwitch(a.fp)) {
++        command_line->AppendSwitchASCII(
++            a.uxr, command_line->GetSwitchValueASCII(a.fp));
++      }
++    }
++
++    if (command_line->HasSwitch("fingerprint-locale")) {
++      const std::string loc =
++          command_line->GetSwitchValueASCII("fingerprint-locale");
++      command_line->AppendSwitchASCII("uxr-languages", loc);
++      command_line->AppendSwitchASCII("accept-lang", loc);
++    }
++
++    if (command_line->HasSwitch("fingerprint-platform")) {
++      const std::string p =
++          command_line->GetSwitchValueASCII("fingerprint-platform");
++      command_line->AppendSwitchASCII("uxr-platform", p);
++      if (p == "Win32") {
++        command_line->AppendSwitchASCII("uxr-ua-platform", "Windows");
++        command_line->AppendSwitchASCII("uxr-ua-os",
++            "Windows NT 10.0; Win64; x64");
++      } else if (p == "MacIntel") {
++        command_line->AppendSwitchASCII("uxr-ua-platform", "macOS");
++        command_line->AppendSwitchASCII("uxr-ua-os",
++            "Macintosh; Intel Mac OS X 10_15_7");
++      } else if (p == "Linux x86_64") {
++        command_line->AppendSwitchASCII("uxr-ua-platform", "Linux");
++        command_line->AppendSwitchASCII("uxr-ua-os", "Linux x86_64");
++      }
++    }
++
++    if (command_line->HasSwitch("fingerprint")) {
++      const std::string seed =
++          command_line->GetSwitchValueASCII("fingerprint");
++      if (!seed.empty() && seed != "off") {
++        if (!command_line->HasSwitch("uxr-canvas-seed"))
++          command_line->AppendSwitchASCII("uxr-canvas-seed", seed);
++        if (!command_line->HasSwitch("uxr-audio-seed"))
++          command_line->AppendSwitchASCII("uxr-audio-seed", seed);
++      }
++    }
++
++    if (command_line->HasSwitch("fingerprint-noise") &&
++        command_line->GetSwitchValueASCII("fingerprint-noise") == "false") {
++      command_line->RemoveSwitch("uxr-canvas-seed");
++      command_line->RemoveSwitch("uxr-audio-seed");
++    }
++
++    if (command_line->HasSwitch("fingerprint-sapi-voices") &&
++        command_line->GetSwitchValueASCII("fingerprint-sapi-voices") ==
++            "false") {
++      command_line->RemoveSwitch("uxr-voices");
++    }
++
++    if (command_line->HasSwitch("fingerprint") &&
++        command_line->GetSwitchValueASCII("fingerprint") == "off") {
++      const auto& sws = command_line->GetSwitches();
++      std::vector<std::string> uxr_keys;
++      for (const auto& s : sws) {
++        if (s.first.compare(0, 4, "uxr-") == 0)
++          uxr_keys.push_back(s.first);
++      }
++      for (const auto& k : uxr_keys)
++        command_line->RemoveSwitch(k);
++    }
++
++    if (command_line->HasSwitch("fingerprint-allow-3p-cookies")) {
++      command_line->AppendSwitchASCII(
++          "test-third-party-cookie-phaseout", "false");
++    }
++
++    if (command_line->HasSwitch("fingerprint-webrtc-ip")) {
++      command_line->AppendSwitchASCII("uxr-webrtc-policy",
++          "disable_non_proxied_udp");
++    }
++  }
++
+   // Capture the unpolluted command line snapshot in the browser process.
+   // This must happen immediately after CommandLine::Init to ensure we capture
+   // the state before any internal programmatic mutations.

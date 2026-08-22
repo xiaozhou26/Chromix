@@ -1,0 +1,46 @@
+diff --git a/third_party/blink/renderer/modules/webgpu/gpu_supported_limits.cc b/third_party/blink/renderer/modules/webgpu/gpu_supported_limits.cc
+index c6f066cce4..621740b7f6 100644
+--- a/third_party/blink/renderer/modules/webgpu/gpu_supported_limits.cc
++++ b/third_party/blink/renderer/modules/webgpu/gpu_supported_limits.cc
+@@ -7,6 +7,8 @@
+ #include <algorithm>
+ 
+ #include "base/numerics/checked_math.h"
++#include "base/strings/string_number_conversions.h"  // FORTRESS
++#include "base/uxr_config.h"  // FORTRESS
+ #include "third_party/blink/renderer/bindings/core/v8/v8_union_undefined_unsignedlonglongenforcerange.h"
+ #include "third_party/blink/renderer/bindings/modules/v8/v8_gpu_extent_3d_dict.h"
+ #include "third_party/blink/renderer/core/dom/dom_exception.h"
+@@ -72,6 +74,32 @@ constexpr uint64_t UndefinedLimitValue<uint64_t>() {
+ 
+ GPUSupportedLimits::GPUSupportedLimits(const ComboLimits& limits) {
+   limits.UnlinkedCopyTo(&limits_);
++  // FORTRESS: persona WebGPU limits. Dawn reports the host adapter's limits,
++  // which contradict the claimed persona GPU. Keys follow
++  // uxr-webgpu-limit-<member> (e.g. uxr-webgpu-limit-maxTextureDimension2D);
++  // an all-lowercase spelling is accepted as well. Only values explicitly set
++  // are overridden; everything else keeps the native limit.
++  {
++    base::UxrConfig& ph_cfg = base::UxrConfig::GetInstance();
++    const std::string ph_prefix = "uxr-webgpu-limit-";
++#define X_UXR(name)                                                        \
++    {                                                                      \
++      const std::string ph_member = ph_prefix + #name;                     \
++      std::string ph_lower = ph_member;                                    \
++      for (char& ph_c : ph_lower) {                                        \
++        if (ph_c >= 'A' && ph_c <= 'Z') {                                  \
++          ph_c = static_cast<char>(ph_c - 'A' + 'a');                      \
++        }                                                                  \
++      }                                                                    \
++      uint64_t ph_v = 0;                                                   \
++      if (base::StringToUint64(ph_cfg.Get(ph_member), &ph_v) ||            \
++          base::StringToUint64(ph_cfg.Get(ph_lower), &ph_v)) {             \
++        limits_.name = static_cast<decltype(limits_.name)>(ph_v);          \
++      }                                                                    \
++    }
++    SUPPORTED_LIMITS(X_UXR)
++#undef X_UXR
++  }
+ }
+ 
+ // static

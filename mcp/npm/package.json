@@ -1,0 +1,47 @@
+{
+  "name": "tilion-mcp",
+  "version": "0.1.0",
+  "description": "Stealth-browser MCP for AI agents — fetch pages behind Cloudflare / DataDome / PerimeterX / 403 / CAPTCHA, extract clean markdown & JSON, crawl sites, reverse-engineer private APIs, and drive a real undetected Chromium (Fortress). Local, no account, no key.",
+  "bin": {
+    "tilion-mcp": "cli.js"
+  },
+  "files": [
+    "cli.js",
+    "README.md"
+  ],
+  "keywords": [
+    "mcp",
+    "model-context-protocol",
+    "modelcontextprotocol",
+    "stealth-browser",
+    "undetected",
+    "anti-bot",
+    "bot-detection",
+    "cloudflare",
+    "datadome",
+    "perimeterx",
+    "captcha",
+    "web-scraping",
+    "browser-automation",
+    "playwright",
+    "fortress",
+    "tilion",
+    "agent",
+    "claude",
+    "cursor"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/tiliondev/fortress.git",
+    "directory": "mcp/npm"
+  },
+  "homepage": "https://github.com/tiliondev/fortress/tree/main/mcp",
+  "bugs": {
+    "url": "https://github.com/tiliondev/fortress/issues"
+  },
+  "author": "Tilion",
+  "license": "BSD-3-Clause",
+  "engines": {
+    "node": ">=16"
+  }
+}

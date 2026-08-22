@@ -1,0 +1,115 @@
+diff --git a/third_party/blink/renderer/modules/peerconnection/rtc_peer_connection.cc b/third_party/blink/renderer/modules/peerconnection/rtc_peer_connection.cc
+index b7f6443b95..5cc5453a73 100644
+--- a/third_party/blink/renderer/modules/peerconnection/rtc_peer_connection.cc
++++ b/third_party/blink/renderer/modules/peerconnection/rtc_peer_connection.cc
+@@ -35,6 +35,7 @@
+ #include <optional>
+ #include <string>
+ #include <utility>
++#include <vector>
+ 
+ #include "base/compiler_specific.h"
+ #include "base/containers/to_vector.h"
+@@ -42,6 +43,7 @@
+ #include "base/lazy_instance.h"
+ #include "base/memory/ptr_util.h"
+ #include "base/metrics/histogram_functions.h"
++#include "base/uxr_config.h"  // FORTRESS
+ #include "base/metrics/histogram_macros.h"
+ #include "base/notreached.h"
+ #include "base/numerics/safe_conversions.h"
+@@ -1254,17 +1256,90 @@ ScriptPromise<IDLUndefined> RTCPeerConnection::setLocalDescription(
+   return ToResolvedUndefinedPromise(script_state);
+ }
+ 
++namespace {
++// FORTRESS: persona srflx rewrite for the JS-visible local descriptions.
++// Mirrors the candidate-platform path (onicecandidate events) so that
++// localDescription.sdp and the candidate events agree: srflx connection
++// addresses become the persona egress IP (uxr-webrtc-ip). In-place + idempotent
++// so the [SameObject] description keeps object identity across reads.
++RTCSessionDescription* RewritePersonaSrflx(RTCSessionDescription* desc) {
++  if (!desc) {
++    return nullptr;
++  }
++  std::string ph_ip = base::UxrConfig::GetInstance().Get("uxr-webrtc-ip");
++  if (ph_ip.empty()) {
++    return desc;
++  }
++  const std::string ph_sdp = desc->sdp().Utf8();
++  std::string ph_out;
++  size_t ph_line_start = 0;
++  bool ph_changed = false;
++  while (ph_line_start <= ph_sdp.size()) {
++    const size_t ph_nl = ph_sdp.find('\n', ph_line_start);
++    const size_t ph_line_end =
++        ph_nl == std::string::npos ? ph_sdp.size() : ph_nl;
++    const std::string ph_line =
++        ph_sdp.substr(ph_line_start, ph_line_end - ph_line_start);
++    if (ph_line.rfind("a=candidate:", 0) == 0 &&
++        ph_line.find(" typ srflx ") != std::string::npos) {
++      std::vector<std::string> ph_tokens;
++      std::string ph_tok;
++      for (char ph_c : ph_line) {
++        if (ph_c == ' ') {
++          ph_tokens.push_back(ph_tok);
++          ph_tok.clear();
++        } else {
++          ph_tok += ph_c;
++        }
++      }
++      ph_tokens.push_back(ph_tok);
++      // a=candidate:<foundation> <component> <transport> <priority> <address> <port> ...
++      if (ph_tokens.size() > 5 && ph_tokens[4] != ph_ip) {
++        ph_tokens[4] = ph_ip;
++        std::string ph_new_line;
++        for (size_t ph_i = 0; ph_i < ph_tokens.size(); ++ph_i) {
++          if (ph_i) {
++            ph_new_line += ' ';
++          }
++          ph_new_line += ph_tokens[ph_i];
++        }
++        ph_out += ph_new_line;
++        ph_changed = true;
++      } else {
++        ph_out += ph_line;
++      }
++    } else {
++      ph_out += ph_line;
++    }
++    ph_out += '\n';
++    if (ph_nl == std::string::npos) {
++      break;
++    }
++    ph_line_start = ph_nl + 1;
++  }
++  if (ph_changed) {
++    if (!ph_out.empty() && ph_out.back() == '\n' && ph_sdp.back() != '\n') {
++      ph_out.pop_back();  // do not invent a trailing newline
++    }
++    desc->setSdp(String::FromUtf8(ph_out));
++  }
++  return desc;
++}
++}  // namespace
++
+ RTCSessionDescription* RTCPeerConnection::localDescription() const {
+-  return pending_local_description_ ? pending_local_description_
+-                                    : current_local_description_;
++  RTCSessionDescription* ph_desc = pending_local_description_
++                                       ? pending_local_description_
++                                       : current_local_description_;
++  return RewritePersonaSrflx(ph_desc);
+ }
+ 
+ RTCSessionDescription* RTCPeerConnection::currentLocalDescription() const {
+-  return current_local_description_.Get();
++  return RewritePersonaSrflx(current_local_description_.Get());
+ }
+ 
+ RTCSessionDescription* RTCPeerConnection::pendingLocalDescription() const {
+-  return pending_local_description_.Get();
++  return RewritePersonaSrflx(pending_local_description_.Get());
+ }
+ 
+ ScriptPromise<IDLUndefined> RTCPeerConnection::setRemoteDescription(

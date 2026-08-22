@@ -1,0 +1,49 @@
+diff --git a/third_party/blink/renderer/modules/screen_orientation/screen_orientation.cc b/third_party/blink/renderer/modules/screen_orientation/screen_orientation.cc
+index fce1a975e3..b0541d35e9 100644
+--- a/third_party/blink/renderer/modules/screen_orientation/screen_orientation.cc
++++ b/third_party/blink/renderer/modules/screen_orientation/screen_orientation.cc
+@@ -2,6 +2,8 @@
+ // Use of this source code is governed by a BSD-style license that can be
+ // found in the LICENSE file.
+ 
++#include "base/strings/string_number_conversions.h"  // FORTRESS
++#include "base/uxr_config.h"  // FORTRESS
+ #include "third_party/blink/renderer/modules/screen_orientation/screen_orientation.h"
+ 
+ #include <memory>
+@@ -88,10 +90,35 @@ ExecutionContext* ScreenOrientation::GetExecutionContext() const {
+ }
+ 
+ V8OrientationType ScreenOrientation::type() const {
++  // FORTRESS: persona screen orientation. Desktop Chrome is landscape-primary
++  // with angle 0; a headless host reporting anything else contradicts the
++  // desktop persona.
++  std::string ph_o = base::UxrConfig::GetInstance().Get("uxr-screen-orientation");
++  if (!ph_o.empty()) {
++    if (ph_o == "portrait-primary") {
++      return V8OrientationType(V8OrientationType::Enum::kPortraitPrimary);
++    }
++    if (ph_o == "portrait-secondary") {
++      return V8OrientationType(V8OrientationType::Enum::kPortraitSecondary);
++    }
++    if (ph_o == "landscape-secondary") {
++      return V8OrientationType(V8OrientationType::Enum::kLandscapeSecondary);
++    }
++    return V8OrientationType(V8OrientationType::Enum::kLandscapePrimary);
++  }
+   return V8OrientationType(OrientationTypeToV8Enum(type_));
+ }
+ 
+ uint16_t ScreenOrientation::angle() const {
++  {  // FORTRESS: persona orientation angle (0 for any standard desktop layout)
++    int ph_a = -1;
++    if (base::StringToInt(
++            base::UxrConfig::GetInstance().Get("uxr-screen-orientation-angle"),
++            &ph_a) &&
++        ph_a >= 0) {
++      return static_cast<uint16_t>(ph_a);
++    }
++  }
+   return angle_;
+ }
+ 
