@@ -71,9 +71,14 @@ function Invoke-Tracked {
       Get-Content $log -Tail 3 | ForEach-Object { Write-Host "    | $_" }
     }
   }
-  if (Test-Path $err) { Get-Content $err -Tail 5 | ForEach-Object { Write-Host "  ! | $_" } }
   $code = $p.ExitCode
   if ($null -eq $code) { $code = 1 }
+  if ($code -ne 0) {
+    # gclient prints most errors to stdout; surface the tail on failure so the
+    # Actions log shows WHY a step died instead of just the exit code.
+    if (Test-Path $log) { Get-Content $log -Tail 20 | ForEach-Object { Write-Host "  ! | $_" } }
+    if (Test-Path $err) { Get-Content $err -Tail 10 | ForEach-Object { Write-Host "  ! | $_" } }
+  }
   return $code
 }
 
@@ -206,20 +211,32 @@ solutions = [
   # skipped on re-run, so partial syncs resume where they left off.
   $syncOk = $false
   $attempt = 0
+  $fastFails = 0
   while ((Get-RemainingMin) -gt ($PackReserveMin + 60)) {
     $attempt++
     $budgetSec = ((Get-RemainingMin) - ($PackReserveMin + 45)) * 60
     if ($budgetSec -lt 300) { break }
     Write-Host "==> gclient sync attempt $attempt (budget $([int]($budgetSec/60)) min)"
+    $swSync = [Diagnostics.Stopwatch]::StartNew()
     $rc = Invoke-Tracked -File "cmd.exe" -ArgList "/c gclient sync --revision src@$ChromiumVersion -D --no-history --reset --jobs 8" -Cwd $Chromium -TimeoutSec $budgetSec
     if ($rc -eq 0) { $syncOk = $true; break }
+    # A sync interrupted mid-clone leaves stale git lock files; every retry then
+    # dies at the same dep within ~a minute. Sweep the locks and carry on.
+    if ($swSync.Elapsed.TotalSeconds -lt 150) { $fastFails++ } else { $fastFails = 0 }
+    if ($fastFails -ge 4) {
+      Write-Host "==> $fastFails consecutive fast failures; sweeping stale git locks"
+      Get-ChildItem "$Chromium" -Recurse -Force -Include index.lock, shallow.lock, config.lock, HEAD.lock, packed-refs.lock -ErrorAction SilentlyContinue |
+        Where-Object { $_.FullName -match "\\\.git\\" } |
+        ForEach-Object { Write-Host "    removing $($_.FullName)"; Remove-Item -Force $_.FullName -ErrorAction SilentlyContinue }
+      $fastFails = 0
+    }
     Write-Host "  sync attempt failed (exit $rc); retrying in 60s"
     Start-Sleep -Seconds 60
   }
   if (-not $syncOk) {
-    Write-Host "==> sync budget exhausted; handing partial tree to next stage"
+    Write-Host "==> sync budget exhausted; handing git state to next stage"
     Write-OutVar upload_parts true
-    . "$PSScriptRoot\ci-parts.ps1" -Root $Root -PartsDir $PartsDir
+    . "$PSScriptRoot\ci-parts.ps1" -Root $Root -PartsDir $PartsDir -Mode Unsynced
     return
   }
   # gclient leaves src detached at the pinned revision; verify before marking.
@@ -263,7 +280,7 @@ $ninjaBudget = (Get-RemainingMin) - $PackReserveMin
 if ($ninjaBudget -lt 20) {
   Write-Host "==> not enough budget left to build (<20 min); handing tree to next stage"
   Write-OutVar upload_parts true
-  . "$PSScriptRoot\ci-parts.ps1" -Root $Root -PartsDir $PartsDir
+  . "$PSScriptRoot\ci-parts.ps1" -Root $Root -PartsDir $PartsDir -Mode Synced
   return
 }
 Write-Host "==> autoninja budget: $ninjaBudget min"
@@ -279,4 +296,4 @@ if ($rc -eq 0) {
 
 Write-Host "==> ninja stopped (exit $rc, budget or mid-build failure); handing tree to next stage"
 Write-OutVar upload_parts true
-. "$PSScriptRoot\ci-parts.ps1" -Root $Root -PartsDir $PartsDir
+. "$PSScriptRoot\ci-parts.ps1" -Root $Root -PartsDir $PartsDir -Mode Synced
