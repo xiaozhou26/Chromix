@@ -1,0 +1,810 @@
+# GitHub-hosted Windows x64 build, modeled on ungoogled-chromium-windows'
+# staged CI: a full Chromium build far exceeds the 6h single-job limit, so
+# build-1..build-12 form a chain. Each stage runs build/windows/ci-stage.ps1
+# under a self-imposed ~5h budget, then snapshots C:\c (mtimes preserved) into
+# 7z volumes uploaded as artifacts; the next stage restores them and resumes
+# ninja incrementally until it returns 0.
+name: build-win-x64-github
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: build-win-x64-github
+  cancel-in-progress: false
+
+env:
+  DEPOT_TOOLS_WIN_TOOLCHAIN: '0'
+  DEPOT_TOOLS_METRICS: '0'
+  DEPOT_TOOLS_COLLECT_METRICS: '0'
+
+jobs:
+  build-1:
+    name: stage 1 (fetch + sync + first compile)
+    runs-on: windows-2022
+    timeout-minutes: 355
+    outputs:
+      finished: ${{ steps.stage.outputs.finished }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run stage 1
+        id: stage
+        shell: powershell
+        run: build\windows\ci-stage.ps1 -StageIndex 1
+      - name: Upload tree part 1
+        if: steps.stage.outputs.upload_parts == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: tree-s1-part1
+          path: C:\parts\p1\*
+          if-no-files-found: warn
+          retention-days: 3
+          compression-level: 0
+      - name: Upload tree part 2
+        if: steps.stage.outputs.upload_parts == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: tree-s1-part2
+          path: C:\parts\p2\*
+          if-no-files-found: warn
+          retention-days: 3
+          compression-level: 0
+      - name: Upload tree part 3
+        if: steps.stage.outputs.upload_parts == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: tree-s1-part3
+          path: C:\parts\p3\*
+          if-no-files-found: warn
+          retention-days: 3
+          compression-level: 0
+      - name: Upload tree part 4
+        if: steps.stage.outputs.upload_parts == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: tree-s1-part4
+          path: C:\parts\p4\*
+          if-no-files-found: warn
+          retention-days: 3
+          compression-level: 0
+      - name: Upload final bundle
+        if: steps.stage.outputs.finished == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: tilion-fortress-win-x64
+          path: C:\c\dist\tilion-fortress-win-x64.zip
+          if-no-files-found: error
+          retention-days: 7
+          compression-level: 0
+  build-2:
+    name: stage 2 (resume compile)
+    needs: build-1
+    if: needs.build-1.result == 'success' && needs.build-1.outputs.finished != 'true'
+    runs-on: windows-2022
+    timeout-minutes: 355
+    outputs:
+      finished: ${{ steps.stage.outputs.finished }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Download tree from previous stage
+        uses: actions/download-artifact@v4
+        with:
+          pattern: tree-s1-part*
+          merge-multiple: true
+          path: C:\restore
+      - name: Run stage 2
+        id: stage
+        shell: powershell
+        run: build\windows\ci-stage.ps1 -StageIndex 2 -FromArtifact
+      - name: Upload tree part 1
+        if: steps.stage.outputs.upload_parts == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: tree-s2-part1
+          path: C:\parts\p1\*
+          if-no-files-found: warn
+          retention-days: 3
+          compression-level: 0
+      - name: Upload tree part 2
+        if: steps.stage.outputs.upload_parts == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: tree-s2-part2
+          path: C:\parts\p2\*
+          if-no-files-found: warn
+          retention-days: 3
+          compression-level: 0
+      - name: Upload tree part 3
+        if: steps.stage.outputs.upload_parts == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: tree-s2-part3
+          path: C:\parts\p3\*
+          if-no-files-found: warn
+          retention-days: 3
+          compression-level: 0
+      - name: Upload tree part 4
+        if: steps.stage.outputs.upload_parts == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: tree-s2-part4
+          path: C:\parts\p4\*
+          if-no-files-found: warn
+          retention-days: 3
+          compression-level: 0
+      - name: Upload final bundle
+        if: steps.stage.outputs.finished == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: tilion-fortress-win-x64
+          path: C:\c\dist\tilion-fortress-win-x64.zip
+          if-no-files-found: error
+          retention-days: 7
+          compression-level: 0
+  build-3:
+    name: stage 3 (resume compile)
+    needs: build-2
+    if: needs.build-2.result == 'success' && needs.build-2.outputs.finished != 'true'
+    runs-on: windows-2022
+    timeout-minutes: 355
+    outputs:
+      finished: ${{ steps.stage.outputs.finished }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Download tree from previous stage
+        uses: actions/download-artifact@v4
+        with:
+          pattern: tree-s2-part*
+          merge-multiple: true
+          path: C:\restore
+      - name: Run stage 3
+        id: stage
+        shell: powershell
+        run: build\windows\ci-stage.ps1 -StageIndex 3 -FromArtifact
+      - name: Upload tree part 1
+        if: steps.stage.outputs.upload_parts == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: tree-s3-part1
+          path: C:\parts\p1\*
+          if-no-files-found: warn
+          retention-days: 3
+          compression-level: 0
+      - name: Upload tree part 2
+        if: steps.stage.outputs.upload_parts == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: tree-s3-part2
+          path: C:\parts\p2\*
+          if-no-files-found: warn
+          retention-days: 3
+          compression-level: 0
+      - name: Upload tree part 3
+        if: steps.stage.outputs.upload_parts == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: tree-s3-part3
+          path: C:\parts\p3\*
+          if-no-files-found: warn
+          retention-days: 3
+          compression-level: 0
+      - name: Upload tree part 4
+        if: steps.stage.outputs.upload_parts == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: tree-s3-part4
+          path: C:\parts\p4\*
+          if-no-files-found: warn
+          retention-days: 3
+          compression-level: 0
+      - name: Upload final bundle
+        if: steps.stage.outputs.finished == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: tilion-fortress-win-x64
+          path: C:\c\dist\tilion-fortress-win-x64.zip
+          if-no-files-found: error
+          retention-days: 7
+          compression-level: 0
+  build-4:
+    name: stage 4 (resume compile)
+    needs: build-3
+    if: needs.build-3.result == 'success' && needs.build-3.outputs.finished != 'true'
+    runs-on: windows-2022
+    timeout-minutes: 355
+    outputs:
+      finished: ${{ steps.stage.outputs.finished }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Download tree from previous stage
+        uses: actions/download-artifact@v4
+        with:
+          pattern: tree-s3-part*
+          merge-multiple: true
+          path: C:\restore
+      - name: Run stage 4
+        id: stage
+        shell: powershell
+        run: build\windows\ci-stage.ps1 -StageIndex 4 -FromArtifact
+      - name: Upload tree part 1
+        if: steps.stage.outputs.upload_parts == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: tree-s4-part1
+          path: C:\parts\p1\*
+          if-no-files-found: warn
+          retention-days: 3
+          compression-level: 0
+      - name: Upload tree part 2
+        if: steps.stage.outputs.upload_parts == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: tree-s4-part2
+          path: C:\parts\p2\*
+          if-no-files-found: warn
+          retention-days: 3
+          compression-level: 0
+      - name: Upload tree part 3
+        if: steps.stage.outputs.upload_parts == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: tree-s4-part3
+          path: C:\parts\p3\*
+          if-no-files-found: warn
+          retention-days: 3
+          compression-level: 0
+      - name: Upload tree part 4
+        if: steps.stage.outputs.upload_parts == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: tree-s4-part4
+          path: C:\parts\p4\*
+          if-no-files-found: warn
+          retention-days: 3
+          compression-level: 0
+      - name: Upload final bundle
+        if: steps.stage.outputs.finished == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: tilion-fortress-win-x64
+          path: C:\c\dist\tilion-fortress-win-x64.zip
+          if-no-files-found: error
+          retention-days: 7
+          compression-level: 0
+  build-5:
+    name: stage 5 (resume compile)
+    needs: build-4
+    if: needs.build-4.result == 'success' && needs.build-4.outputs.finished != 'true'
+    runs-on: windows-2022
+    timeout-minutes: 355
+    outputs:
+      finished: ${{ steps.stage.outputs.finished }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Download tree from previous stage
+        uses: actions/download-artifact@v4
+        with:
+          pattern: tree-s4-part*
+          merge-multiple: true
+          path: C:\restore
+      - name: Run stage 5
+        id: stage
+        shell: powershell
+        run: build\windows\ci-stage.ps1 -StageIndex 5 -FromArtifact
+      - name: Upload tree part 1
+        if: steps.stage.outputs.upload_parts == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: tree-s5-part1
+          path: C:\parts\p1\*
+          if-no-files-found: warn
+          retention-days: 3
+          compression-level: 0
+      - name: Upload tree part 2
+        if: steps.stage.outputs.upload_parts == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: tree-s5-part2
+          path: C:\parts\p2\*
+          if-no-files-found: warn
+          retention-days: 3
+          compression-level: 0
+      - name: Upload tree part 3
+        if: steps.stage.outputs.upload_parts == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: tree-s5-part3
+          path: C:\parts\p3\*
+          if-no-files-found: warn
+          retention-days: 3
+          compression-level: 0
+      - name: Upload tree part 4
+        if: steps.stage.outputs.upload_parts == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: tree-s5-part4
+          path: C:\parts\p4\*
+          if-no-files-found: warn
+          retention-days: 3
+          compression-level: 0
+      - name: Upload final bundle
+        if: steps.stage.outputs.finished == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: tilion-fortress-win-x64
+          path: C:\c\dist\tilion-fortress-win-x64.zip
+          if-no-files-found: error
+          retention-days: 7
+          compression-level: 0
+  build-6:
+    name: stage 6 (resume compile)
+    needs: build-5
+    if: needs.build-5.result == 'success' && needs.build-5.outputs.finished != 'true'
+    runs-on: windows-2022
+    timeout-minutes: 355
+    outputs:
+      finished: ${{ steps.stage.outputs.finished }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Download tree from previous stage
+        uses: actions/download-artifact@v4
+        with:
+          pattern: tree-s5-part*
+          merge-multiple: true
+          path: C:\restore
+      - name: Run stage 6
+        id: stage
+        shell: powershell
+        run: build\windows\ci-stage.ps1 -StageIndex 6 -FromArtifact
+      - name: Upload tree part 1
+        if: steps.stage.outputs.upload_parts == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: tree-s6-part1
+          path: C:\parts\p1\*
+          if-no-files-found: warn
+          retention-days: 3
+          compression-level: 0
+      - name: Upload tree part 2
+        if: steps.stage.outputs.upload_parts == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: tree-s6-part2
+          path: C:\parts\p2\*
+          if-no-files-found: warn
+          retention-days: 3
+          compression-level: 0
+      - name: Upload tree part 3
+        if: steps.stage.outputs.upload_parts == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: tree-s6-part3
+          path: C:\parts\p3\*
+          if-no-files-found: warn
+          retention-days: 3
+          compression-level: 0
+      - name: Upload tree part 4
+        if: steps.stage.outputs.upload_parts == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: tree-s6-part4
+          path: C:\parts\p4\*
+          if-no-files-found: warn
+          retention-days: 3
+          compression-level: 0
+      - name: Upload final bundle
+        if: steps.stage.outputs.finished == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: tilion-fortress-win-x64
+          path: C:\c\dist\tilion-fortress-win-x64.zip
+          if-no-files-found: error
+          retention-days: 7
+          compression-level: 0
+  build-7:
+    name: stage 7 (resume compile)
+    needs: build-6
+    if: needs.build-6.result == 'success' && needs.build-6.outputs.finished != 'true'
+    runs-on: windows-2022
+    timeout-minutes: 355
+    outputs:
+      finished: ${{ steps.stage.outputs.finished }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Download tree from previous stage
+        uses: actions/download-artifact@v4
+        with:
+          pattern: tree-s6-part*
+          merge-multiple: true
+          path: C:\restore
+      - name: Run stage 7
+        id: stage
+        shell: powershell
+        run: build\windows\ci-stage.ps1 -StageIndex 7 -FromArtifact
+      - name: Upload tree part 1
+        if: steps.stage.outputs.upload_parts == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: tree-s7-part1
+          path: C:\parts\p1\*
+          if-no-files-found: warn
+          retention-days: 3
+          compression-level: 0
+      - name: Upload tree part 2
+        if: steps.stage.outputs.upload_parts == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: tree-s7-part2
+          path: C:\parts\p2\*
+          if-no-files-found: warn
+          retention-days: 3
+          compression-level: 0
+      - name: Upload tree part 3
+        if: steps.stage.outputs.upload_parts == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: tree-s7-part3
+          path: C:\parts\p3\*
+          if-no-files-found: warn
+          retention-days: 3
+          compression-level: 0
+      - name: Upload tree part 4
+        if: steps.stage.outputs.upload_parts == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: tree-s7-part4
+          path: C:\parts\p4\*
+          if-no-files-found: warn
+          retention-days: 3
+          compression-level: 0
+      - name: Upload final bundle
+        if: steps.stage.outputs.finished == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: tilion-fortress-win-x64
+          path: C:\c\dist\tilion-fortress-win-x64.zip
+          if-no-files-found: error
+          retention-days: 7
+          compression-level: 0
+  build-8:
+    name: stage 8 (resume compile)
+    needs: build-7
+    if: needs.build-7.result == 'success' && needs.build-7.outputs.finished != 'true'
+    runs-on: windows-2022
+    timeout-minutes: 355
+    outputs:
+      finished: ${{ steps.stage.outputs.finished }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Download tree from previous stage
+        uses: actions/download-artifact@v4
+        with:
+          pattern: tree-s7-part*
+          merge-multiple: true
+          path: C:\restore
+      - name: Run stage 8
+        id: stage
+        shell: powershell
+        run: build\windows\ci-stage.ps1 -StageIndex 8 -FromArtifact
+      - name: Upload tree part 1
+        if: steps.stage.outputs.upload_parts == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: tree-s8-part1
+          path: C:\parts\p1\*
+          if-no-files-found: warn
+          retention-days: 3
+          compression-level: 0
+      - name: Upload tree part 2
+        if: steps.stage.outputs.upload_parts == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: tree-s8-part2
+          path: C:\parts\p2\*
+          if-no-files-found: warn
+          retention-days: 3
+          compression-level: 0
+      - name: Upload tree part 3
+        if: steps.stage.outputs.upload_parts == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: tree-s8-part3
+          path: C:\parts\p3\*
+          if-no-files-found: warn
+          retention-days: 3
+          compression-level: 0
+      - name: Upload tree part 4
+        if: steps.stage.outputs.upload_parts == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: tree-s8-part4
+          path: C:\parts\p4\*
+          if-no-files-found: warn
+          retention-days: 3
+          compression-level: 0
+      - name: Upload final bundle
+        if: steps.stage.outputs.finished == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: tilion-fortress-win-x64
+          path: C:\c\dist\tilion-fortress-win-x64.zip
+          if-no-files-found: error
+          retention-days: 7
+          compression-level: 0
+  build-9:
+    name: stage 9 (resume compile)
+    needs: build-8
+    if: needs.build-8.result == 'success' && needs.build-8.outputs.finished != 'true'
+    runs-on: windows-2022
+    timeout-minutes: 355
+    outputs:
+      finished: ${{ steps.stage.outputs.finished }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Download tree from previous stage
+        uses: actions/download-artifact@v4
+        with:
+          pattern: tree-s8-part*
+          merge-multiple: true
+          path: C:\restore
+      - name: Run stage 9
+        id: stage
+        shell: powershell
+        run: build\windows\ci-stage.ps1 -StageIndex 9 -FromArtifact
+      - name: Upload tree part 1
+        if: steps.stage.outputs.upload_parts == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: tree-s9-part1
+          path: C:\parts\p1\*
+          if-no-files-found: warn
+          retention-days: 3
+          compression-level: 0
+      - name: Upload tree part 2
+        if: steps.stage.outputs.upload_parts == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: tree-s9-part2
+          path: C:\parts\p2\*
+          if-no-files-found: warn
+          retention-days: 3
+          compression-level: 0
+      - name: Upload tree part 3
+        if: steps.stage.outputs.upload_parts == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: tree-s9-part3
+          path: C:\parts\p3\*
+          if-no-files-found: warn
+          retention-days: 3
+          compression-level: 0
+      - name: Upload tree part 4
+        if: steps.stage.outputs.upload_parts == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: tree-s9-part4
+          path: C:\parts\p4\*
+          if-no-files-found: warn
+          retention-days: 3
+          compression-level: 0
+      - name: Upload final bundle
+        if: steps.stage.outputs.finished == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: tilion-fortress-win-x64
+          path: C:\c\dist\tilion-fortress-win-x64.zip
+          if-no-files-found: error
+          retention-days: 7
+          compression-level: 0
+  build-10:
+    name: stage 10 (resume compile)
+    needs: build-9
+    if: needs.build-9.result == 'success' && needs.build-9.outputs.finished != 'true'
+    runs-on: windows-2022
+    timeout-minutes: 355
+    outputs:
+      finished: ${{ steps.stage.outputs.finished }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Download tree from previous stage
+        uses: actions/download-artifact@v4
+        with:
+          pattern: tree-s9-part*
+          merge-multiple: true
+          path: C:\restore
+      - name: Run stage 10
+        id: stage
+        shell: powershell
+        run: build\windows\ci-stage.ps1 -StageIndex 10 -FromArtifact
+      - name: Upload tree part 1
+        if: steps.stage.outputs.upload_parts == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: tree-s10-part1
+          path: C:\parts\p1\*
+          if-no-files-found: warn
+          retention-days: 3
+          compression-level: 0
+      - name: Upload tree part 2
+        if: steps.stage.outputs.upload_parts == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: tree-s10-part2
+          path: C:\parts\p2\*
+          if-no-files-found: warn
+          retention-days: 3
+          compression-level: 0
+      - name: Upload tree part 3
+        if: steps.stage.outputs.upload_parts == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: tree-s10-part3
+          path: C:\parts\p3\*
+          if-no-files-found: warn
+          retention-days: 3
+          compression-level: 0
+      - name: Upload tree part 4
+        if: steps.stage.outputs.upload_parts == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: tree-s10-part4
+          path: C:\parts\p4\*
+          if-no-files-found: warn
+          retention-days: 3
+          compression-level: 0
+      - name: Upload final bundle
+        if: steps.stage.outputs.finished == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: tilion-fortress-win-x64
+          path: C:\c\dist\tilion-fortress-win-x64.zip
+          if-no-files-found: error
+          retention-days: 7
+          compression-level: 0
+  build-11:
+    name: stage 11 (resume compile)
+    needs: build-10
+    if: needs.build-10.result == 'success' && needs.build-10.outputs.finished != 'true'
+    runs-on: windows-2022
+    timeout-minutes: 355
+    outputs:
+      finished: ${{ steps.stage.outputs.finished }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Download tree from previous stage
+        uses: actions/download-artifact@v4
+        with:
+          pattern: tree-s10-part*
+          merge-multiple: true
+          path: C:\restore
+      - name: Run stage 11
+        id: stage
+        shell: powershell
+        run: build\windows\ci-stage.ps1 -StageIndex 11 -FromArtifact
+      - name: Upload tree part 1
+        if: steps.stage.outputs.upload_parts == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: tree-s11-part1
+          path: C:\parts\p1\*
+          if-no-files-found: warn
+          retention-days: 3
+          compression-level: 0
+      - name: Upload tree part 2
+        if: steps.stage.outputs.upload_parts == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: tree-s11-part2
+          path: C:\parts\p2\*
+          if-no-files-found: warn
+          retention-days: 3
+          compression-level: 0
+      - name: Upload tree part 3
+        if: steps.stage.outputs.upload_parts == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: tree-s11-part3
+          path: C:\parts\p3\*
+          if-no-files-found: warn
+          retention-days: 3
+          compression-level: 0
+      - name: Upload tree part 4
+        if: steps.stage.outputs.upload_parts == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: tree-s11-part4
+          path: C:\parts\p4\*
+          if-no-files-found: warn
+          retention-days: 3
+          compression-level: 0
+      - name: Upload final bundle
+        if: steps.stage.outputs.finished == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: tilion-fortress-win-x64
+          path: C:\c\dist\tilion-fortress-win-x64.zip
+          if-no-files-found: error
+          retention-days: 7
+          compression-level: 0
+  build-12:
+    name: stage 12 (resume compile)
+    needs: build-11
+    if: needs.build-11.result == 'success' && needs.build-11.outputs.finished != 'true'
+    runs-on: windows-2022
+    timeout-minutes: 355
+    outputs:
+      finished: ${{ steps.stage.outputs.finished }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Download tree from previous stage
+        uses: actions/download-artifact@v4
+        with:
+          pattern: tree-s11-part*
+          merge-multiple: true
+          path: C:\restore
+      - name: Run stage 12
+        id: stage
+        shell: powershell
+        run: build\windows\ci-stage.ps1 -StageIndex 12 -FromArtifact
+      - name: Upload tree part 1
+        if: steps.stage.outputs.upload_parts == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: tree-s12-part1
+          path: C:\parts\p1\*
+          if-no-files-found: warn
+          retention-days: 3
+          compression-level: 0
+      - name: Upload tree part 2
+        if: steps.stage.outputs.upload_parts == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: tree-s12-part2
+          path: C:\parts\p2\*
+          if-no-files-found: warn
+          retention-days: 3
+          compression-level: 0
+      - name: Upload tree part 3
+        if: steps.stage.outputs.upload_parts == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: tree-s12-part3
+          path: C:\parts\p3\*
+          if-no-files-found: warn
+          retention-days: 3
+          compression-level: 0
+      - name: Upload tree part 4
+        if: steps.stage.outputs.upload_parts == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: tree-s12-part4
+          path: C:\parts\p4\*
+          if-no-files-found: warn
+          retention-days: 3
+          compression-level: 0
+      - name: Upload final bundle
+        if: steps.stage.outputs.finished == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: tilion-fortress-win-x64
+          path: C:\c\dist\tilion-fortress-win-x64.zip
+          if-no-files-found: error
+          retention-days: 7
+          compression-level: 0
+
+  complete:
+    name: ensure build finished
+    needs: [build-1, build-2, build-3, build-4, build-5, build-6, build-7, build-8, build-9, build-10, build-11, build-12]
+    runs-on: ubuntu-latest
+    if: ${{ !cancelled() }}
+    steps:
+      - name: Assert some stage reported finished
+        run: |
+          f="${{ join(needs.*.outputs.finished) }}"
+          case "$f" in
+            *true*) echo "Build finished; tilion-fortress-win-x64 artifact uploaded." ;;
+            *) echo "Build did not finish within 12 stages."; exit 1 ;;
+          esac
