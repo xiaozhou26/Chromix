@@ -46,7 +46,7 @@ function Invoke-Tracked {
   while (-not $process.HasExited) {
     if ($stopwatch.Elapsed.TotalSeconds -gt $TimeoutSec) {
       Write-Host "==> timeout after $([int]$stopwatch.Elapsed.TotalMinutes) min; killing process tree"
-      & taskkill.exe /PID $process.Id /T /F 2>$null | Out-Null
+      try { & taskkill.exe /PID $process.Id /T /F 2>&1 | Out-Null } catch {}
       $process.WaitForExit()
       Start-Sleep -Seconds 2
       return 124
