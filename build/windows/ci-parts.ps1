@@ -5,11 +5,11 @@
 
   Modes (a full gclient tree is ~80 GB with ~600 dependency .git dirs, which
   does not fit the runner disk next to its own archive, nor the 4x9 GB
-  artifact slots — so .git state and working tree are never packed together):
+  artifact slots - so .git state and working tree are never packed together):
 
     Synced    Source is synced + patched: pack the working tree (incl. out\)
-              WITHOUT .git — later stages only run gn/ninja, which need no git.
-    Unsynced  Sync budget ran out: pack ONLY .gclient* + every .git dir — the
+              WITHOUT .git - later stages only run gn/ninja, which need no git.
+    Unsynced  Sync budget ran out: pack ONLY .gclient* + every .git dir - the
               next stage's `gclient sync` rebuilds working trees from the
               local git objects instead of re-downloading them.
 
@@ -34,7 +34,7 @@ function Get-FreeGB { [math]::Round((Get-PSDrive C).Free / 1GB, 1) }
 
 $freeBefore = Get-FreeGB
 if ($freeBefore -lt 12) {
-  throw "only $freeBefore GB free — not enough to create volumes alongside the tree"
+  throw "only $freeBefore GB free - not enough to create volumes alongside the tree"
 }
 
 Write-Host "==> packing $Root into 7z volumes at $PartsDir (mode: $Mode; disk: $freeBefore GB free)"
@@ -64,7 +64,7 @@ Write-Host "==> packed in $([int]$sw.Elapsed.TotalMinutes) min; disk now: $(Get-
 
 $vols = @(Get-ChildItem "$PartsDir\stage\tree.7z.*" | Sort-Object Name)
 if ($vols.Count -gt $MaxSlots) {
-  throw "$($vols.Count) volumes exceed the $MaxSlots upload slots (~$([math]::Round(($vols | Measure-Object Length -Sum).Sum/1GB,1)) GB total) — tree too large to hand off"
+  throw "$($vols.Count) volumes exceed the $MaxSlots upload slots (~$([math]::Round(($vols | Measure-Object Length -Sum).Sum/1GB,1)) GB total) - tree too large to hand off"
 }
 Write-Host "==> $($vols.Count) volumes, distributing round-robin into p1..p$MaxSlots"
 for ($i = 0; $i -lt $vols.Count; $i++) {

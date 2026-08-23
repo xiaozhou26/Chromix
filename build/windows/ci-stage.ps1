@@ -122,7 +122,7 @@ function Free-Disk {
 }
 
 # gn gen runs vs_toolchain.py copy_dlls, which requires dbghelp.dll from the
-# Windows SDK "Debugging Tools" feature — not preinstalled on GitHub runners.
+# Windows SDK "Debugging Tools" feature - not preinstalled on GitHub runners.
 function Install-Debuggers {
   $dbg = "${env:ProgramFiles(x86)}\Windows Kits\10\Debuggers\x64\dbghelp.dll"
   if (Test-Path $dbg) { Write-Host "==> debugging tools already present"; return }
@@ -206,9 +206,13 @@ solutions = [
 '@ | Set-Content -Path "$Chromium\.gclient" -Encoding ASCII
   }
 
-  # gclient sync pinned to the tag: googlesource rate-limits (HTTP 429)
-  # transiently, so retry within the remaining budget; already-cloned deps are
-  # skipped on re-run, so partial syncs resume where they left off.
+  # gclient sync pinned to the tag, deps only: googlesource rate-limits (HTTP
+  # 429) transiently, so retry within the remaining budget; already-cloned deps
+  # are skipped on re-run, so partial syncs resume where they left off. Hooks
+  # run manually below -- gclient's parallel hook phase failed silently and
+  # repeatably on runners (exact ~60s death, no error text in either stream),
+  # and at 151 the clang/rust toolchains are GCS *deps*, not hooks, so only a
+  # handful of small hooks are actually needed to build.
   $syncOk = $false
   $attempt = 0
   $fastFails = 0
@@ -218,7 +222,7 @@ solutions = [
     if ($budgetSec -lt 300) { break }
     Write-Host "==> gclient sync attempt $attempt (budget $([int]($budgetSec/60)) min)"
     $swSync = [Diagnostics.Stopwatch]::StartNew()
-    $rc = Invoke-Tracked -File "cmd.exe" -ArgList "/c gclient sync --revision src@$ChromiumVersion -D --no-history --reset --jobs 8" -Cwd $Chromium -TimeoutSec $budgetSec
+    $rc = Invoke-Tracked -File "cmd.exe" -ArgList "/c gclient sync --nohooks --revision src@$ChromiumVersion -D --no-history --reset --jobs 8" -Cwd $Chromium -TimeoutSec $budgetSec
     if ($rc -eq 0) { $syncOk = $true; break }
     # A sync interrupted mid-clone leaves stale git lock files; every retry then
     # dies at the same dep within ~a minute. Sweep the locks and carry on.
@@ -246,6 +250,41 @@ solutions = [
     $want = & git rev-parse "refs/tags/$ChromiumVersion^{commit}"
     if ($head -ne $want) { throw "src is at $head, expected tag $ChromiumVersion ($want)" }
   } finally { Pop-Location }
+
+  # The build-relevant subset of DEPS hooks, run one by one with logging.
+  $hooks = @(
+    @{ Desc = "vpython bootstrap";  Cwd = $Chromium; Cmd = "vpython3 -vpython-spec src/.vpython3 -vpython-tool install" },
+    @{ Desc = "landmines";           Cwd = $Chromium; Cmd = "python3 src/build/landmines.py" },
+    @{ Desc = "vs_toolchain update"; Cwd = $Chromium; Cmd = "python3 src/build/vs_toolchain.py update --force" },
+    @{ Desc = "lastchange";          Cwd = $Chromium; Cmd = "python3 src/build/util/lastchange.py -o src/build/util/LASTCHANGE" },
+    @{ Desc = "gpu lists version";   Cwd = $Chromium; Cmd = "python3 src/build/util/lastchange.py -m GPU_LISTS_VERSION --revision-id-only --header src/gpu/config/gpu_lists_version.h" },
+    @{ Desc = "skia commit hash";    Cwd = $Chromium; Cmd = "python3 src/build/util/lastchange.py -m SKIA_COMMIT_HASH -s src/third_party/skia --header src/skia/ext/skia_commit_hash.h" },
+    @{ Desc = "dawn commit hash";    Cwd = $Chromium; Cmd = "python3 src/build/util/lastchange.py -m DAWN_COMMIT_HASH -s src/third_party/dawn --revision src/gpu/webgpu/DAWN_VERSION --header src/gpu/webgpu/dawn_commit_hash.h" },
+    @{ Desc = "rc.exe (resource compiler)"; Cwd = $Chromium; Cmd = "python3 src/third_party/depot_tools/download_from_google_storage.py --no_resume --bucket chromium-browser-clang/rc -s src/build/toolchain/win/rc/win/rc.exe.sha1" },
+    @{ Desc = "devtools rollup libs"; Cwd = "$Src\third_party\devtools-frontend\src"; Cmd = "vpython3.bat scripts/deps/sync_rollup_libs.py"; Optional = $true }
+  )
+  foreach ($h in $hooks) {
+    if ((Get-RemainingMin) -lt ($PackReserveMin + 25)) {
+      Write-Host "==> hook budget exhausted before '$($h.Desc)'"
+      Write-OutVar upload_parts true
+      . "$PSScriptRoot\ci-parts.ps1" -Root $Root -PartsDir $PartsDir -Mode Unsynced
+      return
+    }
+    $hookRc = 1
+    for ($try = 1; $try -le 3; $try++) {
+      Write-Host "==> hook [$($h.Desc)] attempt $try"
+      $hookRc = Invoke-Tracked -File "cmd.exe" -ArgList "/c $($h.Cmd)" -Cwd $h.Cwd -TimeoutSec 600
+      if ($hookRc -eq 0) { break }
+      Start-Sleep -Seconds 20
+    }
+    if ($hookRc -ne 0) {
+      if ($h.Optional) {
+        Write-Host "==> optional hook failed (continuing): $($h.Desc)"
+      } else {
+        throw "hook failed after retries: $($h.Desc)"
+      }
+    }
+  }
   Set-Content -Path "$Src\.chromix-synced" -Value $ChromiumVersion
 
   # Apply Chromix patches (only after a fully synced tree at the pinned tag).
