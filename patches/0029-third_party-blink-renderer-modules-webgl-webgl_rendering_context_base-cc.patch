@@ -1,5 +1,5 @@
 diff --git a/third_party/blink/renderer/modules/webgl/webgl_rendering_context_base.cc b/third_party/blink/renderer/modules/webgl/webgl_rendering_context_base.cc
-index 319e17ecde..f407355285 100644
+index 8a2decf999..cb167de3b5 100644
 --- a/third_party/blink/renderer/modules/webgl/webgl_rendering_context_base.cc
 +++ b/third_party/blink/renderer/modules/webgl/webgl_rendering_context_base.cc
 @@ -39,6 +39,9 @@
@@ -128,10 +128,12 @@ index 319e17ecde..f407355285 100644
        return WebGLAny(
            script_state,
            StrCat({"WebGL 1.0 (", String(ContextGL()->GetString(GL_VERSION)),
-@@ -4191,8 +4266,15 @@ ScriptValue WebGLRenderingContextBase::getParameter(ScriptState* script_state,
+@@ -4191,10 +4282,15 @@ ScriptValue WebGLRenderingContextBase::getParameter(ScriptState* script_state,
        return ScriptValue::CreateNull(script_state->GetIsolate());
      case WebGLDebugRendererInfo::kUnmaskedRendererWebgl:
        if (ExtensionEnabled(kWebGLDebugRendererInfoName)) {
+-        if (base::FeatureList::IsEnabled(blink::features::kSpoofWebGLInfo))
+-          return WebGLAny(script_state, String(blink::features::kSpoofWebGLRendererParam.Get()));
 -        return WebGLAny(script_state,
 -                        String(ContextGL()->GetString(GL_RENDERER)));
 +        // UXR patch #3: switch-driven renderer (dynamic persona).
@@ -146,10 +148,12 @@ index 319e17ecde..f407355285 100644
        }
        SynthesizeGLError(
            GL_INVALID_ENUM, "getParameter",
-@@ -4200,8 +4282,12 @@ ScriptValue WebGLRenderingContextBase::getParameter(ScriptState* script_state,
+@@ -4202,10 +4298,12 @@ ScriptValue WebGLRenderingContextBase::getParameter(ScriptState* script_state,
        return ScriptValue::CreateNull(script_state->GetIsolate());
      case WebGLDebugRendererInfo::kUnmaskedVendorWebgl:
        if (ExtensionEnabled(kWebGLDebugRendererInfoName)) {
+-        if (base::FeatureList::IsEnabled(blink::features::kSpoofWebGLInfo))
+-          return WebGLAny(script_state, String(blink::features::kSpoofWebGLVendorParam.Get()));
 -        return WebGLAny(script_state,
 -                        String(ContextGL()->GetString(GL_VENDOR)));
 +        // UXR patch #3: switch-driven vendor (dynamic persona).
@@ -161,7 +165,7 @@ index 319e17ecde..f407355285 100644
        }
        SynthesizeGLError(
            GL_INVALID_ENUM, "getParameter",
-@@ -4497,6 +4583,16 @@ WebGLShaderPrecisionFormat* WebGLRenderingContextBase::getShaderPrecisionFormat(
+@@ -4501,6 +4599,16 @@ WebGLShaderPrecisionFormat* WebGLRenderingContextBase::getShaderPrecisionFormat(
        return nullptr;
    }
  
