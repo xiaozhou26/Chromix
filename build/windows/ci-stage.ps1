@@ -25,6 +25,7 @@
 [CmdletBinding()]
 param(
   [int]$StageIndex = 1,
+  [int]$MaxStages = 12,
   [switch]$FromArtifact
 )
 $ErrorActionPreference = "Stop"
@@ -46,6 +47,7 @@ function Write-OutVar($k, $v) {
   Write-Host "==> outvar $k=$v"
 }
 function Get-RemainingMin { [int]((New-TimeSpan -Start (Get-Date) -End $Deadline).TotalMinutes) }
+function Test-LastStage { $StageIndex -ge $MaxStages }
 
 # Run a console command as a tracked child process: stream tail of its output
 # into the Actions log, kill the whole tree on timeout. Returns exit code
@@ -83,6 +85,43 @@ function Invoke-Tracked {
 }
 
 function Get-FreeGB { [math]::Round((Get-PSDrive C).Free / 1GB, 1) }
+
+function Resolve-7Zip {
+  $cmd = Get-Command 7z.exe -ErrorAction SilentlyContinue
+  if ($cmd) { return $cmd.Source }
+  $installed = "$env:ProgramFiles\7-Zip\7z.exe"
+  if (Test-Path $installed) { return $installed }
+  throw "7z.exe is not available"
+}
+
+function Save-Handoff {
+  param([ValidateSet("Synced", "Unsynced")] [string]$Mode)
+  if (Test-LastStage) {
+    throw "build did not finish within $MaxStages stages"
+  }
+  Write-OutVar upload_parts true
+  . "$PSScriptRoot\ci-parts.ps1" -Root $Root -PartsDir $PartsDir -Mode $Mode
+}
+
+function Assert-CiScripts {
+  foreach ($path in @(
+    "$PSScriptRoot\ci-stage.ps1",
+    "$PSScriptRoot\ci-parts.ps1",
+    "$PSScriptRoot\package-win.ps1"
+  )) {
+    $bytes = [IO.File]::ReadAllBytes($path)
+    if ($bytes | Where-Object { $_ -gt 127 } | Select-Object -First 1) {
+      throw "$path contains non-ASCII bytes; Windows PowerShell 5.1 may misparse UTF-8 without a BOM"
+    }
+    $tokens = $null
+    $errors = $null
+    [Management.Automation.Language.Parser]::ParseFile($path, [ref]$tokens, [ref]$errors) | Out-Null
+    if ($errors.Count -gt 0) {
+      throw "$path failed PowerShell parsing: $($errors[0].Message)"
+    }
+  }
+  Write-Host "==> CI PowerShell preflight passed"
+}
 
 function Free-Disk {
   Write-Host "==> disk before cleanup: $(Get-FreeGB) GB free"
@@ -154,6 +193,7 @@ Write-OutVar finished false
 Write-OutVar upload_parts false
 
 # ---------------------------------------------------------------- environment
+Assert-CiScripts
 Free-Disk
 Install-Debuggers
 git config --global core.longpaths true
@@ -178,16 +218,32 @@ Remove-Item Env:PYTHONUTF8 -ErrorAction SilentlyContinue
 Remove-Item Env:PYTHONIOENCODING -ErrorAction SilentlyContinue
 
 # ---------------------------------------------------------------- restore tree
+if ($FromArtifact -and -not (Test-Path "C:\restore\tree.7z.001")) {
+  throw "resume artifact missing: C:\restore\tree.7z.001"
+}
+if (-not $FromArtifact -and $StageIndex -gt 1) {
+  throw "stage $StageIndex requires -FromArtifact"
+}
 if ($FromArtifact -and (Test-Path "C:\restore\tree.7z.001")) {
+  Write-Host "==> validating build tree from previous stage"
+  $sevenZip = Resolve-7Zip
+  & $sevenZip t "C:\restore\tree.7z.001" | Select-Object -Last 3
+  if ($LASTEXITCODE -ne 0) { throw "7z archive test failed (exit $LASTEXITCODE)" }
   Write-Host "==> restoring build tree from previous stage ($(Get-RemainingMin) min left)"
-  & 7z.exe x "C:\restore\tree.7z.001" -o"$Root" -y | Select-Object -Last 3
+  & $sevenZip x "C:\restore\tree.7z.001" -o"$Root" -y | Select-Object -Last 3
   if ($LASTEXITCODE -ne 0) { throw "7z restore failed (exit $LASTEXITCODE)" }
   Remove-Item C:\restore -Recurse -Force -ErrorAction SilentlyContinue
   Write-Host "==> restore done; disk: $(Get-FreeGB) GB free; remaining $(Get-RemainingMin) min"
 }
 
 # ---------------------------------------------------------------- fetch + sync
-if (-not (Test-Path "$Src\.chromix-synced")) {
+$syncedMarker = "$Src\.chromix-synced"
+$patchedMarker = "$Src\.chromix-patched"
+$sourceReady = (Test-Path $syncedMarker) -and (Test-Path $patchedMarker) -and
+  ((Get-Content $syncedMarker -Raw).Trim() -eq $ChromiumVersion) -and
+  ((Get-Content $patchedMarker -Raw).Trim() -eq $ChromiumVersion)
+if (-not $sourceReady) {
+  Remove-Item $syncedMarker, $patchedMarker -Force -ErrorAction SilentlyContinue
   # Hand-written .gclient: clone src from the GitHub mirror, which is fast and
   # reliable from Azure runner IPs (googlesource rate-limits them hard; it
   # killed the initial 2 GB src clone ~10 min in on the first CI attempt).
@@ -239,8 +295,7 @@ solutions = [
   }
   if (-not $syncOk) {
     Write-Host "==> sync budget exhausted; handing git state to next stage"
-    Write-OutVar upload_parts true
-    . "$PSScriptRoot\ci-parts.ps1" -Root $Root -PartsDir $PartsDir -Mode Unsynced
+    Save-Handoff -Mode Unsynced
     return
   }
   # gclient leaves src detached at the pinned revision; verify before marking.
@@ -251,23 +306,32 @@ solutions = [
     if ($head -ne $want) { throw "src is at $head, expected tag $ChromiumVersion ($want)" }
   } finally { Pop-Location }
 
-  # The build-relevant subset of DEPS hooks, run one by one with logging.
+  # Run the unconditional and Windows hooks observed in Chromium 151's DEPS.
+  # The recursive DevTools hook is last because gclient previously returned 1
+  # immediately after it; running hooks one by one makes the exact failure clear.
   $hooks = @(
-    @{ Desc = "vpython bootstrap";  Cwd = $Chromium; Cmd = "vpython3 -vpython-spec src/.vpython3 -vpython-tool install" },
-    @{ Desc = "landmines";           Cwd = $Chromium; Cmd = "python3 src/build/landmines.py" },
+    @{ Desc = "vpython bootstrap"; Cwd = $Chromium; Cmd = "vpython3.bat -vpython-spec src/.vpython3 -vpython-tool install" },
+    @{ Desc = "landmines"; Cwd = $Chromium; Cmd = "python3 src/build/landmines.py" },
+    @{ Desc = "disable depot_tools self-update"; Cwd = $Chromium; Cmd = "python3 src/third_party/depot_tools/update_depot_tools_toggle.py --disable" },
+    @{ Desc = "remove stale files"; Cwd = $Chromium; Cmd = "python3 src/tools/remove_stale_files.py src/third_party/test_fonts/test_fonts.tar.gz src/third_party/node/node_modules.tar.gz src/third_party/tfhub_models src/tools/clang/crashreports" },
+    @{ Desc = "remove stale pyc files"; Cwd = $Chromium; Cmd = "python3 src/tools/remove_stale_pyc_files.py src/android_webview/tools src/build/android src/gpu/gles2_conform_support src/infra src/ppapi src/printing src/third_party/blink/renderer/build/scripts src/third_party/blink/tools src/third_party/catapult src/third_party/mako src/tools" },
     @{ Desc = "vs_toolchain update"; Cwd = $Chromium; Cmd = "python3 src/build/vs_toolchain.py update --force" },
-    @{ Desc = "lastchange";          Cwd = $Chromium; Cmd = "python3 src/build/util/lastchange.py -o src/build/util/LASTCHANGE" },
-    @{ Desc = "gpu lists version";   Cwd = $Chromium; Cmd = "python3 src/build/util/lastchange.py -m GPU_LISTS_VERSION --revision-id-only --header src/gpu/config/gpu_lists_version.h" },
-    @{ Desc = "skia commit hash";    Cwd = $Chromium; Cmd = "python3 src/build/util/lastchange.py -m SKIA_COMMIT_HASH -s src/third_party/skia --header src/skia/ext/skia_commit_hash.h" },
-    @{ Desc = "dawn commit hash";    Cwd = $Chromium; Cmd = "python3 src/build/util/lastchange.py -m DAWN_COMMIT_HASH -s src/third_party/dawn --revision src/gpu/webgpu/DAWN_VERSION --header src/gpu/webgpu/dawn_commit_hash.h" },
-    @{ Desc = "rc.exe (resource compiler)"; Cwd = $Chromium; Cmd = "python3 src/third_party/depot_tools/download_from_google_storage.py --no_resume --bucket chromium-browser-clang/rc -s src/build/toolchain/win/rc/win/rc.exe.sha1" },
-    @{ Desc = "devtools rollup libs"; Cwd = "$Src\third_party\devtools-frontend\src"; Cmd = "vpython3.bat scripts/deps/sync_rollup_libs.py"; Optional = $true }
+    @{ Desc = "lastchange"; Cwd = $Chromium; Cmd = "python3 src/build/util/lastchange.py -o src/build/util/LASTCHANGE" },
+    @{ Desc = "gpu lists version"; Cwd = $Chromium; Cmd = "python3 src/build/util/lastchange.py -m GPU_LISTS_VERSION --revision-id-only --header src/gpu/config/gpu_lists_version.h" },
+    @{ Desc = "skia commit hash"; Cwd = $Chromium; Cmd = "python3 src/build/util/lastchange.py -m SKIA_COMMIT_HASH -s src/third_party/skia --header src/skia/ext/skia_commit_hash.h" },
+    @{ Desc = "dawn commit hash"; Cwd = $Chromium; Cmd = "python3 src/build/util/lastchange.py -m DAWN_COMMIT_HASH -s src/third_party/dawn --revision src/gpu/webgpu/DAWN_VERSION --header src/gpu/webgpu/dawn_commit_hash.h" },
+    @{ Desc = "rc.exe resource compiler"; Cwd = $Chromium; Cmd = "python3 src/third_party/depot_tools/download_from_google_storage.py --no_resume --bucket chromium-browser-clang/rc -s src/build/toolchain/win/rc/win/rc.exe.sha1" },
+    @{ Desc = "Apache Win32 binaries"; Cwd = $Chromium; Cmd = "python3 src/third_party/depot_tools/download_from_google_storage.py --no_resume --directory --recursive --num_threads=16 --bucket chromium-apache-win32 src/third_party/apache-win32" },
+    @{ Desc = "location tags"; Cwd = $Chromium; Cmd = "python3 src/testing/generate_location_tags.py --out src/testing/location_tags.json" },
+    @{ Desc = "reclient config"; Cwd = $Chromium; Cmd = "python3 src/buildtools/reclient_cfgs/configure_reclient_cfgs.py --rbe_instance projects/rbe-chrome-untrusted/instances/default_instance --reproxy_cfg_template reproxy.cfg.template --rewrapper_cfg_project `"`" --skip_remoteexec_cfg_fetch --quiet" },
+    @{ Desc = "siso config"; Cwd = $Chromium; Cmd = "python3 src/build/config/siso/configure_siso.py --rbe_instance projects/rbe-chrome-untrusted/instances/default_instance --reapi_instance `"`" --reapi_address `"`" --reapi_backend_config_path `"`" --credential-helper `"`"" },
+    @{ Desc = "tast control"; Cwd = $Chromium; Cmd = "python3 src/build/util/tast_control.py -o src/chromeos/tast_control.gni -t src/chromeos/tast_control.gni.template -i src/chromeos/tast_control_disabled_tests.txt --input-public src/chromeos/tast_control_disabled_tests_public_builders.txt -f src/chromeos/tast_control_flaky_tests.txt" },
+    @{ Desc = "devtools rollup libs"; Cwd = "$Src\third_party\devtools-frontend\src"; Cmd = "vpython3.bat scripts/deps/sync_rollup_libs.py" }
   )
   foreach ($h in $hooks) {
     if ((Get-RemainingMin) -lt ($PackReserveMin + 25)) {
       Write-Host "==> hook budget exhausted before '$($h.Desc)'"
-      Write-OutVar upload_parts true
-      . "$PSScriptRoot\ci-parts.ps1" -Root $Root -PartsDir $PartsDir -Mode Unsynced
+      Save-Handoff -Mode Unsynced
       return
     }
     $hookRc = 1
@@ -285,9 +349,7 @@ solutions = [
       }
     }
   }
-  Set-Content -Path "$Src\.chromix-synced" -Value $ChromiumVersion
-
-  # Apply Chromix patches (only after a fully synced tree at the pinned tag).
+  # Apply Chromix patches only after sync and all required hooks succeeded.
   Push-Location $Src
   try {
     foreach ($rel in Get-Content "$Repo\patches\series") {
@@ -297,7 +359,8 @@ solutions = [
       if ($LASTEXITCODE -ne 0) { throw "patch failed: $rel" }
     }
   } finally { Pop-Location }
-  Set-Content -Path "$Src\.chromix-patched" -Value $ChromiumVersion
+  Set-Content -Path $syncedMarker -Value $ChromiumVersion
+  Set-Content -Path $patchedMarker -Value $ChromiumVersion
   Write-Host "==> source ready (synced + patched); disk: $(Get-FreeGB) GB free; remaining $(Get-RemainingMin) min"
 }
 else {
@@ -318,8 +381,7 @@ if (-not (Test-Path "$OutDir\build.ninja")) {
 $ninjaBudget = (Get-RemainingMin) - $PackReserveMin
 if ($ninjaBudget -lt 20) {
   Write-Host "==> not enough budget left to build (<20 min); handing tree to next stage"
-  Write-OutVar upload_parts true
-  . "$PSScriptRoot\ci-parts.ps1" -Root $Root -PartsDir $PartsDir -Mode Synced
+  Save-Handoff -Mode Synced
   return
 }
 Write-Host "==> autoninja budget: $ninjaBudget min"
@@ -333,6 +395,9 @@ if ($rc -eq 0) {
   return
 }
 
-Write-Host "==> ninja stopped (exit $rc, budget or mid-build failure); handing tree to next stage"
-Write-OutVar upload_parts true
-. "$PSScriptRoot\ci-parts.ps1" -Root $Root -PartsDir $PartsDir -Mode Synced
+if ($rc -eq 124) {
+  Write-Host "==> ninja budget exhausted; handing tree to next stage"
+  Save-Handoff -Mode Synced
+  return
+}
+throw "autoninja failed (exit $rc)"

@@ -33,12 +33,12 @@ jobs:
       - name: Run stage 1
         id: stage
         shell: powershell
-        run: build\windows\ci-stage.ps1 -StageIndex 1
+        run: build\windows\ci-stage.ps1 -StageIndex 1 -MaxStages 12
       - name: Upload tree part 1
         if: steps.stage.outputs.upload_parts == 'true'
         uses: actions/upload-artifact@v4
         with:
-          name: tree-s1-part1
+          name: tree-s1-attempt-${{ github.run_attempt }}-part1
           path: C:\parts\p1\*
           if-no-files-found: warn
           retention-days: 3
@@ -47,7 +47,7 @@ jobs:
         if: steps.stage.outputs.upload_parts == 'true'
         uses: actions/upload-artifact@v4
         with:
-          name: tree-s1-part2
+          name: tree-s1-attempt-${{ github.run_attempt }}-part2
           path: C:\parts\p2\*
           if-no-files-found: warn
           retention-days: 3
@@ -56,7 +56,7 @@ jobs:
         if: steps.stage.outputs.upload_parts == 'true'
         uses: actions/upload-artifact@v4
         with:
-          name: tree-s1-part3
+          name: tree-s1-attempt-${{ github.run_attempt }}-part3
           path: C:\parts\p3\*
           if-no-files-found: warn
           retention-days: 3
@@ -65,7 +65,7 @@ jobs:
         if: steps.stage.outputs.upload_parts == 'true'
         uses: actions/upload-artifact@v4
         with:
-          name: tree-s1-part4
+          name: tree-s1-attempt-${{ github.run_attempt }}-part4
           path: C:\parts\p4\*
           if-no-files-found: warn
           retention-days: 3
@@ -92,18 +92,18 @@ jobs:
       - name: Download tree from previous stage
         uses: actions/download-artifact@v4
         with:
-          pattern: tree-s1-part*
+          pattern: tree-s1-attempt-${{ github.run_attempt }}-part*
           merge-multiple: true
           path: C:\restore
       - name: Run stage 2
         id: stage
         shell: powershell
-        run: build\windows\ci-stage.ps1 -StageIndex 2 -FromArtifact
+        run: build\windows\ci-stage.ps1 -StageIndex 2 -MaxStages 12 -FromArtifact
       - name: Upload tree part 1
         if: steps.stage.outputs.upload_parts == 'true'
         uses: actions/upload-artifact@v4
         with:
-          name: tree-s2-part1
+          name: tree-s2-attempt-${{ github.run_attempt }}-part1
           path: C:\parts\p1\*
           if-no-files-found: warn
           retention-days: 3
@@ -112,7 +112,7 @@ jobs:
         if: steps.stage.outputs.upload_parts == 'true'
         uses: actions/upload-artifact@v4
         with:
-          name: tree-s2-part2
+          name: tree-s2-attempt-${{ github.run_attempt }}-part2
           path: C:\parts\p2\*
           if-no-files-found: warn
           retention-days: 3
@@ -121,7 +121,7 @@ jobs:
         if: steps.stage.outputs.upload_parts == 'true'
         uses: actions/upload-artifact@v4
         with:
-          name: tree-s2-part3
+          name: tree-s2-attempt-${{ github.run_attempt }}-part3
           path: C:\parts\p3\*
           if-no-files-found: warn
           retention-days: 3
@@ -130,7 +130,7 @@ jobs:
         if: steps.stage.outputs.upload_parts == 'true'
         uses: actions/upload-artifact@v4
         with:
-          name: tree-s2-part4
+          name: tree-s2-attempt-${{ github.run_attempt }}-part4
           path: C:\parts\p4\*
           if-no-files-found: warn
           retention-days: 3
@@ -157,18 +157,18 @@ jobs:
       - name: Download tree from previous stage
         uses: actions/download-artifact@v4
         with:
-          pattern: tree-s2-part*
+          pattern: tree-s2-attempt-${{ github.run_attempt }}-part*
           merge-multiple: true
           path: C:\restore
       - name: Run stage 3
         id: stage
         shell: powershell
-        run: build\windows\ci-stage.ps1 -StageIndex 3 -FromArtifact
+        run: build\windows\ci-stage.ps1 -StageIndex 3 -MaxStages 12 -FromArtifact
       - name: Upload tree part 1
         if: steps.stage.outputs.upload_parts == 'true'
         uses: actions/upload-artifact@v4
         with:
-          name: tree-s3-part1
+          name: tree-s3-attempt-${{ github.run_attempt }}-part1
           path: C:\parts\p1\*
           if-no-files-found: warn
           retention-days: 3
@@ -177,7 +177,7 @@ jobs:
         if: steps.stage.outputs.upload_parts == 'true'
         uses: actions/upload-artifact@v4
         with:
-          name: tree-s3-part2
+          name: tree-s3-attempt-${{ github.run_attempt }}-part2
           path: C:\parts\p2\*
           if-no-files-found: warn
           retention-days: 3
@@ -186,7 +186,7 @@ jobs:
         if: steps.stage.outputs.upload_parts == 'true'
         uses: actions/upload-artifact@v4
         with:
-          name: tree-s3-part3
+          name: tree-s3-attempt-${{ github.run_attempt }}-part3
           path: C:\parts\p3\*
           if-no-files-found: warn
           retention-days: 3
@@ -195,7 +195,7 @@ jobs:
         if: steps.stage.outputs.upload_parts == 'true'
         uses: actions/upload-artifact@v4
         with:
-          name: tree-s3-part4
+          name: tree-s3-attempt-${{ github.run_attempt }}-part4
           path: C:\parts\p4\*
           if-no-files-found: warn
           retention-days: 3
@@ -222,18 +222,18 @@ jobs:
       - name: Download tree from previous stage
         uses: actions/download-artifact@v4
         with:
-          pattern: tree-s3-part*
+          pattern: tree-s3-attempt-${{ github.run_attempt }}-part*
           merge-multiple: true
           path: C:\restore
       - name: Run stage 4
         id: stage
         shell: powershell
-        run: build\windows\ci-stage.ps1 -StageIndex 4 -FromArtifact
+        run: build\windows\ci-stage.ps1 -StageIndex 4 -MaxStages 12 -FromArtifact
       - name: Upload tree part 1
         if: steps.stage.outputs.upload_parts == 'true'
         uses: actions/upload-artifact@v4
         with:
-          name: tree-s4-part1
+          name: tree-s4-attempt-${{ github.run_attempt }}-part1
           path: C:\parts\p1\*
           if-no-files-found: warn
           retention-days: 3
@@ -242,7 +242,7 @@ jobs:
         if: steps.stage.outputs.upload_parts == 'true'
         uses: actions/upload-artifact@v4
         with:
-          name: tree-s4-part2
+          name: tree-s4-attempt-${{ github.run_attempt }}-part2
           path: C:\parts\p2\*
           if-no-files-found: warn
           retention-days: 3
@@ -251,7 +251,7 @@ jobs:
         if: steps.stage.outputs.upload_parts == 'true'
         uses: actions/upload-artifact@v4
         with:
-          name: tree-s4-part3
+          name: tree-s4-attempt-${{ github.run_attempt }}-part3
           path: C:\parts\p3\*
           if-no-files-found: warn
           retention-days: 3
@@ -260,7 +260,7 @@ jobs:
         if: steps.stage.outputs.upload_parts == 'true'
         uses: actions/upload-artifact@v4
         with:
-          name: tree-s4-part4
+          name: tree-s4-attempt-${{ github.run_attempt }}-part4
           path: C:\parts\p4\*
           if-no-files-found: warn
           retention-days: 3
@@ -287,18 +287,18 @@ jobs:
       - name: Download tree from previous stage
         uses: actions/download-artifact@v4
         with:
-          pattern: tree-s4-part*
+          pattern: tree-s4-attempt-${{ github.run_attempt }}-part*
           merge-multiple: true
           path: C:\restore
       - name: Run stage 5
         id: stage
         shell: powershell
-        run: build\windows\ci-stage.ps1 -StageIndex 5 -FromArtifact
+        run: build\windows\ci-stage.ps1 -StageIndex 5 -MaxStages 12 -FromArtifact
       - name: Upload tree part 1
         if: steps.stage.outputs.upload_parts == 'true'
         uses: actions/upload-artifact@v4
         with:
-          name: tree-s5-part1
+          name: tree-s5-attempt-${{ github.run_attempt }}-part1
           path: C:\parts\p1\*
           if-no-files-found: warn
           retention-days: 3
@@ -307,7 +307,7 @@ jobs:
         if: steps.stage.outputs.upload_parts == 'true'
         uses: actions/upload-artifact@v4
         with:
-          name: tree-s5-part2
+          name: tree-s5-attempt-${{ github.run_attempt }}-part2
           path: C:\parts\p2\*
           if-no-files-found: warn
           retention-days: 3
@@ -316,7 +316,7 @@ jobs:
         if: steps.stage.outputs.upload_parts == 'true'
         uses: actions/upload-artifact@v4
         with:
-          name: tree-s5-part3
+          name: tree-s5-attempt-${{ github.run_attempt }}-part3
           path: C:\parts\p3\*
           if-no-files-found: warn
           retention-days: 3
@@ -325,7 +325,7 @@ jobs:
         if: steps.stage.outputs.upload_parts == 'true'
         uses: actions/upload-artifact@v4
         with:
-          name: tree-s5-part4
+          name: tree-s5-attempt-${{ github.run_attempt }}-part4
           path: C:\parts\p4\*
           if-no-files-found: warn
           retention-days: 3
@@ -352,18 +352,18 @@ jobs:
       - name: Download tree from previous stage
         uses: actions/download-artifact@v4
         with:
-          pattern: tree-s5-part*
+          pattern: tree-s5-attempt-${{ github.run_attempt }}-part*
           merge-multiple: true
           path: C:\restore
       - name: Run stage 6
         id: stage
         shell: powershell
-        run: build\windows\ci-stage.ps1 -StageIndex 6 -FromArtifact
+        run: build\windows\ci-stage.ps1 -StageIndex 6 -MaxStages 12 -FromArtifact
       - name: Upload tree part 1
         if: steps.stage.outputs.upload_parts == 'true'
         uses: actions/upload-artifact@v4
         with:
-          name: tree-s6-part1
+          name: tree-s6-attempt-${{ github.run_attempt }}-part1
           path: C:\parts\p1\*
           if-no-files-found: warn
           retention-days: 3
@@ -372,7 +372,7 @@ jobs:
         if: steps.stage.outputs.upload_parts == 'true'
         uses: actions/upload-artifact@v4
         with:
-          name: tree-s6-part2
+          name: tree-s6-attempt-${{ github.run_attempt }}-part2
           path: C:\parts\p2\*
           if-no-files-found: warn
           retention-days: 3
@@ -381,7 +381,7 @@ jobs:
         if: steps.stage.outputs.upload_parts == 'true'
         uses: actions/upload-artifact@v4
         with:
-          name: tree-s6-part3
+          name: tree-s6-attempt-${{ github.run_attempt }}-part3
           path: C:\parts\p3\*
           if-no-files-found: warn
           retention-days: 3
@@ -390,7 +390,7 @@ jobs:
         if: steps.stage.outputs.upload_parts == 'true'
         uses: actions/upload-artifact@v4
         with:
-          name: tree-s6-part4
+          name: tree-s6-attempt-${{ github.run_attempt }}-part4
           path: C:\parts\p4\*
           if-no-files-found: warn
           retention-days: 3
@@ -417,18 +417,18 @@ jobs:
       - name: Download tree from previous stage
         uses: actions/download-artifact@v4
         with:
-          pattern: tree-s6-part*
+          pattern: tree-s6-attempt-${{ github.run_attempt }}-part*
           merge-multiple: true
           path: C:\restore
       - name: Run stage 7
         id: stage
         shell: powershell
-        run: build\windows\ci-stage.ps1 -StageIndex 7 -FromArtifact
+        run: build\windows\ci-stage.ps1 -StageIndex 7 -MaxStages 12 -FromArtifact
       - name: Upload tree part 1
         if: steps.stage.outputs.upload_parts == 'true'
         uses: actions/upload-artifact@v4
         with:
-          name: tree-s7-part1
+          name: tree-s7-attempt-${{ github.run_attempt }}-part1
           path: C:\parts\p1\*
           if-no-files-found: warn
           retention-days: 3
@@ -437,7 +437,7 @@ jobs:
         if: steps.stage.outputs.upload_parts == 'true'
         uses: actions/upload-artifact@v4
         with:
-          name: tree-s7-part2
+          name: tree-s7-attempt-${{ github.run_attempt }}-part2
           path: C:\parts\p2\*
           if-no-files-found: warn
           retention-days: 3
@@ -446,7 +446,7 @@ jobs:
         if: steps.stage.outputs.upload_parts == 'true'
         uses: actions/upload-artifact@v4
         with:
-          name: tree-s7-part3
+          name: tree-s7-attempt-${{ github.run_attempt }}-part3
           path: C:\parts\p3\*
           if-no-files-found: warn
           retention-days: 3
@@ -455,7 +455,7 @@ jobs:
         if: steps.stage.outputs.upload_parts == 'true'
         uses: actions/upload-artifact@v4
         with:
-          name: tree-s7-part4
+          name: tree-s7-attempt-${{ github.run_attempt }}-part4
           path: C:\parts\p4\*
           if-no-files-found: warn
           retention-days: 3
@@ -482,18 +482,18 @@ jobs:
       - name: Download tree from previous stage
         uses: actions/download-artifact@v4
         with:
-          pattern: tree-s7-part*
+          pattern: tree-s7-attempt-${{ github.run_attempt }}-part*
           merge-multiple: true
           path: C:\restore
       - name: Run stage 8
         id: stage
         shell: powershell
-        run: build\windows\ci-stage.ps1 -StageIndex 8 -FromArtifact
+        run: build\windows\ci-stage.ps1 -StageIndex 8 -MaxStages 12 -FromArtifact
       - name: Upload tree part 1
         if: steps.stage.outputs.upload_parts == 'true'
         uses: actions/upload-artifact@v4
         with:
-          name: tree-s8-part1
+          name: tree-s8-attempt-${{ github.run_attempt }}-part1
           path: C:\parts\p1\*
           if-no-files-found: warn
           retention-days: 3
@@ -502,7 +502,7 @@ jobs:
         if: steps.stage.outputs.upload_parts == 'true'
         uses: actions/upload-artifact@v4
         with:
-          name: tree-s8-part2
+          name: tree-s8-attempt-${{ github.run_attempt }}-part2
           path: C:\parts\p2\*
           if-no-files-found: warn
           retention-days: 3
@@ -511,7 +511,7 @@ jobs:
         if: steps.stage.outputs.upload_parts == 'true'
         uses: actions/upload-artifact@v4
         with:
-          name: tree-s8-part3
+          name: tree-s8-attempt-${{ github.run_attempt }}-part3
           path: C:\parts\p3\*
           if-no-files-found: warn
           retention-days: 3
@@ -520,7 +520,7 @@ jobs:
         if: steps.stage.outputs.upload_parts == 'true'
         uses: actions/upload-artifact@v4
         with:
-          name: tree-s8-part4
+          name: tree-s8-attempt-${{ github.run_attempt }}-part4
           path: C:\parts\p4\*
           if-no-files-found: warn
           retention-days: 3
@@ -547,18 +547,18 @@ jobs:
       - name: Download tree from previous stage
         uses: actions/download-artifact@v4
         with:
-          pattern: tree-s8-part*
+          pattern: tree-s8-attempt-${{ github.run_attempt }}-part*
           merge-multiple: true
           path: C:\restore
       - name: Run stage 9
         id: stage
         shell: powershell
-        run: build\windows\ci-stage.ps1 -StageIndex 9 -FromArtifact
+        run: build\windows\ci-stage.ps1 -StageIndex 9 -MaxStages 12 -FromArtifact
       - name: Upload tree part 1
         if: steps.stage.outputs.upload_parts == 'true'
         uses: actions/upload-artifact@v4
         with:
-          name: tree-s9-part1
+          name: tree-s9-attempt-${{ github.run_attempt }}-part1
           path: C:\parts\p1\*
           if-no-files-found: warn
           retention-days: 3
@@ -567,7 +567,7 @@ jobs:
         if: steps.stage.outputs.upload_parts == 'true'
         uses: actions/upload-artifact@v4
         with:
-          name: tree-s9-part2
+          name: tree-s9-attempt-${{ github.run_attempt }}-part2
           path: C:\parts\p2\*
           if-no-files-found: warn
           retention-days: 3
@@ -576,7 +576,7 @@ jobs:
         if: steps.stage.outputs.upload_parts == 'true'
         uses: actions/upload-artifact@v4
         with:
-          name: tree-s9-part3
+          name: tree-s9-attempt-${{ github.run_attempt }}-part3
           path: C:\parts\p3\*
           if-no-files-found: warn
           retention-days: 3
@@ -585,7 +585,7 @@ jobs:
         if: steps.stage.outputs.upload_parts == 'true'
         uses: actions/upload-artifact@v4
         with:
-          name: tree-s9-part4
+          name: tree-s9-attempt-${{ github.run_attempt }}-part4
           path: C:\parts\p4\*
           if-no-files-found: warn
           retention-days: 3
@@ -612,18 +612,18 @@ jobs:
       - name: Download tree from previous stage
         uses: actions/download-artifact@v4
         with:
-          pattern: tree-s9-part*
+          pattern: tree-s9-attempt-${{ github.run_attempt }}-part*
           merge-multiple: true
           path: C:\restore
       - name: Run stage 10
         id: stage
         shell: powershell
-        run: build\windows\ci-stage.ps1 -StageIndex 10 -FromArtifact
+        run: build\windows\ci-stage.ps1 -StageIndex 1 -MaxStages 120 -FromArtifact
       - name: Upload tree part 1
         if: steps.stage.outputs.upload_parts == 'true'
         uses: actions/upload-artifact@v4
         with:
-          name: tree-s10-part1
+          name: tree-s10-attempt-${{ github.run_attempt }}-part1
           path: C:\parts\p1\*
           if-no-files-found: warn
           retention-days: 3
@@ -632,7 +632,7 @@ jobs:
         if: steps.stage.outputs.upload_parts == 'true'
         uses: actions/upload-artifact@v4
         with:
-          name: tree-s10-part2
+          name: tree-s10-attempt-${{ github.run_attempt }}-part2
           path: C:\parts\p2\*
           if-no-files-found: warn
           retention-days: 3
@@ -641,7 +641,7 @@ jobs:
         if: steps.stage.outputs.upload_parts == 'true'
         uses: actions/upload-artifact@v4
         with:
-          name: tree-s10-part3
+          name: tree-s10-attempt-${{ github.run_attempt }}-part3
           path: C:\parts\p3\*
           if-no-files-found: warn
           retention-days: 3
@@ -650,7 +650,7 @@ jobs:
         if: steps.stage.outputs.upload_parts == 'true'
         uses: actions/upload-artifact@v4
         with:
-          name: tree-s10-part4
+          name: tree-s10-attempt-${{ github.run_attempt }}-part4
           path: C:\parts\p4\*
           if-no-files-found: warn
           retention-days: 3
@@ -677,18 +677,18 @@ jobs:
       - name: Download tree from previous stage
         uses: actions/download-artifact@v4
         with:
-          pattern: tree-s10-part*
+          pattern: tree-s10-attempt-${{ github.run_attempt }}-part*
           merge-multiple: true
           path: C:\restore
       - name: Run stage 11
         id: stage
         shell: powershell
-        run: build\windows\ci-stage.ps1 -StageIndex 11 -FromArtifact
+        run: build\windows\ci-stage.ps1 -StageIndex 1 -MaxStages 121 -FromArtifact
       - name: Upload tree part 1
         if: steps.stage.outputs.upload_parts == 'true'
         uses: actions/upload-artifact@v4
         with:
-          name: tree-s11-part1
+          name: tree-s11-attempt-${{ github.run_attempt }}-part1
           path: C:\parts\p1\*
           if-no-files-found: warn
           retention-days: 3
@@ -697,7 +697,7 @@ jobs:
         if: steps.stage.outputs.upload_parts == 'true'
         uses: actions/upload-artifact@v4
         with:
-          name: tree-s11-part2
+          name: tree-s11-attempt-${{ github.run_attempt }}-part2
           path: C:\parts\p2\*
           if-no-files-found: warn
           retention-days: 3
@@ -706,7 +706,7 @@ jobs:
         if: steps.stage.outputs.upload_parts == 'true'
         uses: actions/upload-artifact@v4
         with:
-          name: tree-s11-part3
+          name: tree-s11-attempt-${{ github.run_attempt }}-part3
           path: C:\parts\p3\*
           if-no-files-found: warn
           retention-days: 3
@@ -715,7 +715,7 @@ jobs:
         if: steps.stage.outputs.upload_parts == 'true'
         uses: actions/upload-artifact@v4
         with:
-          name: tree-s11-part4
+          name: tree-s11-attempt-${{ github.run_attempt }}-part4
           path: C:\parts\p4\*
           if-no-files-found: warn
           retention-days: 3
@@ -742,18 +742,18 @@ jobs:
       - name: Download tree from previous stage
         uses: actions/download-artifact@v4
         with:
-          pattern: tree-s11-part*
+          pattern: tree-s11-attempt-${{ github.run_attempt }}-part*
           merge-multiple: true
           path: C:\restore
       - name: Run stage 12
         id: stage
         shell: powershell
-        run: build\windows\ci-stage.ps1 -StageIndex 12 -FromArtifact
+        run: build\windows\ci-stage.ps1 -StageIndex 1 -MaxStages 122 -FromArtifact
       - name: Upload tree part 1
         if: steps.stage.outputs.upload_parts == 'true'
         uses: actions/upload-artifact@v4
         with:
-          name: tree-s12-part1
+          name: tree-s12-attempt-${{ github.run_attempt }}-part1
           path: C:\parts\p1\*
           if-no-files-found: warn
           retention-days: 3
@@ -762,7 +762,7 @@ jobs:
         if: steps.stage.outputs.upload_parts == 'true'
         uses: actions/upload-artifact@v4
         with:
-          name: tree-s12-part2
+          name: tree-s12-attempt-${{ github.run_attempt }}-part2
           path: C:\parts\p2\*
           if-no-files-found: warn
           retention-days: 3
@@ -771,7 +771,7 @@ jobs:
         if: steps.stage.outputs.upload_parts == 'true'
         uses: actions/upload-artifact@v4
         with:
-          name: tree-s12-part3
+          name: tree-s12-attempt-${{ github.run_attempt }}-part3
           path: C:\parts\p3\*
           if-no-files-found: warn
           retention-days: 3
@@ -780,7 +780,7 @@ jobs:
         if: steps.stage.outputs.upload_parts == 'true'
         uses: actions/upload-artifact@v4
         with:
-          name: tree-s12-part4
+          name: tree-s12-attempt-${{ github.run_attempt }}-part4
           path: C:\parts\p4\*
           if-no-files-found: warn
           retention-days: 3

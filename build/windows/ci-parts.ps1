@@ -32,9 +32,47 @@ foreach ($i in 1..$MaxSlots) { New-Item -ItemType Directory -Force -Path "$Parts
 
 function Get-FreeGB { [math]::Round((Get-PSDrive C).Free / 1GB, 1) }
 
+function Resolve-7Zip {
+  $cmd = Get-Command 7z.exe -ErrorAction SilentlyContinue
+  if ($cmd) { return $cmd.Source }
+  $installed = "$env:ProgramFiles\7-Zip\7z.exe"
+  if (Test-Path $installed) { return $installed }
+  throw "7z.exe is not available"
+}
+
+function Get-TreeGB {
+  param([string]$Path, [string]$ArchiveMode)
+  if ($ArchiveMode -eq "Unsynced") {
+    $items = @(
+      Get-Item (Join-Path $Path "chromium\.gclient") -ErrorAction SilentlyContinue
+      Get-Item (Join-Path $Path "chromium\.gclient_entries") -ErrorAction SilentlyContinue
+      Get-ChildItem $Path -Recurse -Force -Filter ".git" -ErrorAction SilentlyContinue |
+        ForEach-Object {
+          if ($_.PSIsContainer) {
+            Get-ChildItem $_.FullName -Recurse -Force -File -ErrorAction SilentlyContinue
+          }
+          else { $_ }
+        }
+    )
+  }
+  else {
+    $items = Get-ChildItem $Path -Recurse -Force -File -ErrorAction SilentlyContinue |
+      Where-Object { $_.FullName -notmatch "\\\.git(\\|$)" }
+  }
+  [math]::Round(($items | Measure-Object Length -Sum).Sum / 1GB, 1)
+}
+
+$SevenZip = Resolve-7Zip
 $freeBefore = Get-FreeGB
-if ($freeBefore -lt 12) {
-  throw "only $freeBefore GB free - not enough to create volumes alongside the tree"
+$inputGB = Get-TreeGB -Path $Root -ArchiveMode $Mode
+$minFreeGB = if ($Mode -eq "Unsynced") {
+  [math]::Max(12, [math]::Ceiling($inputGB + 5))
+} else {
+  [math]::Max(24, [math]::Ceiling(($inputGB * 0.25) + 5))
+}
+Write-Host "==> handoff input: $inputGB GB; minimum free space: $minFreeGB GB"
+if ($freeBefore -lt $minFreeGB) {
+  throw "only $freeBefore GB free - need at least $minFreeGB GB to create the $Mode handoff"
 }
 
 Write-Host "==> packing $Root into 7z volumes at $PartsDir (mode: $Mode; disk: $freeBefore GB free)"
@@ -44,19 +82,19 @@ try {
   if ($Mode -eq "Synced") {
     # Relative paths so the archive stores chromium\... and depot_tools\...
     # and later extracts 1:1 with `7z x tree.7z.001 -oC:\c`.
-    & 7z.exe a -v9g -mx=1 -mtc=on "$PartsDir\stage\tree.7z" chromium depot_tools "-xr!.git"
+    & $SevenZip a -v9g -mx=1 -mtc=on "$PartsDir\stage\tree.7z" chromium depot_tools "-xr!.git"
     if ($LASTEXITCODE -ne 0) { throw "7z volume creation failed (exit $LASTEXITCODE)" }
   }
   else {
     $list = "$PartsDir\stage\list.txt"
     $entries = @("chromium\.gclient", "chromium\.gclient_entries") |
       Where-Object { Test-Path (Join-Path $Root $_) }
-    Write-Host "==> enumerating .git dirs (this walks the whole tree once)"
-    $gitDirs = Get-ChildItem -Recurse -Force -Directory -Filter ".git" -ErrorAction SilentlyContinue |
-      ForEach-Object { Resolve-Path -Relative $_.FullName }
-    Write-Host "==> found $($gitDirs.Count) git repositories"
+    Write-Host "==> enumerating .git dirs and files (this walks the whole tree once)"
+    $gitDirs = Get-ChildItem -Recurse -Force -Filter ".git" -ErrorAction SilentlyContinue |
+      ForEach-Object { (Resolve-Path -Relative $_.FullName) -replace '^\.[\\/]', '' }
+    Write-Host "==> found $($gitDirs.Count) git entries"
     ($entries + $gitDirs) | Set-Content -Path $list -Encoding ASCII
-    & 7z.exe a -v9g -mx=1 -mtc=on "$PartsDir\stage\tree.7z" "@$list"
+    & $SevenZip a -spf2 -v9g -mx=1 -mtc=on "$PartsDir\stage\tree.7z" "@$list"
     if ($LASTEXITCODE -ne 0) { throw "7z volume creation failed (exit $LASTEXITCODE)" }
   }
 } finally { Pop-Location }
