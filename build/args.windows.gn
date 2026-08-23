@@ -20,5 +20,4 @@ use_sysroot = false
 use_remoteexec = false
 treat_warnings_as_errors = false
 fatal_linker_warnings = false
-enable_nacl = false
 generate_location_tags = false
