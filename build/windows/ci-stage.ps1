@@ -9,7 +9,8 @@
 param(
   [int]$StageIndex = 1,
   [int]$MaxStages = 12,
-  [switch]$FromArtifact
+  [switch]$FromArtifact,
+  [switch]$ValidateOnly
 )
 $ErrorActionPreference = "Stop"
 $Repo = (Resolve-Path "$PSScriptRoot\..\..").Path
@@ -239,6 +240,12 @@ try {
   if ($LASTEXITCODE -ne 0) { throw "gn gen failed" }
 } finally {
   Pop-Location
+}
+
+if ($ValidateOnly) {
+  Write-Host "==> validate-only: gn gen passed, skipping ninja"
+  Write-OutVar finished true
+  return
 }
 
 $ninjaBudget = (Get-RemainingMin) - $PackReserveMin

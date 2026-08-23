@@ -22,8 +22,22 @@ env:
   DEPOT_TOOLS_COLLECT_METRICS: '0'
 
 jobs:
+  validate:
+    name: validate (source prep + gn gen)
+    runs-on: windows-2022
+    timeout-minutes: 90
+    outputs:
+      finished: ${{ steps.stage.outputs.finished }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run validation
+        id: stage
+        shell: powershell
+        run: build\windows\ci-stage.ps1 -StageIndex 1 -MaxStages 12 -ValidateOnly
   build-1:
     name: stage 1 (fetch + sync + first compile)
+    needs: validate
+    if: needs.validate.result == 'success' && needs.validate.outputs.finished == 'true'
     runs-on: windows-2022
     timeout-minutes: 355
     outputs:
@@ -797,7 +811,7 @@ jobs:
 
   complete:
     name: ensure build finished
-    needs: [build-1, build-2, build-3, build-4, build-5, build-6, build-7, build-8, build-9, build-10, build-11, build-12]
+    needs: [validate, build-1, build-2, build-3, build-4, build-5, build-6, build-7, build-8, build-9, build-10, build-11, build-12]
     runs-on: ubuntu-latest
     if: ${{ !cancelled() }}
     steps:
