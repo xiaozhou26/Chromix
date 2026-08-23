@@ -119,6 +119,28 @@ function Free-Disk {
   Write-Host "==> disk after cleanup: $(Get-FreeGB) GB free"
 }
 
+function Initialize-VisualStudio {
+  $vswhere = "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe"
+  if (-not (Test-Path $vswhere)) { throw "vswhere.exe is not available: $vswhere" }
+  $installation = (& $vswhere -latest -products * `
+    -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 `
+    -property installationPath).Trim()
+  if (-not $installation) { throw "Visual Studio 2022 C++ tools are not installed" }
+  $devCmd = Join-Path $installation "Common7\Tools\VsDevCmd.bat"
+  if (-not (Test-Path $devCmd)) { throw "VsDevCmd.bat is missing: $devCmd" }
+
+  $command = "`"$devCmd`" -no_logo -arch=x64 -host_arch=x64 >nul && set"
+  $environment = & $env:COMSPEC /d /s /c $command
+  if ($LASTEXITCODE -ne 0) { throw "VsDevCmd.bat failed with exit $LASTEXITCODE" }
+  foreach ($line in $environment) {
+    if ($line -match '^([^=]+)=(.*)$') {
+      [Environment]::SetEnvironmentVariable($Matches[1], $Matches[2], "Process")
+    }
+  }
+  $compiler = (Get-Command cl.exe -ErrorAction Stop).Source
+  Write-Host "==> Visual Studio compiler: $compiler"
+}
+
 function Install-Debuggers {
   $dbghelp = "${env:ProgramFiles(x86)}\Windows Kits\10\Debuggers\x64\dbghelp.dll"
   if (Test-Path $dbghelp) { return }
@@ -149,6 +171,7 @@ Write-OutVar finished false
 Write-OutVar upload_parts false
 Assert-CiScripts
 Free-Disk
+Initialize-VisualStudio
 Install-Debuggers
 git config --global core.longpaths true
 
