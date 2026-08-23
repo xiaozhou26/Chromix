@@ -1,0 +1,30 @@
+diff --git a/third_party/blink/renderer/core/html/canvas/text_metrics.h b/third_party/blink/renderer/core/html/canvas/text_metrics.h
+index 3d2c354..a0f85fe 100644
+--- a/third_party/blink/renderer/core/html/canvas/text_metrics.h
++++ b/third_party/blink/renderer/core/html/canvas/text_metrics.h
+@@ -95,6 +95,25 @@ class CORE_EXPORT TextMetrics final : public ScriptWrappable {
+   const Font* GetFont() const { return font_; }
+ 
+   void Trace(Visitor*) const override;
++  void OverrideFromBridge(double width,
++                          double actual_left,
++                          double actual_right,
++                          double font_ascent,
++                          double font_descent,
++                          double actual_ascent,
++                          double actual_descent,
++                          double em_ascent,
++                          double em_descent) {
++    width_ = width;
++    actual_bounding_box_left_ = actual_left;
++    actual_bounding_box_right_ = actual_right;
++    font_bounding_box_ascent_ = font_ascent;
++    font_bounding_box_descent_ = font_descent;
++    actual_bounding_box_ascent_ = actual_ascent;
++    actual_bounding_box_descent_ = actual_descent;
++    em_height_ascent_ = em_ascent;
++    em_height_descent_ = em_descent;
++  }
+ 
+   struct RunWithOffset {
+     DISALLOW_NEW();

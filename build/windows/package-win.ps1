@@ -1,36 +1,70 @@
 <#
-  Package the native Windows Chromix build into a portable chromix\ bundle + zip + SHA256.
-  Usage: pwsh build\windows\package-win.ps1 -Out <out\Chromix dir> -Dest <dist dir>
+  Package the native Windows Chromix build into a portable chromix bundle,
+  zip archive, and SHA256 manifest.
 #>
 param(
   [Parameter(Mandatory)] [string]$Out,
   [Parameter(Mandatory)] [string]$Dest
 )
 $ErrorActionPreference = "Stop"
-$B = Join-Path $Dest "chromix"
-Remove-Item -Recurse -Force $B -ErrorAction SilentlyContinue
-New-Item -ItemType Directory -Force -Path $B | Out-Null
+$Bundle = Join-Path $Dest "chromix"
+Remove-Item -Recurse -Force $Bundle -ErrorAction SilentlyContinue
+New-Item -ItemType Directory -Force -Path $Bundle | Out-Null
 
-# Windows runtime set (the files chrome.exe needs at runtime; the rest of out\ is build junk).
-$runtime = @(
-  "chrome.exe","chrome.dll","chrome_elf.dll","chrome_proxy.exe",
-  "chrome_100_percent.pak","chrome_200_percent.pak","resources.pak",
-  "icudtl.dat","snapshot_blob.bin","v8_context_snapshot.bin",
-  "libEGL.dll","libGLESv2.dll","vk_swiftshader.dll","vk_swiftshader_icd.json","vulkan-1.dll",
-  "d3dcompiler_47.dll","dxcompiler.dll","dxil.dll"
+$required = @(
+  "chrome.exe", "chrome.dll", "chrome_elf.dll",
+  "chrome_100_percent.pak", "chrome_200_percent.pak", "resources.pak",
+  "icudtl.dat", "libEGL.dll", "libGLESv2.dll"
 )
-foreach ($f in $runtime) {
-  $src = Join-Path $Out $f
-  if (Test-Path $src) { Copy-Item $src (Join-Path $B $f) }
+foreach ($name in $required) {
+  $source = Join-Path $Out $name
+  if (-not (Test-Path $source)) { throw "required runtime file is missing: $source" }
+  Copy-Item $source (Join-Path $Bundle $name)
 }
-# version dir (e.g. 151.0.7922.174) carries more dlls in official builds
+
+$snapshot = @("v8_context_snapshot.bin", "snapshot_blob.bin") |
+  Where-Object { Test-Path (Join-Path $Out $_) } |
+  Select-Object -First 1
+if (-not $snapshot) { throw "no V8 snapshot blob found in $Out" }
+Copy-Item (Join-Path $Out $snapshot) (Join-Path $Bundle $snapshot)
+
+$locales = Join-Path $Out "locales"
+if (-not (Test-Path $locales)) { throw "required locales directory is missing: $locales" }
+Copy-Item $locales (Join-Path $Bundle "locales") -Recurse
+
+foreach ($name in @(
+  "chrome_proxy.exe", "chrome_wer.dll", "chrome_crashpad_handler.exe",
+  "d3dcompiler_47.dll", "dxcompiler.dll", "dxil.dll",
+  "vk_swiftshader.dll", "vk_swiftshader_icd.json", "vulkan-1.dll"
+)) {
+  $source = Join-Path $Out $name
+  if (Test-Path $source) { Copy-Item $source (Join-Path $Bundle $name) }
+}
+
+$manifests = @(Get-ChildItem $Out -File -Filter "*.manifest" -ErrorAction SilentlyContinue)
+if ($manifests.Count -eq 0) { throw "required side-by-side manifest is missing from $Out" }
+foreach ($manifest in $manifests) { Copy-Item $manifest.FullName (Join-Path $Bundle $manifest.Name) }
 Get-ChildItem $Out -Directory | Where-Object { $_.Name -match '^\d+\.\d+\.\d+\.\d+$' } |
-  ForEach-Object { Copy-Item $_.FullName (Join-Path $B $_.Name) -Recurse }
-Copy-Item (Join-Path $Out "locales") (Join-Path $B "locales") -Recurse
+  ForEach-Object { Copy-Item $_.FullName (Join-Path $Bundle $_.Name) -Recurse }
+
+$runtimeCandidates = @(
+  (Join-Path $Out "msvcp140.dll"),
+  (Join-Path $Out "vcruntime140.dll"),
+  (Join-Path $Out "vcruntime140_1.dll"),
+  (Join-Path $Out "concrt140.dll")
+)
+foreach ($source in $runtimeCandidates) {
+  if (Test-Path $source) { Copy-Item $source (Join-Path $Bundle (Split-Path $source -Leaf)) }
+}
+
+@'
+@echo off
+"%~dp0chrome.exe" %*
+'@ | Set-Content -Encoding ASCII (Join-Path $Bundle "chromix.cmd")
 
 $asset = Join-Path $Dest "chromix-win-x64.zip"
 Remove-Item $asset -ErrorAction SilentlyContinue
-Compress-Archive -Path $B -DestinationPath $asset
-$hash = (Get-FileHash $asset -Algorithm SHA256).Hash.ToLower()
-"$hash  chromix-win-x64.zip" | Out-File -Append -Encoding ascii (Join-Path $Dest "SHA256SUMS")
+Compress-Archive -Path $Bundle -DestinationPath $asset
+$hash = (Get-FileHash $asset -Algorithm SHA256).Hash.ToLowerInvariant()
+"$hash  chromix-win-x64.zip" | Set-Content -Encoding ASCII (Join-Path $Dest "SHA256SUMS")
 Write-Host "==> $asset  sha256=$hash"

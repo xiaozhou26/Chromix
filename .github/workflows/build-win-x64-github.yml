@@ -748,7 +748,7 @@ jobs:
       - name: Run stage 12
         id: stage
         shell: powershell
-        run: build\windows\ci-stage.ps1 -StageIndex 1 -MaxStages 122 -FromArtifact
+        run: build\windows\ci-stage.ps1 -StageIndex 12 -MaxStages 12 -FromArtifact
       - name: Upload tree part 1
         if: steps.stage.outputs.upload_parts == 'true'
         uses: actions/upload-artifact@v4

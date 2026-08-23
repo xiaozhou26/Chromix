@@ -1,0 +1,20 @@
+diff --git a/third_party/blink/renderer/platform/canvas_bridge/BUILD.gn b/third_party/blink/renderer/platform/canvas_bridge/BUILD.gn
+new file mode 100644
+index 0000000..1804ce0
+--- /dev/null
++++ b/third_party/blink/renderer/platform/canvas_bridge/BUILD.gn
+@@ -0,0 +1,14 @@
++# Copyright 2026.
++# Use of this source code is governed by a BSD-style license.
++source_set("canvas_bridge") {
++  sources = [
++    "canvas_bridge_client.cc",
++    "canvas_bridge_client.h",
++    "canvas_bridge_codec.cc",
++    "canvas_bridge_codec.h",
++  ]
++  deps = [ "//base" ]
++  if (is_win) {
++    libs = [ "ws2_32.lib" ]
++  }
++}

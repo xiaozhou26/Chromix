@@ -1,0 +1,24 @@
+diff --git a/third_party/webrtc/p2p/base/port.h b/third_party/webrtc/p2p/base/port.h
+index 4ef1c63e6b0faef2a119ac26032a7b3479c1bd18..b6c65bfad7966a1a37e050f60d11088da14ef844 100644
+--- a/third_party/webrtc/p2p/base/port.h
++++ b/third_party/webrtc/p2p/base/port.h
+@@ -40,6 +40,7 @@
+ #include "rtc_base/async_packet_socket.h"
+ #include "rtc_base/callback_list.h"
+ #include "rtc_base/dscp.h"
++#include "rtc_base/ip_address.h"
+ #include "rtc_base/net_helper.h"
+ #include "rtc_base/network.h"
+ #include "rtc_base/network/received_packet.h"
+@@ -51,6 +52,11 @@
+ 
+ namespace webrtc {
+ 
++// Sets the process-wide fake server-reflexive address. Only IPv4 values enable
++// the behavior; invalid or empty values clear it.
++RTC_EXPORT bool SetForcedWebRtcSrflxIP(absl::string_view ip);
++RTC_EXPORT std::optional<IPAddress> ForcedWebRtcSrflxIP();
++
+ enum class MdnsNameRegistrationStatus {
+   // IP concealment with mDNS is not enabled or the name registration process is
+   // not started yet.

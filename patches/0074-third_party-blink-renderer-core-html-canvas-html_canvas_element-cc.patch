@@ -1,0 +1,57 @@
+diff --git a/third_party/blink/renderer/core/html/canvas/html_canvas_element.cc b/third_party/blink/renderer/core/html/canvas/html_canvas_element.cc
+index 4c784e3..95638cf 100644
+--- a/third_party/blink/renderer/core/html/canvas/html_canvas_element.cc
++++ b/third_party/blink/renderer/core/html/canvas/html_canvas_element.cc
+@@ -32,6 +32,7 @@
+ #include <limits>
+ #include <memory>
+ #include <utility>
++#include <vector>
+ 
+ #include "base/feature_list.h"
+ #include "base/functional/callback_helpers.h"
+@@ -44,10 +45,13 @@
+ #include "base/trace_event/typed_macros.h"
+ #include "build/build_config.h"
+ #include "cc/layers/texture_layer.h"
++#include "cc/paint/paint_image_builder.h"
+ #include "cc/trees/layer_tree_host.h"
+ #include "services/metrics/public/cpp/ukm_recorder.h"
+ #include "services/metrics/public/cpp/ukm_source_id.h"
+ #include "third_party/blink/public/common/features.h"
++#include "third_party/skia/include/core/SkData.h"
++#include "third_party/skia/include/core/SkImage.h"
+ #include "third_party/blink/public/common/thread_safe_browser_interface_broker_proxy.h"
+ #include "third_party/blink/public/mojom/gpu/gpu.mojom-blink.h"
+ #include "third_party/blink/public/platform/platform.h"
+@@ -1292,6 +1296,30 @@ String HTMLCanvasElement::ToDataURLInternal(
+ 
+   scoped_refptr<StaticBitmapImage> image_bitmap = Snapshot(source_buffer);
+   if (image_bitmap) {
++    std::vector<uint8_t> bridge_pixels;
++    CanvasRenderingContext* context = RenderingContext();
++    if (context &&
++        context->ReadBridgePixels(&bridge_pixels, image_bitmap->width(),
++                                  image_bitmap->height())) {
++      const uint64_t expected = static_cast<uint64_t>(image_bitmap->width()) *
++                                image_bitmap->height() * 4;
++      if (expected == bridge_pixels.size()) {
++        const SkImageInfo info = SkImageInfo::Make(
++            image_bitmap->width(), image_bitmap->height(),
++            kRGBA_8888_SkColorType, kUnpremul_SkAlphaType);
++        sk_sp<SkData> data =
++            SkData::MakeWithCopy(bridge_pixels.data(), bridge_pixels.size());
++        if (sk_sp<SkImage> image =
++                SkImages::RasterFromData(info, data, info.minRowBytes())) {
++          image_bitmap = StaticBitmapImage::Create(
++              PaintImageBuilder::WithDefault()
++                  .set_id(PaintImage::GetNextId())
++                  .set_image(image, PaintImage::GetNextContentId())
++                  .TakePaintImage(),
++              image_bitmap->Orientation());
++        }
++      }
++    }
+     std::unique_ptr<ImageDataBuffer> data_buffer =
+         ImageDataBuffer::Create(image_bitmap);
+     if (!data_buffer)

@@ -1,0 +1,97 @@
+diff --git a/third_party/blink/renderer/modules/canvas/canvas2d/canvas_path.cc b/third_party/blink/renderer/modules/canvas/canvas2d/canvas_path.cc
+index 8c8b5f5..463b3fb 100644
+--- a/third_party/blink/renderer/modules/canvas/canvas2d/canvas_path.cc
++++ b/third_party/blink/renderer/modules/canvas/canvas2d/canvas_path.cc
+@@ -75,6 +75,7 @@ String StrFloatCat(StringView leading, float value, StringView trailing) {
+ }  // namespace
+ 
+ void CanvasPath::closePath() {
++  RecordBridgeOp(4u, std::string(), {});
+   if (IsEmpty()) [[unlikely]] {
+     return;
+   }
+@@ -105,6 +106,7 @@ void CanvasPath::closePath() {
+ }
+ 
+ void CanvasPath::moveTo(double double_x, double double_y) {
++  RecordBridgeOp(30u, std::string(), {double_x, double_y});
+   float x = base::saturated_cast<float>(double_x);
+   float y = base::saturated_cast<float>(double_y);
+   if (!std::isfinite(x) || !std::isfinite(y)) [[unlikely]] {
+@@ -123,6 +125,7 @@ void CanvasPath::moveTo(double double_x, double double_y) {
+ }
+ 
+ void CanvasPath::lineTo(double double_x, double double_y) {
++  RecordBridgeOp(31u, std::string(), {double_x, double_y});
+   float x = base::saturated_cast<float>(double_x);
+   float y = base::saturated_cast<float>(double_y);
+   if (!std::isfinite(x) || !std::isfinite(y)) [[unlikely]] {
+@@ -154,7 +157,9 @@ void CanvasPath::quadraticCurveTo(double double_cpx,
+                                   double double_cpy,
+                                   double double_x,
+                                   double double_y) {
+-  float cpx = base::saturated_cast<float>(double_cpx);
++    RecordBridgeOp(35u, std::string(),
++                 {double_cpx, double_cpy, double_x, double_y});
++float cpx = base::saturated_cast<float>(double_cpx);
+   float cpy = base::saturated_cast<float>(double_cpy);
+   float x = base::saturated_cast<float>(double_x);
+   float y = base::saturated_cast<float>(double_y);
+@@ -185,7 +190,10 @@ void CanvasPath::bezierCurveTo(double double_cp1x,
+                                double double_cp2y,
+                                double double_x,
+                                double double_y) {
+-  float cp1x = base::saturated_cast<float>(double_cp1x);
++    RecordBridgeOp(36u, std::string(),
++                 {double_cp1x, double_cp1y, double_cp2x, double_cp2y,
++                  double_x, double_y});
++float cp1x = base::saturated_cast<float>(double_cp1x);
+   float cp1y = base::saturated_cast<float>(double_cp1y);
+   float cp2x = base::saturated_cast<float>(double_cp2x);
+   float cp2y = base::saturated_cast<float>(double_cp2y);
+@@ -220,7 +228,9 @@ void CanvasPath::arcTo(double double_x1,
+                        double double_y2,
+                        double double_r,
+                        ExceptionState& exception_state) {
+-  float x1 = base::saturated_cast<float>(double_x1);
++    RecordBridgeOp(34u, std::string(),
++                 {double_x1, double_y1, double_x2, double_y2, double_r});
++float x1 = base::saturated_cast<float>(double_x1);
+   float y1 = base::saturated_cast<float>(double_y1);
+   float x2 = base::saturated_cast<float>(double_x2);
+   float y2 = base::saturated_cast<float>(double_y2);
+@@ -431,7 +441,10 @@ void CanvasPath::arc(double double_x,
+                      double double_end_angle,
+                      bool anticlockwise,
+                      ExceptionState& exception_state) {
+-  float x = base::saturated_cast<float>(double_x);
++    RecordBridgeOp(33u, std::string(),
++                 {double_x, double_y, double_radius, double_start_angle,
++                  double_end_angle});
++float x = base::saturated_cast<float>(double_x);
+   float y = base::saturated_cast<float>(double_y);
+   float radius = base::saturated_cast<float>(double_radius);
+   float start_angle = base::saturated_cast<float>(double_start_angle);
+@@ -488,7 +501,10 @@ void CanvasPath::ellipse(double double_x,
+                          ExceptionState& exception_state) {
+   float x = base::saturated_cast<float>(double_x);
+   float y = base::saturated_cast<float>(double_y);
+-  float radius_x = base::saturated_cast<float>(double_radius_x);
++    RecordBridgeOp(37u, std::string(),
++                 {double_x, double_y, double_radius_x, double_radius_y,
++                  double_rotation, double_start_angle, double_end_angle});
++float radius_x = base::saturated_cast<float>(double_radius_x);
+   float radius_y = base::saturated_cast<float>(double_radius_y);
+   float rotation = base::saturated_cast<float>(double_rotation);
+   float start_angle = base::saturated_cast<float>(double_start_angle);
+@@ -542,7 +558,9 @@ void CanvasPath::rect(double double_x,
+                       double double_height) {
+   float x = base::saturated_cast<float>(double_x);
+   float y = base::saturated_cast<float>(double_y);
+-  float width = base::saturated_cast<float>(double_width);
++    RecordBridgeOp(32u, std::string(),
++                 {double_x, double_y, double_width, double_height});
++float width = base::saturated_cast<float>(double_width);
+   float height = base::saturated_cast<float>(double_height);
+   if (!IsTransformInvertible()) [[unlikely]] {
+     return;

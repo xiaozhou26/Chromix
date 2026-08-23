@@ -1,0 +1,24 @@
+diff --git a/third_party/blink/renderer/core/html/canvas/canvas_rendering_context.h b/third_party/blink/renderer/core/html/canvas/canvas_rendering_context.h
+index 52fc572..b9126b7 100644
+--- a/third_party/blink/renderer/core/html/canvas/canvas_rendering_context.h
++++ b/third_party/blink/renderer/core/html/canvas/canvas_rendering_context.h
+@@ -26,6 +26,8 @@
+ #ifndef THIRD_PARTY_BLINK_RENDERER_CORE_HTML_CANVAS_CANVAS_RENDERING_CONTEXT_H_
+ #define THIRD_PARTY_BLINK_RENDERER_CORE_HTML_CANVAS_CANVAS_RENDERING_CONTEXT_H_
+ 
++#include <vector>
++
+ #include "base/byte_size.h"
+ #include "base/containers/span.h"
+ #include "base/functional/callback_forward.h"
+@@ -182,6 +184,10 @@ class CORE_EXPORT CanvasRenderingContext
+   virtual void PageVisibilityChanged() = 0;
+   virtual void SizeChanged() {}
+   virtual bool isContextLost() const { return true; }
++  virtual bool ReadBridgePixels(std::vector<uint8_t>* out, int width,
++                                int height) {
++    return false;
++  }
+   bool IsContextBeingRestored() const { return is_context_being_restored_; }
+   // TODO(fserb): remove AsV8RenderingContext and AsV8OffscreenRenderingContext.
+   virtual V8RenderingContext* AsV8RenderingContext() { NOTREACHED(); }

@@ -1,0 +1,106 @@
+diff --git a/third_party/blink/renderer/platform/canvas_bridge/canvas_bridge_codec.h b/third_party/blink/renderer/platform/canvas_bridge/canvas_bridge_codec.h
+new file mode 100644
+index 0000000..6b6c44f
+--- /dev/null
++++ b/third_party/blink/renderer/platform/canvas_bridge/canvas_bridge_codec.h
+@@ -0,0 +1,100 @@
++// Copyright 2026.
++// Use of this source code is governed by a BSD-style license.
++#ifndef THIRD_PARTY_BLINK_RENDERER_PLATFORM_CANVAS_BRIDGE_CANVAS_BRIDGE_CODEC_H_
++#define THIRD_PARTY_BLINK_RENDERER_PLATFORM_CANVAS_BRIDGE_CANVAS_BRIDGE_CODEC_H_
++
++#include <cstdint>
++#include <optional>
++#include <string>
++#include <vector>
++
++#include "base/containers/span.h"
++
++namespace blink::canvas_bridge {
++
++enum class MessageType : uint32_t {
++  kUnknown = 0,
++  kHello = 1,
++  kWelcome = 2,
++  kCreateCanvas2D = 3,
++  kCanvas2DGetImageData = 4,
++  kImageData = 5,
++  kCanvas2DOp = 6,
++  kMeasureText = 7,
++  kCreateWebGL = 8,
++  kWebGLOp = 9,
++};
++
++enum class WebGLOp : uint32_t {
++  kUnknown = 0,
++  kCreateBuffer = 1, kCreateShader = 2, kCreateProgram = 3, kCreateTexture = 4,
++  kCreateFramebuffer = 5, kCreateRenderbuffer = 6, kDeleteObject = 9,
++  kShaderSource = 10, kCompileShader = 11, kAttachShader = 12,
++  kBindAttribLocation = 13, kLinkProgram = 14, kUseProgram = 15,
++  kGetUniformLocation = 16,
++  kBindBuffer = 20, kBufferData = 21, kBufferDataSize = 22, kBufferSubData = 23,
++  kEnableVertexAttribArray = 30, kDisableVertexAttribArray = 31,
++  kVertexAttribPointer = 32,
++  kUniform1f = 40, kUniform2f = 41, kUniform3f = 42, kUniform4f = 43,
++  kUniform1i = 44, kUniformMatrix4fv = 50,
++  kBindTexture = 60, kTexImage2D = 61, kTexParameteri = 62, kActiveTexture = 63,
++  kGenerateMipmap = 64, kTexParameterf = 65, kTexSubImage2D = 66,
++  kBindFramebuffer = 70, kFramebufferTexture2D = 71, kBindRenderbuffer = 72,
++  kRenderbufferStorage = 73, kFramebufferRenderbuffer = 74,
++  kViewport = 80, kClearColor = 81, kClear = 82, kEnable = 83, kDisable = 84,
++  kBlendFunc = 85, kDepthFunc = 86, kPixelStorei = 87, kScissor = 88,
++  kDrawArrays = 90, kDrawElements = 91,
++};
++
++enum class Canvas2DOp : uint32_t {
++  kUnknown = 0,
++  kSave = 1, kRestore = 2, kBeginPath = 3, kClosePath = 4, kFill = 5,
++  kStroke = 6, kClip = 7,
++  kFillRect = 10, kStrokeRect = 11, kClearRect = 12,
++  kFillText = 20, kStrokeText = 21,
++  kMoveTo = 30, kLineTo = 31, kRect = 32, kArc = 33, kArcTo = 34,
++  kQuadraticCurveTo = 35, kBezierCurveTo = 36, kEllipse = 37,
++  kSetTransform = 40, kTransform = 41, kTranslate = 42, kRotate = 43,
++  kScale = 44, kResetTransform = 45,
++  kSetFillStyle = 50, kSetStrokeStyle = 51, kSetLineWidth = 52,
++  kSetFont = 53, kSetTextAlign = 54, kSetTextBaseline = 55,
++  kSetGlobalAlpha = 56, kSetGlobalCompositeOperation = 57,
++  kSetLineCap = 58, kSetLineJoin = 59, kSetMiterLimit = 60,
++  kSetLineDashOffset = 61, kSetShadowColor = 62, kSetShadowBlur = 63,
++  kSetShadowOffsetX = 64, kSetShadowOffsetY = 65, kSetDirection = 66,
++  kSetTextRendering = 67, kSetLetterSpacing = 68, kSetWordSpacing = 69,
++  kSetImageSmoothingEnabled = 70,
++};
++
++struct HelloMessage { uint32_t protocol_version = 1; uint64_t persona_seed = 0; std::string client_version; };
++struct WelcomeMessage { uint32_t protocol_version = 0; std::string server_version; std::string os; std::string gpu_vendor; std::string gpu_renderer; };
++struct CreateCanvas2DMessage { uint32_t canvas_id = 0; uint32_t width = 0; uint32_t height = 0; bool opaque = false; };
++struct Canvas2DOpMessage { uint32_t canvas_id = 0; uint32_t op = 0; std::string str_arg; std::vector<double> args; };
++struct MeasureTextMessage { uint32_t canvas_id = 0; std::string text; };
++struct CreateWebGLMessage { uint32_t canvas_id = 0; uint32_t width = 0; uint32_t height = 0; uint32_t context_type = 1; };
++struct WebGLOpMessage { uint32_t canvas_id = 0; uint32_t op = 0; std::vector<int32_t> ints; std::vector<double> floats; std::string str; std::vector<uint8_t> data; };
++struct GetImageDataMessage { uint32_t canvas_id = 0; int32_t x = 0; int32_t y = 0; uint32_t width = 0; uint32_t height = 0; uint32_t content_version = 0; };
++struct ImageDataMessage { uint32_t canvas_id = 0; uint32_t width = 0; uint32_t height = 0; std::vector<uint8_t> pixels; uint32_t content_version = 0; };
++
++MessageType PeekType(base::span<const uint8_t> frame);
++std::vector<uint8_t> Encode(const HelloMessage&);
++std::vector<uint8_t> Encode(const WelcomeMessage&);
++std::vector<uint8_t> Encode(const CreateCanvas2DMessage&);
++std::vector<uint8_t> Encode(const Canvas2DOpMessage&);
++std::vector<uint8_t> Encode(const MeasureTextMessage&);
++std::vector<uint8_t> Encode(const CreateWebGLMessage&);
++std::vector<uint8_t> Encode(const WebGLOpMessage&);
++std::vector<uint8_t> Encode(const GetImageDataMessage&);
++std::vector<uint8_t> Encode(const ImageDataMessage&);
++std::optional<HelloMessage> DecodeHello(base::span<const uint8_t>);
++std::optional<WelcomeMessage> DecodeWelcome(base::span<const uint8_t>);
++std::optional<CreateCanvas2DMessage> DecodeCreateCanvas2D(base::span<const uint8_t>);
++std::optional<Canvas2DOpMessage> DecodeCanvas2DOp(base::span<const uint8_t>);
++std::optional<MeasureTextMessage> DecodeMeasureText(base::span<const uint8_t>);
++std::optional<CreateWebGLMessage> DecodeCreateWebGL(base::span<const uint8_t>);
++std::optional<WebGLOpMessage> DecodeWebGLOp(base::span<const uint8_t>);
++std::optional<GetImageDataMessage> DecodeGetImageData(base::span<const uint8_t>);
++std::optional<ImageDataMessage> DecodeImageData(base::span<const uint8_t>);
++
++}  // namespace blink::canvas_bridge
++#endif

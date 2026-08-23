@@ -29,7 +29,7 @@ index bc4c0c6ca0..f6e8ff99cf 100644
  
    // We don't need to copy anything if a) the buffer offset is past the end of
    // the AudioBuffer or b) the internal `Data()` of is a zero-length
-@@ -342,4 +348,36 @@ void SharedAudioBuffer::Zero() {
+@@ -342,4 +348,34 @@ void SharedAudioBuffer::Zero() {
    }
  }
  
@@ -43,11 +43,9 @@ index bc4c0c6ca0..f6e8ff99cf 100644
 +  }
 +  uxr_audio_farbled_ = true;  // farble once; repeated reads stay stable
 +  uint32_t seed = 0u;
-+  if (!base::StringToUint(base::UxrConfig::GetInstance().Get("uxr-audio-seed"), &seed)) {
-+    seed = 0u;
-+  }
-+  if (seed == 0u) {
-+    seed = 0x9e3779b9u;
++  if (!base::StringToUint(base::UxrConfig::GetInstance().Get("uxr-audio-seed"), &seed) ||
++      seed == 0u) {
++    return;
 +  }
 +  for (unsigned c = 0; c < channels_.size(); ++c) {
 +    if (!channels_[c]) {

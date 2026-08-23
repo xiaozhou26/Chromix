@@ -16,6 +16,7 @@
 // Intentional differences: licenseKey is accepted and ignored (one open tier),
 // geoip uses ip-api.com instead of a local GeoLite2 database, and there is no
 // puppeteer subpath (use the playwright surface).
+import { randomBytes } from "node:crypto";
 import { existsSync, rmSync, readdirSync } from "node:fs";
 import { join } from "node:path";
 import {
@@ -91,8 +92,8 @@ export async function checkForUpdate() {
 // ---------------------------------------------------------------------------
 
 export function getDefaultStealthArgs() {
-  const seed = 10000 + Math.floor(Math.random() * 90000);
-  const base = ["--no-sandbox", `--fingerprint=${seed}`];
+  const seed = randomBytes(4).readUInt32LE(0) || 1;
+  const base = [`--fingerprint=${seed}`];
   return process.platform === "darwin"
     ? [...base, "--fingerprint-platform=macos"]
     : [...base, "--fingerprint-platform=windows"];

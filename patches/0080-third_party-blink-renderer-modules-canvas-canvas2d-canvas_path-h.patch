@@ -1,0 +1,24 @@
+diff --git a/third_party/blink/renderer/modules/canvas/canvas2d/canvas_path.h b/third_party/blink/renderer/modules/canvas/canvas2d/canvas_path.h
+index 117bddc..3eb565a 100644
+--- a/third_party/blink/renderer/modules/canvas/canvas2d/canvas_path.h
++++ b/third_party/blink/renderer/modules/canvas/canvas2d/canvas_path.h
+@@ -28,6 +28,10 @@
+  */
+ 
+ #ifndef THIRD_PARTY_BLINK_RENDERER_MODULES_CANVAS_CANVAS2D_CANVAS_PATH_H_
++
++#include <cstdint>
++#include <string>
++#include <vector>
+ #define THIRD_PARTY_BLINK_RENDERER_MODULES_CANVAS_CANVAS2D_CANVAS_PATH_H_
+ 
+ #include "base/check.h"
+@@ -176,6 +180,8 @@ class MODULES_EXPORT CanvasPath : public GarbageCollectedMixin {
+   gfx::RectF BoundingRect() const;
+ 
+  protected:
++  virtual void RecordBridgeOp(uint32_t op, const std::string& str,
++                              const std::vector<double>& args) {}
+   CanvasPath() { path_builder_.SetIsVolatile(true); }
+   explicit CanvasPath(const Path& path) : path_builder_(path) {
+     path_builder_.SetIsVolatile(true);

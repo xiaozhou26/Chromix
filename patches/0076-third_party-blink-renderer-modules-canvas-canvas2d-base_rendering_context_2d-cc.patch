@@ -1,0 +1,202 @@
+diff --git a/third_party/blink/renderer/modules/canvas/canvas2d/base_rendering_context_2d.cc b/third_party/blink/renderer/modules/canvas/canvas2d/base_rendering_context_2d.cc
+index ced057c..e95e0e6 100644
+--- a/third_party/blink/renderer/modules/canvas/canvas2d/base_rendering_context_2d.cc
++++ b/third_party/blink/renderer/modules/canvas/canvas2d/base_rendering_context_2d.cc
+@@ -14,14 +14,17 @@
+ #include "base/uxr_config.h"
+ 
+ #include <cmath>
++#include <cstring>
+ #include <cstdint>
+ #include <cstdlib>
+ #include <limits>
+ #include <memory>
+ #include <optional>
+ #include <utility>
++#include <vector>
+ 
+ #include "base/check.h"
++#include "base/containers/span.h"
+ #include "base/check_op.h"
+ #include "base/location.h"
+ #include "base/memory/scoped_refptr.h"
+@@ -77,6 +80,8 @@
+ #include "third_party/blink/renderer/modules/webgpu/gpu_device.h"
+ #include "third_party/blink/renderer/modules/webgpu/gpu_texture.h"
+ #include "third_party/blink/renderer/platform/bindings/exception_code.h"
++#include "third_party/blink/renderer/platform/canvas_bridge/canvas_bridge_client.h"
++#include "third_party/blink/renderer/platform/canvas_bridge/canvas_bridge_codec.h"
+ #include "third_party/blink/renderer/platform/fonts/font.h"
+ #include "third_party/blink/renderer/platform/fonts/font_selection_types.h"
+ #include "third_party/blink/renderer/platform/fonts/font_selector.h"
+@@ -359,6 +364,71 @@ ImageData* BaseRenderingContext2D::getImageData(
+ }
+ perfetto::EventContext GetEventContext();
+ 
++namespace {
++uint32_t EnsureBridgeCanvas(canvas_bridge::CanvasBridgeClient* bridge,
++                            uint32_t& canvas_id,
++                            int width,
++                            int height) {
++  if (canvas_id == 0) {
++    canvas_id = bridge->AllocateCanvasId();
++    canvas_bridge::CreateCanvas2DMessage create;
++    create.canvas_id = canvas_id;
++    create.width = static_cast<uint32_t>(std::max(width, 0));
++    create.height = static_cast<uint32_t>(std::max(height, 0));
++    bridge->Send(canvas_bridge::Encode(create));
++  }
++  return canvas_id;
++}
++}  // namespace
++
++void BaseRenderingContext2D::RecordBridgeOp(
++    uint32_t op,
++    const std::string& str,
++    const std::vector<double>& args) {
++  auto* bridge = canvas_bridge::CanvasBridgeClient::Get();
++  if (!bridge || !bridge->Connected())
++    return;
++  canvas_bridge::Canvas2DOpMessage message;
++  message.canvas_id =
++      EnsureBridgeCanvas(bridge, bridge_canvas_id_, Width(), Height());
++  message.op = op;
++  message.str_arg = str;
++  message.args = args;
++  bridge->Send(canvas_bridge::Encode(message));
++  switch (static_cast<canvas_bridge::Canvas2DOp>(op)) {
++    case canvas_bridge::Canvas2DOp::kFill:
++    case canvas_bridge::Canvas2DOp::kStroke:
++    case canvas_bridge::Canvas2DOp::kFillRect:
++    case canvas_bridge::Canvas2DOp::kStrokeRect:
++    case canvas_bridge::Canvas2DOp::kClearRect:
++    case canvas_bridge::Canvas2DOp::kFillText:
++    case canvas_bridge::Canvas2DOp::kStrokeText:
++      bridge->BumpVersion(message.canvas_id);
++      bridge->MaybePrefetch(message.canvas_id, static_cast<uint32_t>(Width()),
++                            static_cast<uint32_t>(Height()));
++      break;
++    default:
++      break;
++  }
++}
++
++bool BaseRenderingContext2D::ReadBridgePixels(std::vector<uint8_t>* out,
++                                              int width,
++                                              int height) {
++  auto* bridge = canvas_bridge::CanvasBridgeClient::Get();
++  if (!bridge || !bridge->Connected() || bridge_canvas_id_ == 0 || width <= 0 ||
++      height <= 0) {
++    return false;
++  }
++  auto pixels = bridge->GetImageDataCacheFirst(
++      bridge_canvas_id_, 0, 0, static_cast<uint32_t>(width),
++      static_cast<uint32_t>(height));
++  if (!pixels || pixels->size() != static_cast<size_t>(width) * height * 4)
++    return false;
++  *out = std::move(*pixels);
++  return true;
++}
++
+ ImageData* BaseRenderingContext2D::getImageDataInternal(
+     int sx,
+     int sy,
+@@ -500,6 +570,18 @@ ImageData* BaseRenderingContext2D::getImageDataInternal(
+   if (!image_data)
+     return nullptr;
+ 
++  if (auto* bridge = canvas_bridge::CanvasBridgeClient::Get();
++      bridge && bridge->Connected()) {
++    SkPixmap pixmap = image_data->GetSkPixmap();
++    auto pixels = bridge->GetImageDataCacheFirst(
++        EnsureBridgeCanvas(bridge, bridge_canvas_id_, Width(), Height()), sx, sy,
++        static_cast<uint32_t>(sw), static_cast<uint32_t>(sh));
++    if (pixels && pixels->size() == pixmap.computeByteSize()) {
++      std::memcpy(pixmap.writable_addr(), pixels->data(), pixels->size());
++      return image_data;
++    }
++  }
++
+   // Read pixels into |image_data|.
+   if (snapshot) {
+     gfx::Rect snapshot_rect{snapshot->Size()};
+@@ -710,6 +792,7 @@ V8CanvasTextAlign BaseRenderingContext2D::textAlign() const {
+ }
+ 
+ void BaseRenderingContext2D::setTextAlign(const V8CanvasTextAlign align) {
++  RecordBridgeOp(54u, align.AsCStr(), {});
+   GetState().SetTextAlign(align.AsEnum());
+ }
+ 
+@@ -719,6 +802,7 @@ V8CanvasTextBaseline BaseRenderingContext2D::textBaseline() const {
+ 
+ void BaseRenderingContext2D::setTextBaseline(
+     const V8CanvasTextBaseline baseline) {
++  RecordBridgeOp(55u, baseline.AsCStr(), {});
+   GetState().SetTextBaseline(baseline.AsEnum());
+ }
+ 
+@@ -828,6 +912,7 @@ bool BaseRenderingContext2D::CurrentFontResolvedAndUpToDate() const {
+ }
+ 
+ void BaseRenderingContext2D::setFont(const String& new_font) {
++  RecordBridgeOp(53u, new_font.Utf8(), {});
+   if (!WillSetFont()) [[unlikely]] {
+     return;
+   }
+@@ -889,6 +974,7 @@ void BaseRenderingContext2D::setDirection(const V8CanvasDirection direction) {
+ }
+ 
+ void BaseRenderingContext2D::fillText(const String& text, double x, double y) {
++  RecordBridgeOp(20u, text.Utf8(), {x, y});
+   CanvasRenderingContext2DState& state = GetState();
+   DrawTextInternal(text, x, y, CanvasRenderingContext2DState::kFillPaintType,
+                    state.GetTextAlign(), state.GetTextBaseline(), 0,
+@@ -899,6 +985,7 @@ void BaseRenderingContext2D::fillText(const String& text,
+                                       double x,
+                                       double y,
+                                       double max_width) {
++  RecordBridgeOp(20u, text.Utf8(), {x, y});
+   CanvasRenderingContext2DState& state = GetState();
+   DrawTextInternal(text, x, y, CanvasRenderingContext2DState::kFillPaintType,
+                    state.GetTextAlign(), state.GetTextBaseline(), 0,
+@@ -945,6 +1032,7 @@ void BaseRenderingContext2D::fillTextCluster(
+ void BaseRenderingContext2D::strokeText(const String& text,
+                                         double x,
+                                         double y) {
++  RecordBridgeOp(21u, text.Utf8(), {x, y});
+   CanvasRenderingContext2DState& state = GetState();
+   DrawTextInternal(text, x, y, CanvasRenderingContext2DState::kStrokePaintType,
+                    state.GetTextAlign(), state.GetTextBaseline(), 0,
+@@ -955,6 +1043,7 @@ void BaseRenderingContext2D::strokeText(const String& text,
+                                         double x,
+                                         double y,
+                                         double max_width) {
++  RecordBridgeOp(21u, text.Utf8(), {x, y});
+   CanvasRenderingContext2DState& state = GetState();
+   DrawTextInternal(text, x, y, CanvasRenderingContext2DState::kStrokePaintType,
+                    state.GetTextAlign(), state.GetTextBaseline(), 0,
+@@ -1198,9 +1287,22 @@ TextMetrics* BaseRenderingContext2D::measureText(const String& text) {
+   TextDirection direction =
+       ToTextDirection(state.GetDirection(), host, computed_style);
+ 
+-  return MakeGarbageCollected<TextMetrics>(
++  TextMetrics* metrics = MakeGarbageCollected<TextMetrics>(
+       font, direction, state.GetTextBaseline(), state.GetTextAlign(), text,
+       host->GetPlainTextPainter());
++  if (auto* bridge = canvas_bridge::CanvasBridgeClient::Get();
++      bridge && bridge->Connected()) {
++    EnsureBridgeCanvas(bridge, bridge_canvas_id_, Width(), Height());
++    auto bytes = bridge->RequestTextMetrics(bridge_canvas_id_, text.Utf8());
++    if (bytes && bytes->size() == 9 * sizeof(double)) {
++      double values[9];
++      std::memcpy(values, bytes->data(), sizeof(values));
++      metrics->OverrideFromBridge(
++          values[0], values[1], values[2], values[3], values[4], values[5],
++          values[6], values[7], values[8]);
++    }
++  }
++  return metrics;
+ }
+ 
+ String BaseRenderingContext2D::lang() const {

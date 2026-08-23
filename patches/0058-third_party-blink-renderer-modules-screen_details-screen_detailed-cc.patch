@@ -1,0 +1,89 @@
+diff --git a/third_party/blink/renderer/modules/screen_details/screen_detailed.cc b/third_party/blink/renderer/modules/screen_details/screen_detailed.cc
+index 490cda3..610eb64 100644
+--- a/third_party/blink/renderer/modules/screen_details/screen_detailed.cc
++++ b/third_party/blink/renderer/modules/screen_details/screen_detailed.cc
+@@ -7,6 +7,8 @@
+ #include <cmath>
+ 
+ #include "base/numerics/safe_conversions.h"
++#include "base/strings/string_number_conversions.h"
++#include "base/uxr_config.h"
+ #include "third_party/blink/renderer/core/frame/local_dom_window.h"
+ #include "third_party/blink/renderer/core/frame/local_frame.h"
+ #include "third_party/blink/renderer/core/frame/settings.h"
+@@ -19,6 +21,19 @@
+ 
+ namespace blink {
+ 
++namespace {
++
++bool UxrSingleScreenActive() {
++  const base::UxrConfig& config = base::UxrConfig::GetInstance();
++  return config.Has("uxr-screen-width") ||
++         config.Has("uxr-screen-height") ||
++         config.Has("uxr-screen-avail-width") ||
++         config.Has("uxr-screen-avail-height") ||
++         config.Has("uxr-screen-color-depth");
++}
++
++}  // namespace
++
+ ScreenDetailed::ScreenDetailed(LocalDOMWindow* window, int64_t display_id)
+     : Screen(window, display_id) {}
+ 
+@@ -104,36 +119,55 @@ bool ScreenDetailed::AreHdrHeadroomEqual(const display::ScreenInfo& prev,
+ int ScreenDetailed::left() const {
+   if (!DomWindow())
+     return 0;
++  if (UxrSingleScreenActive())
++    return 0;
+   return GetRect(/*available=*/false).x();
+ }
+ 
+ int ScreenDetailed::top() const {
+   if (!DomWindow())
+     return 0;
++  if (UxrSingleScreenActive())
++    return 0;
+   return GetRect(/*available=*/false).y();
+ }
+ 
+ bool ScreenDetailed::isPrimary() const {
+   if (!DomWindow())
+     return false;
++  if (UxrSingleScreenActive())
++    return true;
+   return GetScreenInfo().is_primary;
+ }
+ 
+ bool ScreenDetailed::isInternal() const {
+   if (!DomWindow())
+     return false;
++  if (UxrSingleScreenActive())
++    return false;
+   return GetScreenInfo().is_internal;
+ }
+ 
+ float ScreenDetailed::devicePixelRatio() const {
+   if (!DomWindow())
+     return 0.f;
++  if (UxrSingleScreenActive()) {
++    double dpr = 0.0;
++    if (base::StringToDouble(
++            base::UxrConfig::GetInstance().Get("uxr-device-pixel-ratio"),
++            &dpr) &&
++        dpr > 0.0) {
++      return static_cast<float>(dpr);
++    }
++  }
+   return GetScreenInfo().device_scale_factor;
+ }
+ 
+ String ScreenDetailed::label() const {
+   if (!DomWindow())
+     return String();
++  if (UxrSingleScreenActive())
++    return String();
+   return String::FromUtf8(GetScreenInfo().label);
+ }
+ 

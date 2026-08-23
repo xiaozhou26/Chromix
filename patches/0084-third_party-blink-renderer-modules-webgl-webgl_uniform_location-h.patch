@@ -1,0 +1,21 @@
+diff --git a/third_party/blink/renderer/modules/webgl/webgl_uniform_location.h b/third_party/blink/renderer/modules/webgl/webgl_uniform_location.h
+index 3e016dc..d815036 100644
+--- a/third_party/blink/renderer/modules/webgl/webgl_uniform_location.h
++++ b/third_party/blink/renderer/modules/webgl/webgl_uniform_location.h
+@@ -41,6 +41,8 @@ class WebGLUniformLocation final : public ScriptWrappable {
+   WebGLProgram* Program() const;
+ 
+   GLint Location() const;
++  uint32_t BridgeId() const { return bridge_id_; }
++  void SetBridgeId(uint32_t id) { bridge_id_ = id; }
+ 
+   void Trace(Visitor*) const override;
+ 
+@@ -48,6 +50,7 @@ class WebGLUniformLocation final : public ScriptWrappable {
+   Member<WebGLProgram> program_;
+   GLint location_;
+   unsigned link_count_;
++  uint32_t bridge_id_ = 0;
+ };
+ 
+ }  // namespace blink

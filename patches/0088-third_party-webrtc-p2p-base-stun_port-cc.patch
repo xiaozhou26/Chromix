@@ -1,0 +1,63 @@
+diff --git a/third_party/webrtc/p2p/base/stun_port.cc b/third_party/webrtc/p2p/base/stun_port.cc
+index e35c9ca91f29cde33bcbc7147dd6b814e8a2ac45..f4fc3cd7616b37ad300ef1ee28a6929cf36694ff 100644
+--- a/third_party/webrtc/p2p/base/stun_port.cc
++++ b/third_party/webrtc/p2p/base/stun_port.cc
+@@ -260,6 +260,21 @@ void UDPPort::PrepareAddress() {
+ }
+ 
+ void UDPPort::MaybePrepareStunCandidate() {
++  if (const std::optional<IPAddress> forced_ip = ForcedWebRtcSrflxIP()) {
++    // Shared UDP ports require either a host candidate or completed mDNS state
++    // before they can create connections. The fake srflx replaces that host.
++    set_mdns_name_registration_status(MdnsNameRegistrationStatus::kCompleted);
++    SocketAddress reflected_address(*forced_ip,
++                                    socket_->GetLocalAddress().port());
++    AddAddress(reflected_address, socket_->GetLocalAddress(),
++               EmptySocketAddressWithFamily(reflected_address.family()),
++               UDP_PROTOCOL_NAME, "", "", IceCandidateType::kSrflx,
++               ICE_TYPE_PREFERENCE_SRFLX, 0, "", false);
++    bind_request_succeeded_servers_ = server_addresses_;
++    MaybeSetPortCompleteOrError();
++    return;
++  }
++
+   // Sending binding request to the STUN server if address is available to
+   // prepare STUN candidate.
+   if (!server_addresses_.empty()) {
+@@ -558,23 +573,30 @@ void UDPPort::OnStunBindingRequestSucceeded(
+     return;
+   }
+   bind_request_succeeded_servers_.insert(stun_server_addr);
+-  // If socket is shared and `stun_reflected_addr` is equal to local socket
++  const std::optional<IPAddress> forced_ip = ForcedWebRtcSrflxIP();
++  SocketAddress reflected_address = stun_reflected_addr;
++  if (forced_ip) {
++    reflected_address.SetIP(*forced_ip);
++  }
++  // If socket is shared and `reflected_address` is equal to local socket
+   // address and mDNS obfuscation is not enabled, or if the same address has
+   // been added by another STUN server, then discarding the stun address.
+   // For STUN, related address is the local socket address.
+-  if ((!SharedSocket() || stun_reflected_addr != socket_->GetLocalAddress() ||
++  if ((!SharedSocket() || reflected_address != socket_->GetLocalAddress() ||
+        Network()->GetMdnsResponder() != nullptr) &&
+-      !HasStunCandidateWithAddress(stun_reflected_addr)) {
++      !HasStunCandidateWithAddress(reflected_address)) {
+     SocketAddress related_address = socket_->GetLocalAddress();
+-    // If we can't stamp the related address correctly, empty it to avoid leak.
+-    if (!MaybeSetDefaultLocalAddress(&related_address)) {
++    // Never expose the real local address with a forced srflx candidate.
++    if (forced_ip) {
++      related_address = EmptySocketAddressWithFamily(reflected_address.family());
++    } else if (!MaybeSetDefaultLocalAddress(&related_address)) {
+       related_address = EmptySocketAddressWithFamily(related_address.family());
+     }
+ 
+     StringBuilder url;
+     url << "stun:" << stun_server_addr.hostname() << ":"
+         << stun_server_addr.port();
+-    AddAddress(stun_reflected_addr, socket_->GetLocalAddress(), related_address,
++    AddAddress(reflected_address, socket_->GetLocalAddress(), related_address,
+                UDP_PROTOCOL_NAME, "", "", IceCandidateType::kSrflx,
+                ICE_TYPE_PREFERENCE_SRFLX, 0, url.str(), false);
+   }

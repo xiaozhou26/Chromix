@@ -10,7 +10,7 @@ index b5cc00e4c8..3cc7963afa 100644
  #include <memory>
  #include <optional>
  
-@@ -161,6 +162,104 @@ int ChromeMain(int argc, const char** argv) {
+@@ -161,6 +162,117 @@ int ChromeMain(int argc, const char** argv) {
  
    base::CommandLine* command_line(base::CommandLine::ForCurrentProcess());
  
@@ -33,6 +33,19 @@ index b5cc00e4c8..3cc7963afa 100644
 +      {"fingerprint-timezone",            "uxr-timezone"},
 +      {"fingerprint-storage-quota",        "uxr-storage-quota"},
 +      {"fingerprint-taskbar-height",      "uxr-taskbar-height"},
++      {"fingerprint-geolocation",         "uxr-geolocation"},
++      {"fingerprint-codec-h264",          "uxr-codec-h264"},
++      {"fingerprint-codec-vp8",           "uxr-codec-vp8"},
++      {"fingerprint-codec-vp9",           "uxr-codec-vp9"},
++      {"fingerprint-codec-av1",           "uxr-codec-av1"},
++      {"fingerprint-codec-hevc",          "uxr-codec-hevc"},
++      {"fingerprint-devtools-runtime-suppression",
++                                             "uxr-devtools-runtime-suppression"},
++      {"fingerprint-canvas-bridge",        "uxr-canvas-bridge"},
++      {"fingerprint-canvas-bridge-unsafe", "uxr-canvas-bridge-unsafe"},
++      {"fingerprint-webrtc-fake-srflx",    "uxr-webrtc-fake-srflx"},
++      {"fingerprint-webrtc-fake-srflx-allow-udp",
++                                             "uxr-webrtc-fake-srflx-allow-udp"},
 +    };
 +    for (const auto& a : kAliases) {
 +      if (command_line->HasSwitch(a.fp)) {

@@ -1,0 +1,13 @@
+diff --git a/v8/src/flags/flag-definitions.h b/v8/src/flags/flag-definitions.h
+index 2b5120ff988ab3a5cb9ae4e5eb9c48b1d44b6f78..b23e7fcce9caf75440afafdc249d24120beed20b 100644
+--- a/v8/src/flags/flag-definitions.h
++++ b/v8/src/flags/flag-definitions.h
+@@ -3228,6 +3228,8 @@ DEFINE_BOOL(expose_inspector_scripts, false,
+ DEFINE_BOOL(inspector_live_edit, false,
+             "Enable the Debugger.setScriptSource CDP command, otherwise it'll "
+             "always fail with an error")
++DEFINE_BOOL(uxr_devtools_runtime_suppression, false,
++            "suppress selected Runtime domain observables")
+ 
+ // execution.cc
+ //

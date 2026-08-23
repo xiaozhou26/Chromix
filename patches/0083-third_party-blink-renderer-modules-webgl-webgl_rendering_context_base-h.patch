@@ -1,0 +1,27 @@
+diff --git a/third_party/blink/renderer/modules/webgl/webgl_rendering_context_base.h b/third_party/blink/renderer/modules/webgl/webgl_rendering_context_base.h
+index 1fc5b8f..af0d9c7 100644
+--- a/third_party/blink/renderer/modules/webgl/webgl_rendering_context_base.h
++++ b/third_party/blink/renderer/modules/webgl/webgl_rendering_context_base.h
+@@ -26,6 +26,8 @@
+ #ifndef THIRD_PARTY_BLINK_RENDERER_MODULES_WEBGL_WEBGL_RENDERING_CONTEXT_BASE_H_
+ #define THIRD_PARTY_BLINK_RENDERER_MODULES_WEBGL_WEBGL_RENDERING_CONTEXT_BASE_H_
+ 
++#include <vector>
++
+ #include <array>
+ #include <memory>
+ #include <optional>
+@@ -695,6 +697,13 @@ class MODULES_EXPORT WebGLRenderingContextBase
+   friend class WebGLPolygonMode;
+   friend class WebGLShaderPixelLocalStorage;
+ 
++  uint32_t bridge_canvas_id_ = 0;
++  uint32_t bridge_webgl_obj_counter_ = 0;
++  bool bridge_webgl_unsupported_ = false;
++  bool bridge_tex_handled_ = false;
++  bool ReadBridgePixels(std::vector<uint8_t>* out, int width,
++                        int height) override;
++
+   WebGLRenderingContextBase(CanvasRenderingContextHost*,
+                             std::unique_ptr<WebGraphicsContext3DProvider>,
+                             const Platform::WebGLContextInfo&,

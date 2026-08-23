@@ -99,9 +99,9 @@ def test_build_args_maximize_suppressed_by_geometry():
 
 def test_get_default_stealth_args_seed_shape():
     sa = api.get_default_stealth_args()
-    assert "--no-sandbox" in sa
+    assert "--no-sandbox" not in sa
     seeds = [a for a in sa if a.startswith("--fingerprint=")]
-    assert len(seeds) == 1 and int(seeds[0].split("=")[1]) >= 10000
+    assert len(seeds) == 1 and 1 <= int(seeds[0].split("=")[1]) <= 0xFFFFFFFF
 
 
 def test_geoip_disabled_passthrough():

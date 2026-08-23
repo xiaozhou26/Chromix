@@ -1,0 +1,75 @@
+diff --git a/third_party/blink/renderer/core/geolocation/geolocation.cc b/third_party/blink/renderer/core/geolocation/geolocation.cc
+index 32bbb76..a3f2602 100644
+--- a/third_party/blink/renderer/core/geolocation/geolocation.cc
++++ b/third_party/blink/renderer/core/geolocation/geolocation.cc
+@@ -29,8 +29,12 @@
+ 
+ #include <algorithm>
+ #include <optional>
++#include <string>
+ 
++#include "base/strings/string_number_conversions.h"
+ #include "base/task/single_thread_task_runner.h"
++#include "base/time/time.h"
++#include "base/uxr_config.h"
+ #include "build/build_config.h"
+ #include "services/device/public/mojom/geoposition.mojom-blink.h"
+ #include "services/network/public/mojom/permissions_policy/permissions_policy_feature.mojom-blink.h"
+@@ -124,6 +128,39 @@ bool ValidateGeoposition(const device::mojom::blink::Geoposition& position) {
+          position.accuracy >= 0. && !position.timestamp.is_null();
+ }
+ 
++device::mojom::blink::GeopositionPtr UxrGeoposition() {
++  const std::string value =
++      base::UxrConfig::GetInstance().Get("uxr-geolocation");
++  const size_t first_comma = value.find(',');
++  const size_t second_comma =
++      first_comma == std::string::npos
++          ? std::string::npos
++          : value.find(',', first_comma + 1);
++  if (first_comma == std::string::npos ||
++      second_comma == std::string::npos ||
++      value.find(',', second_comma + 1) != std::string::npos) {
++    return nullptr;
++  }
++
++  auto position = device::mojom::blink::Geoposition::New();
++  if (!base::StringToDouble(value.substr(0, first_comma),
++                            &position->latitude) ||
++      !base::StringToDouble(
++          value.substr(first_comma + 1, second_comma - first_comma - 1),
++          &position->longitude) ||
++      !base::StringToDouble(value.substr(second_comma + 1),
++                            &position->accuracy)) {
++    return nullptr;
++  }
++
++  position->altitude = -10001.0;
++  position->altitude_accuracy = -1.0;
++  position->heading = -1.0;
++  position->speed = -1.0;
++  position->timestamp = base::Time::Now();
++  return ValidateGeoposition(*position) ? std::move(position) : nullptr;
++}
++
+ #if BUILDFLAG(IS_ANDROID)
+ // On Android, `enableHighAccuracy` previously always returned a precise
+ // location. With the `ApproximateGeolocationPermissionEnabled` feature, the
+@@ -615,6 +652,17 @@ void Geolocation::ResetGeolocationConnection() {
+ }
+ 
+ void Geolocation::QueryNextPosition() {
++  if (device::mojom::blink::GeopositionPtr position = UxrGeoposition()) {
++    GetExecutionContext()
++        ->GetTaskRunner(TaskType::kMiscPlatformAPI)
++        ->PostTask(
++            FROM_HERE,
++            blink::BindOnce(
++                &Geolocation::OnPositionUpdated, WrapPersistent(this),
++                device::mojom::blink::GeopositionResult::NewPosition(
++                    std::move(position))));
++    return;
++  }
+   geolocation_->QueryNextPosition(
+       blink::BindOnce(&Geolocation::OnPositionUpdated, WrapPersistent(this)));
+ }

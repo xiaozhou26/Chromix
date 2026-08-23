@@ -1,0 +1,103 @@
+diff --git a/third_party/blink/renderer/platform/canvas_bridge/canvas_bridge_client.h b/third_party/blink/renderer/platform/canvas_bridge/canvas_bridge_client.h
+new file mode 100644
+index 0000000..3ff2e3f
+--- /dev/null
++++ b/third_party/blink/renderer/platform/canvas_bridge/canvas_bridge_client.h
+@@ -0,0 +1,97 @@
++// Copyright 2026.
++// Use of this source code is governed by a BSD-style license.
++#ifndef THIRD_PARTY_BLINK_RENDERER_PLATFORM_CANVAS_BRIDGE_CANVAS_BRIDGE_CLIENT_H_
++#define THIRD_PARTY_BLINK_RENDERER_PLATFORM_CANVAS_BRIDGE_CANVAS_BRIDGE_CLIENT_H_
++
++#include <cstdint>
++#include <map>
++#include <optional>
++#include <string>
++#include <vector>
++
++#include "base/containers/span.h"
++#include "base/synchronization/condition_variable.h"
++#include "base/synchronization/lock.h"
++#include "base/synchronization/waitable_event.h"
++#include "base/threading/platform_thread.h"
++
++namespace blink::canvas_bridge {
++
++class CanvasBridgeClient : public base::PlatformThread::Delegate {
++ public:
++  // The raw-socket bridge is created only when both uxr-canvas-bridge contains
++  // a valid endpoint and uxr-canvas-bridge-unsafe is explicitly present.
++  static CanvasBridgeClient* Get();
++
++  CanvasBridgeClient(const CanvasBridgeClient&) = delete;
++  CanvasBridgeClient& operator=(const CanvasBridgeClient&) = delete;
++
++  bool Connected();
++  uint32_t AllocateCanvasId();
++  bool Send(base::span<const uint8_t> frame);
++  std::optional<std::vector<uint8_t>> RequestImageData(
++      uint32_t canvas_id, int32_t x, int32_t y, uint32_t width, uint32_t height);
++  std::optional<std::vector<uint8_t>> RequestTextMetrics(
++      uint32_t canvas_id, const std::string& text);
++  void BumpVersion(uint32_t canvas_id);
++  void MaybePrefetch(uint32_t canvas_id, uint32_t full_width,
++                     uint32_t full_height);
++  std::optional<std::vector<uint8_t>> GetImageDataCacheFirst(
++      uint32_t canvas_id, int32_t x, int32_t y, uint32_t width,
++      uint32_t height);
++
++ private:
++  CanvasBridgeClient(std::string host, int port, std::string path);
++  ~CanvasBridgeClient() override;
++  void ThreadMain() override;
++  bool Connect();
++  void WaitUntilReady();
++  void ReadLoop();
++  void Dispatch(base::span<const uint8_t> frame);
++  bool WriteWebSocketFrame(base::span<const uint8_t> payload);
++  bool ReadWebSocketFrame(std::vector<uint8_t>* out);
++  bool ReadExact(void* buf, size_t n);
++  bool WriteExact(const void* buf, size_t n);
++  void CloseSocket();
++  void SendPrefetchRequest(uint32_t canvas_id, uint32_t content_version,
++                           uint32_t width, uint32_t height);
++  std::optional<std::vector<uint8_t>> TryGetCachedSurface(
++      uint32_t canvas_id, int32_t x, int32_t y, uint32_t width,
++      uint32_t height, bool wait_for_inflight);
++
++  const std::string host_;
++  const int port_;
++  const std::string path_;
++  uintptr_t socket_ = static_cast<uintptr_t>(-1);
++  base::Lock write_lock_;
++  base::Lock state_lock_;
++  base::ConditionVariable state_cv_{&state_lock_};
++  bool connected_ = false;
++  bool connect_finished_ = false;
++  base::Lock id_lock_;
++  uint32_t next_canvas_id_ = 1;
++
++  struct PendingReadback {
++    base::WaitableEvent event{base::WaitableEvent::ResetPolicy::MANUAL,
++                              base::WaitableEvent::InitialState::NOT_SIGNALED};
++    std::optional<std::vector<uint8_t>> pixels;
++  };
++  base::Lock pending_lock_;
++  std::map<uint32_t, PendingReadback*> pending_;
++
++  struct CachedSurface {
++    uint32_t current_version = 0;
++    uint32_t have_version = 0;
++    uint32_t inflight_version = 0;
++    bool refetch_pending = false;
++    uint32_t full_width = 0;
++    uint32_t full_height = 0;
++    std::vector<uint8_t> pixels;
++  };
++  base::Lock cache_lock_;
++  base::ConditionVariable cache_cv_{&cache_lock_};
++  std::map<uint32_t, CachedSurface> cache_;
++};
++
++}  // namespace blink::canvas_bridge
++#endif

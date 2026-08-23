@@ -12,7 +12,7 @@ index 319e17ecde..f407355285 100644
  #include "base/strings/stringprintf.h"
  #include "base/synchronization/lock.h"
  #include "base/task/single_thread_task_runner.h"
-@@ -207,6 +210,38 @@ unsigned WebGLRenderingContextBase::max_active_webgl_contexts_on_worker_ = 0;
+@@ -207,6 +210,54 @@ unsigned WebGLRenderingContextBase::max_active_webgl_contexts_on_worker_ = 0;
  
  namespace {
  
@@ -20,19 +20,35 @@ index 319e17ecde..f407355285 100644
 +// non-constant per session and not a known-attributable (SwiftShader) hash. PARTIAL
 +// mitigation only: matching a CLAIMED GPU hash still needs a real GPU. Keyed to the
 +// shared visual seed --uxr-canvas-seed (same as canvas 2D).
-+void UxrFarbleReadPixels(uint8_t* data, size_t n) {
-+  if (n == 0u || data == nullptr) {
++void UxrFarbleReadPixels(uint8_t* data,
++                            GLsizei width,
++                            GLsizei height,
++                            GLenum format,
++                            GLenum type) {
++  // Byte-wise perturbation is only valid for tightly packed RGBA8. Other
++  // formats (FLOAT, HALF_FLOAT, packed integers, RGB, RED, etc.) require
++  // component-aware handling; leave them native rather than corrupting data.
++  if (data == nullptr || width <= 0 || height <= 0 || format != GL_RGBA ||
++      type != GL_UNSIGNED_BYTE) {
++    return;
++  }
++  base::CheckedNumeric<size_t> checked_size = width;
++  checked_size *= height;
++  checked_size *= 4u;
++  if (!checked_size.IsValid()) {
++    return;
++  }
++  const size_t n = checked_size.ValueOrDie();
++  if (n == 0u) {
 +    return;
 +  }
 +  if (!base::UxrConfig::GetInstance().Has("uxr-canvas-seed")) {
 +    return;
 +  }
 +  uint32_t seed = 0u;
-+  if (!base::StringToUint(base::UxrConfig::GetInstance().Get("uxr-canvas-seed"), &seed)) {
-+    seed = 0u;
-+  }
-+  if (seed == 0u) {
-+    seed = 0x9e3779b9u;
++  if (!base::StringToUint(base::UxrConfig::GetInstance().Get("uxr-canvas-seed"), &seed) ||
++      seed == 0u) {
++    return;
 +  }
 +  base::span<uint8_t> px = UNSAFE_BUFFERS(base::span<uint8_t>(data, n));
 +  for (size_t i = 0; i < n; ++i) {
@@ -166,7 +182,7 @@ index 319e17ecde..f407355285 100644
        return;
      }
      ContextGL()->ReadPixels(x, y, width, height, format, type, data);
-+    UxrFarbleReadPixels(data, static_cast<size_t>(buffer_size.ValueOrDie()));  // UXR
++    UxrFarbleReadPixels(data, width, height, format, type);  // UXR
    }
  }
  

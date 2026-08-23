@@ -66,6 +66,23 @@ Env vars: `CLOAKBROWSER_BINARY_PATH`, `CLOAKBROWSER_VERSION`,
    Chrome or `CLOAKBROWSER_WIDEVINE_CDM`); on Linux fetch one with
    `python -m chromix widevine`.
 
+High-risk engine ports are available only through explicit `args`:
+
+```javascript
+const browser = await launch({ args: [
+  '--fingerprint-devtools-runtime-suppression',
+  '--fingerprint-canvas-bridge=127.0.0.1:9228',
+  '--fingerprint-canvas-bridge-unsafe',
+  '--fingerprint-webrtc-fake-srflx=203.0.113.20',
+  '--fingerprint-webrtc-fake-srflx-allow-udp',
+] });
+```
+
+Runtime suppression can break console/binding-based automation. Canvas Bridge
+removes the sandbox from bridge renderer processes and forwards canvas/WebGL
+operations to the configured endpoint. Fake srflx does not enable non-proxied
+UDP unless the separate `allow-udp` flag is supplied.
+
 ## CLI
 
 ```bash

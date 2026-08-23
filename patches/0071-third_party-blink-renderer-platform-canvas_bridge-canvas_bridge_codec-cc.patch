@@ -1,0 +1,347 @@
+diff --git a/third_party/blink/renderer/platform/canvas_bridge/canvas_bridge_codec.cc b/third_party/blink/renderer/platform/canvas_bridge/canvas_bridge_codec.cc
+new file mode 100644
+index 0000000..eeb41ef
+--- /dev/null
++++ b/third_party/blink/renderer/platform/canvas_bridge/canvas_bridge_codec.cc
+@@ -0,0 +1,341 @@
++// Copyright 2026.
++// Use of this source code is governed by a BSD-style license.
++
++#include "third_party/blink/renderer/platform/canvas_bridge/canvas_bridge_codec.h"
++
++namespace blink::canvas_bridge {
++namespace {
++
++// Little-endian, append-only writer.
++class Writer {
++ public:
++  void U32(uint32_t v) {
++    for (int i = 0; i < 4; ++i)
++      buf_.push_back(static_cast<uint8_t>((v >> (8 * i)) & 0xFF));
++  }
++  void I32(int32_t v) { U32(static_cast<uint32_t>(v)); }
++  void U64(uint64_t v) {
++    for (int i = 0; i < 8; ++i)
++      buf_.push_back(static_cast<uint8_t>((v >> (8 * i)) & 0xFF));
++  }
++  void F64(double v) {
++    uint64_t u = 0;
++    __builtin_memcpy(&u, &v, sizeof(u));
++    U64(u);
++  }
++  void Bool(bool v) { buf_.push_back(v ? 1 : 0); }
++  void Str(const std::string& s) {
++    U32(static_cast<uint32_t>(s.size()));
++    for (char c : s)
++      buf_.push_back(static_cast<uint8_t>(c));
++  }
++  void Bytes(base::span<const uint8_t> b) {
++    U32(static_cast<uint32_t>(b.size()));
++    buf_.insert(buf_.end(), b.begin(), b.end());
++  }
++  std::vector<uint8_t> Take() { return std::move(buf_); }
++
++ private:
++  std::vector<uint8_t> buf_;
++};
++
++// Bounds-checked little-endian reader; any underflow latches ok_ = false.
++class Reader {
++ public:
++  explicit Reader(base::span<const uint8_t> data) : data_(data) {}
++  uint32_t U32() {
++    uint32_t v = 0;
++    if (Avail(4)) {
++      for (int i = 0; i < 4; ++i)
++        v |= static_cast<uint32_t>(data_[pos_++]) << (8 * i);
++    }
++    return v;
++  }
++  int32_t I32() { return static_cast<int32_t>(U32()); }
++  uint64_t U64() {
++    uint64_t v = 0;
++    if (Avail(8)) {
++      for (int i = 0; i < 8; ++i)
++        v |= static_cast<uint64_t>(data_[pos_++]) << (8 * i);
++    }
++    return v;
++  }
++  double F64() {
++    uint64_t u = U64();
++    double v = 0;
++    __builtin_memcpy(&v, &u, sizeof(v));
++    return v;
++  }
++  bool Bool() { return Avail(1) ? data_[pos_++] != 0 : false; }
++  std::string Str() {
++    uint32_t n = U32();
++    if (!Avail(n))
++      return std::string();
++    std::string s(reinterpret_cast<const char*>(data_.data() + pos_), n);
++    pos_ += n;
++    return s;
++  }
++  std::vector<uint8_t> Bytes() {
++    uint32_t n = U32();
++    if (!Avail(n))
++      return {};
++    std::vector<uint8_t> b(data_.begin() + pos_, data_.begin() + pos_ + n);
++    pos_ += n;
++    return b;
++  }
++  bool ok() const { return ok_; }
++  bool done() const { return ok_ && pos_ == data_.size(); }
++
++ private:
++  bool Avail(size_t n) {
++    if (pos_ + n > data_.size()) {
++      ok_ = false;
++      return false;
++    }
++    return true;
++  }
++  base::span<const uint8_t> data_;
++  size_t pos_ = 0;
++  bool ok_ = true;
++};
++
++}  // namespace
++
++MessageType PeekType(base::span<const uint8_t> frame) {
++  Reader r(frame);
++  uint32_t t = r.U32();
++  return r.ok() ? static_cast<MessageType>(t) : MessageType::kUnknown;
++}
++
++std::vector<uint8_t> Encode(const HelloMessage& m) {
++  Writer w;
++  w.U32(static_cast<uint32_t>(MessageType::kHello));
++  w.U32(m.protocol_version);
++  w.U64(m.persona_seed);
++  w.Str(m.client_version);
++  return w.Take();
++}
++
++std::vector<uint8_t> Encode(const WelcomeMessage& m) {
++  Writer w;
++  w.U32(static_cast<uint32_t>(MessageType::kWelcome));
++  w.U32(m.protocol_version);
++  w.Str(m.server_version);
++  w.Str(m.os);
++  w.Str(m.gpu_vendor);
++  w.Str(m.gpu_renderer);
++  return w.Take();
++}
++
++std::vector<uint8_t> Encode(const CreateCanvas2DMessage& m) {
++  Writer w;
++  w.U32(static_cast<uint32_t>(MessageType::kCreateCanvas2D));
++  w.U32(m.canvas_id);
++  w.U32(m.width);
++  w.U32(m.height);
++  w.Bool(m.opaque);
++  return w.Take();
++}
++
++std::vector<uint8_t> Encode(const Canvas2DOpMessage& m) {
++  Writer w;
++  w.U32(static_cast<uint32_t>(MessageType::kCanvas2DOp));
++  w.U32(m.canvas_id);
++  w.U32(m.op);
++  w.Str(m.str_arg);
++  w.U32(static_cast<uint32_t>(m.args.size()));
++  for (double a : m.args)
++    w.F64(a);
++  return w.Take();
++}
++
++std::vector<uint8_t> Encode(const MeasureTextMessage& m) {
++  Writer w;
++  w.U32(static_cast<uint32_t>(MessageType::kMeasureText));
++  w.U32(m.canvas_id);
++  w.Str(m.text);
++  return w.Take();
++}
++
++std::vector<uint8_t> Encode(const CreateWebGLMessage& m) {
++  Writer w;
++  w.U32(static_cast<uint32_t>(MessageType::kCreateWebGL));
++  w.U32(m.canvas_id);
++  w.U32(m.width);
++  w.U32(m.height);
++  w.U32(m.context_type);
++  return w.Take();
++}
++
++std::vector<uint8_t> Encode(const WebGLOpMessage& m) {
++  Writer w;
++  w.U32(static_cast<uint32_t>(MessageType::kWebGLOp));
++  w.U32(m.canvas_id);
++  w.U32(m.op);
++  w.U32(static_cast<uint32_t>(m.ints.size()));
++  for (int32_t v : m.ints)
++    w.I32(v);
++  w.U32(static_cast<uint32_t>(m.floats.size()));
++  for (double v : m.floats)
++    w.F64(v);
++  w.Str(m.str);
++  w.Bytes(m.data);
++  return w.Take();
++}
++
++std::vector<uint8_t> Encode(const GetImageDataMessage& m) {
++  Writer w;
++  w.U32(static_cast<uint32_t>(MessageType::kCanvas2DGetImageData));
++  w.U32(m.canvas_id);
++  w.I32(m.x);
++  w.I32(m.y);
++  w.U32(m.width);
++  w.U32(m.height);
++  w.U32(m.content_version);
++  return w.Take();
++}
++
++std::vector<uint8_t> Encode(const ImageDataMessage& m) {
++  Writer w;
++  w.U32(static_cast<uint32_t>(MessageType::kImageData));
++  w.U32(m.canvas_id);
++  w.U32(m.width);
++  w.U32(m.height);
++  w.Bytes(m.pixels);
++  w.U32(m.content_version);
++  return w.Take();
++}
++
++std::optional<HelloMessage> DecodeHello(base::span<const uint8_t> f) {
++  Reader r(f);
++  if (static_cast<MessageType>(r.U32()) != MessageType::kHello)
++    return std::nullopt;
++  HelloMessage m;
++  m.protocol_version = r.U32();
++  m.persona_seed = r.U64();
++  m.client_version = r.Str();
++  return r.done() ? std::optional<HelloMessage>(std::move(m)) : std::nullopt;
++}
++
++std::optional<WelcomeMessage> DecodeWelcome(base::span<const uint8_t> f) {
++  Reader r(f);
++  if (static_cast<MessageType>(r.U32()) != MessageType::kWelcome)
++    return std::nullopt;
++  WelcomeMessage m;
++  m.protocol_version = r.U32();
++  m.server_version = r.Str();
++  m.os = r.Str();
++  m.gpu_vendor = r.Str();
++  m.gpu_renderer = r.Str();
++  return r.done() ? std::optional<WelcomeMessage>(std::move(m)) : std::nullopt;
++}
++
++std::optional<CreateCanvas2DMessage> DecodeCreateCanvas2D(
++    base::span<const uint8_t> f) {
++  Reader r(f);
++  if (static_cast<MessageType>(r.U32()) != MessageType::kCreateCanvas2D)
++    return std::nullopt;
++  CreateCanvas2DMessage m;
++  m.canvas_id = r.U32();
++  m.width = r.U32();
++  m.height = r.U32();
++  m.opaque = r.Bool();
++  return r.done() ? std::optional<CreateCanvas2DMessage>(m) : std::nullopt;
++}
++
++std::optional<Canvas2DOpMessage> DecodeCanvas2DOp(base::span<const uint8_t> f) {
++  Reader r(f);
++  if (static_cast<MessageType>(r.U32()) != MessageType::kCanvas2DOp)
++    return std::nullopt;
++  Canvas2DOpMessage m;
++  m.canvas_id = r.U32();
++  m.op = r.U32();
++  m.str_arg = r.Str();
++  uint32_t n = r.U32();
++  if (!r.ok() || n > f.size() / sizeof(double))
++    return std::nullopt;
++  m.args.reserve(n);
++  for (uint32_t i = 0; i < n; ++i)
++    m.args.push_back(r.F64());
++  return r.done() ? std::optional<Canvas2DOpMessage>(std::move(m)) : std::nullopt;
++}
++
++std::optional<MeasureTextMessage> DecodeMeasureText(
++    base::span<const uint8_t> f) {
++  Reader r(f);
++  if (static_cast<MessageType>(r.U32()) != MessageType::kMeasureText)
++    return std::nullopt;
++  MeasureTextMessage m;
++  m.canvas_id = r.U32();
++  m.text = r.Str();
++  return r.done() ? std::optional<MeasureTextMessage>(std::move(m)) : std::nullopt;
++}
++
++std::optional<CreateWebGLMessage> DecodeCreateWebGL(
++    base::span<const uint8_t> f) {
++  Reader r(f);
++  if (static_cast<MessageType>(r.U32()) != MessageType::kCreateWebGL)
++    return std::nullopt;
++  CreateWebGLMessage m;
++  m.canvas_id = r.U32();
++  m.width = r.U32();
++  m.height = r.U32();
++  m.context_type = r.U32();
++  return r.done() ? std::optional<CreateWebGLMessage>(m) : std::nullopt;
++}
++
++std::optional<WebGLOpMessage> DecodeWebGLOp(base::span<const uint8_t> f) {
++  Reader r(f);
++  if (static_cast<MessageType>(r.U32()) != MessageType::kWebGLOp)
++    return std::nullopt;
++  WebGLOpMessage m;
++  m.canvas_id = r.U32();
++  m.op = r.U32();
++  uint32_t ni = r.U32();
++  if (!r.ok() || ni > f.size() / sizeof(int32_t))
++    return std::nullopt;
++  m.ints.reserve(ni);
++  for (uint32_t i = 0; i < ni; ++i)
++    m.ints.push_back(r.I32());
++  uint32_t nf = r.U32();
++  if (!r.ok() || nf > f.size() / sizeof(double))
++    return std::nullopt;
++  m.floats.reserve(nf);
++  for (uint32_t i = 0; i < nf; ++i)
++    m.floats.push_back(r.F64());
++  m.str = r.Str();
++  m.data = r.Bytes();
++  return r.done() ? std::optional<WebGLOpMessage>(std::move(m)) : std::nullopt;
++}
++
++std::optional<GetImageDataMessage> DecodeGetImageData(
++    base::span<const uint8_t> f) {
++  Reader r(f);
++  if (static_cast<MessageType>(r.U32()) != MessageType::kCanvas2DGetImageData)
++    return std::nullopt;
++  GetImageDataMessage m;
++  m.canvas_id = r.U32();
++  m.x = r.I32();
++  m.y = r.I32();
++  m.width = r.U32();
++  m.height = r.U32();
++  bool core_ok = r.ok();
++  m.content_version = r.U32();  // optional trailing field (0 if absent)
++  return core_ok ? std::optional<GetImageDataMessage>(m) : std::nullopt;
++}
++
++std::optional<ImageDataMessage> DecodeImageData(base::span<const uint8_t> f) {
++  Reader r(f);
++  if (static_cast<MessageType>(r.U32()) != MessageType::kImageData)
++    return std::nullopt;
++  ImageDataMessage m;
++  m.canvas_id = r.U32();
++  m.width = r.U32();
++  m.height = r.U32();
++  m.pixels = r.Bytes();
++  bool core_ok = r.ok();
++  m.content_version = r.U32();  // optional trailing field (0 if absent)
++  return core_ok ? std::optional<ImageDataMessage>(std::move(m)) : std::nullopt;
++}
++
++}  // namespace blink::canvas_bridge

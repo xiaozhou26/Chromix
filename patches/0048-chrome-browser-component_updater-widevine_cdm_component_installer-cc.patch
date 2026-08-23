@@ -15,7 +15,7 @@ index 198513af0e..8a5f52e680 100644
  #include "base/logging.h"
  #include "base/memory/ref_counted.h"
  #include "base/native_library.h"
-@@ -437,6 +439,43 @@ void WidevineCdmComponentInstallerPolicy::UpdateCdmPath(
+@@ -437,6 +439,44 @@ void WidevineCdmComponentInstallerPolicy::UpdateCdmPath(
  }
  
  void RegisterWidevineCdmComponent(ComponentUpdateService* cus) {
@@ -32,11 +32,12 @@ index 198513af0e..8a5f52e680 100644
 +    if (ph_cmd->HasSwitch("uxr-widevine-cdm")) {
 +      const base::FilePath ph_dir =
 +          ph_cmd->GetSwitchValuePath("uxr-widevine-cdm");
-+      base::FilePath ph_error;
++      int ph_error_code = 0;
++      std::string ph_error_message;
 +      std::unique_ptr<base::Value> ph_value =
 +          JSONFileValueDeserializer(
 +              ph_dir.Append(FILE_PATH_LITERAL("manifest.json")))
-+              .Deserialize(&ph_error);
++              .Deserialize(&ph_error_code, &ph_error_message);
 +      const base::Value::Dict* ph_dict =
 +          ph_value ? ph_value->GetIfDict() : nullptr;
 +      media::CdmCapability ph_capability;

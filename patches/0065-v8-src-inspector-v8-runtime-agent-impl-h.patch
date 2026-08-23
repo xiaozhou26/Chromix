@@ -1,0 +1,13 @@
+diff --git a/v8/src/inspector/v8-runtime-agent-impl.h b/v8/src/inspector/v8-runtime-agent-impl.h
+index b0efbe69a86a923a514c03f95ab215402453734e..4bb212766c36ce85c1664c6dd2fd22e470d37b43 100644
+--- a/v8/src/inspector/v8-runtime-agent-impl.h
++++ b/v8/src/inspector/v8-runtime-agent-impl.h
+@@ -160,7 +160,7 @@ class V8RuntimeAgentImpl : public protocol::Runtime::Backend {
+                std::unique_ptr<protocol::DictionaryValue> hints,
+                int executionContextId);
+   void messageAdded(V8ConsoleMessage*);
+-  bool enabled() const { return m_enabled; }
++  bool enabled() const;
+ 
+  private:
+   bool reportMessage(V8ConsoleMessage*, bool generatePreview);

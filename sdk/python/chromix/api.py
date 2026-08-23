@@ -20,7 +20,7 @@ Intentional differences:
 from __future__ import annotations
 import json
 import os
-import random
+import secrets
 import shutil
 import sys
 import urllib.request
@@ -152,8 +152,8 @@ def get_default_stealth_args() -> list[str]:
     macOS runs native (no Windows spoofing); Linux/Windows claim the Windows
     persona — normalized to --uxr-* by the engine's chrome_main patch.
     """
-    seed = random.randint(10000, 99999)
-    base = ["--no-sandbox", f"--fingerprint={seed}"]
+    seed = secrets.randbits(32) or 1
+    base = [f"--fingerprint={seed}"]
     if sys.platform == "darwin":
         return base + ["--fingerprint-platform=macos"]
     return base + ["--fingerprint-platform=windows"]

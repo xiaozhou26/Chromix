@@ -40,7 +40,7 @@ the download.
 | `launch_context_async(**opts)` | Async variant |
 | `launch_persistent_context(user_data_dir, **opts)` | Persistent profile |
 | `launch_persistent_context_async(user_data_dir, **opts)` | Async variant |
-| `build_args` / `get_default_stealth_args` | Arg assembly (random seed + platform claim) |
+| `build_args` / `get_default_stealth_args` | Arg assembly (32-bit random seed + platform claim) |
 | `maybe_resolve_geoip(geoip, proxy, tz, locale, args)` | Egress IP → (tz, locale, exit_ip) |
 | `ensure_binary` / `clear_cache` / `binary_info` / `check_for_update` | Binary management |
 | `HumanConfig` / `resolve_human_config` | Behavioral-layer config (`default` / `careful` presets) |
@@ -59,6 +59,23 @@ name-for-name; `**kwargs` passes through to `playwright.chromium.launch()` /
 - `CLOAKBROWSER_GEOIP_TIMEOUT_SECONDS` — geoip lookup timeout
 - `CLOAKBROWSER_WIDEVINE_CDM` — explicit Widevine CDM dir (DRM); `CLOAKBROWSER_WIDEVINE=0` disables DRM
 - `CHROMIX_CACHE_DIR` / `CHROMIX_DOWNLOAD_HOST` — cache location / release host override
+
+High-risk engine ports are available only through explicit browser `args`:
+
+```python
+browser = launch(args=[
+    "--fingerprint-devtools-runtime-suppression",
+    "--fingerprint-canvas-bridge=127.0.0.1:9228",
+    "--fingerprint-canvas-bridge-unsafe",
+    "--fingerprint-webrtc-fake-srflx=203.0.113.20",
+    "--fingerprint-webrtc-fake-srflx-allow-udp",
+])
+```
+
+Runtime suppression can break console/binding-based automation. Canvas Bridge
+removes the sandbox from bridge renderer processes and forwards canvas/WebGL
+operations to the configured endpoint. Fake srflx does not enable non-proxied
+UDP unless the separate `allow-udp` flag is supplied.
 
 ## CLI
 

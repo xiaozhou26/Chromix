@@ -12,7 +12,7 @@ index d0b1bd6401..4ccaa08ed3 100644
  #include "media/base/audio_bus.h"
  #include "third_party/blink/renderer/platform/audio/audio_bus.h"
  #include "third_party/blink/renderer/platform/audio/audio_utilities.h"
-@@ -98,6 +101,34 @@ bool RealtimeAnalyser::SetFftSize(uint32_t size) {
+@@ -98,6 +101,32 @@ bool RealtimeAnalyser::SetFftSize(uint32_t size) {
    return true;
  }
  
@@ -25,11 +25,9 @@ index d0b1bd6401..4ccaa08ed3 100644
 +    return false;
 +  }
 +  uint32_t sd = 0u;
-+  if (!base::StringToUint(base::UxrConfig::GetInstance().Get("uxr-audio-seed"), &sd)) {
-+    sd = 0u;
-+  }
-+  if (sd == 0u) {
-+    sd = 0x9e3779b9u;
++  if (!base::StringToUint(base::UxrConfig::GetInstance().Get("uxr-audio-seed"), &sd) ||
++      sd == 0u) {
++    return false;
 +  }
 +  *out = sd;
 +  return true;

@@ -29,10 +29,10 @@ test("buildArgs maximize suppressed by geometry / added when free", () => {
   assert.ok(buildArgs({ startMaximized: true }).includes("--start-maximized"), "added when free");
 });
 
-test("default stealth args carry one seed + --no-sandbox", () => {
+test("default stealth args carry one seed and preserve the sandbox", () => {
   const sa = getDefaultStealthArgs();
   assert.equal(sa.filter((a) => a.startsWith("--fingerprint=")).length, 1);
-  assert.ok(sa.includes("--no-sandbox"));
+  assert.ok(!sa.includes("--no-sandbox"));
 });
 
 test("context options: default viewport, explicit null, CDP emulation stripped", () => {

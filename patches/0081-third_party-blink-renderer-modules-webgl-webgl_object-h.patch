@@ -1,0 +1,21 @@
+diff --git a/third_party/blink/renderer/modules/webgl/webgl_object.h b/third_party/blink/renderer/modules/webgl/webgl_object.h
+index 97caa90..2aefb9b 100644
+--- a/third_party/blink/renderer/modules/webgl/webgl_object.h
++++ b/third_party/blink/renderer/modules/webgl/webgl_object.h
+@@ -92,6 +92,8 @@ class WebGLObject : public ScriptWrappable {
+   // A reference is returned so it can be made a pointer for glDelete* calls
+   const GLuint& Object() const { return object_; }
+   bool HasObject() const { return object_ != 0; }
++  uint32_t BridgeId() const { return bridge_id_; }
++  void SetBridgeId(uint32_t id) { bridge_id_ = id; }
+ 
+   virtual bool IsRenderbuffer() const { return false; }
+   virtual bool IsTexture() const { return false; }
+@@ -122,6 +124,7 @@ class WebGLObject : public ScriptWrappable {
+   Member<WebGLContextObjectSupport> context_;
+ 
+   GLuint object_ = 0;
++  uint32_t bridge_id_ = 0;
+ 
+   // The context generation number of the associated WebGLContext when the
+   // object was created, to prevent reuse in later generations.

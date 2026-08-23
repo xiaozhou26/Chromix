@@ -1,0 +1,177 @@
+diff --git a/third_party/blink/renderer/modules/canvas/canvas2d/canvas_2d_recorder_context.cc b/third_party/blink/renderer/modules/canvas/canvas2d/canvas_2d_recorder_context.cc
+index a90d5e3..37fd16f 100644
+--- a/third_party/blink/renderer/modules/canvas/canvas2d/canvas_2d_recorder_context.cc
++++ b/third_party/blink/renderer/modules/canvas/canvas2d/canvas_2d_recorder_context.cc
+@@ -392,6 +392,7 @@ Canvas2DRecorderContext::~Canvas2DRecorderContext() {
+ }
+ 
+ void Canvas2DRecorderContext::save() {
++  RecordBridgeOp(1u, std::string(), {});
+   if (isContextLost()) [[unlikely]] {
+     return;
+   }
+@@ -417,6 +418,7 @@ void Canvas2DRecorderContext::save() {
+ }
+ 
+ void Canvas2DRecorderContext::restore(ExceptionState& exception_state) {
++  RecordBridgeOp(2u, std::string(), {});
+   if (isContextLost()) [[unlikely]] {
+     return;
+   }
+@@ -921,6 +923,7 @@ void Canvas2DRecorderContext::setStrokeStyle(v8::Isolate* isolate,
+   // from the string is expensive) so we keep a map of string to color.
+   if (value->IsString()) {
+     v8::Local<v8::String> v8_string = value.As<v8::String>();
++    RecordBridgeOp(51u, ToCoreString(isolate, v8_string).Utf8(), {});
+     if (state.IsUnparsedStrokeColor(v8_string)) {
+       return;
+     }
+@@ -1044,6 +1047,7 @@ void Canvas2DRecorderContext::setFillStyle(v8::Isolate* isolate,
+   // details on this.
+   if (value->IsString()) {
+     v8::Local<v8::String> v8_string = value.As<v8::String>();
++    RecordBridgeOp(50u, ToCoreString(isolate, v8_string).Utf8(), {});
+     if (state.IsUnparsedFillColor(v8_string)) {
+       return;
+     }
+@@ -1101,6 +1105,7 @@ double Canvas2DRecorderContext::lineWidth() const {
+ }
+ 
+ void Canvas2DRecorderContext::setLineWidth(double width) {
++  RecordBridgeOp(52u, std::string(), {width});
+   if (!std::isfinite(width) || width <= 0) {
+     return;
+   }
+@@ -1116,6 +1121,7 @@ String Canvas2DRecorderContext::lineCap() const {
+ }
+ 
+ void Canvas2DRecorderContext::setLineCap(const String& s) {
++  RecordBridgeOp(58u, s.Utf8(), {});
+   LineCap cap;
+   if (!ParseLineCap(s, cap)) {
+     return;
+@@ -1132,6 +1138,7 @@ String Canvas2DRecorderContext::lineJoin() const {
+ }
+ 
+ void Canvas2DRecorderContext::setLineJoin(const String& s) {
++  RecordBridgeOp(59u, s.Utf8(), {});
+   LineJoin join;
+   if (!ParseLineJoin(s, join)) {
+     return;
+@@ -1263,6 +1270,7 @@ double Canvas2DRecorderContext::globalAlpha() const {
+ }
+ 
+ void Canvas2DRecorderContext::setGlobalAlpha(double alpha) {
++  RecordBridgeOp(56u, std::string(), {alpha});
+   if (!(alpha >= 0 && alpha <= 1)) {
+     return;
+   }
+@@ -1292,6 +1300,7 @@ String Canvas2DRecorderContext::globalCompositeOperation() const {
+ 
+ void Canvas2DRecorderContext::setGlobalCompositeOperation(
+     const String& operation) {
++  RecordBridgeOp(57u, operation.Utf8(), {});
+   CompositeOperator op = kCompositeSourceOver;
+   BlendMode blend_mode = BlendMode::kNormal;
+   if (!ParseCanvasCompositeAndBlendMode(operation, op, blend_mode)) {
+@@ -1352,6 +1361,7 @@ void Canvas2DRecorderContext::setFilter(
+ }
+ 
+ void Canvas2DRecorderContext::scale(double sx, double sy) {
++  RecordBridgeOp(44u, std::string(), {sx, sy});
+   // TODO(crbug.com/40153853): Investigate the performance impact of simply
+   // calling the 3d version of this function
+   cc::PaintCanvas* c = GetOrCreatePaintCanvas();
+@@ -1382,6 +1392,7 @@ void Canvas2DRecorderContext::scale(double sx, double sy) {
+ }
+ 
+ void Canvas2DRecorderContext::rotate(double angle_in_radians) {
++  RecordBridgeOp(43u, std::string(), {angle_in_radians});
+   cc::PaintCanvas* c = GetOrCreatePaintCanvas();
+   if (!c) {
+     return;
+@@ -1408,6 +1419,7 @@ void Canvas2DRecorderContext::rotate(double angle_in_radians) {
+ }
+ 
+ void Canvas2DRecorderContext::translate(double tx, double ty) {
++  RecordBridgeOp(42u, std::string(), {tx, ty});
+   // TODO(crbug.com/40153853): Investigate the performance impact of simply
+   // calling the 3d version of this function
+   cc::PaintCanvas* c = GetOrCreatePaintCanvas();
+@@ -1447,6 +1459,7 @@ void Canvas2DRecorderContext::transform(double m11,
+                                         double m22,
+                                         double dx,
+                                         double dy) {
++  RecordBridgeOp(41u, std::string(), {m11, m12, m21, m22, dx, dy});
+   cc::PaintCanvas* c = GetOrCreatePaintCanvas();
+   if (!c) {
+     return;
+@@ -1489,6 +1502,7 @@ void Canvas2DRecorderContext::transform(double m11,
+ // |effective_zoom_| in resetTransform instead of setTransform, to avoid
+ // integrating it twice if we have resetTransform and setTransform API calls.
+ void Canvas2DRecorderContext::resetTransform() {
++  RecordBridgeOp(45u, std::string(), {});
+   cc::PaintCanvas* c = GetOrCreatePaintCanvas();
+   if (!c) {
+     return;
+@@ -1531,6 +1545,7 @@ void Canvas2DRecorderContext::setTransform(double m11,
+                                            double m22,
+                                            double dx,
+                                            double dy) {
++  RecordBridgeOp(40u, std::string(), {m11, m12, m21, m22, dx, dy});
+   if (!std::isfinite(m11) || !std::isfinite(m21) || !std::isfinite(dx) ||
+       !std::isfinite(m12) || !std::isfinite(m22) || !std::isfinite(dy)) {
+     return;
+@@ -1569,6 +1584,7 @@ AffineTransform Canvas2DRecorderContext::GetTransform() const {
+ }
+ 
+ void Canvas2DRecorderContext::beginPath() {
++  RecordBridgeOp(3u, std::string(), {});
+   Clear();
+ }
+ 
+@@ -1667,10 +1683,12 @@ static SkPathFillType CanvasFillRuleToSkiaFillType(
+ }
+ 
+ void Canvas2DRecorderContext::fill() {
++  RecordBridgeOp(5u, std::string(), {});
+   FillImpl(SkPathFillType::kWinding);
+ }
+ 
+ void Canvas2DRecorderContext::fill(const V8CanvasFillRule& winding) {
++  RecordBridgeOp(5u, std::string(), {});
+   FillImpl(CanvasFillRuleToSkiaFillType(winding));
+ }
+ 
+@@ -1695,6 +1713,7 @@ void Canvas2DRecorderContext::FillPathImpl(Path2D* dom_path,
+ }
+ 
+ void Canvas2DRecorderContext::stroke() {
++  RecordBridgeOp(6u, std::string(), {});
+   DrawPathInternal(*this, CanvasRenderingContext2DState::kStrokePaintType,
+                    SkPathFillType::kWinding, UsePaintCache::kDisabled);
+ }
+@@ -1708,6 +1727,7 @@ void Canvas2DRecorderContext::fillRect(double x,
+                                        double y,
+                                        double width,
+                                        double height) {
++  RecordBridgeOp(10u, std::string(), {x, y, width, height});
+   if (!ValidateRectForCanvas(x, y, width, height)) {
+     return;
+   }
+@@ -1771,6 +1791,7 @@ void Canvas2DRecorderContext::strokeRect(double x,
+                                          double y,
+                                          double width,
+                                          double height) {
++  RecordBridgeOp(11u, std::string(), {x, y, width, height});
+   if (!ValidateRectForCanvas(x, y, width, height)) {
+     return;
+   }
+@@ -1929,6 +1950,7 @@ void Canvas2DRecorderContext::clearRect(double x,
+                                         double y,
+                                         double width,
+                                         double height) {
++  RecordBridgeOp(12u, std::string(), {x, y, width, height});
+   if (!ValidateRectForCanvas(x, y, width, height)) {
+     return;
+   }

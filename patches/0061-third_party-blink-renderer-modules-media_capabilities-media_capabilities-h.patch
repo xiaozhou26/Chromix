@@ -1,0 +1,12 @@
+diff --git a/third_party/blink/renderer/modules/media_capabilities/media_capabilities.h b/third_party/blink/renderer/modules/media_capabilities/media_capabilities.h
+index 21e1a8b7bd..5d9888ae63 100644
+--- a/third_party/blink/renderer/modules/media_capabilities/media_capabilities.h
++++ b/third_party/blink/renderer/modules/media_capabilities/media_capabilities.h
+@@ -83,6 +83,7 @@ class MODULES_EXPORT MediaCapabilities final
+     std::optional<bool> db_is_power_efficient;
+     std::optional<bool> is_gpu_factories_supported;
+     std::optional<bool> is_builtin_video_codec;
++    media::VideoCodec video_codec = media::VideoCodec::kUnknown;
+     base::TimeTicks request_time;
+   };
+ 

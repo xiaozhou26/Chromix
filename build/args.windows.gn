@@ -1,7 +1,6 @@
-# Chromix — official max-stealth Chromium build args for WINDOWS x64 (GN).
-# Used by build/windows/build.ps1:  gn gen out\Chromix --args="(cat build\args.windows.gn)"
-# Requires: Visual Studio 2022 (C++ workload) + Windows 11 SDK
+# Chromix release overlay on top of ungoogled common and Windows flags.
 
+chrome_pgo_phase = 0
 is_official_build = true
 is_component_build = false
 is_debug = false
@@ -9,19 +8,16 @@ dcheck_always_on = false
 
 symbol_level = 0
 blink_symbol_level = 0
+v8_symbol_level = 0
 
-# Real media (canPlayType('video/mp4') -> "probably"; stock returns "" = a headless tell).
 proprietary_codecs = true
 ffmpeg_branding = "Chrome"
-
-# De-brand: build as Chromium; runtime persona supplies the "Google Chrome" identity.
-is_chrome_branded = false
-chrome_pgo_phase = 0
-
-enable_nacl = false
-# Widevine adapter in; CDM library fetched at runtime
-# (tools/fetch-widevine.py + --uxr-widevine-cdm=<dir>, patch 0048).
 enable_widevine = true
 
 target_cpu = "x64"
 target_os = "win"
+use_sysroot = false
+use_remoteexec = false
+treat_warnings_as_errors = false
+fatal_linker_warnings = false
+enable_nacl = false

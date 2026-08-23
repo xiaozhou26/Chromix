@@ -7,13 +7,13 @@ import { join } from "node:path";
 import { pipeline } from "node:stream/promises";
 import { createHash } from "node:crypto";
 
-export const VERSION = "151.0.7922.174";
+export const VERSION = "151.0.7922.173";
 const REPO = "xiaozhou26/Chromix";
 // Two release channels. "stable" = Chromium 149 (matches the version the mass of
 // real users run). "latest" = 151 (newest engine). See build/versions.txt.
 export const CHANNELS = {
   stable: { tag: "v149.0.7827.200" },
-  latest: { tag: "v151.0.7922.174" },
+  latest: { tag: "v151.0.7922.173" },
 };
 export const CACHE = process.env.CHROMIX_CACHE_DIR || join(homedir(), ".cache", "chromix");
 export const hostFor = (tag) => process.env.CHROMIX_DOWNLOAD_HOST

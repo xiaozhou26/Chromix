@@ -1,6 +1,6 @@
-# Chromix supported Chromium versions (build with build/build-version.sh <version>).
-# Pin the EXACT current stable patch from https://chromiumdash.appspot.com/releases before a build.
+# Chromix pinned Chromium versions.
+# Windows builds must use a matching ungoogled-chromium and
+# ungoogled-chromium-windows release; see build/ungoogled-revisions.psd1.
 #
 # major  version           channel
-149      149.0.7827.200     stable — matches the mass of real Chrome users
-151      151.0.7922.174     latest engine; ahead-of-stable can be a soft tell
+151      151.0.7922.173     pinned ungoogled release

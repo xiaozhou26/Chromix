@@ -1,0 +1,582 @@
+diff --git a/third_party/blink/renderer/platform/canvas_bridge/canvas_bridge_client.cc b/third_party/blink/renderer/platform/canvas_bridge/canvas_bridge_client.cc
+new file mode 100644
+index 0000000..272392c
+--- /dev/null
++++ b/third_party/blink/renderer/platform/canvas_bridge/canvas_bridge_client.cc
+@@ -0,0 +1,576 @@
++// Copyright 2026.
++// Use of this source code is governed by a BSD-style license.
++#include "third_party/blink/renderer/platform/canvas_bridge/canvas_bridge_client.h"
++
++#include "build/build_config.h"
++#if BUILDFLAG(IS_WIN)
++#include <winsock2.h>
++#include <ws2tcpip.h>
++#else
++#include <netdb.h>
++#include <sys/socket.h>
++#include <sys/types.h>
++#include <unistd.h>
++#endif
++
++#include <cstring>
++#include <limits>
++#include <string_view>
++
++#include "base/base64.h"
++#include "base/logging.h"
++#include "base/numerics/safe_conversions.h"
++#include "base/rand_util.h"
++#include "base/strings/string_number_conversions.h"
++#include "base/time/time.h"
++#include "base/uxr_config.h"
++#include "third_party/blink/renderer/platform/canvas_bridge/canvas_bridge_codec.h"
++
++namespace blink::canvas_bridge {
++namespace {
++constexpr uintptr_t kInvalidSocket = static_cast<uintptr_t>(-1);
++constexpr uint64_t kMaxFrameBytes = 256u * 1024u * 1024u;
++
++#if BUILDFLAG(IS_WIN)
++void EnsureWinsock() {
++  static const bool started = [] {
++    WSADATA data;
++    return ::WSAStartup(MAKEWORD(2, 2), &data) == 0;
++  }();
++  (void)started;
++}
++#endif
++
++void CloseSocketHandle(uintptr_t socket) {
++  if (socket == kInvalidSocket)
++    return;
++#if BUILDFLAG(IS_WIN)
++  ::closesocket(static_cast<SOCKET>(socket));
++#else
++  ::close(static_cast<int>(socket));
++#endif
++}
++
++bool ParseEndpoint(const std::string& endpoint,
++                   std::string* host,
++                   int* port,
++                   std::string* path) {
++  std::string_view value(endpoint);
++  if (value.starts_with("ws://")) {
++    value.remove_prefix(5);
++  } else if (value.starts_with("http://")) {
++    value.remove_prefix(7);
++  } else if (value.find("://") != std::string_view::npos) {
++    return false;
++  }
++  if (value.empty() || value.find_first_of("\r\n\t @") !=
++                           std::string_view::npos) {
++    return false;
++  }
++
++  const size_t slash = value.find('/');
++  const std::string_view authority = value.substr(0, slash);
++  *path = slash == std::string_view::npos ? "/" : std::string(value.substr(slash));
++  if (authority.empty() || path->empty() || path->front() != '/')
++    return false;
++
++  std::string_view host_part;
++  std::string_view port_part;
++  if (authority.front() == '[') {
++    const size_t close = authority.find(']');
++    if (close == std::string_view::npos || close + 1 >= authority.size() ||
++        authority[close + 1] != ':') {
++      return false;
++    }
++    host_part = authority.substr(1, close - 1);
++    port_part = authority.substr(close + 2);
++  } else {
++    const size_t colon = authority.rfind(':');
++    if (colon == std::string_view::npos ||
++        authority.find(':') != colon) {
++      return false;
++    }
++    host_part = authority.substr(0, colon);
++    port_part = authority.substr(colon + 1);
++  }
++
++  int parsed_port = 0;
++  if (host_part.empty() || port_part.empty() ||
++      !base::StringToInt(port_part, &parsed_port) || parsed_port <= 0 ||
++      parsed_port > 65535) {
++    return false;
++  }
++  *host = std::string(host_part);
++  *port = parsed_port;
++  return true;
++}
++
++}  // namespace
++
++CanvasBridgeClient* CanvasBridgeClient::Get() {
++  static CanvasBridgeClient* instance = []() -> CanvasBridgeClient* {
++    const base::UxrConfig& config = base::UxrConfig::GetInstance();
++    if (!config.Has("uxr-canvas-bridge") ||
++        !config.Has("uxr-canvas-bridge-unsafe")) {
++      return nullptr;
++    }
++    std::string host;
++    std::string path;
++    int port = 0;
++    if (!ParseEndpoint(config.Get("uxr-canvas-bridge"), &host, &port, &path)) {
++      LOG(ERROR) << "canvas-bridge: invalid uxr-canvas-bridge endpoint";
++      return nullptr;
++    }
++    auto* client =
++        new CanvasBridgeClient(std::move(host), port, std::move(path));
++    client->WaitUntilReady();
++    return client;
++  }();
++  return instance;
++}
++
++CanvasBridgeClient::CanvasBridgeClient(std::string host,
++                                       int port,
++                                       std::string path)
++    : host_(std::move(host)), port_(port), path_(std::move(path)) {
++  base::PlatformThread::CreateNonJoinable(0, this);
++}
++CanvasBridgeClient::~CanvasBridgeClient() = default;
++
++bool CanvasBridgeClient::Connected() {
++  base::AutoLock lock(state_lock_);
++  return connected_;
++}
++uint32_t CanvasBridgeClient::AllocateCanvasId() {
++  base::AutoLock lock(id_lock_);
++  return next_canvas_id_++;
++}
++
++void CanvasBridgeClient::ThreadMain() {
++  base::PlatformThread::SetName("CanvasBridge");
++  if (!Connect()) {
++    LOG(ERROR) << "canvas-bridge: connection failed; rendering remains local";
++    base::AutoLock lock(state_lock_);
++    connect_finished_ = true;
++    state_cv_.Broadcast();
++    return;
++  }
++  {
++    base::AutoLock lock(state_lock_);
++    connected_ = true;
++    connect_finished_ = true;
++    state_cv_.Broadcast();
++  }
++  ReadLoop();
++  {
++    base::AutoLock lock(state_lock_);
++    connected_ = false;
++  }
++}
++
++void CanvasBridgeClient::WaitUntilReady() {
++  base::AutoLock lock(state_lock_);
++  const base::TimeTicks deadline = base::TimeTicks::Now() + base::Seconds(5);
++  while (!connect_finished_) {
++    const base::TimeDelta remaining = deadline - base::TimeTicks::Now();
++    if (!remaining.is_positive())
++      return;
++    state_cv_.TimedWait(remaining);
++  }
++}
++
++bool CanvasBridgeClient::Connect() {
++#if BUILDFLAG(IS_WIN)
++  EnsureWinsock();
++#endif
++  addrinfo hints = {};
++  hints.ai_family = AF_UNSPEC;
++  hints.ai_socktype = SOCK_STREAM;
++  addrinfo* result = nullptr;
++  const std::string port_string = base::NumberToString(port_);
++  if (::getaddrinfo(host_.c_str(), port_string.c_str(), &hints, &result) != 0)
++    return false;
++
++  uintptr_t socket = kInvalidSocket;
++  for (addrinfo* address = result; address; address = address->ai_next) {
++    uintptr_t candidate = static_cast<uintptr_t>(
++        ::socket(address->ai_family, address->ai_socktype, address->ai_protocol));
++    if (candidate == kInvalidSocket)
++      continue;
++    if (::connect(static_cast<
++#if BUILDFLAG(IS_WIN)
++                      SOCKET
++#else
++                      int
++#endif
++                      >(candidate),
++                  address->ai_addr, static_cast<int>(address->ai_addrlen)) == 0) {
++      socket = candidate;
++      break;
++    }
++    CloseSocketHandle(candidate);
++  }
++  ::freeaddrinfo(result);
++  if (socket == kInvalidSocket)
++    return false;
++  socket_ = socket;
++
++  uint8_t key_bytes[16];
++  base::RandBytes(key_bytes);
++  const std::string key = base::Base64Encode(key_bytes);
++  const std::string request =
++      "GET " + path_ + " HTTP/1.1\r\nHost: " + host_ + ":" + port_string +
++      "\r\nUpgrade: websocket\r\nConnection: Upgrade\r\n"
++      "Sec-WebSocket-Version: 13\r\nSec-WebSocket-Key: " + key + "\r\n\r\n";
++  if (!WriteExact(request.data(), request.size())) {
++    CloseSocket();
++    return false;
++  }
++
++  std::string response;
++  char byte = 0;
++  while (response.size() < 8192) {
++    if (!ReadExact(&byte, 1)) {
++      CloseSocket();
++      return false;
++    }
++    response.push_back(byte);
++    if (response.ends_with("\r\n\r\n"))
++      break;
++  }
++  if (!response.ends_with("\r\n\r\n") ||
++      (!response.starts_with("HTTP/1.1 101 ") &&
++       !response.starts_with("HTTP/1.0 101 "))) {
++    CloseSocket();
++    return false;
++  }
++
++  HelloMessage hello;
++  uint64_t seed = 0;
++  base::StringToUint64(base::UxrConfig::GetInstance().Get("uxr-canvas-seed"),
++                       &seed);
++  hello.persona_seed = seed;
++  hello.client_version = "uxr-canvas-bridge/1";
++  return WriteWebSocketFrame(Encode(hello));
++}
++
++void CanvasBridgeClient::ReadLoop() {
++  std::vector<uint8_t> frame;
++  while (ReadWebSocketFrame(&frame))
++    Dispatch(frame);
++  CloseSocket();
++}
++
++void CanvasBridgeClient::Dispatch(base::span<const uint8_t> frame) {
++  if (PeekType(frame) != MessageType::kImageData)
++    return;
++  std::optional<ImageDataMessage> message = DecodeImageData(frame);
++  if (!message)
++    return;
++  if (message->content_version == 0) {
++    base::AutoLock lock(pending_lock_);
++    auto it = pending_.find(message->canvas_id);
++    if (it != pending_.end()) {
++      it->second->pixels = std::move(message->pixels);
++      it->second->event.Signal();
++    }
++    return;
++  }
++
++  uint32_t canvas_id = 0;
++  uint32_t version = 0;
++  uint32_t width = 0;
++  uint32_t height = 0;
++  bool refetch = false;
++  {
++    base::AutoLock lock(cache_lock_);
++    CachedSurface& cache = cache_[message->canvas_id];
++    if (message->content_version >= cache.have_version) {
++      cache.have_version = message->content_version;
++      cache.full_width = message->width;
++      cache.full_height = message->height;
++      cache.pixels = std::move(message->pixels);
++    }
++    cache.inflight_version = 0;
++    if (cache.refetch_pending && cache.have_version != cache.current_version) {
++      cache.refetch_pending = false;
++      cache.inflight_version = cache.current_version;
++      canvas_id = message->canvas_id;
++      version = cache.current_version;
++      width = cache.full_width;
++      height = cache.full_height;
++      refetch = true;
++    }
++    cache_cv_.Broadcast();
++  }
++  if (refetch)
++    SendPrefetchRequest(canvas_id, version, width, height);
++}
++
++std::optional<std::vector<uint8_t>> CanvasBridgeClient::RequestImageData(
++    uint32_t canvas_id, int32_t x, int32_t y, uint32_t width, uint32_t height) {
++  if (!Connected())
++    return std::nullopt;
++  PendingReadback pending;
++  {
++    base::AutoLock lock(pending_lock_);
++    pending_[canvas_id] = &pending;
++  }
++  GetImageDataMessage request;
++  request.canvas_id = canvas_id;
++  request.x = x;
++  request.y = y;
++  request.width = width;
++  request.height = height;
++  if (!Send(Encode(request))) {
++    base::AutoLock lock(pending_lock_);
++    pending_.erase(canvas_id);
++    return std::nullopt;
++  }
++  pending.event.TimedWait(base::Seconds(5));
++  base::AutoLock lock(pending_lock_);
++  pending_.erase(canvas_id);
++  return std::move(pending.pixels);
++}
++
++std::optional<std::vector<uint8_t>> CanvasBridgeClient::RequestTextMetrics(
++    uint32_t canvas_id, const std::string& text) {
++  if (!Connected())
++    return std::nullopt;
++  PendingReadback pending;
++  {
++    base::AutoLock lock(pending_lock_);
++    pending_[canvas_id] = &pending;
++  }
++  MeasureTextMessage request;
++  request.canvas_id = canvas_id;
++  request.text = text;
++  if (!Send(Encode(request))) {
++    base::AutoLock lock(pending_lock_);
++    pending_.erase(canvas_id);
++    return std::nullopt;
++  }
++  pending.event.TimedWait(base::Seconds(5));
++  base::AutoLock lock(pending_lock_);
++  pending_.erase(canvas_id);
++  return std::move(pending.pixels);
++}
++
++void CanvasBridgeClient::BumpVersion(uint32_t canvas_id) {
++  base::AutoLock lock(cache_lock_);
++  ++cache_[canvas_id].current_version;
++}
++void CanvasBridgeClient::MaybePrefetch(uint32_t canvas_id,
++                                       uint32_t full_width,
++                                       uint32_t full_height) {
++  if (!Connected())
++    return;
++  uint32_t version = 0;
++  {
++    base::AutoLock lock(cache_lock_);
++    CachedSurface& cache = cache_[canvas_id];
++    cache.full_width = full_width;
++    cache.full_height = full_height;
++    if (cache.current_version == 0 ||
++        cache.have_version == cache.current_version) {
++      return;
++    }
++    if (cache.inflight_version != 0) {
++      cache.refetch_pending = true;
++      return;
++    }
++    cache.inflight_version = cache.current_version;
++    version = cache.current_version;
++  }
++  SendPrefetchRequest(canvas_id, version, full_width, full_height);
++}
++
++std::optional<std::vector<uint8_t>> CanvasBridgeClient::TryGetCachedSurface(
++    uint32_t canvas_id, int32_t x, int32_t y, uint32_t width, uint32_t height,
++    bool wait_for_inflight) {
++  base::AutoLock lock(cache_lock_);
++  auto it = cache_.find(canvas_id);
++  if (it == cache_.end() || it->second.current_version == 0)
++    return std::nullopt;
++  CachedSurface& cache = it->second;
++  const uint32_t wanted_version = cache.current_version;
++  if (cache.have_version != wanted_version) {
++    if (!wait_for_inflight || cache.inflight_version != wanted_version)
++      return std::nullopt;
++    const base::TimeTicks deadline = base::TimeTicks::Now() + base::Seconds(5);
++    while (cache.have_version != wanted_version) {
++      const base::TimeDelta remaining = deadline - base::TimeTicks::Now();
++      if (!remaining.is_positive())
++        return std::nullopt;
++      cache_cv_.TimedWait(remaining);
++      if (cache.current_version != wanted_version)
++        return std::nullopt;
++    }
++  }
++  if (x < 0 || y < 0 || static_cast<uint64_t>(x) + width > cache.full_width ||
++      static_cast<uint64_t>(y) + height > cache.full_height)
++    return std::nullopt;
++  const uint64_t expected =
++      static_cast<uint64_t>(cache.full_width) * cache.full_height * 4;
++  if (expected > std::numeric_limits<size_t>::max() ||
++      cache.pixels.size() != static_cast<size_t>(expected))
++    return std::nullopt;
++  const uint64_t output_size = static_cast<uint64_t>(width) * height * 4;
++  if (output_size > std::numeric_limits<size_t>::max())
++    return std::nullopt;
++  std::vector<uint8_t> output(static_cast<size_t>(output_size));
++  const size_t source_stride = static_cast<size_t>(cache.full_width) * 4;
++  const size_t output_stride = static_cast<size_t>(width) * 4;
++  for (uint32_t row = 0; row < height; ++row) {
++    std::memcpy(output.data() + row * output_stride,
++                cache.pixels.data() +
++                    (static_cast<size_t>(y) + row) * source_stride +
++                    static_cast<size_t>(x) * 4,
++                output_stride);
++  }
++  return output;
++}
++
++std::optional<std::vector<uint8_t>>
++CanvasBridgeClient::GetImageDataCacheFirst(uint32_t canvas_id,
++                                           int32_t x,
++                                           int32_t y,
++                                           uint32_t width,
++                                           uint32_t height) {
++  if (auto cached = TryGetCachedSurface(canvas_id, x, y, width, height, true))
++    return cached;
++  return RequestImageData(canvas_id, x, y, width, height);
++}
++
++void CanvasBridgeClient::SendPrefetchRequest(uint32_t canvas_id,
++                                             uint32_t content_version,
++                                             uint32_t width,
++                                             uint32_t height) {
++  GetImageDataMessage request;
++  request.canvas_id = canvas_id;
++  request.width = width;
++  request.height = height;
++  request.content_version = content_version;
++  Send(Encode(request));
++}
++
++bool CanvasBridgeClient::Send(base::span<const uint8_t> frame) {
++  return Connected() && WriteWebSocketFrame(frame);
++}
++bool CanvasBridgeClient::WriteWebSocketFrame(
++    base::span<const uint8_t> payload) {
++  std::vector<uint8_t> header;
++  header.push_back(0x82);
++  const size_t length = payload.size();
++  if (length < 126) {
++    header.push_back(static_cast<uint8_t>(0x80 | length));
++  } else if (length < 65536) {
++    header.push_back(0x80 | 126);
++    header.push_back(static_cast<uint8_t>(length >> 8));
++    header.push_back(static_cast<uint8_t>(length));
++  } else {
++    header.push_back(0x80 | 127);
++    for (int index = 7; index >= 0; --index)
++      header.push_back(static_cast<uint8_t>(length >> (8 * index)));
++  }
++  uint8_t mask[4];
++  base::RandBytes(mask);
++  header.insert(header.end(), mask, mask + 4);
++  std::vector<uint8_t> masked(payload.begin(), payload.end());
++  for (size_t index = 0; index < masked.size(); ++index)
++    masked[index] ^= mask[index % 4];
++  base::AutoLock lock(write_lock_);
++  return WriteExact(header.data(), header.size()) &&
++         WriteExact(masked.data(), masked.size());
++}
++
++bool CanvasBridgeClient::ReadWebSocketFrame(std::vector<uint8_t>* out) {
++  for (;;) {
++    uint8_t header[2];
++    if (!ReadExact(header, 2))
++      return false;
++    const uint8_t opcode = header[0] & 0x0f;
++    uint64_t length = header[1] & 0x7f;
++    if (length == 126) {
++      uint8_t extended[2];
++      if (!ReadExact(extended, 2))
++        return false;
++      length = (static_cast<uint64_t>(extended[0]) << 8) | extended[1];
++    } else if (length == 127) {
++      uint8_t extended[8];
++      if (!ReadExact(extended, 8))
++        return false;
++      length = 0;
++      for (uint8_t byte : extended)
++        length = (length << 8) | byte;
++    }
++    if (length > kMaxFrameBytes || length > std::numeric_limits<size_t>::max())
++      return false;
++    uint8_t mask[4] = {};
++    const bool masked = (header[1] & 0x80) != 0;
++    if (masked && !ReadExact(mask, 4))
++      return false;
++    std::vector<uint8_t> payload(static_cast<size_t>(length));
++    if (length && !ReadExact(payload.data(), payload.size()))
++      return false;
++    if (masked) {
++      for (size_t index = 0; index < payload.size(); ++index)
++        payload[index] ^= mask[index % 4];
++    }
++    if (opcode == 0x8)
++      return false;
++    if (opcode == 0x9 || opcode == 0xa)
++      continue;
++    if (opcode != 0x2)
++      return false;
++    *out = std::move(payload);
++    return true;
++  }
++}
++
++bool CanvasBridgeClient::ReadExact(void* buffer, size_t length) {
++  uint8_t* output = static_cast<uint8_t*>(buffer);
++  size_t received = 0;
++  while (received < length) {
++#if BUILDFLAG(IS_WIN)
++    const int chunk = base::saturated_cast<int>(length - received);
++    const int result = ::recv(static_cast<SOCKET>(socket_),
++                              reinterpret_cast<char*>(output + received),
++                              chunk, 0);
++#else
++    const ssize_t result =
++        ::recv(static_cast<int>(socket_), output + received, length - received, 0);
++#endif
++    if (result <= 0)
++      return false;
++    received += static_cast<size_t>(result);
++  }
++  return true;
++}
++bool CanvasBridgeClient::WriteExact(const void* buffer, size_t length) {
++  const uint8_t* input = static_cast<const uint8_t*>(buffer);
++  size_t sent = 0;
++  while (sent < length) {
++#if BUILDFLAG(IS_WIN)
++    const int chunk = base::saturated_cast<int>(length - sent);
++    const int result = ::send(static_cast<SOCKET>(socket_),
++                              reinterpret_cast<const char*>(input + sent),
++                              chunk, 0);
++#else
++    const ssize_t result =
++        ::send(static_cast<int>(socket_), input + sent, length - sent, 0);
++#endif
++    if (result <= 0)
++      return false;
++    sent += static_cast<size_t>(result);
++  }
++  return true;
++}
++void CanvasBridgeClient::CloseSocket() {
++  if (socket_ == kInvalidSocket)
++    return;
++  CloseSocketHandle(socket_);
++  socket_ = kInvalidSocket;
++}
++
++}  // namespace blink::canvas_bridge

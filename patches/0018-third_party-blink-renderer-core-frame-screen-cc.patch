@@ -60,7 +60,7 @@ index 69ffc2b05f..ed8e2ea806 100644
    return GetScreenInfo().depth == 0
               ? unknown_color_depth
               : base::saturated_cast<unsigned>(GetScreenInfo().depth);
-@@ -124,12 +148,24 @@ int Screen::availTop() const {
+@@ -124,12 +148,23 @@ int Screen::availTop() const {
  int Screen::availHeight() const {
    if (!DomWindow())
      return 0;
@@ -71,8 +71,7 @@ index 69ffc2b05f..ed8e2ea806 100644
 +      return p > tb ? p - tb : p;
 +  }
 +  if (UxrScreenInt("uxr-screen-avail-height", &p)) return p;  // UXR
-+  if (UxrScreenInt("uxr-screen-height", &p))  // UXR: taskbar-aware avail
-+    return p > 48 ? p - 48 : p;
++  if (UxrScreenInt("uxr-screen-height", &p)) return p;  // UXR
    return GetRect(/*available=*/true).height();
  }
  

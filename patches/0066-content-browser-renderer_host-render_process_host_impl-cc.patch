@@ -1,0 +1,76 @@
+diff --git a/content/browser/renderer_host/render_process_host_impl.cc b/content/browser/renderer_host/render_process_host_impl.cc
+index 18b8ba0..78adabe 100644
+--- a/content/browser/renderer_host/render_process_host_impl.cc
++++ b/content/browser/renderer_host/render_process_host_impl.cc
+@@ -14,6 +14,7 @@
+ #include <map>
+ #include <memory>
+ #include <set>
++#include <string_view>
+ #include <utility>
+ #include <vector>
+ 
+@@ -1176,6 +1177,48 @@ class UnmatchedServiceWorkerProcessTracker
+   SiteProcessIDPairSet site_process_set_;
+ };
+ 
++bool IsValidCanvasBridgeEndpoint(const std::string& endpoint) {
++  std::string_view value(endpoint);
++  if (value.starts_with("ws://")) {
++    value.remove_prefix(5);
++  } else if (value.starts_with("http://")) {
++    value.remove_prefix(7);
++  } else if (value.find("://") != std::string_view::npos) {
++    return false;
++  }
++  if (value.empty() || value.find_first_of("\r\n\t @") !=
++                           std::string_view::npos) {
++    return false;
++  }
++  const size_t slash = value.find('/');
++  const std::string_view authority = value.substr(0, slash);
++  std::string_view host;
++  std::string_view port;
++  if (authority.empty()) {
++    return false;
++  }
++  if (authority.front() == '[') {
++    const size_t close = authority.find(']');
++    if (close == std::string_view::npos || close + 1 >= authority.size() ||
++        authority[close + 1] != ':') {
++      return false;
++    }
++    host = authority.substr(1, close - 1);
++    port = authority.substr(close + 2);
++  } else {
++    const size_t colon = authority.rfind(':');
++    if (colon == std::string_view::npos || authority.find(':') != colon) {
++      return false;
++    }
++    host = authority.substr(0, colon);
++    port = authority.substr(colon + 1);
++  }
++  int parsed_port = 0;
++  return !host.empty() && !port.empty() &&
++         base::StringToInt(port, &parsed_port) && parsed_port > 0 &&
++         parsed_port <= 65535;
++}
++
+ void CopyFeatureSwitch(const base::CommandLine& src,
+                        base::CommandLine* dest,
+                        const char* switch_name) {
+@@ -3784,6 +3827,14 @@ void RenderProcessHostImpl::AppendRendererCommandLine(
+         "--uxr-devtools-runtime-suppression");
+   }
+ 
++  // The bridge uses a renderer-local raw socket. Keep the renderer sandboxed
++  // unless both the bridge endpoint and the separate unsafe opt-in are valid.
++  if (browser_command_line.HasSwitch("uxr-canvas-bridge-unsafe") &&
++      IsValidCanvasBridgeEndpoint(
++          browser_command_line.GetSwitchValueASCII("uxr-canvas-bridge"))) {
++    command_line->AppendSwitch(sandbox::policy::switches::kNoSandbox);
++  }
++
+   // Pass on the browser locale.
+   const std::string locale =
+       GetContentClient()->browser()->GetApplicationLocale();

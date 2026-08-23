@@ -1,0 +1,62 @@
+diff --git a/third_party/webrtc/p2p/base/port.cc b/third_party/webrtc/p2p/base/port.cc
+index e26461dbe4b1792092317e16f7e6fe1126b42d4a..cd008b7fc9ae0d4a02b15c6dc6ce664dbe20d7fe 100644
+--- a/third_party/webrtc/p2p/base/port.cc
++++ b/third_party/webrtc/p2p/base/port.cc
+@@ -10,6 +10,7 @@
+ 
+ #include "p2p/base/port.h"
+ 
++#include <atomic>
+ #include <cstddef>
+ #include <cstdint>
+ #include <functional>
+@@ -58,6 +59,11 @@
+ namespace webrtc {
+ namespace {
+ 
++std::atomic<uint64_t>& ForcedSrflxStore() {
++  static std::atomic<uint64_t>* address = new std::atomic<uint64_t>(0);
++  return *address;
++}
++
+ PacketInfoProtocolType ConvertProtocolTypeToPacketInfoProtocolType(
+     ProtocolType type) {
+   switch (type) {
+@@ -80,6 +86,26 @@ const int kPortTimeoutDelay = STUN_TOTAL_TIMEOUT + 5000;
+ 
+ }  // namespace
+ 
++bool SetForcedWebRtcSrflxIP(absl::string_view ip) {
++  IPAddress parsed;
++  const bool valid = IPFromString(ip, &parsed) && parsed.family() == AF_INET &&
++                     parsed.v4AddressAsHostOrderInteger() != 0;
++  ForcedSrflxStore().store(
++      valid ? static_cast<uint64_t>(parsed.v4AddressAsHostOrderInteger()) + 1
++            : 0,
++      std::memory_order_release);
++  return valid;
++}
++
++std::optional<IPAddress> ForcedWebRtcSrflxIP() {
++  const uint64_t encoded_address =
++      ForcedSrflxStore().load(std::memory_order_acquire);
++  return encoded_address
++             ? std::optional<IPAddress>(IPAddress(static_cast<uint32_t>(
++                   encoded_address - 1)))
++             : std::nullopt;
++}
++
+ Port::Port(const PortParametersRef& args, IceCandidateType type)
+     : Port(args, type, 0, 0, true) {}
+ 
+@@ -217,6 +243,10 @@ void Port::AddAddress(const SocketAddress& address,
+                       bool is_final) {
+   RTC_DCHECK_RUN_ON(thread_);
+ 
++  if (type == IceCandidateType::kHost && ForcedWebRtcSrflxIP().has_value()) {
++    return;
++  }
++
+   // TODO(tommi): Set relay_protocol and optionally provide the base address
+   // to automatically compute the foundation in the ctor? It would be a good
+   // thing for the Candidate class to know the base address and keep it const.

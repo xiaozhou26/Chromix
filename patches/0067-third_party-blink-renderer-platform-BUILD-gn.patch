@@ -1,0 +1,12 @@
+diff --git a/third_party/blink/renderer/platform/BUILD.gn b/third_party/blink/renderer/platform/BUILD.gn
+index 85d03ee..6059e8c 100644
+--- a/third_party/blink/renderer/platform/BUILD.gn
++++ b/third_party/blink/renderer/platform/BUILD.gn
+@@ -1771,6 +1771,7 @@ component("platform") {
+ 
+   allow_circular_includes_from = [
+     "//third_party/blink/renderer/platform/blob",
++    "//third_party/blink/renderer/platform/canvas_bridge",
+     "//third_party/blink/renderer/platform/heap:heap",
+     "//third_party/blink/renderer/platform/instrumentation",
+     "//third_party/blink/renderer/platform/loader:loader",
