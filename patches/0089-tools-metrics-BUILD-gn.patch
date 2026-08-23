@@ -1,0 +1,13 @@
+diff --git a/tools/metrics/BUILD.gn b/tools/metrics/BUILD.gn
+index a1b2c3d..e4f5g6h 100644
+--- a/tools/metrics/BUILD.gn
++++ b/tools/metrics/BUILD.gn
+@@ -45,7 +45,7 @@
+   # for non-git checkouts.
+   # TODO(crbug.com/329080012): Remove this once dirmd works in non-git
+   # checkouts.
+-  if (generate_location_tags) {
++  if (generate_location_tags && path_exists("//.git")) {
+     deps += [ ":histograms_xml" ]
+   }
+ }

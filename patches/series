@@ -86,3 +86,4 @@ patches/0085-third_party-blink-renderer-modules-peerconnection-peer_connection_d
 patches/0086-third_party-webrtc-p2p-base-port-h.patch
 patches/0087-third_party-webrtc-p2p-base-port-cc.patch
 patches/0088-third_party-webrtc-p2p-base-stun_port-cc.patch
+patches/0089-tools-metrics-BUILD-gn.patch
