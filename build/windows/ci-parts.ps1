@@ -64,7 +64,9 @@ Push-Location $Root
 try {
   if (-not (Test-Path "chromix")) { throw "$Root\chromix does not exist" }
   & $SevenZip a -v9g -mx=1 -mtc=on "$PartsDir\stage\tree.7z" chromix
-  if ($LASTEXITCODE -ne 0) { throw "7z volume creation failed (exit $LASTEXITCODE)" }
+  $rc = $LASTEXITCODE
+  if ($rc -gt 1) { throw "7z volume creation failed (exit $rc)" }
+  if ($rc -eq 1) { Write-Host "==> 7z completed with warnings (some files skipped)" }
 } finally { Pop-Location }
 Write-Host "==> packed in $([int]$sw.Elapsed.TotalMinutes) min; disk now: $(Get-FreeGB) GB free"
 
