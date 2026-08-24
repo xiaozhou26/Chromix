@@ -66,7 +66,10 @@ try {
   & $SevenZip a -v9g -mx=1 -mtc=on "$PartsDir\stage\tree.7z" chromix
   $rc = $LASTEXITCODE
   if ($rc -gt 1) { throw "7z volume creation failed (exit $rc)" }
-  if ($rc -eq 1) { Write-Host "==> 7z completed with warnings (some files skipped)" }
+  if ($rc -eq 1) {
+    Write-Host "==> 7z completed with warnings (some files skipped)"
+    $global:LASTEXITCODE = 0
+  }
 } finally { Pop-Location }
 Write-Host "==> packed in $([int]$sw.Elapsed.TotalMinutes) min; disk now: $(Get-FreeGB) GB free"
 

@@ -26,8 +26,6 @@ jobs:
     name: validate (source prep + gn gen)
     runs-on: windows-2022
     timeout-minutes: 90
-    outputs:
-      finished: ${{ steps.stage.outputs.finished }}
     steps:
       - uses: actions/checkout@v4
       - name: Run validation
@@ -37,7 +35,7 @@ jobs:
   build-1:
     name: stage 1 (fetch + sync + first compile)
     needs: validate
-    if: needs.validate.result == 'success' && needs.validate.outputs.finished == 'true'
+    if: needs.validate.result == 'success'
     runs-on: windows-2022
     timeout-minutes: 355
     outputs:
