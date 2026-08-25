@@ -36,7 +36,14 @@ function Get-RemainingMin {
 function Test-LastStage { return $StageIndex -ge $MaxStages }
 
 function Invoke-Tracked {
-  param([string]$File, [string]$ArgList, [string]$Cwd, [int]$TimeoutSec, [switch]$Quiet)
+  param(
+    [string]$File,
+    [string]$ArgList,
+    [string]$Cwd,
+    [int]$TimeoutSec,
+    [switch]$Quiet,
+    [switch]$FullFailureOutput
+  )
   $log = "$env:TEMP\ci-tracked.log"
   $err = "$env:TEMP\ci-tracked.err"
   Remove-Item $log, $err -ErrorAction SilentlyContinue
@@ -60,9 +67,21 @@ function Invoke-Tracked {
   }
   $process.WaitForExit()
   $code = $process.ExitCode
-  if ($null -eq $code) { $code = 1 }
+  if ($null -eq $code) {
+    Write-Host "==> tracked process exit code is null after WaitForExit; treating as failure"
+    $code = 1
+  } else {
+    Write-Host "==> tracked process exit code: $code"
+  }
   if ($code -ne 0) {
-    if (Test-Path $log) { Get-Content $log -Tail 200 | ForEach-Object { Write-Host "  ! | $_" } }
+    if (Test-Path $log) {
+      if ($FullFailureOutput) {
+        Write-Host "==> tracked process stdout (complete)"
+        Get-Content $log | ForEach-Object { Write-Host "  ! | $_" }
+      } else {
+        Get-Content $log -Tail 200 | ForEach-Object { Write-Host "  ! | $_" }
+      }
+    }
     if (Test-Path $err) { Get-Content $err | ForEach-Object { Write-Host "  ! | $_" } }
   }
   return $code
@@ -247,8 +266,8 @@ if ($ValidateOnly) {
   Write-Host "==> validate-only: building V8 Torque generation target"
   $validationBudget = [Math]::Max(60, (Get-RemainingMin) - 10)
   $validationRc = Invoke-Tracked -File (Join-Path $Src "third_party\ninja\ninja.exe") `
-    -ArgList "-C `"$OutDir`" -j 4 gen/v8/torque-generated/bit-field-asserts.cc" `
-    -Cwd $Src -TimeoutSec ($validationBudget * 60)
+    -ArgList "-C `"$OutDir`" -j 1 -v gen/v8/torque-generated/bit-field-asserts.cc" `
+    -Cwd $Src -TimeoutSec ($validationBudget * 60) -FullFailureOutput
   if ($validationRc -ne 0) { throw "V8 Torque validation failed (exit $validationRc)" }
   Write-Host "==> validate-only: gn gen and V8 Torque generation passed"
   Write-OutVar finished true
