@@ -58,11 +58,12 @@ function Invoke-Tracked {
       Get-Content $log -Tail 3 | ForEach-Object { Write-Host "    | $_" }
     }
   }
+  $process.WaitForExit()
   $code = $process.ExitCode
   if ($null -eq $code) { $code = 1 }
   if ($code -ne 0) {
-    if (Test-Path $log) { Get-Content $log -Tail 20 | ForEach-Object { Write-Host "  ! | $_" } }
-    if (Test-Path $err) { Get-Content $err -Tail 10 | ForEach-Object { Write-Host "  ! | $_" } }
+    if (Test-Path $log) { Get-Content $log -Tail 200 | ForEach-Object { Write-Host "  ! | $_" } }
+    if (Test-Path $err) { Get-Content $err | ForEach-Object { Write-Host "  ! | $_" } }
   }
   return $code
 }
