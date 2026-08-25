@@ -46,45 +46,76 @@ function Invoke-Tracked {
   )
   $log = "$env:TEMP\ci-tracked.log"
   $err = "$env:TEMP\ci-tracked.err"
-  Remove-Item $log, $err -ErrorAction SilentlyContinue
-  $process = Start-Process -FilePath $File -ArgumentList $ArgList -WorkingDirectory $Cwd `
-    -PassThru -WindowStyle Hidden -RedirectStandardOutput $log -RedirectStandardError $err
-  $stopwatch = [Diagnostics.Stopwatch]::StartNew()
-  $tick = 0
-  while (-not $process.HasExited) {
-    if ($stopwatch.Elapsed.TotalSeconds -gt $TimeoutSec) {
-      Write-Host "==> timeout after $([int]$stopwatch.Elapsed.TotalMinutes) min; killing process tree"
-      try { & taskkill.exe /PID $process.Id /T /F 2>&1 | Out-Null } catch {}
-      $process.WaitForExit()
-      Start-Sleep -Seconds 2
-      return 124
-    }
-    Start-Sleep -Seconds 10
-    $tick++
-    if (-not $Quiet -and ($tick % 6) -eq 0 -and (Test-Path $log)) {
-      Get-Content $log -Tail 3 | ForEach-Object { Write-Host "    | $_" }
-    }
-  }
-  $process.WaitForExit()
-  $code = $process.ExitCode
-  if ($null -eq $code) {
-    Write-Host "==> tracked process exit code is null after WaitForExit; treating as failure"
-    $code = 1
-  } else {
-    Write-Host "==> tracked process exit code: $code"
-  }
-  if ($code -ne 0) {
-    if (Test-Path $log) {
-      if ($FullFailureOutput) {
-        Write-Host "==> tracked process stdout (complete)"
-        Get-Content $log | ForEach-Object { Write-Host "  ! | $_" }
-      } else {
-        Get-Content $log -Tail 200 | ForEach-Object { Write-Host "  ! | $_" }
+  $wrapperName = "ci-tracked-$PID-$([Guid]::NewGuid().ToString('N'))"
+  $wrapper = Join-Path $env:TEMP "$wrapperName.cmd"
+  $status = Join-Path $env:TEMP "$wrapperName.exit"
+  Remove-Item $log, $err, $wrapper, $status -ErrorAction SilentlyContinue
+
+  $cmdFile = $File.Replace("%", "%%")
+  $cmdArgs = $ArgList.Replace("%", "%%")
+  $cmdStatus = $status.Replace("%", "%%")
+  $wrapperLines = @(
+    "@echo off",
+    "`"$cmdFile`" $cmdArgs",
+    'set "ci_tracked_exit=%ERRORLEVEL%"',
+    ">`"$cmdStatus`" echo %ci_tracked_exit%",
+    "exit /b %ci_tracked_exit%"
+  )
+
+  try {
+    [IO.File]::WriteAllLines($wrapper, $wrapperLines, [Text.Encoding]::ASCII)
+    $process = Start-Process -FilePath $env:COMSPEC `
+      -ArgumentList "/d /s /c `"`"$wrapper`"`"" -WorkingDirectory $Cwd `
+      -PassThru -WindowStyle Hidden -RedirectStandardOutput $log -RedirectStandardError $err
+    $stopwatch = [Diagnostics.Stopwatch]::StartNew()
+    $tick = 0
+    while (-not $process.HasExited) {
+      if ($stopwatch.Elapsed.TotalSeconds -gt $TimeoutSec) {
+        Write-Host "==> timeout after $([int]$stopwatch.Elapsed.TotalMinutes) min; killing process tree"
+        try { & taskkill.exe /PID $process.Id /T /F 2>&1 | Out-Null } catch {}
+        $process.WaitForExit()
+        Start-Sleep -Seconds 2
+        return 124
+      }
+      Start-Sleep -Seconds 10
+      $tick++
+      if (-not $Quiet -and ($tick % 6) -eq 0 -and (Test-Path $log)) {
+        Get-Content $log -Tail 3 | ForEach-Object { Write-Host "    | $_" }
       }
     }
-    if (Test-Path $err) { Get-Content $err | ForEach-Object { Write-Host "  ! | $_" } }
+    $process.WaitForExit()
+
+    $code = 1
+    if (-not (Test-Path -LiteralPath $status -PathType Leaf)) {
+      Write-Host "==> tracked process exit status file is missing: $status; treating as failure"
+    } else {
+      $statusText = Get-Content -LiteralPath $status -Raw -ErrorAction SilentlyContinue
+      $statusValue = if ($null -eq $statusText) { "" } else { $statusText.Trim() }
+      $parsedCode = 0
+      if ($statusValue -notmatch '^-?\d+$' -or
+          -not [int]::TryParse($statusValue, [ref]$parsedCode)) {
+        $displayStatus = if ($statusValue) { $statusValue } else { "<empty>" }
+        Write-Host "==> tracked process exit status is invalid: '$displayStatus'; treating as failure"
+      } else {
+        $code = $parsedCode
+        Write-Host "==> tracked process exit code: $code"
+      }
+    }
+    if ($code -ne 0) {
+      if (Test-Path $log) {
+        if ($FullFailureOutput) {
+          Write-Host "==> tracked process stdout (complete)"
+          Get-Content $log | ForEach-Object { Write-Host "  ! | $_" }
+        } else {
+          Get-Content $log -Tail 200 | ForEach-Object { Write-Host "  ! | $_" }
+        }
+      }
+      if (Test-Path $err) { Get-Content $err | ForEach-Object { Write-Host "  ! | $_" } }
+    }
+    return $code
+  } finally {
+    Remove-Item $wrapper, $status -ErrorAction SilentlyContinue
   }
-  return $code
 }
 
 function Get-FreeGB { return [math]::Round((Get-PSDrive C).Free / 1GB, 1) }

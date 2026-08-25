@@ -22,12 +22,71 @@ def validate_only_source() -> str:
 
 
 class InvokeTrackedRegressionTest(unittest.TestCase):
-    def test_waits_before_reading_natural_exit_code(self):
+    def test_uses_cmd_wrapper_status_instead_of_process_exit_code(self):
+        source = invoke_tracked_source()
+        self.assertIn(
+            '$wrapperName = "ci-tracked-$PID-$([Guid]::NewGuid().ToString(\'N\'))"',
+            source,
+        )
+        self.assertIn('$wrapper = Join-Path $env:TEMP "$wrapperName.cmd"', source)
+        self.assertIn('$status = Join-Path $env:TEMP "$wrapperName.exit"', source)
+        self.assertRegex(
+            source,
+            r'"`"\$cmdFile`" \$cmdArgs",\s+'
+            r"'set \"ci_tracked_exit=%ERRORLEVEL%\"',\s+"
+            r'">`"\$cmdStatus`" echo %ci_tracked_exit%",\s+'
+            r'"exit /b %ci_tracked_exit%"',
+        )
+        self.assertNotIn("$process.ExitCode", source)
+
+    def test_cleans_old_tracking_files_and_quotes_wrapper_path(self):
+        source = invoke_tracked_source()
+        self.assertIn(
+            "Remove-Item $log, $err, $wrapper, $status -ErrorAction SilentlyContinue",
+            source,
+        )
+        self.assertIn('$File.Replace("%", "%%")', source)
+        self.assertIn('$ArgList.Replace("%", "%%")', source)
+        self.assertIn('$status.Replace("%", "%%")', source)
+        self.assertRegex(
+            source,
+            r'Start-Process -FilePath \$env:COMSPEC\s+`\n'
+            r'\s+-ArgumentList "/d /s /c `"`"\$wrapper`"`""',
+        )
+
+    def test_waits_before_strictly_parsing_status_file(self):
         source = invoke_tracked_source()
         self.assertEqual(source.count("$process.WaitForExit()"), 2)
         self.assertRegex(
             source,
-            r"\n  \}\n  \$process\.WaitForExit\(\)\n  \$code = \$process\.ExitCode\n",
+            r"\n    \}\n    \$process\.WaitForExit\(\)\n\n"
+            r"    \$code = 1\n"
+            r"    if \(-not \(Test-Path -LiteralPath \$status -PathType Leaf\)\)",
+        )
+        self.assertIn("$statusValue -notmatch '^-?\\d+$'", source)
+        self.assertIn("[int]::TryParse($statusValue, [ref]$parsedCode)", source)
+
+    def test_missing_or_invalid_status_fails_conservatively(self):
+        source = invoke_tracked_source()
+        self.assertIn("$code = 1", source)
+        self.assertIn(
+            'Write-Host "==> tracked process exit status file is missing: '
+            '$status; treating as failure"',
+            source,
+        )
+        self.assertIn(
+            'Write-Host "==> tracked process exit status is invalid: '
+            "'$displayStatus'; treating as failure\"",
+            source,
+        )
+        self.assertIn('Write-Host "==> tracked process exit code: $code"', source)
+
+    def test_timeout_still_returns_124(self):
+        source = invoke_tracked_source()
+        self.assertRegex(
+            source,
+            r"(?s)taskkill\.exe /PID \$process\.Id /T /F.*?"
+            r"\$process\.WaitForExit\(\).*?return 124",
         )
 
     def test_failure_output_keeps_long_stdout_tail_and_full_stderr(self):
@@ -47,15 +106,6 @@ class InvokeTrackedRegressionTest(unittest.TestCase):
             r'"==> tracked process stdout \(complete\)"\s+'
             r"Get-Content \$log \| ForEach-Object",
         )
-
-    def test_reports_whether_exit_code_is_null(self):
-        source = invoke_tracked_source()
-        self.assertIn(
-            'Write-Host "==> tracked process exit code is null after WaitForExit; '
-            'treating as failure"',
-            source,
-        )
-        self.assertIn('Write-Host "==> tracked process exit code: $code"', source)
 
 
 class ValidateOnlyRegressionTest(unittest.TestCase):
