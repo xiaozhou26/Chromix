@@ -73,6 +73,14 @@ function Get-PatchSetKey {
       if (-not (Test-Path $path)) { throw "patch listed in series is missing: $rel" }
       $bytes.AddRange([IO.File]::ReadAllBytes($path))
     }
+    $payloadRoot = Join-Path $Repo "build\windows\lite-tarball-files"
+    if (Test-Path $payloadRoot) {
+      foreach ($path in Get-ChildItem $payloadRoot -Recurse -File | Sort-Object FullName) {
+        $relative = $path.FullName.Substring($payloadRoot.Length).TrimStart('\')
+        $bytes.AddRange([Text.Encoding]::UTF8.GetBytes($relative.Replace('\', '/')))
+        $bytes.AddRange([IO.File]::ReadAllBytes($path.FullName))
+      }
+    }
     return ([BitConverter]::ToString($hasher.ComputeHash($bytes.ToArray())) -replace "-", "").ToLowerInvariant()
   } finally {
     $hasher.Dispose()
@@ -104,6 +112,19 @@ function Prepare-RustToolchain {
   }
   & $rustc --version | Set-Content -Encoding ASCII (Join-Path $destination "INSTALLED_VERSION")
   if ($LASTEXITCODE -ne 0) { throw "rustc version check failed" }
+}
+
+function Restore-LiteTarballFiles {
+  $payloadRoot = Join-Path $Repo "build\windows\lite-tarball-files"
+  if (-not (Test-Path $payloadRoot)) { return }
+
+  Get-ChildItem $payloadRoot -Recurse -File | ForEach-Object {
+    $relative = $_.FullName.Substring($payloadRoot.Length).TrimStart('\')
+    $destination = Join-Path $Src $relative
+    New-Item -ItemType Directory -Force -Path (Split-Path $destination) | Out-Null
+    Copy-Item $_.FullName $destination -Force
+    Write-Host "    restored lite-tarball file: $relative"
+  }
 }
 
 function Invoke-PatchDirectory([string]$Directory) {
@@ -206,6 +227,7 @@ if (-not (Test-Marker ".chromix-source-unpacked" $Revisions.ChromiumVersion)) {
 if (-not (Test-Path (Join-Path $Src "third_party\rust-toolchain\bin\rustc.exe"))) {
   Prepare-RustToolchain
 }
+Restore-LiteTarballFiles
 
 if (-not (Test-Marker ".chromix-ungoogled-core" $Revisions.UngoogledCommit)) {
   Write-Host "==> applying ungoogled-chromium core patches"

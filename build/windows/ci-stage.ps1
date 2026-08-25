@@ -243,7 +243,13 @@ try {
 }
 
 if ($ValidateOnly) {
-  Write-Host "==> validate-only: gn gen passed, skipping ninja"
+  Write-Host "==> validate-only: building V8 Torque generation target"
+  $validationBudget = [Math]::Max(60, (Get-RemainingMin) - 10)
+  $validationRc = Invoke-Tracked -File (Join-Path $Src "third_party\ninja\ninja.exe") `
+    -ArgList "-C `"$OutDir`" -j 4 gen/v8/torque-generated/bit-field-asserts.cc" `
+    -Cwd $Src -TimeoutSec ($validationBudget * 60)
+  if ($validationRc -ne 0) { throw "V8 Torque validation failed (exit $validationRc)" }
+  Write-Host "==> validate-only: gn gen and V8 Torque generation passed"
   Write-OutVar finished true
   return
 }
