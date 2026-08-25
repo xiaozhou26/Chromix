@@ -32,7 +32,7 @@ index 3b1a90dae1..cf4455f9e7 100644
 +      "fangsong",      "ui-serif",         "ui-sans-serif", "ui-monospace",
 +      "ui-rounded",    "ui-fangsong",      "-webkit-body",
 +      "-webkit-pictograph", "-webkit-system-font", "-webkit-control"};
-+  std::string ph_name = family.LowerASCII().Utf8();
++  std::string ph_name = family.GetString().ToAsciiLower().Utf8();
 +  for (const char* ph_g : kGenerics) {
 +    if (ph_name == ph_g) {
 +      return false;
