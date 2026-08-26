@@ -135,10 +135,13 @@ jobs:
           path: C:\restore
       - name: Download tree from previous run
         if: ${{ inputs.resume_run_id != '' && inputs.resume_stage == '2' }}
-        shell: powershell
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: build\windows\download-stage-artifacts.ps1 -RunId '${{ inputs.resume_run_id }}' -StageIndex 1
+        uses: actions/download-artifact@v4
+        with:
+          pattern: tree-s1-attempt-*-part*
+          merge-multiple: true
+          path: C:\restore
+          github-token: ${{ github.token }}
+          run-id: ${{ inputs.resume_run_id }}
       - name: Run stage 2
         id: stage
         shell: powershell
@@ -207,10 +210,13 @@ jobs:
           path: C:\restore
       - name: Download tree from previous run
         if: ${{ inputs.resume_run_id != '' && inputs.resume_stage == '3' }}
-        shell: powershell
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: build\windows\download-stage-artifacts.ps1 -RunId '${{ inputs.resume_run_id }}' -StageIndex 2
+        uses: actions/download-artifact@v4
+        with:
+          pattern: tree-s2-attempt-*-part*
+          merge-multiple: true
+          path: C:\restore
+          github-token: ${{ github.token }}
+          run-id: ${{ inputs.resume_run_id }}
       - name: Run stage 3
         id: stage
         shell: powershell
@@ -279,10 +285,13 @@ jobs:
           path: C:\restore
       - name: Download tree from previous run
         if: ${{ inputs.resume_run_id != '' && inputs.resume_stage == '4' }}
-        shell: powershell
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: build\windows\download-stage-artifacts.ps1 -RunId '${{ inputs.resume_run_id }}' -StageIndex 3
+        uses: actions/download-artifact@v4
+        with:
+          pattern: tree-s3-attempt-*-part*
+          merge-multiple: true
+          path: C:\restore
+          github-token: ${{ github.token }}
+          run-id: ${{ inputs.resume_run_id }}
       - name: Run stage 4
         id: stage
         shell: powershell
@@ -351,10 +360,13 @@ jobs:
           path: C:\restore
       - name: Download tree from previous run
         if: ${{ inputs.resume_run_id != '' && inputs.resume_stage == '5' }}
-        shell: powershell
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: build\windows\download-stage-artifacts.ps1 -RunId '${{ inputs.resume_run_id }}' -StageIndex 4
+        uses: actions/download-artifact@v4
+        with:
+          pattern: tree-s4-attempt-*-part*
+          merge-multiple: true
+          path: C:\restore
+          github-token: ${{ github.token }}
+          run-id: ${{ inputs.resume_run_id }}
       - name: Run stage 5
         id: stage
         shell: powershell
@@ -423,10 +435,13 @@ jobs:
           path: C:\restore
       - name: Download tree from previous run
         if: ${{ inputs.resume_run_id != '' && inputs.resume_stage == '6' }}
-        shell: powershell
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: build\windows\download-stage-artifacts.ps1 -RunId '${{ inputs.resume_run_id }}' -StageIndex 5
+        uses: actions/download-artifact@v4
+        with:
+          pattern: tree-s5-attempt-*-part*
+          merge-multiple: true
+          path: C:\restore
+          github-token: ${{ github.token }}
+          run-id: ${{ inputs.resume_run_id }}
       - name: Run stage 6
         id: stage
         shell: powershell
@@ -495,10 +510,13 @@ jobs:
           path: C:\restore
       - name: Download tree from previous run
         if: ${{ inputs.resume_run_id != '' && inputs.resume_stage == '7' }}
-        shell: powershell
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: build\windows\download-stage-artifacts.ps1 -RunId '${{ inputs.resume_run_id }}' -StageIndex 6
+        uses: actions/download-artifact@v4
+        with:
+          pattern: tree-s6-attempt-*-part*
+          merge-multiple: true
+          path: C:\restore
+          github-token: ${{ github.token }}
+          run-id: ${{ inputs.resume_run_id }}
       - name: Run stage 7
         id: stage
         shell: powershell
@@ -567,10 +585,13 @@ jobs:
           path: C:\restore
       - name: Download tree from previous run
         if: ${{ inputs.resume_run_id != '' && inputs.resume_stage == '8' }}
-        shell: powershell
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: build\windows\download-stage-artifacts.ps1 -RunId '${{ inputs.resume_run_id }}' -StageIndex 7
+        uses: actions/download-artifact@v4
+        with:
+          pattern: tree-s7-attempt-*-part*
+          merge-multiple: true
+          path: C:\restore
+          github-token: ${{ github.token }}
+          run-id: ${{ inputs.resume_run_id }}
       - name: Run stage 8
         id: stage
         shell: powershell
@@ -639,10 +660,13 @@ jobs:
           path: C:\restore
       - name: Download tree from previous run
         if: ${{ inputs.resume_run_id != '' && inputs.resume_stage == '9' }}
-        shell: powershell
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: build\windows\download-stage-artifacts.ps1 -RunId '${{ inputs.resume_run_id }}' -StageIndex 8
+        uses: actions/download-artifact@v4
+        with:
+          pattern: tree-s8-attempt-*-part*
+          merge-multiple: true
+          path: C:\restore
+          github-token: ${{ github.token }}
+          run-id: ${{ inputs.resume_run_id }}
       - name: Run stage 9
         id: stage
         shell: powershell
@@ -711,10 +735,13 @@ jobs:
           path: C:\restore
       - name: Download tree from previous run
         if: ${{ inputs.resume_run_id != '' && inputs.resume_stage == '10' }}
-        shell: powershell
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: build\windows\download-stage-artifacts.ps1 -RunId '${{ inputs.resume_run_id }}' -StageIndex 9
+        uses: actions/download-artifact@v4
+        with:
+          pattern: tree-s9-attempt-*-part*
+          merge-multiple: true
+          path: C:\restore
+          github-token: ${{ github.token }}
+          run-id: ${{ inputs.resume_run_id }}
       - name: Run stage 10
         id: stage
         shell: powershell
@@ -783,10 +810,13 @@ jobs:
           path: C:\restore
       - name: Download tree from previous run
         if: ${{ inputs.resume_run_id != '' && inputs.resume_stage == '11' }}
-        shell: powershell
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: build\windows\download-stage-artifacts.ps1 -RunId '${{ inputs.resume_run_id }}' -StageIndex 10
+        uses: actions/download-artifact@v4
+        with:
+          pattern: tree-s10-attempt-*-part*
+          merge-multiple: true
+          path: C:\restore
+          github-token: ${{ github.token }}
+          run-id: ${{ inputs.resume_run_id }}
       - name: Run stage 11
         id: stage
         shell: powershell
@@ -855,10 +885,13 @@ jobs:
           path: C:\restore
       - name: Download tree from previous run
         if: ${{ inputs.resume_run_id != '' && inputs.resume_stage == '12' }}
-        shell: powershell
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: build\windows\download-stage-artifacts.ps1 -RunId '${{ inputs.resume_run_id }}' -StageIndex 11
+        uses: actions/download-artifact@v4
+        with:
+          pattern: tree-s11-attempt-*-part*
+          merge-multiple: true
+          path: C:\restore
+          github-token: ${{ github.token }}
+          run-id: ${{ inputs.resume_run_id }}
       - name: Run stage 12
         id: stage
         shell: powershell

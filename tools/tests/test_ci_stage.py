@@ -6,7 +6,6 @@ import unittest
 REPO = Path(__file__).resolve().parents[2]
 CI_STAGE = REPO / "build" / "windows" / "ci-stage.ps1"
 WORKFLOW = REPO / ".github" / "workflows" / "build-win-x64-github.yml"
-DOWNLOAD_STAGE = REPO / "build" / "windows" / "download-stage-artifacts.ps1"
 
 
 def invoke_tracked_source() -> str:
@@ -131,27 +130,22 @@ class ResumeWorkflowRegressionTest(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         cls.source = WORKFLOW.read_text(encoding="utf-8")
-        cls.download = DOWNLOAD_STAGE.read_text(encoding="utf-8")
 
     def test_resume_skips_predecessors_and_starts_requested_stage(self):
         self.assertIn("resume_run_id:", self.source)
         self.assertIn("if: ${{ inputs.resume_run_id == '' }}", self.source)
         for stage in range(2, 13):
             self.assertIn(f"inputs.resume_stage == '{stage}'", self.source)
-            self.assertIn(
-                f"download-stage-artifacts.ps1 -RunId '${{{{ inputs.resume_run_id }}}}' -StageIndex {stage - 1}",
-                self.source,
-            )
+            self.assertIn(f"pattern: tree-s{stage - 1}-attempt-*-part*", self.source)
         self.assertEqual(self.source.count("always()"), 11)
-        self.assertEqual(self.source.count("download-stage-artifacts.ps1"), 11)
+        self.assertEqual(self.source.count("Download tree from previous run"), 11)
 
-    def test_resume_downloads_non_expired_previous_stage_artifacts(self):
+    def test_resume_uses_official_cross_run_artifact_download(self):
         self.assertIn("actions: read", self.source)
-        self.assertIn("Download tree from previous run", self.source)
-        self.assertIn("actions/runs/$RunId/artifacts?per_page=100", self.download)
-        self.assertIn('$prefix = "tree-s$StageIndex-attempt-"', self.download)
-        self.assertIn("-and -not $_.expired", self.download)
-        self.assertIn("Test-Path C:\\restore\\tree.7z.001", self.download)
+        self.assertEqual(self.source.count("github-token: ${{ github.token }}"), 11)
+        self.assertEqual(self.source.count("run-id: ${{ inputs.resume_run_id }}"), 11)
+        self.assertEqual(self.source.count("merge-multiple: true"), 22)
+        self.assertNotIn("download-stage-artifacts.ps1", self.source)
 
 
 if __name__ == "__main__":
