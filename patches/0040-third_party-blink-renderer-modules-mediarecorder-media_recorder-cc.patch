@@ -24,7 +24,7 @@ index c84e540318..f9f9964cec 100644
 +    const std::string ph_matrix =
 +        base::UxrConfig::GetInstance().Get("uxr-codec-matrix");
 +    if (!ph_matrix.empty()) {
-+      const std::string ph_type = type.LowerASCII().Utf8();
++      const std::string ph_type = type.ToAsciiLower().Utf8();
 +      const std::string ph_container = ph_type.substr(0, ph_type.find(';'));
 +      const size_t ph_codecs_at = ph_type.find("codecs=");
 +      std::string ph_codecs =
