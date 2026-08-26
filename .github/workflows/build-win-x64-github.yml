@@ -8,9 +8,23 @@ name: build-win-x64-github
 
 on:
   workflow_dispatch:
+    inputs:
+      resume_run_id:
+        description: 'Previous run ID whose successful stage artifact should be reused'
+        required: false
+        default: ''
+        type: string
+      resume_stage:
+        description: 'Stage to resume (currently supported: 4)'
+        required: false
+        default: '4'
+        type: choice
+        options:
+          - '4'
 
 permissions:
   contents: read
+  actions: read
 
 concurrency:
   group: build-win-x64-github
@@ -24,6 +38,7 @@ env:
 jobs:
   validate:
     name: validate (source prep + gn gen + V8 Torque)
+    if: ${{ inputs.resume_run_id == '' }}
     runs-on: windows-2022
     timeout-minutes: 150
     steps:
@@ -224,7 +239,7 @@ jobs:
   build-4:
     name: stage 4 (resume compile)
     needs: build-3
-    if: needs.build-3.result == 'success' && needs.build-3.outputs.finished != 'true'
+    if: ${{ always() && ((needs.build-3.result == 'success' && needs.build-3.outputs.finished != 'true') || (inputs.resume_run_id != '' && inputs.resume_stage == '4')) }}
     runs-on: windows-2022
     timeout-minutes: 355
     outputs:
@@ -232,11 +247,32 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Download tree from previous stage
+        if: ${{ inputs.resume_run_id == '' }}
         uses: actions/download-artifact@v4
         with:
           pattern: tree-s3-attempt-${{ github.run_attempt }}-part*
           merge-multiple: true
           path: C:\restore
+      - name: Download tree from previous run
+        if: ${{ inputs.resume_run_id != '' }}
+        shell: powershell
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $runId = '${{ inputs.resume_run_id }}'
+          $artifacts = Invoke-RestMethod -Headers @{ Authorization = "Bearer $env:GH_TOKEN"; Accept = 'application/vnd.github+json' } `
+            -Uri "https://api.github.com/repos/${{ github.repository }}/actions/runs/$runId/artifacts?per_page=100"
+          $parts = @($artifacts.artifacts | Where-Object { $_.name -like 'tree-s3-attempt-*-part*' -and -not $_.expired })
+          if ($parts.Count -eq 0) { throw "No non-expired stage 3 artifacts found in run $runId" }
+          New-Item -ItemType Directory -Force -Path C:\restore | Out-Null
+          foreach ($artifact in $parts) {
+            $zip = Join-Path $env:TEMP "$($artifact.id).zip"
+            Invoke-WebRequest -Headers @{ Authorization = "Bearer $env:GH_TOKEN"; Accept = 'application/vnd.github+json' } `
+              -Uri $artifact.archive_download_url -OutFile $zip
+            Expand-Archive -LiteralPath $zip -DestinationPath C:\restore -Force
+            Remove-Item $zip -Force
+          }
+          if (-not (Test-Path C:\restore\tree.7z.001)) { throw "Stage 3 archive is incomplete in run $runId" }
       - name: Run stage 4
         id: stage
         shell: powershell

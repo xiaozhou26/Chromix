@@ -5,6 +5,7 @@ import unittest
 
 REPO = Path(__file__).resolve().parents[2]
 CI_STAGE = REPO / "build" / "windows" / "ci-stage.ps1"
+WORKFLOW = REPO / ".github" / "workflows" / "build-win-x64-github.yml"
 
 
 def invoke_tracked_source() -> str:
@@ -123,6 +124,29 @@ class ValidateOnlyRegressionTest(unittest.TestCase):
             r'\(exit \$validationRc\)" \}',
         )
         self.assertNotIn("Test-Path", source)
+
+
+class ResumeWorkflowRegressionTest(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        cls.source = WORKFLOW.read_text(encoding="utf-8")
+
+    def test_resume_skips_completed_predecessors_and_starts_stage_four(self):
+        self.assertIn("resume_run_id:", self.source)
+        self.assertIn("if: ${{ inputs.resume_run_id == '' }}", self.source)
+        self.assertIn(
+            "(inputs.resume_run_id != '' && inputs.resume_stage == '4')",
+            self.source,
+        )
+        self.assertIn("always()", self.source)
+
+    def test_resume_downloads_non_expired_stage_three_artifacts(self):
+        self.assertIn("actions: read", self.source)
+        self.assertIn("Download tree from previous run", self.source)
+        self.assertIn("actions/runs/$runId/artifacts?per_page=100", self.source)
+        self.assertIn("tree-s3-attempt-*-part*", self.source)
+        self.assertIn("-and -not $_.expired", self.source)
+        self.assertIn("Test-Path C:\\restore\\tree.7z.001", self.source)
 
 
 if __name__ == "__main__":
