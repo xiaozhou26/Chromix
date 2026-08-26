@@ -137,6 +137,7 @@ class ResumeWorkflowRegressionTest(unittest.TestCase):
         self.assertIn("if: ${{ inputs.resume_run_id == '' }}", self.source)
         for stage in range(2, 13):
             self.assertIn(f"inputs.resume_stage == '{stage}'", self.source)
+            self.assertIn(f"inputs.resume_run_id == '' || inputs.resume_stage != '{stage}'", self.source)
             self.assertIn(f"pattern: tree-s{stage - 1}-attempt-*-part*", self.source)
         self.assertEqual(self.source.count("always()"), 11)
         self.assertEqual(self.source.count("Download tree from previous run"), 11)

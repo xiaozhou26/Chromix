@@ -127,7 +127,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Download tree from previous stage
-        if: ${{ inputs.resume_run_id == '' }}
+        if: ${{ inputs.resume_run_id == '' || inputs.resume_stage != '2' }}
         uses: actions/download-artifact@v4
         with:
           pattern: tree-s1-attempt-${{ github.run_attempt }}-part*
@@ -202,7 +202,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Download tree from previous stage
-        if: ${{ inputs.resume_run_id == '' }}
+        if: ${{ inputs.resume_run_id == '' || inputs.resume_stage != '3' }}
         uses: actions/download-artifact@v4
         with:
           pattern: tree-s2-attempt-${{ github.run_attempt }}-part*
@@ -277,7 +277,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Download tree from previous stage
-        if: ${{ inputs.resume_run_id == '' }}
+        if: ${{ inputs.resume_run_id == '' || inputs.resume_stage != '4' }}
         uses: actions/download-artifact@v4
         with:
           pattern: tree-s3-attempt-${{ github.run_attempt }}-part*
@@ -352,7 +352,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Download tree from previous stage
-        if: ${{ inputs.resume_run_id == '' }}
+        if: ${{ inputs.resume_run_id == '' || inputs.resume_stage != '5' }}
         uses: actions/download-artifact@v4
         with:
           pattern: tree-s4-attempt-${{ github.run_attempt }}-part*
@@ -427,7 +427,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Download tree from previous stage
-        if: ${{ inputs.resume_run_id == '' }}
+        if: ${{ inputs.resume_run_id == '' || inputs.resume_stage != '6' }}
         uses: actions/download-artifact@v4
         with:
           pattern: tree-s5-attempt-${{ github.run_attempt }}-part*
@@ -502,7 +502,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Download tree from previous stage
-        if: ${{ inputs.resume_run_id == '' }}
+        if: ${{ inputs.resume_run_id == '' || inputs.resume_stage != '7' }}
         uses: actions/download-artifact@v4
         with:
           pattern: tree-s6-attempt-${{ github.run_attempt }}-part*
@@ -577,7 +577,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Download tree from previous stage
-        if: ${{ inputs.resume_run_id == '' }}
+        if: ${{ inputs.resume_run_id == '' || inputs.resume_stage != '8' }}
         uses: actions/download-artifact@v4
         with:
           pattern: tree-s7-attempt-${{ github.run_attempt }}-part*
@@ -652,7 +652,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Download tree from previous stage
-        if: ${{ inputs.resume_run_id == '' }}
+        if: ${{ inputs.resume_run_id == '' || inputs.resume_stage != '9' }}
         uses: actions/download-artifact@v4
         with:
           pattern: tree-s8-attempt-${{ github.run_attempt }}-part*
@@ -727,7 +727,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Download tree from previous stage
-        if: ${{ inputs.resume_run_id == '' }}
+        if: ${{ inputs.resume_run_id == '' || inputs.resume_stage != '10' }}
         uses: actions/download-artifact@v4
         with:
           pattern: tree-s9-attempt-${{ github.run_attempt }}-part*
@@ -802,7 +802,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Download tree from previous stage
-        if: ${{ inputs.resume_run_id == '' }}
+        if: ${{ inputs.resume_run_id == '' || inputs.resume_stage != '11' }}
         uses: actions/download-artifact@v4
         with:
           pattern: tree-s10-attempt-${{ github.run_attempt }}-part*
@@ -877,7 +877,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Download tree from previous stage
-        if: ${{ inputs.resume_run_id == '' }}
+        if: ${{ inputs.resume_run_id == '' || inputs.resume_stage != '12' }}
         uses: actions/download-artifact@v4
         with:
           pattern: tree-s11-attempt-${{ github.run_attempt }}-part*
