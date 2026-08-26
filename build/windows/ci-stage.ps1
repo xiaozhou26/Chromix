@@ -139,6 +139,7 @@ function Assert-CiScripts {
   foreach ($path in @(
     "$PSScriptRoot\ci-stage.ps1",
     "$PSScriptRoot\ci-parts.ps1",
+    "$PSScriptRoot\download-stage-artifacts.ps1",
     "$PSScriptRoot\prepare-ungoogled.ps1",
     "$PSScriptRoot\package-win.ps1"
   )) {

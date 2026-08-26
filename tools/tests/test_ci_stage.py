@@ -6,6 +6,7 @@ import unittest
 REPO = Path(__file__).resolve().parents[2]
 CI_STAGE = REPO / "build" / "windows" / "ci-stage.ps1"
 WORKFLOW = REPO / ".github" / "workflows" / "build-win-x64-github.yml"
+DOWNLOAD_STAGE = REPO / "build" / "windows" / "download-stage-artifacts.ps1"
 
 
 def invoke_tracked_source() -> str:
@@ -130,23 +131,27 @@ class ResumeWorkflowRegressionTest(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         cls.source = WORKFLOW.read_text(encoding="utf-8")
+        cls.download = DOWNLOAD_STAGE.read_text(encoding="utf-8")
 
-    def test_resume_skips_completed_predecessors_and_starts_stage_four(self):
+    def test_resume_skips_predecessors_and_starts_requested_stage(self):
         self.assertIn("resume_run_id:", self.source)
         self.assertIn("if: ${{ inputs.resume_run_id == '' }}", self.source)
-        self.assertIn(
-            "(inputs.resume_run_id != '' && inputs.resume_stage == '4')",
-            self.source,
-        )
-        self.assertIn("always()", self.source)
+        for stage in range(2, 13):
+            self.assertIn(f"inputs.resume_stage == '{stage}'", self.source)
+            self.assertIn(
+                f"download-stage-artifacts.ps1 -RunId '${{{{ inputs.resume_run_id }}}}' -StageIndex {stage - 1}",
+                self.source,
+            )
+        self.assertEqual(self.source.count("always()"), 11)
+        self.assertEqual(self.source.count("download-stage-artifacts.ps1"), 11)
 
-    def test_resume_downloads_non_expired_stage_three_artifacts(self):
+    def test_resume_downloads_non_expired_previous_stage_artifacts(self):
         self.assertIn("actions: read", self.source)
         self.assertIn("Download tree from previous run", self.source)
-        self.assertIn("actions/runs/$runId/artifacts?per_page=100", self.source)
-        self.assertIn("tree-s3-attempt-*-part*", self.source)
-        self.assertIn("-and -not $_.expired", self.source)
-        self.assertIn("Test-Path C:\\restore\\tree.7z.001", self.source)
+        self.assertIn("actions/runs/$RunId/artifacts?per_page=100", self.download)
+        self.assertIn('$prefix = "tree-s$StageIndex-attempt-"', self.download)
+        self.assertIn("-and -not $_.expired", self.download)
+        self.assertIn("Test-Path C:\\restore\\tree.7z.001", self.download)
 
 
 if __name__ == "__main__":
