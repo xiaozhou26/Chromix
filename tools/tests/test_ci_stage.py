@@ -6,6 +6,7 @@ import unittest
 REPO = Path(__file__).resolve().parents[2]
 CI_STAGE = REPO / "build" / "windows" / "ci-stage.ps1"
 WORKFLOW = REPO / ".github" / "workflows" / "build-win-x64-github.yml"
+RESTORED_SOURCE_UPDATE = REPO / "build" / "windows" / "update-restored-source.ps1"
 
 
 def invoke_tracked_source() -> str:
@@ -146,6 +147,20 @@ class ResumeWorkflowRegressionTest(unittest.TestCase):
         self.assertEqual(self.source.count("run-id: ${{ inputs.resume_run_id }}"), 11)
         self.assertEqual(self.source.count("merge-multiple: true"), 22)
         self.assertNotIn("download-stage-artifacts.ps1", self.source)
+
+
+class RestoredSourceUpdateRegressionTest(unittest.TestCase):
+    def test_resume_updates_stale_media_recorder_source(self):
+        stage_source = CI_STAGE.read_text(encoding="utf-8")
+        update_source = RESTORED_SOURCE_UPDATE.read_text(encoding="utf-8")
+        restore = stage_source.index('& $sevenZip x "C:\\restore\\tree.7z.001"')
+        update = stage_source.index('update-restored-source.ps1', restore)
+        prepare = stage_source.index('.chromix-source-ready', update)
+        self.assertLess(restore, update)
+        self.assertLess(update, prepare)
+        self.assertIn("type.LowerASCII().Utf8()", update_source)
+        self.assertIn("type.ToAsciiLower().Utf8()", update_source)
+        self.assertIn("expected old or new text", update_source)
 
 
 if __name__ == "__main__":
