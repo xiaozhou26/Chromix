@@ -1,38 +1,12 @@
 diff --git a/third_party/blink/renderer/modules/webgl/webgl2_rendering_context_base.cc b/third_party/blink/renderer/modules/webgl/webgl2_rendering_context_base.cc
-index d1d2310450..6ae82732e1 100644
+index d1d2310450..fd0d1b1b3e 100644
 --- a/third_party/blink/renderer/modules/webgl/webgl2_rendering_context_base.cc
 +++ b/third_party/blink/renderer/modules/webgl/webgl2_rendering_context_base.cc
-@@ -7,6 +7,7 @@
- #include <memory>
- 
- #include "base/compiler_specific.h"
-+#include "base/uxr_config.h"
- #include "base/containers/heap_array.h"
- #include "base/feature_list.h"
- #include "base/numerics/checked_math.h"
-@@ -4793,6 +4794,13 @@ ScriptValue WebGL2RenderingContextBase::getParameter(ScriptState* script_state,
+@@ -4793,6 +4793,7 @@ ScriptValue WebGL2RenderingContextBase::getParameter(ScriptState* script_state,
      return ScriptValue::CreateNull(script_state->GetIsolate());
    switch (pname) {
      case GL_SHADING_LANGUAGE_VERSION: {
-+      // Normalize GLSL/VERSION so WebGL2 matches the spoofed renderer.
-+      if (base::UxrConfig::GetInstance().Has("uxr-webgl-fullparams") ||
-+          base::UxrConfig::GetInstance().Has("uxr-webgl-renderer")) {
-+        return WebGLAny(
-+            script_state,
-+            String("WebGL GLSL ES 3.00 (OpenGL ES GLSL ES 3.0 Chromium)"));
-+      }
++      // Keep WebGL 2 version strings derived from the active backend.
        return WebGLAny(
            script_state,
            StrCat({"WebGL GLSL ES 3.00 (",
-@@ -4800,6 +4808,11 @@ ScriptValue WebGL2RenderingContextBase::getParameter(ScriptState* script_state,
-                   ")"}));
-     }
-     case GL_VERSION:
-+      if (base::UxrConfig::GetInstance().Has("uxr-webgl-fullparams") ||
-+          base::UxrConfig::GetInstance().Has("uxr-webgl-renderer")) {
-+        return WebGLAny(script_state,
-+                        String("WebGL 2.0 (OpenGL ES 3.0 Chromium)"));
-+      }
-       return WebGLAny(
-           script_state,
-           StrCat({"WebGL 2.0 (", String(ContextGL()->GetString(GL_VERSION)),

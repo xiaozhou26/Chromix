@@ -165,6 +165,9 @@ class RestoredSourceUpdateRegressionTest(unittest.TestCase):
         self.assertIn("json_file_value_serializer.h", update_source)
         self.assertIn("base::Value::Dict", update_source)
         self.assertIn("base::DictValue", update_source)
+        self.assertIn("uxr-webgl-renderer", update_source)
+        self.assertIn("uxr-webgl-vendor", update_source)
+        self.assertIn("UxrFarbleReadPixels", update_source)
         self.assertIn("expected old or new text", update_source)
 
 
