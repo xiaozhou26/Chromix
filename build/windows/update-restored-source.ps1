@@ -197,6 +197,7 @@ Set-SourceReplacement `
         }
 '@ `
   -CurrentMarker @(
+    'const std::string renderer = config.Get("uxr-webgl-renderer");',
     'String(renderer.c_str())',
     'String(WebGLPersonaRenderer().c_str())'
   )
@@ -220,6 +221,7 @@ Set-SourceReplacement `
         }
 '@ `
   -CurrentMarker @(
+    'const std::string vendor = config.Get("uxr-webgl-vendor");',
     'String(vendor.c_str())',
     'String(WebGLPersonaVendor().c_str())'
   )

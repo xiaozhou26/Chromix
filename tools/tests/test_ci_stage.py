@@ -204,7 +204,7 @@ class RestoredSourceUpdateRegressionTest(unittest.TestCase):
         self.assertLess(current, stale)
         self.assertIn("expected old or new text", update_source)
 
-    def test_resume_accepts_final_webgl_persona_markers(self):
+    def test_resume_accepts_historical_webgl_persona_markers(self):
         update_source = RESTORED_SOURCE_UPDATE.read_text(encoding="utf-8")
         self.assertIn('[string[]]$CurrentMarker = @()', update_source)
         current = update_source.index('$content.Contains($NewText)')
@@ -214,8 +214,10 @@ class RestoredSourceUpdateRegressionTest(unittest.TestCase):
         self.assertLess(marker, stale)
         self.assertIn("'String(renderer.c_str())'", update_source)
         self.assertIn("'String(WebGLPersonaRenderer().c_str())'", update_source)
+        self.assertIn("'const std::string renderer = config.Get(\"uxr-webgl-renderer\");'", update_source)
         self.assertIn("'String(vendor.c_str())'", update_source)
         self.assertIn("'String(WebGLPersonaVendor().c_str())'", update_source)
+        self.assertIn("'const std::string vendor = config.Get(\"uxr-webgl-vendor\");'", update_source)
         self.assertIn(
             "-CurrentMarker 'String(\"WebGL GLSL ES 3.00 "
             "(OpenGL ES GLSL ES 3.0 Chromium)\")'",
