@@ -8,7 +8,8 @@ function Set-SourceReplacement {
   param(
     [Parameter(Mandatory)] [string]$RelativePath,
     [Parameter(Mandatory)] [string]$OldText,
-    [Parameter(Mandatory)] [AllowEmptyString()] [string]$NewText
+    [Parameter(Mandatory)] [AllowEmptyString()] [string]$NewText,
+    [string]$CurrentMarker = ""
   )
   $path = Join-Path $Src $RelativePath
   if (-not (Test-Path -LiteralPath $path -PathType Leaf)) {
@@ -16,6 +17,10 @@ function Set-SourceReplacement {
   }
   $content = [IO.File]::ReadAllText($path)
   if ($NewText -ne "" -and $content.Contains($NewText)) {
+    Write-Host "==> restored source already current: $RelativePath"
+    return
+  }
+  if ($CurrentMarker -ne "" -and $content.Contains($CurrentMarker)) {
     Write-Host "==> restored source already current: $RelativePath"
     return
   }
@@ -188,7 +193,8 @@ Set-SourceReplacement `
         if (!renderer.empty() && !vendor.empty()) {
           return WebGLAny(script_state, String(renderer.c_str()));
         }
-'@
+'@ `
+  -CurrentMarker "WebGLPersonaRenderer()"
 
 Set-SourceReplacement `
   -RelativePath "third_party\blink\renderer\modules\webgl\webgl_rendering_context_base.cc" `
@@ -207,7 +213,8 @@ Set-SourceReplacement `
         if (!renderer.empty() && !vendor.empty()) {
           return WebGLAny(script_state, String(vendor.c_str()));
         }
-'@
+'@ `
+  -CurrentMarker "WebGLPersonaVendor()"
 
 Set-SourceReplacement `
   -RelativePath "third_party\blink\renderer\modules\webgl\webgl_rendering_context_base.cc" `
@@ -302,7 +309,8 @@ Set-SourceReplacement `
 '@ `
   -NewText @'
       // Keep WebGL 2 version strings derived from the active backend.
-'@
+'@ `
+  -CurrentMarker 'String("WebGL GLSL ES 3.00 (OpenGL ES GLSL ES 3.0 Chromium)")'
 
 Set-SourceReplacement `
   -RelativePath "third_party\blink\renderer\modules\webgl\webgl2_rendering_context_base.cc" `

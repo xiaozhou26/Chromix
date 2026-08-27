@@ -204,6 +204,22 @@ class RestoredSourceUpdateRegressionTest(unittest.TestCase):
         self.assertLess(current, stale)
         self.assertIn("expected old or new text", update_source)
 
+    def test_resume_accepts_final_webgl_persona_markers(self):
+        update_source = RESTORED_SOURCE_UPDATE.read_text(encoding="utf-8")
+        self.assertIn('[string]$CurrentMarker = ""', update_source)
+        current = update_source.index('$content.Contains($NewText)')
+        marker = update_source.index('$content.Contains($CurrentMarker)')
+        stale = update_source.index('$content.Contains($OldText)')
+        self.assertLess(current, marker)
+        self.assertLess(marker, stale)
+        self.assertIn('-CurrentMarker "WebGLPersonaRenderer()"', update_source)
+        self.assertIn('-CurrentMarker "WebGLPersonaVendor()"', update_source)
+        self.assertIn(
+            "-CurrentMarker 'String(\"WebGL GLSL ES 3.00 "
+            "(OpenGL ES GLSL ES 3.0 Chromium)\")'",
+            update_source,
+        )
+
 
 if __name__ == "__main__":
     unittest.main()
