@@ -313,3 +313,207 @@ Set-SourceReplacement `
       }
 '@ `
   -NewText ""
+
+Set-SourceReplacement `
+  -RelativePath "third_party\blink\renderer\core\html\canvas\text_metrics.cc" `
+  -OldText '#include <cmath>' `
+  -NewText ""
+
+Set-SourceReplacement `
+  -RelativePath "third_party\blink\renderer\core\html\canvas\text_metrics.cc" `
+  -OldText '#include "base/bit_cast.h"' `
+  -NewText ""
+
+Set-SourceReplacement `
+  -RelativePath "third_party\blink\renderer\core\html\canvas\text_metrics.cc" `
+  -OldText '#include "base/strings/string_number_conversions.h"  // UXR' `
+  -NewText ""
+
+Set-SourceReplacement `
+  -RelativePath "third_party\blink\renderer\core\html\canvas\text_metrics.cc" `
+  -OldText '#include "base/uxr_config.h"                          // UXR' `
+  -NewText ""
+
+Set-SourceReplacement `
+  -RelativePath "third_party\blink\renderer\core\html\canvas\text_metrics.cc" `
+  -OldText @'
+// UXR: seeded, value-dependent sub-pixel jitter for TextMetrics. Canvas/audio/DOMRect
+// are already noised; measureText() exposed a stable, substituted-font measurement fingerprint.
+// Keyed on the canvas seed so it is per-persona and stable within a session. Fail-closed:
+// no/zero/invalid seed or non-finite/zero value -> returned unchanged.
+static double UxrJitterMetric(double v, uint32_t seed, uint32_t salt) {
+  if (seed == 0u || v == 0.0 || !std::isfinite(v))
+    return v;
+  uint64_t bits = base::bit_cast<uint64_t>(v);
+  uint32_t z = seed ^ salt ^ static_cast<uint32_t>(bits) ^
+               static_cast<uint32_t>(bits >> 32);
+  z ^= z >> 16; z *= 0x85ebca6bu; z ^= z >> 13; z *= 0xc2b2ae35u; z ^= z >> 16;
+  double delta = (static_cast<double>(z & 0xffffu) / 65535.0 - 0.5) * 0.0125;
+  return v + delta;
+}
+
+'@ `
+  -NewText ""
+
+Set-SourceReplacement `
+  -RelativePath "third_party\blink\renderer\core\html\canvas\text_metrics.cc" `
+  -OldText 'void TextMetrics::Update(const Font* font,' `
+  -NewText @'
+// Text metrics remain derived from the actual shaped and rendered font.
+void TextMetrics::Update(const Font* font,
+'@
+
+Set-SourceReplacement `
+  -RelativePath "third_party\blink\renderer\core\html\canvas\text_metrics.cc" `
+  -OldText @'
+  // UXR: apply per-persona jitter so TextMetrics is not a stable measurement fingerprint.
+  uint32_t ph_seed = 0;
+  base::UxrConfig& ph_cfg = base::UxrConfig::GetInstance();
+  if (ph_cfg.Has("uxr-canvas-seed"))
+    base::StringToUint(ph_cfg.Get("uxr-canvas-seed"), &ph_seed);
+  if (ph_seed != 0u) {
+    width_ = UxrJitterMetric(width_, ph_seed, 0x1001u);
+    actual_bounding_box_left_ = UxrJitterMetric(actual_bounding_box_left_, ph_seed, 0x1002u);
+    actual_bounding_box_right_ = UxrJitterMetric(actual_bounding_box_right_, ph_seed, 0x1003u);
+    actual_bounding_box_ascent_ = UxrJitterMetric(actual_bounding_box_ascent_, ph_seed, 0x1004u);
+    actual_bounding_box_descent_ = UxrJitterMetric(actual_bounding_box_descent_, ph_seed, 0x1005u);
+    font_bounding_box_ascent_ = UxrJitterMetric(font_bounding_box_ascent_, ph_seed, 0x1006u);
+    font_bounding_box_descent_ = UxrJitterMetric(font_bounding_box_descent_, ph_seed, 0x1007u);
+    em_height_ascent_ = UxrJitterMetric(em_height_ascent_, ph_seed, 0x1008u);
+    em_height_descent_ = UxrJitterMetric(em_height_descent_, ph_seed, 0x1009u);
+  }
+'@ `
+  -NewText ""
+
+Set-SourceReplacement `
+  -RelativePath "third_party\blink\renderer\platform\fonts\font_cache.cc" `
+  -OldText '#include "base/uxr_config.h"  // UXR' `
+  -NewText @'
+#include "base/strings/string_split.h"
+#include "base/strings/string_util.h"
+#include "base/uxr_config.h"
+'@
+
+Set-SourceReplacement `
+  -RelativePath "third_party\blink\renderer\platform\fonts\font_cache.cc" `
+  -OldText @'
+namespace {
+// UXR: persona font availability. Font-enumeration fingerprinting measures
+// per-family glyph metrics to list the fonts the host actually has; a Linux
+// host resolving "Ubuntu"/"Noto Color Emoji" contradicts a Windows persona.
+// When uxr-font-whitelist is set (comma-separated, case-insensitive family
+// names), every non-generic family not on the list resolves to nullptr, so CSS
+// falls through to the next family exactly as on a machine without it.
+// Unset -> native font resolution untouched.
+bool UxrFontHidden(const AtomicString& family) {
+  if (family.empty()) {
+    return false;
+  }
+  static const char* const kGenerics[] = {
+      "serif",         "sans-serif",       "monospace",  "cursive",
+      "fantasy",       "system-ui",        "math",       "emoji",
+      "fangsong",      "ui-serif",         "ui-sans-serif", "ui-monospace",
+      "ui-rounded",    "ui-fangsong",      "-webkit-body",
+      "-webkit-pictograph", "-webkit-system-font", "-webkit-control"};
+  std::string ph_name = family.GetString().ToAsciiLower().Utf8();
+  for (const char* ph_g : kGenerics) {
+    if (ph_name == ph_g) {
+      return false;
+    }
+  }
+  const std::string ph_list =
+      base::UxrConfig::GetInstance().Get("uxr-font-whitelist");
+  if (ph_list.empty()) {
+    return false;
+  }
+  // Substring match on comma-separated entries, both sides lowercased and
+  // space-trimmed. A quoted family with commas would break this — acceptable:
+  // persona generators emit plain family names.
+  std::string ph_norm;
+  for (char ph_c : ph_list) {
+    if (ph_c == ' ' || ph_c == '\t') {
+      continue;
+    }
+    ph_norm += (ph_c >= 'A' && ph_c <= 'Z')
+                   ? static_cast<char>(ph_c - 'A' + 'a')
+                   : ph_c;
+  }
+  size_t ph_pos = 0;
+  while (ph_pos < ph_norm.size()) {
+    const size_t ph_comma = ph_norm.find(',', ph_pos);
+    const size_t ph_end =
+        ph_comma == std::string::npos ? ph_norm.size() : ph_comma;
+    if (ph_name == ph_norm.substr(ph_pos, ph_end - ph_pos)) {
+      return false;  // whitelisted: available
+    }
+    ph_pos = ph_comma == std::string::npos ? ph_norm.size() : ph_comma + 1;
+  }
+  return true;
+}
+}  // namespace
+
+'@ `
+  -NewText @'
+namespace {
+
+bool UxrFontFamilyIsGeneric(const AtomicString& family) {
+  const std::string name = family.GetString().ToAsciiLower().Utf8();
+  static constexpr const char* kGenericFamilies[] = {
+      "serif",       "sans-serif", "monospace",    "cursive",
+      "fantasy",     "system-ui",  "math",         "emoji",
+      "fangsong",    "ui-serif",   "ui-sans-serif", "ui-monospace",
+      "ui-rounded",  "ui-fangsong", "-webkit-body",
+      "-webkit-pictograph", "-webkit-system-font", "-webkit-control"};
+  for (const char* generic : kGenericFamilies) {
+    if (name == generic)
+      return true;
+  }
+  return false;
+}
+
+bool UxrFontFamilyAllowed(const AtomicString& family) {
+  if (family.empty() || UxrFontFamilyIsGeneric(family))
+    return true;
+
+  const std::string whitelist =
+      base::UxrConfig::GetInstance().Get("uxr-font-whitelist");
+  if (whitelist.empty())
+    return true;
+
+  const std::string requested = family.GetString().Utf8();
+  for (const std::string& entry : base::SplitString(
+           whitelist, ",", base::TRIM_WHITESPACE, base::SPLIT_WANT_NONEMPTY)) {
+    if (base::EqualsCaseInsensitiveASCII(entry, requested))
+      return true;
+  }
+  return false;
+}
+
+}  // namespace
+
+'@
+
+Set-SourceReplacement `
+  -RelativePath "third_party\blink\renderer\platform\fonts\font_cache.cc" `
+  -OldText @'
+  if (UxrFontHidden(family)) {  // UXR: persona font availability
+    return nullptr;
+  }
+'@ `
+  -NewText ""
+
+Set-SourceReplacement `
+  -RelativePath "third_party\blink\renderer\platform\fonts\font_cache.cc" `
+  -OldText '  TRACE_EVENT0("fonts", "FontCache::GetFontPlatformData");' `
+  -NewText @'
+  // Restrict only native family lookup. Downloaded faces, unique-name lookup,
+  // and last-resort fallback retain normal Blink behavior.
+  if (creation_params.CreationType() == kCreateFontByFamily &&
+      alternate_font_name != AlternateFontName::kLocalUniqueFace &&
+      alternate_font_name != AlternateFontName::kLastResort &&
+      !UxrFontFamilyAllowed(creation_params.Family())) {
+    return nullptr;
+  }
+
+  TRACE_EVENT0("fonts", "FontCache::GetFontPlatformData");
+'@

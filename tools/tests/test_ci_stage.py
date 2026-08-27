@@ -168,6 +168,11 @@ class RestoredSourceUpdateRegressionTest(unittest.TestCase):
         self.assertIn("uxr-webgl-renderer", update_source)
         self.assertIn("uxr-webgl-vendor", update_source)
         self.assertIn("UxrFarbleReadPixels", update_source)
+        self.assertIn("UxrJitterMetric", update_source)
+        self.assertIn("UxrFontFamilyAllowed", update_source)
+        self.assertIn("base::SplitString", update_source)
+        self.assertIn("FontCache::GetFontPlatformData", update_source)
+        self.assertIn("TextMetrics::Update", update_source)
         self.assertIn("expected old or new text", update_source)
 
 
