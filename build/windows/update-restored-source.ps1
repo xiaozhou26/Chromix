@@ -35,3 +35,8 @@ Set-SourceReplacement `
   -RelativePath "chrome\browser\component_updater\widevine_cdm_component_installer.cc" `
   -OldText '#include "base/json/json_file_value_deserializer.h"  // UXR' `
   -NewText '#include "base/json/json_file_value_serializer.h"  // UXR'
+
+Set-SourceReplacement `
+  -RelativePath "chrome\browser\component_updater\widevine_cdm_component_installer.cc" `
+  -OldText "const base::Value::Dict* ph_dict =" `
+  -NewText "const base::DictValue* ph_dict ="

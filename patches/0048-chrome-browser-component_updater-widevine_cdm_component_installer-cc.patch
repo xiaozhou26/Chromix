@@ -38,7 +38,7 @@ index 198513af0e..8a5f52e680 100644
 +          JSONFileValueDeserializer(
 +              ph_dir.Append(FILE_PATH_LITERAL("manifest.json")))
 +              .Deserialize(&ph_error_code, &ph_error_message);
-+      const base::Value::Dict* ph_dict =
++      const base::DictValue* ph_dict =
 +          ph_value ? ph_value->GetIfDict() : nullptr;
 +      media::CdmCapability ph_capability;
 +      if (ph_dict && ParseCdmManifest(*ph_dict, &ph_capability) &&
