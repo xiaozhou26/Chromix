@@ -11,7 +11,7 @@ index 198513af0e..8a5f52e680 100644
  #include "base/files/file_util.h"
  #include "base/functional/bind.h"
  #include "base/functional/callback.h"
-+#include "base/json/json_file_value_deserializer.h"  // UXR
++#include "base/json/json_file_value_serializer.h"  // UXR
  #include "base/logging.h"
  #include "base/memory/ref_counted.h"
  #include "base/native_library.h"

@@ -30,3 +30,8 @@ Set-SourceReplacement `
   -RelativePath "third_party\blink\renderer\modules\mediarecorder\media_recorder.cc" `
   -OldText "const std::string ph_type = type.LowerASCII().Utf8();" `
   -NewText "const std::string ph_type = type.ToAsciiLower().Utf8();"
+
+Set-SourceReplacement `
+  -RelativePath "chrome\browser\component_updater\widevine_cdm_component_installer.cc" `
+  -OldText '#include "base/json/json_file_value_deserializer.h"  // UXR' `
+  -NewText '#include "base/json/json_file_value_serializer.h"  // UXR'

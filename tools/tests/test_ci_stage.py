@@ -161,6 +161,8 @@ class RestoredSourceUpdateRegressionTest(unittest.TestCase):
         self.assertLess(update, prepare)
         self.assertIn("type.LowerASCII().Utf8()", update_source)
         self.assertIn("type.ToAsciiLower().Utf8()", update_source)
+        self.assertIn("json_file_value_deserializer.h", update_source)
+        self.assertIn("json_file_value_serializer.h", update_source)
         self.assertIn("expected old or new text", update_source)
 
 
