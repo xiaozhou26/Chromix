@@ -1,44 +1,170 @@
 diff --git a/third_party/blink/renderer/modules/webgl/webgl_rendering_context_base.cc b/third_party/blink/renderer/modules/webgl/webgl_rendering_context_base.cc
-index 8a2decf999..7f4cd85a10 100644
+index 0000000..0000000 100644
 --- a/third_party/blink/renderer/modules/webgl/webgl_rendering_context_base.cc
 +++ b/third_party/blink/renderer/modules/webgl/webgl_rendering_context_base.cc
-@@ -39,6 +39,7 @@
- #include "base/metrics/histogram_macros.h"
- #include "base/notimplemented.h"
- #include "base/numerics/checked_math.h"
-+#include "base/uxr_config.h"
- #include "base/strings/stringprintf.h"
- #include "base/synchronization/lock.h"
- #include "base/task/single_thread_task_runner.h"
-@@ -4191,9 +4192,15 @@ ScriptValue WebGLRenderingContextBase::getParameter(ScriptState* script_state,
+@@ -27,6 +27,7 @@
+ 
+ #include <inttypes.h>
+ 
++#include <array>
+ #include <memory>
+ #include <utility>
+ 
+@@ -207,6 +208,56 @@
+ 
+ namespace {
+ 
++constexpr char kDefaultWebGLVendor[] = "Google Inc. (Intel)";
++constexpr char kDefaultWebGLRenderer[] =
++    "ANGLE (Intel, Intel(R) UHD Graphics 770 (0x0000A780) Direct3D11 "
++    "vs_5_0 ps_5_0, D3D11)";
++
++const std::string& WebGLPersonaVendor() {
++  static const std::string vendor = [] {
++    const auto& config = base::UxrConfig::GetInstance();
++    const std::string configured_vendor = config.Get("uxr-webgl-vendor");
++    const std::string configured_renderer = config.Get("uxr-webgl-renderer");
++    return !configured_vendor.empty() && !configured_renderer.empty()
++               ? configured_vendor
++               : std::string(kDefaultWebGLVendor);
++  }();
++  return vendor;
++}
++
++const std::string& WebGLPersonaRenderer() {
++  static const std::string renderer = [] {
++    const auto& config = base::UxrConfig::GetInstance();
++    const std::string configured_vendor = config.Get("uxr-webgl-vendor");
++    const std::string configured_renderer = config.Get("uxr-webgl-renderer");
++    return !configured_vendor.empty() && !configured_renderer.empty()
++               ? configured_renderer
++               : std::string(kDefaultWebGLRenderer);
++  }();
++  return renderer;
++}
++
++GLint ClampWebGLPersonaLimit(gpu::gles2::GLES2Interface* gl,
++                             GLenum pname,
++                             GLint persona_value) {
++  GLint real_value = 0;
++  gl->GetIntegerv(pname, &real_value);
++  return real_value > 0 && real_value < persona_value ? real_value
++                                                       : persona_value;
++}
++
++std::array<GLint, 2> ClampWebGLPersonaViewport(
++    gpu::gles2::GLES2Interface* gl,
++    GLint persona_value) {
++  std::array<GLint, 2> real_values = {0, 0};
++  gl->GetIntegerv(GL_MAX_VIEWPORT_DIMS, real_values.data());
++  for (GLint& value : real_values) {
++    if (value <= 0 || value > persona_value)
++      value = persona_value;
++  }
++  return real_values;
++}
++
+ enum class WebGLANGLEImplementation {
+   // These values are persisted to logs. Entries should not be renumbered and
+   // numeric values should never be reused.
+@@ -4061,27 +4112,40 @@
+     case GL_LINE_WIDTH:
+       return GetFloatParameter(script_state, pname);
+     case GL_MAX_COMBINED_TEXTURE_IMAGE_UNITS:
+-      return GetIntParameter(script_state, pname);
++      return WebGLAny(script_state, ClampWebGLPersonaLimit(
++                                        ContextGL(), pname, 32));
+     case GL_MAX_CUBE_MAP_TEXTURE_SIZE:
+-      return GetIntParameter(script_state, pname);
++      return WebGLAny(script_state, ClampWebGLPersonaLimit(
++                                        ContextGL(), pname, 16384));
+     case GL_MAX_FRAGMENT_UNIFORM_VECTORS:
+-      return GetIntParameter(script_state, pname);
++      return WebGLAny(script_state, ClampWebGLPersonaLimit(
++                                        ContextGL(), pname, 1024));
+     case GL_MAX_RENDERBUFFER_SIZE:
+-      return GetIntParameter(script_state, pname);
++      return WebGLAny(script_state, ClampWebGLPersonaLimit(
++                                        ContextGL(), pname, 16384));
+     case GL_MAX_TEXTURE_IMAGE_UNITS:
+-      return GetIntParameter(script_state, pname);
++      return WebGLAny(script_state, ClampWebGLPersonaLimit(
++                                        ContextGL(), pname, 16));
+     case GL_MAX_TEXTURE_SIZE:
+-      return GetIntParameter(script_state, pname);
++      return WebGLAny(script_state, ClampWebGLPersonaLimit(
++                                        ContextGL(), pname, 16384));
+     case GL_MAX_VARYING_VECTORS:
+-      return GetIntParameter(script_state, pname);
++      return WebGLAny(script_state, ClampWebGLPersonaLimit(
++                                        ContextGL(), pname, 30));
+     case GL_MAX_VERTEX_ATTRIBS:
+-      return GetIntParameter(script_state, pname);
++      return WebGLAny(script_state, ClampWebGLPersonaLimit(
++                                        ContextGL(), pname, 16));
+     case GL_MAX_VERTEX_TEXTURE_IMAGE_UNITS:
+-      return GetIntParameter(script_state, pname);
++      return WebGLAny(script_state, ClampWebGLPersonaLimit(
++                                        ContextGL(), pname, 16));
+     case GL_MAX_VERTEX_UNIFORM_VECTORS:
+-      return GetIntParameter(script_state, pname);
+-    case GL_MAX_VIEWPORT_DIMS:
+-      return GetWebGLIntArrayParameter(script_state, pname);
++      return WebGLAny(script_state, ClampWebGLPersonaLimit(
++                                        ContextGL(), pname, 4096));
++    case GL_MAX_VIEWPORT_DIMS: {
++      const auto viewport = ClampWebGLPersonaViewport(ContextGL(), 32767);
++      return WebGLAny(script_state,
++                      DOMInt32Array::Create(base::span(viewport)));
++    }
+     case GL_PACK_ALIGNMENT:
+       return GetIntParameter(script_state, pname);
+     case GL_POLYGON_OFFSET_FACTOR:
+@@ -4115,9 +4179,7 @@
+     case GL_SHADING_LANGUAGE_VERSION:
+       return WebGLAny(
+           script_state,
+-          StrCat({"WebGL GLSL ES 1.0 (",
+-                  String(ContextGL()->GetString(GL_SHADING_LANGUAGE_VERSION)),
+-                  ")"}));
++          String("WebGL GLSL ES 1.0 (OpenGL ES GLSL ES 1.0 Chromium)"));
+     case GL_STENCIL_BACK_FAIL:
+       return GetUnsignedIntParameter(script_state, pname);
+     case GL_STENCIL_BACK_FUNC:
+@@ -4175,10 +4237,8 @@
+     case GL_VENDOR:
+       return WebGLAny(script_state, String("WebKit"));
+     case GL_VERSION:
+-      return WebGLAny(
+-          script_state,
+-          StrCat({"WebGL 1.0 (", String(ContextGL()->GetString(GL_VERSION)),
+-                  ")"}));
++      return WebGLAny(script_state,
++                      String("WebGL 1.0 (OpenGL ES 2.0 Chromium)"));
+     case GL_VIEWPORT:
+       return GetWebGLIntArrayParameter(script_state, pname);
+     case GL_FRAGMENT_SHADER_DERIVATIVE_HINT_OES:  // OES_standard_derivatives
+@@ -4191,10 +4251,8 @@
        return ScriptValue::CreateNull(script_state->GetIsolate());
      case WebGLDebugRendererInfo::kUnmaskedRendererWebgl:
        if (ExtensionEnabled(kWebGLDebugRendererInfoName)) {
-+        const auto& config = base::UxrConfig::GetInstance();
-+        const std::string renderer = config.Get("uxr-webgl-renderer");
-+        const std::string vendor = config.Get("uxr-webgl-vendor");
-+        if (!renderer.empty() && !vendor.empty()) {
-+          return WebGLAny(script_state, String(renderer.c_str()));
-+        }
-         if (base::FeatureList::IsEnabled(blink::features::kSpoofWebGLInfo))
-           return WebGLAny(script_state, String(blink::features::kSpoofWebGLRendererParam.Get()));
+-        if (base::FeatureList::IsEnabled(blink::features::kSpoofWebGLInfo))
+-          return WebGLAny(script_state, String(blink::features::kSpoofWebGLRendererParam.Get()));
          return WebGLAny(script_state,
-                         String(ContextGL()->GetString(GL_RENDERER)));
+-                        String(ContextGL()->GetString(GL_RENDERER)));
++                        String(WebGLPersonaRenderer().c_str()));
        }
        SynthesizeGLError(
-@@ -4202,9 +4210,15 @@ ScriptValue WebGLRenderingContextBase::getParameter(ScriptState* script_state,
+           GL_INVALID_ENUM, "getParameter",
+@@ -4202,10 +4260,8 @@
        return ScriptValue::CreateNull(script_state->GetIsolate());
      case WebGLDebugRendererInfo::kUnmaskedVendorWebgl:
        if (ExtensionEnabled(kWebGLDebugRendererInfoName)) {
-+        const auto& config = base::UxrConfig::GetInstance();
-+        const std::string renderer = config.Get("uxr-webgl-renderer");
-+        const std::string vendor = config.Get("uxr-webgl-vendor");
-+        if (!renderer.empty() && !vendor.empty()) {
-+          return WebGLAny(script_state, String(vendor.c_str()));
-+        }
-         if (base::FeatureList::IsEnabled(blink::features::kSpoofWebGLInfo))
-           return WebGLAny(script_state, String(blink::features::kSpoofWebGLVendorParam.Get()));
+-        if (base::FeatureList::IsEnabled(blink::features::kSpoofWebGLInfo))
+-          return WebGLAny(script_state, String(blink::features::kSpoofWebGLVendorParam.Get()));
          return WebGLAny(script_state,
-                         String(ContextGL()->GetString(GL_VENDOR)));
+-                        String(ContextGL()->GetString(GL_VENDOR)));
++                        String(WebGLPersonaVendor().c_str()));
        }
        SynthesizeGLError(
+           GL_INVALID_ENUM, "getParameter",

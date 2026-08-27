@@ -15,6 +15,10 @@ function Set-SourceReplacement {
     throw "resume source file is missing: $RelativePath"
   }
   $content = [IO.File]::ReadAllText($path)
+  if ($NewText -ne "" -and $content.Contains($NewText)) {
+    Write-Host "==> restored source already current: $RelativePath"
+    return
+  }
   if ($content.Contains($OldText)) {
     [IO.File]::WriteAllText($path, $content.Replace($OldText, $NewText))
     Write-Host "==> updated restored source: $RelativePath"
@@ -24,10 +28,7 @@ function Set-SourceReplacement {
     Write-Host "==> restored source already current: $RelativePath"
     return
   }
-  if (-not $content.Contains($NewText)) {
-    throw "restored source does not contain the expected old or new text: $RelativePath"
-  }
-  Write-Host "==> restored source already current: $RelativePath"
+  throw "restored source does not contain the expected old or new text: $RelativePath"
 }
 
 Set-SourceReplacement `
@@ -516,4 +517,414 @@ Set-SourceReplacement `
   }
 
   TRACE_EVENT0("fonts", "FontCache::GetFontPlatformData");
+'@
+
+Set-SourceReplacement `
+  -RelativePath "third_party\blink\renderer\modules\webgl\webgl_rendering_context_base.cc" `
+  -OldText @'
+#include <inttypes.h>
+
+#include <memory>
+'@ `
+  -NewText @'
+#include <inttypes.h>
+
+#include <array>
+#include <memory>
+'@
+
+Set-SourceReplacement `
+  -RelativePath "third_party\blink\renderer\modules\webgl\webgl_rendering_context_base.cc" `
+  -OldText @'
+namespace {
+
+enum class WebGLANGLEImplementation {
+'@ `
+  -NewText @'
+namespace {
+
+constexpr char kDefaultWebGLVendor[] = "Google Inc. (Intel)";
+constexpr char kDefaultWebGLRenderer[] =
+    "ANGLE (Intel, Intel(R) UHD Graphics 770 (0x0000A780) Direct3D11 "
+    "vs_5_0 ps_5_0, D3D11)";
+
+const std::string& WebGLPersonaVendor() {
+  static const std::string vendor = [] {
+    const auto& config = base::UxrConfig::GetInstance();
+    const std::string configured_vendor = config.Get("uxr-webgl-vendor");
+    const std::string configured_renderer = config.Get("uxr-webgl-renderer");
+    return !configured_vendor.empty() && !configured_renderer.empty()
+               ? configured_vendor
+               : std::string(kDefaultWebGLVendor);
+  }();
+  return vendor;
+}
+
+const std::string& WebGLPersonaRenderer() {
+  static const std::string renderer = [] {
+    const auto& config = base::UxrConfig::GetInstance();
+    const std::string configured_vendor = config.Get("uxr-webgl-vendor");
+    const std::string configured_renderer = config.Get("uxr-webgl-renderer");
+    return !configured_vendor.empty() && !configured_renderer.empty()
+               ? configured_renderer
+               : std::string(kDefaultWebGLRenderer);
+  }();
+  return renderer;
+}
+
+GLint ClampWebGLPersonaLimit(gpu::gles2::GLES2Interface* gl,
+                             GLenum pname,
+                             GLint persona_value) {
+  GLint real_value = 0;
+  gl->GetIntegerv(pname, &real_value);
+  return real_value > 0 && real_value < persona_value ? real_value
+                                                       : persona_value;
+}
+
+std::array<GLint, 2> ClampWebGLPersonaViewport(
+    gpu::gles2::GLES2Interface* gl,
+    GLint persona_value) {
+  std::array<GLint, 2> real_values = {0, 0};
+  gl->GetIntegerv(GL_MAX_VIEWPORT_DIMS, real_values.data());
+  for (GLint& value : real_values) {
+    if (value <= 0 || value > persona_value)
+      value = persona_value;
+  }
+  return real_values;
+}
+
+enum class WebGLANGLEImplementation {
+'@
+
+Set-SourceReplacement `
+  -RelativePath "third_party\blink\renderer\modules\webgl\webgl_rendering_context_base.cc" `
+  -OldText @'
+    case GL_MAX_COMBINED_TEXTURE_IMAGE_UNITS:
+      return GetIntParameter(script_state, pname);
+    case GL_MAX_CUBE_MAP_TEXTURE_SIZE:
+      return GetIntParameter(script_state, pname);
+    case GL_MAX_FRAGMENT_UNIFORM_VECTORS:
+      return GetIntParameter(script_state, pname);
+    case GL_MAX_RENDERBUFFER_SIZE:
+      return GetIntParameter(script_state, pname);
+    case GL_MAX_TEXTURE_IMAGE_UNITS:
+      return GetIntParameter(script_state, pname);
+    case GL_MAX_TEXTURE_SIZE:
+      return GetIntParameter(script_state, pname);
+    case GL_MAX_VARYING_VECTORS:
+      return GetIntParameter(script_state, pname);
+    case GL_MAX_VERTEX_ATTRIBS:
+      return GetIntParameter(script_state, pname);
+    case GL_MAX_VERTEX_TEXTURE_IMAGE_UNITS:
+      return GetIntParameter(script_state, pname);
+    case GL_MAX_VERTEX_UNIFORM_VECTORS:
+      return GetIntParameter(script_state, pname);
+    case GL_MAX_VIEWPORT_DIMS:
+      return GetWebGLIntArrayParameter(script_state, pname);
+'@ `
+  -NewText @'
+    case GL_MAX_COMBINED_TEXTURE_IMAGE_UNITS:
+      return WebGLAny(script_state, ClampWebGLPersonaLimit(
+                                        ContextGL(), pname, 32));
+    case GL_MAX_CUBE_MAP_TEXTURE_SIZE:
+      return WebGLAny(script_state, ClampWebGLPersonaLimit(
+                                        ContextGL(), pname, 16384));
+    case GL_MAX_FRAGMENT_UNIFORM_VECTORS:
+      return WebGLAny(script_state, ClampWebGLPersonaLimit(
+                                        ContextGL(), pname, 1024));
+    case GL_MAX_RENDERBUFFER_SIZE:
+      return WebGLAny(script_state, ClampWebGLPersonaLimit(
+                                        ContextGL(), pname, 16384));
+    case GL_MAX_TEXTURE_IMAGE_UNITS:
+      return WebGLAny(script_state, ClampWebGLPersonaLimit(
+                                        ContextGL(), pname, 16));
+    case GL_MAX_TEXTURE_SIZE:
+      return WebGLAny(script_state, ClampWebGLPersonaLimit(
+                                        ContextGL(), pname, 16384));
+    case GL_MAX_VARYING_VECTORS:
+      return WebGLAny(script_state, ClampWebGLPersonaLimit(
+                                        ContextGL(), pname, 30));
+    case GL_MAX_VERTEX_ATTRIBS:
+      return WebGLAny(script_state, ClampWebGLPersonaLimit(
+                                        ContextGL(), pname, 16));
+    case GL_MAX_VERTEX_TEXTURE_IMAGE_UNITS:
+      return WebGLAny(script_state, ClampWebGLPersonaLimit(
+                                        ContextGL(), pname, 16));
+    case GL_MAX_VERTEX_UNIFORM_VECTORS:
+      return WebGLAny(script_state, ClampWebGLPersonaLimit(
+                                        ContextGL(), pname, 4096));
+    case GL_MAX_VIEWPORT_DIMS: {
+      const auto viewport = ClampWebGLPersonaViewport(ContextGL(), 32767);
+      return WebGLAny(script_state,
+                      DOMInt32Array::Create(base::span(viewport)));
+    }
+'@
+
+Set-SourceReplacement `
+  -RelativePath "third_party\blink\renderer\modules\webgl\webgl_rendering_context_base.cc" `
+  -OldText @'
+    case GL_SHADING_LANGUAGE_VERSION:
+      return WebGLAny(
+          script_state,
+          StrCat({"WebGL GLSL ES 1.0 (",
+                  String(ContextGL()->GetString(GL_SHADING_LANGUAGE_VERSION)),
+                  ")"}));
+'@ `
+  -NewText @'
+    case GL_SHADING_LANGUAGE_VERSION:
+      return WebGLAny(
+          script_state,
+          String("WebGL GLSL ES 1.0 (OpenGL ES GLSL ES 1.0 Chromium)"));
+'@
+
+Set-SourceReplacement `
+  -RelativePath "third_party\blink\renderer\modules\webgl\webgl_rendering_context_base.cc" `
+  -OldText @'
+    case GL_VERSION:
+      return WebGLAny(
+          script_state,
+          StrCat({"WebGL 1.0 (", String(ContextGL()->GetString(GL_VERSION)),
+                  ")"}));
+'@ `
+  -NewText @'
+    case GL_VERSION:
+      return WebGLAny(script_state,
+                      String("WebGL 1.0 (OpenGL ES 2.0 Chromium)"));
+'@
+
+Set-SourceReplacement `
+  -RelativePath "third_party\blink\renderer\modules\webgl\webgl_rendering_context_base.cc" `
+  -OldText @'
+        const auto& config = base::UxrConfig::GetInstance();
+        const std::string renderer = config.Get("uxr-webgl-renderer");
+        const std::string vendor = config.Get("uxr-webgl-vendor");
+        if (!renderer.empty() && !vendor.empty()) {
+          return WebGLAny(script_state, String(renderer.c_str()));
+        }
+        if (base::FeatureList::IsEnabled(blink::features::kSpoofWebGLInfo))
+          return WebGLAny(script_state, String(blink::features::kSpoofWebGLRendererParam.Get()));
+        return WebGLAny(script_state,
+                        String(ContextGL()->GetString(GL_RENDERER)));
+'@ `
+  -NewText @'
+        return WebGLAny(script_state,
+                        String(WebGLPersonaRenderer().c_str()));
+'@
+
+Set-SourceReplacement `
+  -RelativePath "third_party\blink\renderer\modules\webgl\webgl_rendering_context_base.cc" `
+  -OldText @'
+        const auto& config = base::UxrConfig::GetInstance();
+        const std::string renderer = config.Get("uxr-webgl-renderer");
+        const std::string vendor = config.Get("uxr-webgl-vendor");
+        if (!renderer.empty() && !vendor.empty()) {
+          return WebGLAny(script_state, String(vendor.c_str()));
+        }
+        if (base::FeatureList::IsEnabled(blink::features::kSpoofWebGLInfo))
+          return WebGLAny(script_state, String(blink::features::kSpoofWebGLVendorParam.Get()));
+        return WebGLAny(script_state,
+                        String(ContextGL()->GetString(GL_VENDOR)));
+'@ `
+  -NewText @'
+        return WebGLAny(script_state,
+                        String(WebGLPersonaVendor().c_str()));
+'@
+
+Set-SourceReplacement `
+  -RelativePath "third_party\blink\renderer\modules\webgl\webgl2_rendering_context_base.cc" `
+  -OldText 'const GLuint64 kMaxClientWaitTimeout = 0u;' `
+  -NewText @'
+const GLuint64 kMaxClientWaitTimeout = 0u;
+
+GLint ClampWebGL2PersonaLimit(gpu::gles2::GLES2Interface* gl,
+                              GLenum pname,
+                              GLint persona_value) {
+  GLint real_value = 0;
+  gl->GetIntegerv(pname, &real_value);
+  return real_value > 0 && real_value < persona_value ? real_value
+                                                       : persona_value;
+}
+
+GLint WebGL2PersonaVaryingVectors(gpu::gles2::GLES2Interface* gl) {
+  return ClampWebGL2PersonaLimit(gl, GL_MAX_VARYING_VECTORS, 30);
+}
+'@
+
+Set-SourceReplacement `
+  -RelativePath "third_party\blink\renderer\modules\webgl\webgl2_rendering_context_base.cc" `
+  -OldText @'
+    case GL_SHADING_LANGUAGE_VERSION: {
+      // Keep WebGL 2 version strings derived from the active backend.
+      return WebGLAny(
+          script_state,
+          StrCat({"WebGL GLSL ES 3.00 (",
+                  String(ContextGL()->GetString(GL_SHADING_LANGUAGE_VERSION)),
+                  ")"}));
+    }
+    case GL_VERSION:
+      return WebGLAny(
+          script_state,
+          StrCat({"WebGL 2.0 (", String(ContextGL()->GetString(GL_VERSION)),
+                  ")"}));
+'@ `
+  -NewText @'
+    case GL_SHADING_LANGUAGE_VERSION:
+      return WebGLAny(
+          script_state,
+          String("WebGL GLSL ES 3.00 (OpenGL ES GLSL ES 3.0 Chromium)"));
+    case GL_VERSION:
+      return WebGLAny(script_state,
+                      String("WebGL 2.0 (OpenGL ES 3.0 Chromium)"));
+'@
+
+Set-SourceReplacement `
+  -RelativePath "third_party\blink\renderer\modules\webgl\webgl2_rendering_context_base.cc" `
+  -OldText @'
+    case GL_MAX_3D_TEXTURE_SIZE:
+      return GetIntParameter(script_state, pname);
+    case GL_MAX_ARRAY_TEXTURE_LAYERS:
+      return GetIntParameter(script_state, pname);
+'@ `
+  -NewText @'
+    case GL_MAX_3D_TEXTURE_SIZE:
+      return WebGLAny(script_state, ClampWebGL2PersonaLimit(
+                                        ContextGL(), pname, 2048));
+    case GL_MAX_ARRAY_TEXTURE_LAYERS:
+      return WebGLAny(script_state, ClampWebGL2PersonaLimit(
+                                        ContextGL(), pname, 2048));
+'@
+
+Set-SourceReplacement `
+  -RelativePath "third_party\blink\renderer\modules\webgl\webgl2_rendering_context_base.cc" `
+  -OldText @'
+    case GL_MAX_COLOR_ATTACHMENTS:
+      return GetIntParameter(script_state, pname);
+'@ `
+  -NewText @'
+    case GL_MAX_COLOR_ATTACHMENTS:
+      return WebGLAny(script_state, ClampWebGL2PersonaLimit(
+                                        ContextGL(), pname, 8));
+'@
+
+Set-SourceReplacement `
+  -RelativePath "third_party\blink\renderer\modules\webgl\webgl2_rendering_context_base.cc" `
+  -OldText @'
+    case GL_MAX_COMBINED_UNIFORM_BLOCKS:
+      return GetIntParameter(script_state, pname);
+'@ `
+  -NewText @'
+    case GL_MAX_COMBINED_UNIFORM_BLOCKS:
+      return WebGLAny(script_state, ClampWebGL2PersonaLimit(
+                                        ContextGL(), pname, 72));
+'@
+
+Set-SourceReplacement `
+  -RelativePath "third_party\blink\renderer\modules\webgl\webgl2_rendering_context_base.cc" `
+  -OldText @'
+    case GL_MAX_DRAW_BUFFERS:
+      return GetIntParameter(script_state, pname);
+'@ `
+  -NewText @'
+    case GL_MAX_DRAW_BUFFERS:
+      return WebGLAny(script_state, ClampWebGL2PersonaLimit(
+                                        ContextGL(), pname, 8));
+'@
+
+Set-SourceReplacement `
+  -RelativePath "third_party\blink\renderer\modules\webgl\webgl2_rendering_context_base.cc" `
+  -OldText @'
+    case GL_MAX_FRAGMENT_INPUT_COMPONENTS:
+      return GetIntParameter(script_state, pname);
+'@ `
+  -NewText @'
+    case GL_MAX_FRAGMENT_INPUT_COMPONENTS:
+      return WebGLAny(script_state,
+                      4 * WebGL2PersonaVaryingVectors(ContextGL()));
+'@
+
+Set-SourceReplacement `
+  -RelativePath "third_party\blink\renderer\modules\webgl\webgl2_rendering_context_base.cc" `
+  -OldText @'
+    case GL_MAX_FRAGMENT_UNIFORM_BLOCKS:
+      return GetIntParameter(script_state, pname);
+'@ `
+  -NewText @'
+    case GL_MAX_FRAGMENT_UNIFORM_BLOCKS:
+      return WebGLAny(script_state, ClampWebGL2PersonaLimit(
+                                        ContextGL(), pname, 12));
+'@
+
+Set-SourceReplacement `
+  -RelativePath "third_party\blink\renderer\modules\webgl\webgl2_rendering_context_base.cc" `
+  -OldText @'
+    case GL_MAX_FRAGMENT_UNIFORM_COMPONENTS:
+      return GetIntParameter(script_state, pname);
+'@ `
+  -NewText @'
+    case GL_MAX_FRAGMENT_UNIFORM_COMPONENTS:
+      return WebGLAny(script_state, ClampWebGL2PersonaLimit(
+                                        ContextGL(), pname, 4096));
+'@
+
+Set-SourceReplacement `
+  -RelativePath "third_party\blink\renderer\modules\webgl\webgl2_rendering_context_base.cc" `
+  -OldText @'
+    case GL_MAX_SAMPLES:
+      return GetIntParameter(script_state, pname);
+'@ `
+  -NewText @'
+    case GL_MAX_SAMPLES:
+      return WebGLAny(script_state, ClampWebGL2PersonaLimit(
+                                        ContextGL(), pname, 4));
+'@
+
+Set-SourceReplacement `
+  -RelativePath "third_party\blink\renderer\modules\webgl\webgl2_rendering_context_base.cc" `
+  -OldText @'
+    case GL_MAX_UNIFORM_BUFFER_BINDINGS:
+      return GetIntParameter(script_state, pname);
+'@ `
+  -NewText @'
+    case GL_MAX_UNIFORM_BUFFER_BINDINGS:
+      return WebGLAny(script_state, ClampWebGL2PersonaLimit(
+                                        ContextGL(), pname, 72));
+'@
+
+Set-SourceReplacement `
+  -RelativePath "third_party\blink\renderer\modules\webgl\webgl2_rendering_context_base.cc" `
+  -OldText @'
+    case GL_MAX_VARYING_COMPONENTS:
+      return GetIntParameter(script_state, pname);
+    case GL_MAX_VERTEX_OUTPUT_COMPONENTS:
+      return GetIntParameter(script_state, pname);
+'@ `
+  -NewText @'
+    case GL_MAX_VARYING_COMPONENTS:
+    case GL_MAX_VERTEX_OUTPUT_COMPONENTS:
+      return WebGLAny(script_state,
+                      4 * WebGL2PersonaVaryingVectors(ContextGL()));
+'@
+
+Set-SourceReplacement `
+  -RelativePath "third_party\blink\renderer\modules\webgl\webgl2_rendering_context_base.cc" `
+  -OldText @'
+    case GL_MAX_VERTEX_UNIFORM_BLOCKS:
+      return GetIntParameter(script_state, pname);
+'@ `
+  -NewText @'
+    case GL_MAX_VERTEX_UNIFORM_BLOCKS:
+      return WebGLAny(script_state, ClampWebGL2PersonaLimit(
+                                        ContextGL(), pname, 12));
+'@
+
+Set-SourceReplacement `
+  -RelativePath "third_party\blink\renderer\modules\webgl\webgl2_rendering_context_base.cc" `
+  -OldText @'
+    case GL_MAX_VERTEX_UNIFORM_COMPONENTS:
+      return GetIntParameter(script_state, pname);
+'@ `
+  -NewText @'
+    case GL_MAX_VERTEX_UNIFORM_COMPONENTS:
+      return WebGLAny(script_state, ClampWebGL2PersonaLimit(
+                                        ContextGL(), pname, 16384));
 '@

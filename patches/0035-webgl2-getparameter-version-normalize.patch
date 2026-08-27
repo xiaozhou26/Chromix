@@ -1,12 +1,127 @@
 diff --git a/third_party/blink/renderer/modules/webgl/webgl2_rendering_context_base.cc b/third_party/blink/renderer/modules/webgl/webgl2_rendering_context_base.cc
-index d1d2310450..fd0d1b1b3e 100644
+index 0000000..0000000 100644
 --- a/third_party/blink/renderer/modules/webgl/webgl2_rendering_context_base.cc
 +++ b/third_party/blink/renderer/modules/webgl/webgl2_rendering_context_base.cc
-@@ -4793,6 +4793,7 @@ ScriptValue WebGL2RenderingContextBase::getParameter(ScriptState* script_state,
+@@ -112,6 +112,19 @@
+ namespace {
+ 
+ const GLuint64 kMaxClientWaitTimeout = 0u;
++
++GLint ClampWebGL2PersonaLimit(gpu::gles2::GLES2Interface* gl,
++                              GLenum pname,
++                              GLint persona_value) {
++  GLint real_value = 0;
++  gl->GetIntegerv(pname, &real_value);
++  return real_value > 0 && real_value < persona_value ? real_value
++                                                       : persona_value;
++}
++
++GLint WebGL2PersonaVaryingVectors(gpu::gles2::GLES2Interface* gl) {
++  return ClampWebGL2PersonaLimit(gl, GL_MAX_VARYING_VECTORS, 30);
++}
+ 
+ // TODO(kainino): Change outByteLength to GLuint and change the associated
+ // range checking (and all uses) - overflow becomes possible in cases below
+@@ -4792,18 +4805,13 @@
+   if (isContextLost())
      return ScriptValue::CreateNull(script_state->GetIsolate());
    switch (pname) {
-     case GL_SHADING_LANGUAGE_VERSION: {
-+      // Keep WebGL 2 version strings derived from the active backend.
+-    case GL_SHADING_LANGUAGE_VERSION: {
++    case GL_SHADING_LANGUAGE_VERSION:
        return WebGLAny(
            script_state,
-           StrCat({"WebGL GLSL ES 3.00 (",
+-          StrCat({"WebGL GLSL ES 3.00 (",
+-                  String(ContextGL()->GetString(GL_SHADING_LANGUAGE_VERSION)),
+-                  ")"}));
+-    }
++          String("WebGL GLSL ES 3.00 (OpenGL ES GLSL ES 3.0 Chromium)"));
+     case GL_VERSION:
+-      return WebGLAny(
+-          script_state,
+-          StrCat({"WebGL 2.0 (", String(ContextGL()->GetString(GL_VERSION)),
+-                  ")"}));
++      return WebGLAny(script_state,
++                      String("WebGL 2.0 (OpenGL ES 3.0 Chromium)"));
+ 
+     case GL_COPY_READ_BUFFER_BINDING:
+       return WebGLAny(script_state, bound_copy_read_buffer_.Get());
+@@ -4814,21 +4822,26 @@
+     case GL_FRAGMENT_SHADER_DERIVATIVE_HINT:
+       return GetUnsignedIntParameter(script_state, pname);
+     case GL_MAX_3D_TEXTURE_SIZE:
+-      return GetIntParameter(script_state, pname);
++      return WebGLAny(script_state, ClampWebGL2PersonaLimit(
++                                        ContextGL(), pname, 2048));
+     case GL_MAX_ARRAY_TEXTURE_LAYERS:
+-      return GetIntParameter(script_state, pname);
++      return WebGLAny(script_state, ClampWebGL2PersonaLimit(
++                                        ContextGL(), pname, 2048));
+     case GC3D_MAX_CLIENT_WAIT_TIMEOUT_WEBGL:
+       return WebGLAny(script_state, kMaxClientWaitTimeout);
+     case GL_MAX_COLOR_ATTACHMENTS:
+-      return GetIntParameter(script_state, pname);
++      return WebGLAny(script_state, ClampWebGL2PersonaLimit(
++                                        ContextGL(), pname, 8));
+     case GL_MAX_COMBINED_FRAGMENT_UNIFORM_COMPONENTS:
+       return GetInt64Parameter(script_state, pname);
+     case GL_MAX_COMBINED_UNIFORM_BLOCKS:
+-      return GetIntParameter(script_state, pname);
++      return WebGLAny(script_state, ClampWebGL2PersonaLimit(
++                                        ContextGL(), pname, 72));
+     case GL_MAX_COMBINED_VERTEX_UNIFORM_COMPONENTS:
+       return GetInt64Parameter(script_state, pname);
+     case GL_MAX_DRAW_BUFFERS:
+-      return GetIntParameter(script_state, pname);
++      return WebGLAny(script_state, ClampWebGL2PersonaLimit(
++                                        ContextGL(), pname, 8));
+     case GL_MAX_ELEMENT_INDEX:
+       return GetInt64Parameter(script_state, pname);
+     case GL_MAX_ELEMENTS_INDICES:
+@@ -4836,15 +4849,19 @@
+     case GL_MAX_ELEMENTS_VERTICES:
+       return GetIntParameter(script_state, pname);
+     case GL_MAX_FRAGMENT_INPUT_COMPONENTS:
+-      return GetIntParameter(script_state, pname);
++      return WebGLAny(script_state,
++                      4 * WebGL2PersonaVaryingVectors(ContextGL()));
+     case GL_MAX_FRAGMENT_UNIFORM_BLOCKS:
+-      return GetIntParameter(script_state, pname);
++      return WebGLAny(script_state, ClampWebGL2PersonaLimit(
++                                        ContextGL(), pname, 12));
+     case GL_MAX_FRAGMENT_UNIFORM_COMPONENTS:
+-      return GetIntParameter(script_state, pname);
++      return WebGLAny(script_state, ClampWebGL2PersonaLimit(
++                                        ContextGL(), pname, 4096));
+     case GL_MAX_PROGRAM_TEXEL_OFFSET:
+       return GetIntParameter(script_state, pname);
+     case GL_MAX_SAMPLES:
+-      return GetIntParameter(script_state, pname);
++      return WebGLAny(script_state, ClampWebGL2PersonaLimit(
++                                        ContextGL(), pname, 4));
+     case GL_MAX_SERVER_WAIT_TIMEOUT:
+       return GetInt64Parameter(script_state, pname);
+     case GL_MAX_TEXTURE_LOD_BIAS:
+@@ -4858,15 +4875,18 @@
+     case GL_MAX_UNIFORM_BLOCK_SIZE:
+       return GetInt64Parameter(script_state, pname);
+     case GL_MAX_UNIFORM_BUFFER_BINDINGS:
+-      return GetIntParameter(script_state, pname);
++      return WebGLAny(script_state, ClampWebGL2PersonaLimit(
++                                        ContextGL(), pname, 72));
+     case GL_MAX_VARYING_COMPONENTS:
+-      return GetIntParameter(script_state, pname);
+     case GL_MAX_VERTEX_OUTPUT_COMPONENTS:
+-      return GetIntParameter(script_state, pname);
++      return WebGLAny(script_state,
++                      4 * WebGL2PersonaVaryingVectors(ContextGL()));
+     case GL_MAX_VERTEX_UNIFORM_BLOCKS:
+-      return GetIntParameter(script_state, pname);
++      return WebGLAny(script_state, ClampWebGL2PersonaLimit(
++                                        ContextGL(), pname, 12));
+     case GL_MAX_VERTEX_UNIFORM_COMPONENTS:
+-      return GetIntParameter(script_state, pname);
++      return WebGLAny(script_state, ClampWebGL2PersonaLimit(
++                                        ContextGL(), pname, 16384));
+     case GL_MIN_PROGRAM_TEXEL_OFFSET:
+       return GetIntParameter(script_state, pname);
+     case GL_PACK_ROW_LENGTH:

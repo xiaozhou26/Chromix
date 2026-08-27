@@ -1,11 +1,11 @@
 diff --git a/third_party/blink/renderer/modules/webgl/webgl_rendering_context_base.cc b/third_party/blink/renderer/modules/webgl/webgl_rendering_context_base.cc
-index cb167de..8b3fbfe 100644
+index 0000000..0000000 100644
 --- a/third_party/blink/renderer/modules/webgl/webgl_rendering_context_base.cc
 +++ b/third_party/blink/renderer/modules/webgl/webgl_rendering_context_base.cc
-@@ -27,8 +27,10 @@
- 
+@@ -28,8 +28,10 @@
  #include <inttypes.h>
  
+ #include <array>
 +#include <cstring>
  #include <memory>
  #include <utility>
@@ -13,7 +13,7 @@ index cb167de..8b3fbfe 100644
  
  #include "base/bit_cast.h"
  #include "base/byte_size.h"
-@@ -48,6 +50,8 @@
+@@ -46,6 +48,8 @@
  #include "base/trace_event/memory_dump_manager.h"
  #include "base/trace_event/trace_event.h"
  #include "build/build_config.h"
@@ -22,10 +22,10 @@ index cb167de..8b3fbfe 100644
  #include "components/viz/common/gpu/raster_context_provider.h"
  #include "components/viz/common/resources/shared_image_format_utils.h"
  #include "device/vr/buildflags/buildflags.h"
-@@ -207,6 +208,67 @@ unsigned WebGLRenderingContextBase::max_active_webgl_contexts_on_worker_ = 0;
+@@ -258,6 +262,68 @@
+   return real_values;
+ }
  
- namespace {
-
 +uint32_t EnsureBridgeWebGL(canvas_bridge::CanvasBridgeClient* bridge,
 +                           uint32_t& canvas_id,
 +                           int width,
@@ -87,10 +87,11 @@ index cb167de..8b3fbfe 100644
 +                width, height);
 +}
 +
++
  enum class WebGLANGLEImplementation {
    // These values are persisted to logs. Entries should not be renumbered and
    // numeric values should never be reused.
-@@ -2604,6 +2669,8 @@ void WebGLRenderingContextBase::activeTexture(GLenum texture) {
+@@ -2604,6 +2670,8 @@
      return;
    }
    active_texture_unit_ = texture - GL_TEXTURE0;
@@ -99,7 +100,7 @@ index cb167de..8b3fbfe 100644
    ContextGL()->ActiveTexture(texture);
  }
  
-@@ -2617,6 +2684,9 @@ void WebGLRenderingContextBase::attachShader(WebGLProgram* program,
+@@ -2617,6 +2685,9 @@
                        "shader attachment already has shader");
      return;
    }
@@ -109,7 +110,7 @@ index cb167de..8b3fbfe 100644
    ContextGL()->AttachShader(ObjectOrZero(program), ObjectOrZero(shader));
    shader->OnAttached();
  }
-@@ -2633,6 +2703,9 @@ void WebGLRenderingContextBase::bindAttribLocation(WebGLProgram* program,
+@@ -2633,6 +2704,9 @@
                        "reserved prefix");
      return;
    }
@@ -119,7 +120,7 @@ index cb167de..8b3fbfe 100644
    ContextGL()->BindAttribLocation(ObjectOrZero(program), index,
                                    name.Utf8().c_str());
  }
-@@ -2672,6 +2745,9 @@ void WebGLRenderingContextBase::bindBuffer(GLenum target, WebGLBuffer* buffer) {
+@@ -2672,6 +2746,9 @@
      return;
    if (!ValidateAndUpdateBufferBindTarget("bindBuffer", target, buffer))
      return;
@@ -129,18 +130,18 @@ index cb167de..8b3fbfe 100644
    ContextGL()->BindBuffer(target, ObjectOrZero(buffer));
  }
  
-@@ -2713,6 +2789,10 @@ void WebGLRenderingContextBase::bindTexture(GLenum target,
+@@ -2712,6 +2789,10 @@
+                       "textures can not be used with multiple targets");
      return;
    }
- 
++
 +  RecordWebGLOp(60u, {static_cast<int32_t>(target),
 +                      static_cast<int32_t>(texture ? texture->BridgeId() : 0)}, {},
 +                bridge_canvas_id_, drawingBufferWidth(), drawingBufferHeight());
-+
+ 
    if (target == GL_TEXTURE_2D) {
      texture_units_[active_texture_unit_].texture2d_binding_ = texture;
-   } else if (target == GL_TEXTURE_CUBE_MAP) {
-@@ -2839,6 +2919,21 @@ void WebGLRenderingContextBase::BufferDataImpl(GLenum target,
+@@ -2839,6 +2920,21 @@
  
    buffer->SetSize(size);
  
@@ -162,25 +163,25 @@ index cb167de..8b3fbfe 100644
    ContextGL()->BufferData(target, static_cast<GLsizeiptr>(size), data, usage);
  }
  
-@@ -2957,6 +3049,9 @@ void WebGLRenderingContextBase::clear(GLbitfield mask) {
+@@ -2956,6 +3052,9 @@
+     SynthesizeGLError(GL_INVALID_FRAMEBUFFER_OPERATION, "clear", reason);
      return;
    }
- 
++
 +  RecordWebGLOp(82u, {static_cast<int32_t>(mask)}, {}, bridge_canvas_id_,
 +                drawingBufferWidth(), drawingBufferHeight());
-+
+ 
    if (!mask) {
      // Use OnErrorMessage because it's both rate-limited and obeys the
-     // webGLErrorsToConsole setting.
-@@ -3004,9 +3099,35 @@ void WebGLRenderingContextBase::clearColor(GLfloat r,
+@@ -3004,7 +3103,33 @@
    clear_color_[1] = g;
    clear_color_[2] = b;
    clear_color_[3] = a;
 +  RecordWebGLOp(81u, {}, {r, g, b, a}, bridge_canvas_id_,
 +                drawingBufferWidth(), drawingBufferHeight());
    ContextGL()->ClearColor(r, g, b, a);
- }
- 
++}
++
 +bool WebGLRenderingContextBase::ReadBridgePixels(
 +    std::vector<uint8_t>* out,
 +    int width,
@@ -203,12 +204,10 @@ index cb167de..8b3fbfe 100644
 +                row_bytes);
 +  }
 +  return true;
-+}
-+
+ }
+ 
  void WebGLRenderingContextBase::clearDepth(GLfloat depth) {
-   if (isContextLost())
-     return;
-@@ -3037,6 +3158,8 @@ void WebGLRenderingContextBase::colorMask(GLboolean red,
+@@ -3037,6 +3162,8 @@
  void WebGLRenderingContextBase::compileShader(WebGLShader* shader) {
    if (!ValidateWebGLProgramOrShader("compileShader", shader))
      return;
@@ -217,7 +216,7 @@ index cb167de..8b3fbfe 100644
    ContextGL()->CompileShader(ObjectOrZero(shader));
  }
  
-@@ -3196,6 +3319,8 @@ void WebGLRenderingContextBase::copyTexSubImage2D(GLenum target,
+@@ -3196,6 +3323,8 @@
  WebGLBuffer* WebGLRenderingContextBase::createBuffer() {
    auto* buffer = MakeGarbageCollected<WebGLBuffer>(this);
    buffers_.insert(buffer);
@@ -226,7 +225,7 @@ index cb167de..8b3fbfe 100644
    return buffer;
  }
  
-@@ -3204,11 +3329,17 @@ WebGLFramebuffer* WebGLRenderingContextBase::createFramebuffer() {
+@@ -3204,11 +3333,17 @@
  }
  
  WebGLTexture* WebGLRenderingContextBase::createTexture() {
@@ -246,7 +245,7 @@ index cb167de..8b3fbfe 100644
  }
  
  WebGLRenderbuffer* WebGLRenderingContextBase::createRenderbuffer() {
-@@ -3228,7 +3359,15 @@ WebGLShader* WebGLRenderingContextBase::createShader(GLenum type) {
+@@ -3228,7 +3363,15 @@
      return nullptr;
    }
  
@@ -263,7 +262,7 @@ index cb167de..8b3fbfe 100644
  }
  
  void WebGLRenderingContextBase::cullFace(GLenum mode) {
-@@ -3504,6 +3643,8 @@ void WebGLRenderingContextBase::drawArrays(GLenum mode,
+@@ -3504,6 +3647,8 @@
    if (!ValidateDrawArrays("drawArrays"))
      return;
  
@@ -272,7 +271,7 @@ index cb167de..8b3fbfe 100644
    DrawWrapper("drawArrays", CanvasPerformanceMonitor::DrawType::kDrawArrays,
                [&]() { ContextGL()->DrawArrays(mode, first, count); });
  }
-@@ -3515,6 +3656,10 @@ void WebGLRenderingContextBase::drawElements(GLenum mode,
+@@ -3515,6 +3660,10 @@
    if (!ValidateDrawElements("drawElements", type, offset))
      return;
  
@@ -283,7 +282,7 @@ index cb167de..8b3fbfe 100644
    DrawWrapper("drawElements", CanvasPerformanceMonitor::DrawType::kDrawElements,
                [&]() {
                  ContextGL()->DrawElements(
-@@ -3583,6 +3728,8 @@ void WebGLRenderingContextBase::enableVertexAttribArray(GLuint index) {
+@@ -3583,6 +3732,8 @@
      return;
    }
  
@@ -292,7 +291,7 @@ index cb167de..8b3fbfe 100644
    bound_vertex_array_object_->SetAttribEnabled(index, true);
    ContextGL()->EnableVertexAttribArray(index);
  }
-@@ -3682,6 +3829,8 @@ void WebGLRenderingContextBase::generateMipmap(GLenum target) {
+@@ -3682,6 +3833,8 @@
      return;
    if (!ValidateTextureBinding("generateMipmap", target))
      return;
@@ -301,7 +300,7 @@ index cb167de..8b3fbfe 100644
    ContextGL()->GenerateMipmap(target);
  }
  
-@@ -4949,7 +5098,17 @@ WebGLUniformLocation* WebGLRenderingContextBase::getUniformLocation(
+@@ -4897,7 +5050,17 @@
        ObjectOrZero(program), name.Utf8().c_str());
    if (uniform_location == -1)
      return nullptr;
@@ -320,7 +319,7 @@ index cb167de..8b3fbfe 100644
  }
  
  ScriptValue WebGLRenderingContextBase::getVertexAttrib(
-@@ -5169,6 +5328,8 @@ void WebGLRenderingContextBase::linkProgram(WebGLProgram* program) {
+@@ -5117,6 +5280,8 @@
      return;
    }
  
@@ -329,7 +328,7 @@ index cb167de..8b3fbfe 100644
    GLuint query = 0u;
    if (ExtensionEnabled(kKHRParallelShaderCompileName)) {
      ContextGL()->GenQueriesEXT(1, &query);
-@@ -5570,6 +5734,9 @@ void WebGLRenderingContextBase::shaderSource(WebGLShader* shader,
+@@ -5517,6 +5682,9 @@
      return;
    String ascii_string = ReplaceNonASCII(string).Result();
    shader->SetSource(string);
@@ -339,7 +338,7 @@ index cb167de..8b3fbfe 100644
    DCHECK(ascii_string.Is8Bit() && ascii_string.ContainsOnlyAsciiOrEmpty());
    const GLchar* shader_data = base::as_chars(ascii_string.Span8()).data();
    const GLint shader_length = ascii_string.length();
-@@ -5872,6 +6050,9 @@ void WebGLRenderingContextBase::TexImageBase(const TexImageParams& params,
+@@ -5819,6 +5987,9 @@
                                   params.type, pixels);
        break;
    }
@@ -349,7 +348,7 @@ index cb167de..8b3fbfe 100644
  }
  
  void WebGLRenderingContextBase::TexImageStaticBitmapImage(
-@@ -6153,6 +6334,28 @@ void WebGLRenderingContextBase::TexImageHelperDOMArrayBufferView(
+@@ -6100,6 +6271,28 @@
      return;
    }
  
@@ -378,7 +377,7 @@ index cb167de..8b3fbfe 100644
    ScopedUnpackParametersResetRestore temporary_reset_unpack(
        this, change_unpack_params);
    TexImageBase(params, data.data());
-@@ -7034,12 +7237,18 @@ void WebGLRenderingContextBase::TexParameter(GLenum target,
+@@ -6981,12 +7174,18 @@
  void WebGLRenderingContextBase::texParameterf(GLenum target,
                                                GLenum pname,
                                                GLfloat param) {
@@ -397,7 +396,7 @@ index cb167de..8b3fbfe 100644
    TexParameter(target, pname, 0, param, false);
  }
  
-@@ -7287,6 +7496,8 @@ void WebGLRenderingContextBase::uniform1f(const WebGLUniformLocation* location,
+@@ -7234,6 +7433,8 @@
      return;
    }
  
@@ -406,7 +405,7 @@ index cb167de..8b3fbfe 100644
    ContextGL()->Uniform1f(location->Location(), x);
  }
  
-@@ -7312,6 +7523,8 @@ void WebGLRenderingContextBase::uniform1i(const WebGLUniformLocation* location,
+@@ -7259,6 +7460,8 @@
      return;
    }
  
@@ -415,7 +414,7 @@ index cb167de..8b3fbfe 100644
    ContextGL()->Uniform1i(location->Location(), x);
  }
  
-@@ -7338,6 +7551,8 @@ void WebGLRenderingContextBase::uniform2f(const WebGLUniformLocation* location,
+@@ -7285,6 +7488,8 @@
      return;
    }
  
@@ -424,7 +423,7 @@ index cb167de..8b3fbfe 100644
    ContextGL()->Uniform2f(location->Location(), x, y);
  }
  
-@@ -7391,6 +7606,8 @@ void WebGLRenderingContextBase::uniform3f(const WebGLUniformLocation* location,
+@@ -7338,6 +7543,8 @@
      return;
    }
  
@@ -433,7 +432,7 @@ index cb167de..8b3fbfe 100644
    ContextGL()->Uniform3f(location->Location(), x, y, z);
  }
  
-@@ -7446,6 +7663,9 @@ void WebGLRenderingContextBase::uniform4f(const WebGLUniformLocation* location,
+@@ -7393,6 +7600,9 @@
      return;
    }
  
@@ -443,7 +442,7 @@ index cb167de..8b3fbfe 100644
    ContextGL()->Uniform4f(location->Location(), x, y, z, w);
  }
  
-@@ -7529,6 +7749,13 @@ void WebGLRenderingContextBase::uniformMatrix4fv(
+@@ -7476,6 +7686,13 @@
                                         v, 16, 0, v.size(), &data, &length)) {
      return;
    }
@@ -457,7 +456,7 @@ index cb167de..8b3fbfe 100644
    ContextGL()->UniformMatrix4fv(location->Location(), length, transpose, data);
  }
  
-@@ -7540,6 +7767,9 @@ void WebGLRenderingContextBase::useProgram(WebGLProgram* program) {
+@@ -7487,6 +7704,9 @@
      return;
    }
  
@@ -467,7 +466,7 @@ index cb167de..8b3fbfe 100644
    if (current_program_ != program) {
      if (current_program_)
        current_program_->OnDetached(ContextGL());
-@@ -7669,6 +7899,10 @@ void WebGLRenderingContextBase::vertexAttribPointer(GLuint index,
+@@ -7616,6 +7836,10 @@
      return;
    }
  
@@ -478,7 +477,7 @@ index cb167de..8b3fbfe 100644
    bound_vertex_array_object_->SetArrayBufferForAttrib(
        index, bound_array_buffer_.Get());
    ContextGL()->VertexAttribPointer(
-@@ -7696,6 +7930,8 @@ void WebGLRenderingContextBase::viewport(GLint x,
+@@ -7643,6 +7867,8 @@
                                           GLsizei height) {
    if (isContextLost())
      return;
