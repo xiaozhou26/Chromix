@@ -48,6 +48,10 @@ function Get-TreeGB {
 $SevenZip = Resolve-7Zip
 $freeBefore = Get-FreeGB
 $inputGB = Get-TreeGB -Path $Root -ArchiveMode $Mode
+if ($inputGB -le 0) {
+  Write-Host "==> no build tree files found under $Root; skipping empty handoff"
+  exit 0
+}
 $minFreeGB = if ($Mode -eq "Unsynced") {
   [math]::Max(12, [math]::Ceiling($inputGB + 5))
 } else {

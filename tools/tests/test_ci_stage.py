@@ -139,8 +139,27 @@ class ResumeWorkflowRegressionTest(unittest.TestCase):
             self.assertIn(f"inputs.resume_stage == '{stage}'", self.source)
             self.assertIn(f"inputs.resume_run_id == '' || inputs.resume_stage != '{stage}'", self.source)
             self.assertIn(f"pattern: tree-s{stage - 1}-attempt-*-part*", self.source)
-        self.assertEqual(self.source.count("always()"), 11)
         self.assertEqual(self.source.count("Download tree from previous run"), 11)
+
+    def test_every_stage_uploads_a_tree_on_success_or_failure(self):
+        self.assertEqual(self.source.count("- name: Ensure build tree snapshot"), 12)
+        self.assertEqual(
+            self.source.count(
+                "if: ${{ always() && steps.stage.outputs.upload_parts != 'true' }}"
+            ),
+            12,
+        )
+        self.assertEqual(self.source.count("if: ${{ always() }}"), 48)
+        self.assertEqual(self.source.count("- name: Upload tree part 1"), 12)
+        self.assertEqual(self.source.count("- name: Upload tree part 4"), 12)
+        self.assertNotIn("if: steps.stage.outputs.upload_parts == 'true'", self.source)
+        self.assertEqual(
+            self.source.count(
+                ". build\\windows\\ci-parts.ps1 -Root C:\\c "
+                "-PartsDir C:\\parts -Mode Synced"
+            ),
+            12,
+        )
 
     def test_resume_uses_official_cross_run_artifact_download(self):
         self.assertIn("actions: read", self.source)
