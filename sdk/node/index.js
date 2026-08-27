@@ -22,6 +22,7 @@ import { join } from "node:path";
 import {
   CHANNELS, CACHE, hostFor, resolvePlatform, ensureNative,
 } from "./_binary.js";
+import { fontLaunchEnv } from "./_fonts.js";
 
 export const CHROMIUM_VERSION = "151";
 export const DEFAULT_VIEWPORT = { width: 1920, height: 947 };
@@ -301,6 +302,7 @@ export async function buildLaunchOptions(options = {}) {
     startMaximized: options.startMaximized ?? true,
   });
   const proxy = splitProxy(options.proxy);
+  const env = fontLaunchEnv(binary, options.launchOptions?.env);
   return {
     executablePath: binary,
     headless,
@@ -308,6 +310,7 @@ export async function buildLaunchOptions(options = {}) {
     ignoreDefaultArgs: ["--enable-automation"],
     ...(proxy ? { proxy } : {}),
     ...options.launchOptions,
+    ...(env ? { env } : {}),
   };
 }
 

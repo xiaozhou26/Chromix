@@ -5,7 +5,7 @@
   "type": "module",
   "main": "index.js",
   "bin": { "chromix": "cli.js" },
-  "files": ["index.js", "_binary.js", "cli.js", "README.md"],
+  "files": ["index.js", "_binary.js", "_fonts.js", "cli.js", "README.md"],
   "engines": { "node": ">=18" },
   "keywords": ["chromium", "stealth", "browser", "automation", "anti-bot", "cloakbrowser"],
   "license": "BSD-3-Clause",

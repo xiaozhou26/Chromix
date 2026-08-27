@@ -6,6 +6,11 @@ REPO = Path(__file__).resolve().parents[2]
 TEXT_METRICS = REPO / "patches" / "0033-third_party-blink-renderer-core-html-canvas-text_metrics-cc.patch"
 FONT_CACHE = REPO / "patches" / "0047-third_party-blink-renderer-platform-fonts-font_cache-cc.patch"
 PACKAGE_WIN = REPO / "build" / "windows" / "package-win.ps1"
+PACKAGE_LINUX = REPO / "build" / "linux" / "package-linux.sh"
+FONTS = REPO / "assets" / "fonts"
+PY_FONTS = REPO / "sdk" / "python" / "chromix" / "_fonts.py"
+NODE_FONTS = REPO / "sdk" / "node" / "_fonts.js"
+NODE_PACKAGE = REPO / "sdk" / "node" / "package.json"
 
 
 class FontCorrectnessRegressionTest(unittest.TestCase):
@@ -14,6 +19,10 @@ class FontCorrectnessRegressionTest(unittest.TestCase):
         cls.metrics = TEXT_METRICS.read_text(encoding="utf-8")
         cls.fonts = FONT_CACHE.read_text(encoding="utf-8")
         cls.package = PACKAGE_WIN.read_text(encoding="utf-8")
+        cls.linux_package = PACKAGE_LINUX.read_text(encoding="utf-8")
+        cls.py_fonts = PY_FONTS.read_text(encoding="utf-8")
+        cls.node_fonts = NODE_FONTS.read_text(encoding="utf-8")
+        cls.node_package = NODE_PACKAGE.read_text(encoding="utf-8")
 
     def test_allowlist_preserves_multiword_family_names(self):
         self.assertIn("base::SplitString", self.fonts)
@@ -29,6 +38,13 @@ class FontCorrectnessRegressionTest(unittest.TestCase):
         self.assertIn("UxrFontFamilyAllowed(creation_params.Family())", self.fonts)
         self.assertNotIn("UxrFontHidden(family)", self.fonts)
 
+    def test_linux_windows_persona_maps_missing_families_to_bundle(self):
+        self.assertIn("UxrLinuxWindowsFontSubstitute", self.fonts)
+        self.assertIn('{"Trebuchet MS", "Arial"}', self.fonts)
+        self.assertIn('{"Cascadia Code", "Consolas"}', self.fonts)
+        self.assertIn('{"Segoe UI Symbol", "Segoe UI"}', self.fonts)
+        self.assertIn("BUILDFLAG(IS_LINUX)", self.fonts)
+
     def test_generics_keep_native_resolution(self):
         for family in ("serif", "sans-serif", "monospace", "system-ui", "emoji"):
             self.assertIn(f'"{family}"', self.fonts)
@@ -39,9 +55,29 @@ class FontCorrectnessRegressionTest(unittest.TestCase):
         self.assertNotIn("base/uxr_config.h", self.metrics)
         self.assertIn("actual shaped and rendered font", self.metrics)
 
+    def test_fortress_font_bundle_has_license_and_windows_names(self):
+        self.assertTrue((FONTS / "NOTICE").is_file())
+        self.assertTrue((FONTS / "FORTRESS-LICENSE").is_file())
+        self.assertTrue((FONTS / "SOURCE.md").is_file())
+        for family in ("Arial", "Calibri", "Cambria", "Consolas", "SegoeUI", "Tahoma", "TimesNewRoman", "Verdana"):
+            self.assertTrue(any(FONTS.glob(f"{family}-*.ttf")), family)
+        self.assertNotIn("ATTRIBUTION.md", " ".join(p.name for p in FONTS.iterdir()))
+
+    def test_linux_package_bundles_fonts_and_launcher(self):
+        for text in ("fonts.conf.template", "FONTCONFIG_FILE", "NOTICE", "FORTRESS-LICENSE", "SOURCE.md"):
+            self.assertIn(text, self.linux_package)
+        self.assertIn("exec \"$HERE/chrome\"", self.linux_package)
+
     def test_windows_package_does_not_install_or_register_clone_fonts(self):
         for forbidden in ("AddFontResource", "Fonts\\", "fonts.conf", "FONTCONFIG_FILE"):
             self.assertNotIn(forbidden, self.package)
+
+    def test_sdk_font_wiring_is_linux_only_and_caller_env_wins(self):
+        for source in (self.py_fonts, self.node_fonts):
+            self.assertIn('sys.platform != "linux"' if source == self.py_fonts else 'process.platform !== "linux"', source)
+            self.assertIn("FONTCONFIG_FILE", source)
+            self.assertIn("user_env" if source == self.py_fonts else "userEnv", source)
+        self.assertIn('"_fonts.js"', self.node_package)
 
 
 if __name__ == "__main__":

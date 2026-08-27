@@ -28,6 +28,7 @@ from pathlib import Path
 from typing import Any, TypedDict
 
 from ._binary import _CACHE, _CHANNELS, _download, _host, resolve_platform
+from ._fonts import apply_font_env
 from .humanize import HumanConfig, HumanConfigOverrides, HumanPreset, resolve_human_config
 
 __all__ = [
@@ -411,6 +412,7 @@ def launch(headless: bool = True,
         headless, proxy, args, stealth_args, timezone, locale, geoip,
         extension_paths, start_maximized=not _suppress_maximize,
         browser_version=browser_version, release_channel=release_channel)
+    apply_font_env(binary, kwargs)
 
     pw = sync_playwright().start()
     try:
@@ -448,6 +450,7 @@ async def launch_async(headless: bool = True,
         headless, proxy, args, stealth_args, timezone, locale, geoip,
         extension_paths, start_maximized=True,
         browser_version=browser_version, release_channel=release_channel)
+    apply_font_env(binary, kwargs)
     pw = await async_playwright().start()
     try:
         browser = await pw.chromium.launch(
@@ -523,12 +526,15 @@ def launch_context(headless: bool = True,
     ``browser.new_context()`` exactly as in CloakBrowser.
     """
     ctx_kwargs = _split_context_kwargs(viewport, locale, color_scheme, user_agent, kwargs)
+    browser_kwargs = {}
+    if "env" in ctx_kwargs:
+        browser_kwargs["env"] = ctx_kwargs.pop("env")
     browser = launch(headless=headless, proxy=proxy, args=args, stealth_args=stealth_args,
                      timezone=timezone, locale=locale, geoip=geoip, humanize=humanize,
                      human_preset=human_preset, human_config=human_config,
                      extension_paths=extension_paths, license_key=license_key,
                      browser_version=browser_version, release_channel=release_channel,
-                     _suppress_maximize=True)
+                     _suppress_maximize=True, **browser_kwargs)
     ctx = browser.new_context(**ctx_kwargs)
     orig_close = ctx.close
 
@@ -568,12 +574,15 @@ def launch_persistent_context(user_data_dir: str | os.PathLike,
         headless, proxy, args, stealth_args, timezone, locale, geoip,
         extension_paths, start_maximized=False,
         browser_version=browser_version, release_channel=release_channel)
+    launch_kwargs = {"env": ctx_kwargs.pop("env")} if "env" in ctx_kwargs else {}
+    apply_font_env(binary, launch_kwargs)
     pw = sync_playwright().start()
     try:
         ctx = pw.chromium.launch_persistent_context(
             user_data_dir=str(user_data_dir), executable_path=str(binary),
             headless=headless, args=chrome_args,
-            ignore_default_args=["--enable-automation"], **proxy_kwargs, **ctx_kwargs)
+            ignore_default_args=["--enable-automation"], **proxy_kwargs,
+            **launch_kwargs, **ctx_kwargs)
     except Exception:
         pw.stop()
         raise
@@ -612,11 +621,13 @@ async def launch_context_async(**kw: Any) -> Any:
         kw.get("timezone"), kw.get("locale"), kw.get("geoip", False),
         kw.get("extension_paths"), start_maximized=True,
         browser_version=kw.get("browser_version"), release_channel=kw.get("release_channel"))
+    launch_kwargs = dict(proxy_kwargs)
+    apply_font_env(binary, launch_kwargs)
     pw = await async_playwright().start()
     try:
         browser = await pw.chromium.launch(
             executable_path=str(binary), headless=headless, args=chrome_args,
-            ignore_default_args=["--enable-automation"], **proxy_kwargs)
+            ignore_default_args=["--enable-automation"], **launch_kwargs)
         ctx = await browser.new_context(**ctx_kwargs)
     except Exception:
         await pw.stop()
@@ -666,12 +677,15 @@ async def launch_persistent_context_async(**kw: Any) -> Any:
         kw.get("timezone"), kw.get("locale"), kw.get("geoip", False),
         kw.get("extension_paths"), start_maximized=False,
         browser_version=kw.get("browser_version"), release_channel=kw.get("release_channel"))
+    launch_kwargs = {"env": ctx_kwargs.pop("env")} if "env" in ctx_kwargs else {}
+    apply_font_env(binary, launch_kwargs)
     pw = await async_playwright().start()
     try:
         ctx = await pw.chromium.launch_persistent_context(
             user_data_dir=str(user_data_dir), executable_path=str(binary),
             headless=headless, args=chrome_args,
-            ignore_default_args=["--enable-automation"], **proxy_kwargs, **ctx_kwargs)
+            ignore_default_args=["--enable-automation"], **proxy_kwargs,
+            **launch_kwargs, **ctx_kwargs)
     except Exception:
         await pw.stop()
         raise

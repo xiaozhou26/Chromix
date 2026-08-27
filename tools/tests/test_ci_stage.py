@@ -175,6 +175,8 @@ class RestoredSourceUpdateRegressionTest(unittest.TestCase):
         self.assertIn("UxrFarbleReadPixels", update_source)
         self.assertIn("UxrJitterMetric", update_source)
         self.assertIn("UxrFontFamilyAllowed", update_source)
+        self.assertIn("kWindowsFamilies", update_source)
+        self.assertIn('Get("uxr-platform")', update_source)
         self.assertIn("base::SplitString", update_source)
         self.assertIn("FontCache::GetFontPlatformData", update_source)
         self.assertIn("TextMetrics::Update", update_source)

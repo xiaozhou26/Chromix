@@ -1,0 +1,30 @@
+<?xml version="1.0"?>
+<!DOCTYPE fontconfig SYSTEM "fonts.dtd">
+<!-- Self-contained Linux font configuration for the bundled Windows persona fonts. -->
+<fontconfig>
+  <dir>@FONTS_DIR@</dir>
+  <cachedir>@CACHE_DIR@</cachedir>
+
+  <match target="pattern"><test name="family"><string>Courier</string></test><edit name="family" mode="assign" binding="strong"><string>Courier New</string></edit></match>
+  <match target="pattern"><test name="family"><string>Helvetica</string></test><edit name="family" mode="assign" binding="strong"><string>Arial</string></edit></match>
+  <match target="pattern"><test name="family"><string>Times</string></test><edit name="family" mode="assign" binding="strong"><string>Times New Roman</string></edit></match>
+
+  <alias><family>sans-serif</family><prefer><family>Arial</family><family>Segoe UI</family></prefer></alias>
+  <alias><family>serif</family><prefer><family>Times New Roman</family></prefer></alias>
+  <alias><family>monospace</family><prefer><family>Consolas</family><family>Courier New</family></prefer></alias>
+  <alias><family>system-ui</family><prefer><family>Segoe UI</family></prefer></alias>
+  <alias><family>emoji</family><prefer><family>Segoe UI Emoji</family></prefer></alias>
+
+  <!-- Hide the original clone family names if a font still carries them as aliases. -->
+  <match target="pattern"><test name="family"><string>Liberation Sans</string></test><edit name="family" mode="assign" binding="strong"><string>__chromix_none__</string></edit></match>
+  <match target="pattern"><test name="family"><string>Liberation Serif</string></test><edit name="family" mode="assign" binding="strong"><string>__chromix_none__</string></edit></match>
+  <match target="pattern"><test name="family"><string>Liberation Mono</string></test><edit name="family" mode="assign" binding="strong"><string>__chromix_none__</string></edit></match>
+  <match target="pattern"><test name="family"><string>Carlito</string></test><edit name="family" mode="assign" binding="strong"><string>__chromix_none__</string></edit></match>
+  <match target="pattern"><test name="family"><string>Caladea</string></test><edit name="family" mode="assign" binding="strong"><string>__chromix_none__</string></edit></match>
+
+  <match target="font"><edit name="antialias" mode="assign"><bool>true</bool></edit></match>
+  <match target="font"><edit name="hinting" mode="assign"><bool>true</bool></edit></match>
+  <match target="font"><edit name="hintstyle" mode="assign"><const>hintslight</const></edit></match>
+  <match target="font"><edit name="rgba" mode="assign"><const>rgb</const></edit></match>
+  <match target="font"><edit name="lcdfilter" mode="assign"><const>lcddefault</const></edit></match>
+</fontconfig>

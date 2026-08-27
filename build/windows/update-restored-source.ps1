@@ -497,6 +497,119 @@ bool UxrFontFamilyAllowed(const AtomicString& family) {
 Set-SourceReplacement `
   -RelativePath "third_party\blink\renderer\platform\fonts\font_cache.cc" `
   -OldText @'
+namespace {
+
+bool UxrFontFamilyIsGeneric(const AtomicString& family) {
+  const std::string name = family.GetString().ToAsciiLower().Utf8();
+  static constexpr const char* kGenericFamilies[] = {
+      "serif",       "sans-serif", "monospace",    "cursive",
+      "fantasy",     "system-ui",  "math",         "emoji",
+      "fangsong",    "ui-serif",   "ui-sans-serif", "ui-monospace",
+      "ui-rounded",  "ui-fangsong", "-webkit-body",
+      "-webkit-pictograph", "-webkit-system-font", "-webkit-control"};
+  for (const char* generic : kGenericFamilies) {
+    if (name == generic)
+      return true;
+  }
+  return false;
+}
+
+bool UxrFontFamilyAllowed(const AtomicString& family) {
+  if (family.empty() || UxrFontFamilyIsGeneric(family))
+    return true;
+
+  const std::string whitelist =
+      base::UxrConfig::GetInstance().Get("uxr-font-whitelist");
+  if (whitelist.empty())
+    return true;
+
+  const std::string requested = family.GetString().Utf8();
+  for (const std::string& entry : base::SplitString(
+           whitelist, ",", base::TRIM_WHITESPACE, base::SPLIT_WANT_NONEMPTY)) {
+    if (base::EqualsCaseInsensitiveASCII(entry, requested))
+      return true;
+  }
+  return false;
+}
+
+}  // namespace
+
+'@ `
+  -NewText @'
+namespace {
+
+bool UxrFontFamilyIsGeneric(const AtomicString& family) {
+  const std::string name = family.GetString().ToAsciiLower().Utf8();
+  static constexpr const char* kGenericFamilies[] = {
+      "serif",       "sans-serif", "monospace",    "cursive",
+      "fantasy",     "system-ui",  "math",         "emoji",
+      "fangsong",    "ui-serif",   "ui-sans-serif", "ui-monospace",
+      "ui-rounded",  "ui-fangsong", "-webkit-body",
+      "-webkit-pictograph", "-webkit-system-font", "-webkit-control"};
+  for (const char* generic : kGenericFamilies) {
+    if (name == generic)
+      return true;
+  }
+  return false;
+}
+
+bool UxrFontFamilyAllowed(const AtomicString& family) {
+  if (family.empty() || UxrFontFamilyIsGeneric(family))
+    return true;
+
+  const std::string requested = family.GetString().Utf8();
+  const std::string whitelist =
+      base::UxrConfig::GetInstance().Get("uxr-font-whitelist");
+  if (!whitelist.empty()) {
+    for (const std::string& entry : base::SplitString(
+             whitelist, ",", base::TRIM_WHITESPACE,
+             base::SPLIT_WANT_NONEMPTY)) {
+      if (base::EqualsCaseInsensitiveASCII(entry, requested))
+        return true;
+    }
+    return false;
+  }
+
+  const std::string persona =
+      base::UxrConfig::GetInstance().Get("uxr-platform");
+  if (!base::EqualsCaseInsensitiveASCII(persona, "windows") &&
+      !base::EqualsCaseInsensitiveASCII(persona, "win32")) {
+    return true;
+  }
+
+  // Clearcote-style canonical Windows family set. This prevents unusual
+  // user-installed host fonts from leaking when no imported list is supplied.
+  static constexpr const char* kWindowsFamilies[] = {
+      "Arial", "Arial Black", "Bahnschrift", "Calibri", "Cambria",
+      "Cambria Math", "Candara", "Cascadia Code", "Cascadia Mono",
+      "Comic Sans MS", "Consolas", "Constantia", "Corbel", "Courier New",
+      "Ebrima", "Franklin Gothic Medium", "Gabriola", "Gadugi", "Georgia",
+      "HoloLens MDL2 Assets", "Impact", "Ink Free", "Javanese Text",
+      "Leelawadee UI", "Lucida Console", "Lucida Sans Unicode",
+      "Malgun Gothic", "Marlett", "Microsoft Himalaya",
+      "Microsoft JhengHei", "Microsoft New Tai Lue", "Microsoft PhagsPa",
+      "Microsoft Sans Serif", "Microsoft Tai Le", "Microsoft YaHei",
+      "Microsoft Yi Baiti", "MingLiU-ExtB", "Mongolian Baiti", "MS Gothic",
+      "MV Boli", "Myanmar Text", "Nirmala UI", "Palatino Linotype",
+      "Segoe Fluent Icons", "Segoe MDL2 Assets", "Segoe Print",
+      "Segoe Script", "Segoe UI", "Segoe UI Emoji", "Segoe UI Historic",
+      "Segoe UI Symbol", "Segoe UI Variable", "SimSun", "Sitka", "Sylfaen",
+      "Symbol", "Tahoma", "Times New Roman", "Trebuchet MS", "Verdana",
+      "Webdings", "Wingdings", "Yu Gothic"};
+  for (const char* allowed : kWindowsFamilies) {
+    if (base::EqualsCaseInsensitiveASCII(allowed, requested))
+      return true;
+  }
+  return false;
+}
+
+}  // namespace
+
+'@
+
+Set-SourceReplacement `
+  -RelativePath "third_party\blink\renderer\platform\fonts\font_cache.cc" `
+  -OldText @'
   if (UxrFontHidden(family)) {  // UXR: persona font availability
     return nullptr;
   }
