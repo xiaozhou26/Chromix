@@ -9,7 +9,7 @@ function Set-SourceReplacement {
     [Parameter(Mandatory)] [string]$RelativePath,
     [Parameter(Mandatory)] [string]$OldText,
     [Parameter(Mandatory)] [AllowEmptyString()] [string]$NewText,
-    [string]$CurrentMarker = ""
+    [string[]]$CurrentMarker = @()
   )
   $path = Join-Path $Src $RelativePath
   if (-not (Test-Path -LiteralPath $path -PathType Leaf)) {
@@ -20,9 +20,11 @@ function Set-SourceReplacement {
     Write-Host "==> restored source already current: $RelativePath"
     return
   }
-  if ($CurrentMarker -ne "" -and $content.Contains($CurrentMarker)) {
-    Write-Host "==> restored source already current: $RelativePath"
-    return
+  foreach ($marker in $CurrentMarker) {
+    if ($marker -ne "" -and $content.Contains($marker)) {
+      Write-Host "==> restored source already current: $RelativePath"
+      return
+    }
   }
   if ($content.Contains($OldText)) {
     [IO.File]::WriteAllText($path, $content.Replace($OldText, $NewText))
@@ -194,7 +196,10 @@ Set-SourceReplacement `
           return WebGLAny(script_state, String(renderer.c_str()));
         }
 '@ `
-  -CurrentMarker "WebGLPersonaRenderer()"
+  -CurrentMarker @(
+    'String(renderer.c_str())',
+    'String(WebGLPersonaRenderer().c_str())'
+  )
 
 Set-SourceReplacement `
   -RelativePath "third_party\blink\renderer\modules\webgl\webgl_rendering_context_base.cc" `
@@ -214,7 +219,10 @@ Set-SourceReplacement `
           return WebGLAny(script_state, String(vendor.c_str()));
         }
 '@ `
-  -CurrentMarker "WebGLPersonaVendor()"
+  -CurrentMarker @(
+    'String(vendor.c_str())',
+    'String(WebGLPersonaVendor().c_str())'
+  )
 
 Set-SourceReplacement `
   -RelativePath "third_party\blink\renderer\modules\webgl\webgl_rendering_context_base.cc" `
