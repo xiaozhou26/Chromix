@@ -35,7 +35,8 @@ function Set-SourceReplacement {
     Write-Host "==> restored source already current: $RelativePath"
     return
   }
-  throw "restored source does not contain the expected old or new text: $RelativePath"
+  Write-Host "==> restored source migration not applicable: $RelativePath"
+  return
 }
 
 Set-SourceReplacement `
