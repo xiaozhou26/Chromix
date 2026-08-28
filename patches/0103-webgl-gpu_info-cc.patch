@@ -1,0 +1,104 @@
+diff --git a/third_party/blink/renderer/modules/webgl/gpu_info.cc b/third_party/blink/renderer/modules/webgl/gpu_info.cc
+--- /dev/null
++++ b/third_party/blink/renderer/modules/webgl/gpu_info.cc
+@@ -0,0 +1,100 @@
++#include "third_party/blink/renderer/modules/webgl/gpu_info.h"
++
++#include "base/strings/stringprintf.h"
++#include "components/ungoogled/fingerprint_data.h"
++
++namespace blink {
++
++using ungoogled::fingerprint::GpuModelInfo;
++using ungoogled::fingerprint::kGpuModelCount;
++using ungoogled::fingerprint::kGpuModels;
++using ungoogled::fingerprint::kLinuxGpuSuffix;
++using ungoogled::fingerprint::kLinuxVendorString;
++using ungoogled::fingerprint::kMacosGpuModelCount;
++using ungoogled::fingerprint::kMacosGpuModels;
++using ungoogled::fingerprint::kWindowsGpuSuffix;
++using ungoogled::fingerprint::kWindowsVendorString;
++
++// Generate full Windows GPU info on demand
++GpuInfo GetWindowsGpuInfo(size_t index) {
++  if (index >= kGpuModelCount) {
++    // Default to last one (RTX 4090) if out of bounds
++    index = kGpuModelCount - 1;
++  }
++
++  const GpuModelInfo& model = kGpuModels[index];
++  GpuInfo info;
++  info.model_name = model.model_name;
++  info.device_id = model.device_id;
++
++  // Build the Windows renderer string
++  std::string device_id_part = (model.device_id && model.device_id[0]) ?
++    " (" + std::string(model.device_id) + ")" : "";
++
++  info.renderer_string = "ANGLE (" + std::string(kWindowsVendorString) +
++                         ", NVIDIA " + info.model_name +
++                         device_id_part + " " + kWindowsGpuSuffix + ")";
++
++  return info;
++}
++
++// All Windows GPU info list - generated from kGpuModels
++std::vector<GpuInfo> GetAllWindowsGpuInfo() {
++  std::vector<GpuInfo> result;
++  result.reserve(kGpuModelCount);
++
++  for (size_t i = 0; i < kGpuModelCount; ++i) {
++    result.push_back(GetWindowsGpuInfo(i));
++  }
++
++  return result;
++}
++
++// Lazy-initialized list of Windows GPU info
++const std::vector<GpuInfo>& GetWindowsGpuInfoList() {
++  static const std::vector<GpuInfo>* windows_gpu_info = nullptr;
++  if (!windows_gpu_info) {
++    windows_gpu_info = new std::vector<GpuInfo>(GetAllWindowsGpuInfo());
++  }
++  return *windows_gpu_info;
++}
++
++// Implementation of the functions declared in the header
++size_t GetGpuCount() {
++  return kGpuModelCount;
++}
++
++const GpuInfo& GetGpuInfo(size_t index) {
++  // Use the Windows GPU info list
++  const std::vector<GpuInfo>& windows_list = GetWindowsGpuInfoList();
++
++  // Ensure index is in bounds
++  if (index >= windows_list.size()) {
++    return windows_list.back();
++  }
++
++  return windows_list[index];
++}
++
++// Helper function to get a macOS GPU model string
++std::string GetMacosGpuString(size_t index) {
++  if (index >= kMacosGpuModelCount) {
++    // Default to M3 if out of bounds
++    index = kMacosGpuModelCount - 1;  // Index of M3 in the array
++  }
++
++  return base::StringPrintf("ANGLE (Apple, ANGLE Metal Renderer: Apple %s, Unspecified Version)",
++                         kMacosGpuModels[index]);
++}
++
++// Helper function to get a Linux GPU renderer string
++std::string GetLinuxGpuString(const std::string& model_name) {
++  // Note the difference: no device ID and no space before /PCIe
++  // Also using the Linux-specific vendor string
++  return base::StringPrintf("ANGLE (%s, NVIDIA %s%s)",
++                         kLinuxVendorString,
++                         model_name.c_str(),
++                         kLinuxGpuSuffix);
++}
++
++}  // namespace blink

@@ -1,0 +1,228 @@
+diff --git a/third_party/blink/renderer/modules/webgl/webgl2_rendering_context_base.cc b/third_party/blink/renderer/modules/webgl/webgl2_rendering_context_base.cc
+index 0000000..0000000 100644
+--- a/third_party/blink/renderer/modules/webgl/webgl2_rendering_context_base.cc
++++ b/third_party/blink/renderer/modules/webgl/webgl2_rendering_context_base.cc
+@@ -35,9 +35,11 @@
+ #include "third_party/blink/renderer/modules/webgl/webgl_texture.h"
+ #include "third_party/blink/renderer/modules/webgl/webgl_transform_feedback.h"
+ #include "third_party/blink/renderer/modules/webgl/webgl_uniform_location.h"
++#include <algorithm>
+ #include "third_party/blink/renderer/modules/webgl/webgl_vertex_array_object.h"
+ #include "third_party/blink/renderer/platform/heap/garbage_collected.h"
+ #include "third_party/blink/renderer/platform/wtf/text/wtf_string.h"
++#include "components/ungoogled/persona_profile.h"
+ 
+ // Populates all parameters for texImage2D, including width, height, depth (set
+ // to 1), and border. Many callers will need to zero-out border in order to
+@@ -113,17 +115,28 @@
+ 
+ const GLuint64 kMaxClientWaitTimeout = 0u;
+ 
+-GLint ClampWebGL2PersonaLimit(gpu::gles2::GLES2Interface* gl,
+-                              GLenum pname,
+-                              GLint persona_value) {
+-  GLint real_value = 0;
+-  gl->GetIntegerv(pname, &real_value);
+-  return real_value > 0 && real_value < persona_value ? real_value
+-                                                       : persona_value;
+-}
+-
+-GLint WebGL2PersonaVaryingVectors(gpu::gles2::GLES2Interface* gl) {
+-  return ClampWebGL2PersonaLimit(gl, GL_MAX_VARYING_VECTORS, 30);
++GLint ClampPersonaLimit(gpu::gles2::GLES2Interface* gl,
++                        GLenum pname,
++                        int persona_value) {
++  GLint real = 0;
++  gl->GetIntegerv(pname, &real);
++  const GLint value = std::max(0, persona_value);
++  return real > 0 && value > real ? real : value;
++}
++
++GLfloat ClampPersonaLimitF(gpu::gles2::GLES2Interface* gl,
++                           GLenum pname,
++                           float persona_value) {
++  GLfloat real = 0.0f;
++  gl->GetFloatv(pname, &real);
++  const GLfloat value = std::max(0.0f, persona_value);
++  return real > 0.0f && value > real ? real : value;
++}
++
++GLint PersonaMaxVaryingVectors(gpu::gles2::GLES2Interface* gl) {
++  return ClampPersonaLimit(
++      gl, GL_MAX_VARYING_VECTORS,
++      ungoogled::CurrentPersona().webgl_max_varying_vectors);
+ }
+ 
+ // TODO(kainino): Change outByteLength to GLuint and change the associated
+@@ -667,6 +680,25 @@
+       auto values = base::HeapArray<GLint>::WithSize(length);
+       ContextGL()->GetInternalformativ(target, internalformat, GL_SAMPLES,
+                                        length, values.data());
++      if (!ungoogled::CurrentPersona().webgl_real) {
++        const GLint max_samples = ClampPersonaLimit(
++            ContextGL(), GL_MAX_SAMPLES,
++            ungoogled::CurrentPersona().webgl_max_samples);
++        size_t keep = 0;
++        for (GLint value : values) {
++          if (value <= max_samples)
++            ++keep;
++        }
++        if (keep != values.size()) {
++          auto filtered = base::HeapArray<GLint>::WithSize(keep);
++          size_t index = 0;
++          for (GLint value : values) {
++            if (value <= max_samples)
++              filtered[index++] = value;
++          }
++          return WebGLAny(script_state, DOMInt32Array::Create(filtered));
++        }
++      }
+       return WebGLAny(script_state, DOMInt32Array::Create(values));
+     }
+     default:
+@@ -4804,6 +4836,29 @@
+                                                      GLenum pname) {
+   if (isContextLost())
+     return ScriptValue::CreateNull(script_state->GetIsolate());
++  if (ungoogled::CurrentPersona().webgl_real) {
++    switch (pname) {
++      case GL_MAX_3D_TEXTURE_SIZE:
++      case GL_MAX_ARRAY_TEXTURE_LAYERS:
++      case GL_MAX_COLOR_ATTACHMENTS:
++      case GL_MAX_COMBINED_UNIFORM_BLOCKS:
++      case GL_MAX_DRAW_BUFFERS:
++      case GL_MAX_FRAGMENT_UNIFORM_BLOCKS:
++      case GL_MAX_FRAGMENT_UNIFORM_COMPONENTS:
++      case GL_MAX_SAMPLES:
++      case GL_MAX_UNIFORM_BUFFER_BINDINGS:
++      case GL_MAX_VARYING_COMPONENTS:
++      case GL_MAX_VERTEX_OUTPUT_COMPONENTS:
++      case GL_MAX_FRAGMENT_INPUT_COMPONENTS:
++      case GL_MAX_VERTEX_UNIFORM_BLOCKS:
++      case GL_MAX_VERTEX_UNIFORM_COMPONENTS:
++        return GetIntParameter(script_state, pname);
++      case GL_MAX_TEXTURE_LOD_BIAS:
++        return GetFloatParameter(script_state, pname);
++      default:
++        break;
++    }
++  }
+   switch (pname) {
+     case GL_SHADING_LANGUAGE_VERSION:
+       return WebGLAny(
+@@ -4822,26 +4877,30 @@
+     case GL_FRAGMENT_SHADER_DERIVATIVE_HINT:
+       return GetUnsignedIntParameter(script_state, pname);
+     case GL_MAX_3D_TEXTURE_SIZE:
+-      return WebGLAny(script_state, ClampWebGL2PersonaLimit(
+-                                        ContextGL(), pname, 2048));
++      return WebGLAny(script_state, ClampPersonaLimit(
++          ContextGL(), pname,
++          ungoogled::CurrentPersona().webgl_max_3d_texture_size));
+     case GL_MAX_ARRAY_TEXTURE_LAYERS:
+-      return WebGLAny(script_state, ClampWebGL2PersonaLimit(
+-                                        ContextGL(), pname, 2048));
++      return WebGLAny(script_state, ClampPersonaLimit(
++          ContextGL(), pname,
++          ungoogled::CurrentPersona().webgl_max_array_texture_layers));
+     case GC3D_MAX_CLIENT_WAIT_TIMEOUT_WEBGL:
+       return WebGLAny(script_state, kMaxClientWaitTimeout);
+     case GL_MAX_COLOR_ATTACHMENTS:
+-      return WebGLAny(script_state, ClampWebGL2PersonaLimit(
+-                                        ContextGL(), pname, 8));
++      return WebGLAny(script_state, ClampPersonaLimit(
++          ContextGL(), pname,
++          ungoogled::CurrentPersona().webgl_max_color_attachments));
+     case GL_MAX_COMBINED_FRAGMENT_UNIFORM_COMPONENTS:
+-      return GetInt64Parameter(script_state, pname);
++      return WebGLAny(script_state, ClampPersonaLimit(
++          ContextGL(), GL_MAX_COMBINED_FRAGMENT_UNIFORM_COMPONENTS,
++          ungoogled::CurrentPersona().webgl_max_combined_fragment_uniform_components));
+     case GL_MAX_COMBINED_UNIFORM_BLOCKS:
+-      return WebGLAny(script_state, ClampWebGL2PersonaLimit(
+-                                        ContextGL(), pname, 72));
++      return WebGLAny(script_state, ClampPersonaLimit(
++          ContextGL(), pname,
++          ungoogled::CurrentPersona().webgl_max_combined_uniform_blocks));
+     case GL_MAX_COMBINED_VERTEX_UNIFORM_COMPONENTS:
+-      return GetInt64Parameter(script_state, pname);
++      return WebGLAny(script_state, ClampPersonaLimit(
++          ContextGL(), GL_MAX_COMBINED_VERTEX_UNIFORM_COMPONENTS,
++          ungoogled::CurrentPersona().webgl_max_combined_vertex_uniform_components));
+     case GL_MAX_DRAW_BUFFERS:
+-      return WebGLAny(script_state, ClampWebGL2PersonaLimit(
+-                                        ContextGL(), pname, 8));
++      return WebGLAny(script_state, ClampPersonaLimit(
++          ContextGL(), pname, ungoogled::CurrentPersona().webgl_max_draw_buffers));
+     case GL_MAX_ELEMENT_INDEX:
+       return GetInt64Parameter(script_state, pname);
+     case GL_MAX_ELEMENTS_INDICES:
+@@ -4850,22 +4909,26 @@
+       return GetIntParameter(script_state, pname);
+     case GL_MAX_FRAGMENT_INPUT_COMPONENTS:
+       return WebGLAny(script_state,
+-                      4 * WebGL2PersonaVaryingVectors(ContextGL()));
++                      4 * PersonaMaxVaryingVectors(ContextGL()));
+     case GL_MAX_FRAGMENT_UNIFORM_BLOCKS:
+-      return WebGLAny(script_state, ClampWebGL2PersonaLimit(
+-                                        ContextGL(), pname, 12));
++      return WebGLAny(script_state, ClampPersonaLimit(
++          ContextGL(), pname,
++          ungoogled::CurrentPersona().webgl_max_fragment_uniform_blocks));
+     case GL_MAX_FRAGMENT_UNIFORM_COMPONENTS:
+-      return WebGLAny(script_state, ClampWebGL2PersonaLimit(
+-                                        ContextGL(), pname, 4096));
++      return WebGLAny(script_state, ClampPersonaLimit(
++          ContextGL(), pname,
++          ungoogled::CurrentPersona().webgl_max_fragment_uniform_components));
+     case GL_MAX_PROGRAM_TEXEL_OFFSET:
+       return GetIntParameter(script_state, pname);
+     case GL_MAX_SAMPLES:
+-      return WebGLAny(script_state, ClampWebGL2PersonaLimit(
+-                                        ContextGL(), pname, 4));
++      return WebGLAny(script_state, ClampPersonaLimit(
++          ContextGL(), pname, ungoogled::CurrentPersona().webgl_max_samples));
+     case GL_MAX_SERVER_WAIT_TIMEOUT:
+       return GetInt64Parameter(script_state, pname);
+     case GL_MAX_TEXTURE_LOD_BIAS:
+-      return GetFloatParameter(script_state, pname);
++      return WebGLAny(script_state, ClampPersonaLimitF(
++          ContextGL(), pname,
++          ungoogled::CurrentPersona().webgl_max_texture_lod_bias));
+     case GL_MAX_TRANSFORM_FEEDBACK_INTERLEAVED_COMPONENTS:
+-      return GetIntParameter(script_state, pname);
++      return WebGLAny(script_state, ClampPersonaLimit(
++          ContextGL(), GL_MAX_TRANSFORM_FEEDBACK_INTERLEAVED_COMPONENTS,
++          ungoogled::CurrentPersona().webgl_max_transform_feedback_interleaved_components));
+     case GL_MAX_TRANSFORM_FEEDBACK_SEPARATE_ATTRIBS:
+@@ -4875,18 +4938,21 @@
+     case GL_MAX_UNIFORM_BLOCK_SIZE:
+-      return WebGLAny(script_state, ClampPersonaLimit(
+-          ContextGL(), GL_MAX_UNIFORM_BLOCK_SIZE,
+-          ungoogled::CurrentPersona().webgl_max_uniform_block_size));
+     case GL_MAX_UNIFORM_BUFFER_BINDINGS:
+-      return WebGLAny(script_state, ClampWebGL2PersonaLimit(
+-                                        ContextGL(), pname, 72));
++      return WebGLAny(script_state, ClampPersonaLimit(
++          ContextGL(), pname,
++          ungoogled::CurrentPersona().webgl_max_uniform_buffer_bindings));
+     case GL_MAX_VARYING_COMPONENTS:
+     case GL_MAX_VERTEX_OUTPUT_COMPONENTS:
+       return WebGLAny(script_state,
+-                      4 * WebGL2PersonaVaryingVectors(ContextGL()));
++                      4 * PersonaMaxVaryingVectors(ContextGL()));
+     case GL_MAX_VERTEX_UNIFORM_BLOCKS:
+-      return WebGLAny(script_state, ClampWebGL2PersonaLimit(
+-                                        ContextGL(), pname, 12));
++      return WebGLAny(script_state, ClampPersonaLimit(
++          ContextGL(), pname,
++          ungoogled::CurrentPersona().webgl_max_vertex_uniform_blocks));
+     case GL_MAX_VERTEX_UNIFORM_COMPONENTS:
+-      return WebGLAny(script_state, ClampWebGL2PersonaLimit(
+-                                        ContextGL(), pname, 16384));
++      return WebGLAny(script_state, ClampPersonaLimit(
++          ContextGL(), pname,
++          ungoogled::CurrentPersona().webgl_max_vertex_uniform_components));
+     case GL_MIN_PROGRAM_TEXEL_OFFSET:
+       return GetIntParameter(script_state, pname);
+     case GL_PACK_ROW_LENGTH:

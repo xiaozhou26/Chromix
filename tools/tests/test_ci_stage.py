@@ -1,6 +1,6 @@
-from pathlib import Path
 import re
 import unittest
+from pathlib import Path
 
 
 REPO = Path(__file__).resolve().parents[2]
@@ -137,7 +137,10 @@ class ResumeWorkflowRegressionTest(unittest.TestCase):
         self.assertIn("if: ${{ inputs.resume_run_id == '' }}", self.source)
         for stage in range(2, 13):
             self.assertIn(f"inputs.resume_stage == '{stage}'", self.source)
-            self.assertIn(f"inputs.resume_run_id == '' || inputs.resume_stage != '{stage}'", self.source)
+            self.assertIn(
+                f"inputs.resume_run_id == '' || inputs.resume_stage != '{stage}'",
+                self.source,
+            )
             self.assertIn(f"pattern: tree-s{stage - 1}-attempt-*-part*", self.source)
         self.assertEqual(self.source.count("Download tree from previous run"), 11)
 
@@ -225,6 +228,13 @@ class RestoredSourceUpdateRegressionTest(unittest.TestCase):
             "(OpenGL ES GLSL ES 3.0 Chromium)\")'",
             update_source,
         )
+
+    def test_resume_passes_output_directory_and_invalidates_webgl_objects(self):
+        stage = CI_STAGE.read_text(encoding="utf-8")
+        update = RESTORED_SOURCE_UPDATE.read_text(encoding="utf-8")
+        self.assertIn('update-restored-source.ps1" -Src $Src -OutDir $OutDir', stage)
+        self.assertIn('chromix-webgl-objects-invalidated.txt', update)
+        self.assertIn('removed $($staleObjects.Count) restored WebGL object files', update)
 
 
 if __name__ == "__main__":

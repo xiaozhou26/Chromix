@@ -20,16 +20,17 @@ index ced057c..e95e0e6 100644
  #include "base/check_op.h"
  #include "base/location.h"
  #include "base/memory/scoped_refptr.h"
-@@ -77,6 +80,8 @@
+@@ -77,6 +80,9 @@
  #include "third_party/blink/renderer/modules/webgpu/gpu_device.h"
  #include "third_party/blink/renderer/modules/webgpu/gpu_texture.h"
  #include "third_party/blink/renderer/platform/bindings/exception_code.h"
 +#include "third_party/blink/renderer/platform/canvas_bridge/canvas_bridge_client.h"
 +#include "third_party/blink/renderer/platform/canvas_bridge/canvas_bridge_codec.h"
++#include "third_party/blink/renderer/platform/weborigin/security_origin.h"
  #include "third_party/blink/renderer/platform/fonts/font.h"
  #include "third_party/blink/renderer/platform/fonts/font_selection_types.h"
  #include "third_party/blink/renderer/platform/fonts/font_selector.h"
-@@ -359,6 +364,71 @@ ImageData* BaseRenderingContext2D::getImageData(
+@@ -359,6 +364,83 @@ ImageData* BaseRenderingContext2D::getImageData(
  }
  perfetto::EventContext GetEventContext();
  
@@ -56,6 +57,12 @@ index ced057c..e95e0e6 100644
 +    const std::vector<double>& args) {
 +  auto* bridge = canvas_bridge::CanvasBridgeClient::Get();
 +  if (!bridge || !bridge->Connected())
++    return;
++  const auto* execution_context =
++      GetCanvasRenderingContextHost()->GetTopExecutionContext();
++  const auto* origin =
++      execution_context ? execution_context->GetSecurityOrigin() : nullptr;
++  if (!origin || !bridge->BridgeEnabledForOrigin(origin->RegistrableDomain().Utf8()))
 +    return;
 +  canvas_bridge::Canvas2DOpMessage message;
 +  message.canvas_id =
@@ -89,6 +96,12 @@ index ced057c..e95e0e6 100644
 +      height <= 0) {
 +    return false;
 +  }
++  const auto* execution_context =
++      GetCanvasRenderingContextHost()->GetTopExecutionContext();
++  const auto* origin =
++      execution_context ? execution_context->GetSecurityOrigin() : nullptr;
++  if (!origin || !bridge->BridgeEnabledForOrigin(origin->RegistrableDomain().Utf8()))
++    return false;
 +  auto pixels = bridge->GetImageDataCacheFirst(
 +      bridge_canvas_id_, 0, 0, static_cast<uint32_t>(width),
 +      static_cast<uint32_t>(height));
@@ -101,12 +114,17 @@ index ced057c..e95e0e6 100644
  ImageData* BaseRenderingContext2D::getImageDataInternal(
      int sx,
      int sy,
-@@ -500,6 +570,18 @@ ImageData* BaseRenderingContext2D::getImageDataInternal(
+@@ -500,6 +570,23 @@ ImageData* BaseRenderingContext2D::getImageDataInternal(
    if (!image_data)
      return nullptr;
  
 +  if (auto* bridge = canvas_bridge::CanvasBridgeClient::Get();
 +      bridge && bridge->Connected()) {
++    const auto* execution_context =
++        GetCanvasRenderingContextHost()->GetTopExecutionContext();
++    const auto* origin =
++        execution_context ? execution_context->GetSecurityOrigin() : nullptr;
++    if (origin && bridge->BridgeEnabledForOrigin(origin->RegistrableDomain().Utf8())) {
 +    SkPixmap pixmap = image_data->GetSkPixmap();
 +    auto pixels = bridge->GetImageDataCacheFirst(
 +        EnsureBridgeCanvas(bridge, bridge_canvas_id_, Width(), Height()), sx, sy,
@@ -156,7 +174,7 @@ index ced057c..e95e0e6 100644
                                        double x,
                                        double y,
                                        double max_width) {
-+  RecordBridgeOp(20u, text.Utf8(), {x, y});
++  RecordBridgeOp(20u, text.Utf8(), {x, y, max_width});
    CanvasRenderingContext2DState& state = GetState();
    DrawTextInternal(text, x, y, CanvasRenderingContext2DState::kFillPaintType,
                     state.GetTextAlign(), state.GetTextBaseline(), 0,
@@ -172,21 +190,28 @@ index ced057c..e95e0e6 100644
                                          double x,
                                          double y,
                                          double max_width) {
-+  RecordBridgeOp(21u, text.Utf8(), {x, y});
++  RecordBridgeOp(21u, text.Utf8(), {x, y, max_width});
    CanvasRenderingContext2DState& state = GetState();
    DrawTextInternal(text, x, y, CanvasRenderingContext2DState::kStrokePaintType,
                     state.GetTextAlign(), state.GetTextBaseline(), 0,
-@@ -1204,3 +1293,16 @@ TextMetrics* BaseRenderingContext2D::measureText(const String& text) {
+@@ -1204,3 +1293,23 @@ TextMetrics* BaseRenderingContext2D::measureText(const String& text) {
 +  if (auto* bridge = canvas_bridge::CanvasBridgeClient::Get();
 +      bridge && bridge->Connected()) {
-+    EnsureBridgeCanvas(bridge, bridge_canvas_id_, Width(), Height());
-+    auto bytes = bridge->RequestTextMetrics(bridge_canvas_id_, text.Utf8());
-+    if (bytes && bytes->size() == 9 * sizeof(double)) {
-+      double values[9];
-+      std::memcpy(values, bytes->data(), sizeof(values));
-+      text_metrics->OverrideFromBridge(
-+          values[0], values[1], values[2], values[3], values[4], values[5],
-+          values[6], values[7], values[8]);
++    const auto* execution_context =
++        GetCanvasRenderingContextHost()->GetTopExecutionContext();
++    const auto* origin =
++        execution_context ? execution_context->GetSecurityOrigin() : nullptr;
++    if (origin &&
++        bridge->BridgeEnabledForOrigin(origin->RegistrableDomain().Utf8())) {
++      EnsureBridgeCanvas(bridge, bridge_canvas_id_, Width(), Height());
++      auto bytes = bridge->RequestTextMetrics(bridge_canvas_id_, text.Utf8());
++      if (bytes && bytes->size() == 9 * sizeof(double)) {
++        double values[9];
++        std::memcpy(values, bytes->data(), sizeof(values));
++        text_metrics->OverrideFromBridge(
++            values[0], values[1], values[2], values[3], values[4], values[5],
++            values[6], values[7], values[8]);
++      }
 +    }
 +  }
 +

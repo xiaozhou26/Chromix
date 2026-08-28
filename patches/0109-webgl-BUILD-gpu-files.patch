@@ -1,0 +1,22 @@
+diff --git a/third_party/blink/renderer/modules/webgl/BUILD.gn b/third_party/blink/renderer/modules/webgl/BUILD.gn
+--- a/third_party/blink/renderer/modules/webgl/BUILD.gn
++++ b/third_party/blink/renderer/modules/webgl/BUILD.gn
+@@ -48,6 +48,10 @@
+     "ext_texture_norm_16.cc",
+     "ext_texture_norm_16.h",
+     "gl_string_query.h",
++    "gpu_info.cc",
++    "gpu_info.h",
++    "gpu_fingerprint.cc",
++    "gpu_fingerprint.h",
+     "khr_parallel_shader_compile.cc",
+     "khr_parallel_shader_compile.h",
+     "nv_shader_noperspective_interpolation.cc",
+@@ -196,6 +200,7 @@
+   public_deps = [ "//device/vr/public/mojom:vr_service_blink" ]
+   deps = [
+     "//device/vr/buildflags",
++    "//components/ungoogled",
+     "//gpu/command_buffer/client:gles2_implementation",
+     "//gpu/command_buffer/client:gles2_interface",
+     "//third_party/blink/renderer/modules/webcodecs",

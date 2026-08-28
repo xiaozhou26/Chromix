@@ -1,0 +1,25 @@
+diff --git a/third_party/blink/renderer/modules/webgl/gpu_fingerprint.h b/third_party/blink/renderer/modules/webgl/gpu_fingerprint.h
+--- /dev/null
++++ b/third_party/blink/renderer/modules/webgl/gpu_fingerprint.h
+@@ -0,0 +1,21 @@
++#ifndef THIRD_PARTY_BLINK_RENDERER_MODULES_WEBGL_GPU_FINGERPRINT_H_
++#define THIRD_PARTY_BLINK_RENDERER_MODULES_WEBGL_GPU_FINGERPRINT_H_
++
++#include <cstdint>
++#include <string>
++
++namespace blink {
++
++// Returns the GL_VENDOR string based on platform and fingerprint.
++// Vendor selection is platform-only (no seed), so this takes no seed argument.
++std::string GetGLVendorStringForFingerprint();
++
++// Returns the GL_RENDERER string based on platform and a per-site farbling
++// seed. |effective_seed| is the per-eTLD+1 seed (see ungoogled::GetFarbleSeed64)
++// and is used to pick the GPU model so the renderer string is stable per site
++// but decorrelated across sites.
++std::string GetGLRendererStringForFingerprint(uint64_t effective_seed);
++
++}  // namespace blink
++
++#endif  // THIRD_PARTY_BLINK_RENDERER_MODULES_WEBGL_GPU_FINGERPRINT_H_

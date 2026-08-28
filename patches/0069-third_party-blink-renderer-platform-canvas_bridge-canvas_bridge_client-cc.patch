@@ -1,9 +1,8 @@
 diff --git a/third_party/blink/renderer/platform/canvas_bridge/canvas_bridge_client.cc b/third_party/blink/renderer/platform/canvas_bridge/canvas_bridge_client.cc
 new file mode 100644
-index 0000000..272392c
 --- /dev/null
 +++ b/third_party/blink/renderer/platform/canvas_bridge/canvas_bridge_client.cc
-@@ -0,0 +1,576 @@
+@@ -0,0 +1,629 @@
 +// Copyright 2026.
 +// Use of this source code is governed by a BSD-style license.
 +#include "third_party/blink/renderer/platform/canvas_bridge/canvas_bridge_client.h"
@@ -29,6 +28,7 @@ index 0000000..272392c
 +#include "base/rand_util.h"
 +#include "base/strings/string_number_conversions.h"
 +#include "base/time/time.h"
++#include "base/strings/string_split.h"
 +#include "base/uxr_config.h"
 +#include "third_party/blink/renderer/platform/canvas_bridge/canvas_bridge_codec.h"
 +
@@ -360,6 +360,54 @@ index 0000000..272392c
 +  base::AutoLock lock(pending_lock_);
 +  pending_.erase(canvas_id);
 +  return std::move(pending.pixels);
++}
++
++void CanvasBridgeClient::EnsurePolicyParsed() {
++  if (policy_parsed_)
++    return;
++  policy_parsed_ = true;
++  const base::UxrConfig& config = base::UxrConfig::GetInstance();
++  const std::string mode = config.Get("uxr-canvas-bridge-mode");
++  std::string list_switch;
++  if (mode == "off") {
++    policy_mode_ = PolicyMode::kOff;
++  } else if (mode == "allow") {
++    policy_mode_ = PolicyMode::kAllow;
++    list_switch = "uxr-canvas-bridge-allow";
++  } else if (mode == "deny") {
++    policy_mode_ = PolicyMode::kDeny;
++    list_switch = "uxr-canvas-bridge-deny";
++  } else {
++    policy_mode_ = PolicyMode::kAll;
++  }
++  if (!list_switch.empty()) {
++    for (const std::string& origin : base::SplitString(
++             config.Get(list_switch), ",",
++             base::TRIM_WHITESPACE, base::SPLIT_WANT_NONEMPTY)) {
++      policy_origins_.insert(origin);
++    }
++  }
++  fallback_local_ = config.Get("uxr-canvas-bridge-fallback") == "local";
++}
++
++bool CanvasBridgeClient::BridgeEnabledForOrigin(const std::string& etld1) {
++  EnsurePolicyParsed();
++  switch (policy_mode_) {
++    case PolicyMode::kOff:
++      return false;
++    case PolicyMode::kAll:
++      return true;
++    case PolicyMode::kAllow:
++      return policy_origins_.count(etld1) != 0;
++    case PolicyMode::kDeny:
++      return policy_origins_.count(etld1) == 0;
++  }
++  return false;
++}
++
++bool CanvasBridgeClient::FallbackToLocal() {
++  EnsurePolicyParsed();
++  return fallback_local_;
 +}
 +
 +void CanvasBridgeClient::BumpVersion(uint32_t canvas_id) {

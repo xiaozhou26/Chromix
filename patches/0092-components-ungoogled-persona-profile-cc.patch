@@ -1,0 +1,139 @@
+diff --git a/components/ungoogled/persona_profile.cc b/components/ungoogled/persona_profile.cc
+new file mode 100644
+--- /dev/null
++++ b/components/ungoogled/persona_profile.cc
+@@ -0,0 +1,125 @@
++// Copyright 2026.
++#include "components/ungoogled/persona_profile.h"
++
++#include <mutex>
++
++#include "base/strings/string_number_conversions.h"
++#include "base/uxr_config.h"
++
++namespace ungoogled {
++namespace {
++
++void OverrideInt(const base::UxrConfig& config, const char* key, int* value) {
++  int parsed = 0;
++  if (config.GetInt(key, &parsed) && parsed >= 0)
++    *value = parsed;
++}
++
++void OverrideFloat(const base::UxrConfig& config,
++                   const char* key,
++                   float* value) {
++  double parsed = 0.0;
++  const std::string raw = config.Get(key);
++  if (!raw.empty() && base::StringToDouble(raw, &parsed) && parsed >= 0.0)
++    *value = static_cast<float>(parsed);
++}
++
++bool ConfigSwitchEnabled(const base::UxrConfig& config, const char* key) {
++  if (!config.Has(key))
++    return false;
++  const std::string value = config.Get(key);
++  return value.empty() || value == "1" || value == "true";
++}
++
++std::vector<std::string> SplitExtensions(const std::string& raw) {
++  std::vector<std::string> result;
++  size_t begin = 0;
++  while (begin < raw.size()) {
++    size_t end = raw.find(',', begin);
++    if (end == std::string::npos)
++      end = raw.size();
++    if (end > begin)
++      result.push_back(raw.substr(begin, end - begin));
++    begin = end + 1;
++  }
++  return result;
++}
++
++PersonaProfile BuildPersona() {
++  PersonaProfile p;
++  const base::UxrConfig& config = base::UxrConfig::GetInstance();
++  const std::string vendor = config.Get("uxr-webgl-vendor");
++  const std::string renderer = config.Get("uxr-webgl-renderer");
++  if (!vendor.empty() && !renderer.empty()) {
++    p.webgl_vendor = vendor;
++    p.webgl_renderer = renderer;
++    p.webgl_identity_explicit = true;
++  }
++  p.webgl_fingerprint = ConfigSwitchEnabled(config, "uxr-webgl-fingerprint");
++  p.webgl_real = ConfigSwitchEnabled(config, "uxr-webgl-real") ||
++                 ConfigSwitchEnabled(config, "uxr-disable-gpu-fingerprint");
++  const std::string platform = config.Get("uxr-platform");
++  p.mobile = platform == "android" || platform == "Android";
++
++  OverrideInt(config, "uxr-webgl-max-texture-size", &p.webgl_max_texture_size);
++  OverrideInt(config, "uxr-webgl-max-cube-map-texture-size",
++              &p.webgl_max_cube_map_texture_size);
++  OverrideInt(config, "uxr-webgl-max-renderbuffer-size",
++              &p.webgl_max_renderbuffer_size);
++  OverrideInt(config, "uxr-webgl-max-viewport-dim", &p.webgl_max_viewport_dim);
++  OverrideInt(config, "uxr-webgl-max-vertex-uniform-vectors",
++              &p.webgl_max_vertex_uniform_vectors);
++  OverrideInt(config, "uxr-webgl-max-fragment-uniform-vectors",
++              &p.webgl_max_fragment_uniform_vectors);
++  OverrideInt(config, "uxr-webgl-max-varying-vectors",
++              &p.webgl_max_varying_vectors);
++  OverrideInt(config, "uxr-webgl-max-combined-texture-image-units",
++              &p.webgl_max_combined_texture_image_units);
++  OverrideInt(config, "uxr-webgl-max-texture-image-units",
++              &p.webgl_max_texture_image_units);
++  OverrideInt(config, "uxr-webgl-max-vertex-attribs",
++              &p.webgl_max_vertex_attribs);
++  OverrideInt(config, "uxr-webgl-max-vertex-texture-image-units",
++              &p.webgl_max_vertex_texture_image_units);
++  OverrideInt(config, "uxr-webgl-max-combined-fragment-uniform-components",
++              &p.webgl_max_combined_fragment_uniform_components);
++  OverrideInt(config, "uxr-webgl-max-combined-vertex-uniform-components",
++              &p.webgl_max_combined_vertex_uniform_components);
++  OverrideInt(config, "uxr-webgl-max-transform-feedback-interleaved-components",
++              &p.webgl_max_transform_feedback_interleaved_components);
++  OverrideInt(config, "uxr-webgl-max-transform-feedback-separate-attribs",
++              &p.webgl_max_transform_feedback_separate_attribs);
++  OverrideInt(config, "uxr-webgl-max-uniform-block-size",
++              &p.webgl_max_uniform_block_size);
++  OverrideInt(config, "uxr-webgl-max-3d-texture-size",
++              &p.webgl_max_3d_texture_size);
++  OverrideInt(config, "uxr-webgl-max-array-texture-layers",
++              &p.webgl_max_array_texture_layers);
++  OverrideInt(config, "uxr-webgl-max-draw-buffers", &p.webgl_max_draw_buffers);
++  OverrideInt(config, "uxr-webgl-max-color-attachments",
++              &p.webgl_max_color_attachments);
++  OverrideInt(config, "uxr-webgl-max-samples", &p.webgl_max_samples);
++  OverrideInt(config, "uxr-webgl-max-vertex-uniform-blocks",
++              &p.webgl_max_vertex_uniform_blocks);
++  OverrideInt(config, "uxr-webgl-max-fragment-uniform-blocks",
++              &p.webgl_max_fragment_uniform_blocks);
++  OverrideInt(config, "uxr-webgl-max-combined-uniform-blocks",
++              &p.webgl_max_combined_uniform_blocks);
++  OverrideInt(config, "uxr-webgl-max-uniform-buffer-bindings",
++              &p.webgl_max_uniform_buffer_bindings);
++  OverrideFloat(config, "uxr-webgl-max-texture-lod-bias",
++                &p.webgl_max_texture_lod_bias);
++  OverrideInt(config, "uxr-webgl-max-vertex-uniform-components",
++              &p.webgl_max_vertex_uniform_components);
++  OverrideInt(config, "uxr-webgl-max-fragment-uniform-components",
++              &p.webgl_max_fragment_uniform_components);
++  OverrideFloat(config, "uxr-webgl-max-anisotropy",
++                &p.webgl_max_texture_max_anisotropy);
++
++  const std::string extensions = config.Get("uxr-webgl-extensions");
++  if (!extensions.empty())
++    p.webgl_extensions = SplitExtensions(extensions);
++  return p;
++}
++
++}  // namespace
++
++const PersonaProfile& CurrentPersona() {
++  static PersonaProfile* profile = nullptr;
++  static std::once_flag once;
++  std::call_once(once, [] { profile = new PersonaProfile(BuildPersona()); });
++  return *profile;
++}
++
++}  // namespace ungoogled

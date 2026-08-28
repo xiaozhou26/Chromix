@@ -1,6 +1,7 @@
 [CmdletBinding()]
 param(
-  [Parameter(Mandatory)] [string]$Src
+  [Parameter(Mandatory)] [string]$Src,
+  [string]$OutDir = (Join-Path $Src "out\Chromix")
 )
 $ErrorActionPreference = "Stop"
 
@@ -32,11 +33,9 @@ function Set-SourceReplacement {
     return
   }
   if ($NewText -eq "") {
-    Write-Host "==> restored source already current: $RelativePath"
-    return
+    throw "resume source migration has unknown state (expected legacy text or an explicit current marker): $RelativePath"
   }
-  Write-Host "==> restored source migration not applicable: $RelativePath"
-  return
+  throw "resume source migration has unknown state (expected legacy text or current marker): $RelativePath"
 }
 
 Set-SourceReplacement `
@@ -1190,3 +1189,15 @@ bool UxrFontFamilyAllowed(const AtomicString& family) {
     }
     return $content
   }
+
+$webglObjDir = Join-Path $OutDir "obj\third_party\blink\renderer\modules\webgl"
+if (Test-Path -LiteralPath $webglObjDir -PathType Container) {
+  $staleObjects = @(Get-ChildItem -LiteralPath $webglObjDir -Recurse -File -Include "*.obj","*.pch" -ErrorAction SilentlyContinue)
+  if ($staleObjects.Count -gt 0) {
+    $staleObjects | Remove-Item -Force
+    Write-Host "==> removed $($staleObjects.Count) restored WebGL object files"
+  }
+}
+$webglObjManifest = Join-Path $OutDir "chromix-webgl-objects-invalidated.txt"
+"restored WebGL object files invalidated at $(Get-Date -Format o)" |
+  Set-Content -Encoding ASCII $webglObjManifest

@@ -1,0 +1,14 @@
+diff --git a/third_party/blink/renderer/modules/webgl/webgl_rendering_context_base.h b/third_party/blink/renderer/modules/webgl/webgl_rendering_context_base.h
+index 0000000..0000000 100644
+--- a/third_party/blink/renderer/modules/webgl/webgl_rendering_context_base.h
++++ b/third_party/blink/renderer/modules/webgl/webgl_rendering_context_base.h
+@@ -2,6 +2,9 @@
+ 
+   uint32_t bridge_canvas_id_ = 0;
+   uint32_t bridge_webgl_obj_counter_ = 0;
++  bool bridge_policy_checked_ = false;
++  bool bridge_policy_allowed_ = false;
++  bool BridgeAllowedForThisContext();
+   bool bridge_webgl_unsupported_ = false;
+   bool bridge_tex_handled_ = false;
+   bool ReadBridgePixels(std::vector<uint8_t>* out, int width,

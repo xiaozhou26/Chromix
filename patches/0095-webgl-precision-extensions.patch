@@ -1,0 +1,65 @@
+diff --git a/third_party/blink/renderer/modules/webgl/webgl_rendering_context_base.cc b/third_party/blink/renderer/modules/webgl/webgl_rendering_context_base.cc
+index 0000000..0000000 100644
+--- a/third_party/blink/renderer/modules/webgl/webgl_rendering_context_base.cc
++++ b/third_party/blink/renderer/modules/webgl/webgl_rendering_context_base.cc
+@@ -4785,6 +4785,37 @@
+       return nullptr;
+   }
+ 
++  if (ungoogled::CurrentPersona().mobile &&
++      !ungoogled::CurrentPersona().webgl_real) {
++    GLint range_min = 127;
++    GLint range_max = 127;
++    GLint precision = 23;
++    switch (precision_type) {
++      case GL_LOW_FLOAT:
++      case GL_MEDIUM_FLOAT:
++        range_min = 15;
++        range_max = 15;
++        precision = 10;
++        break;
++      case GL_HIGH_INT:
++        range_min = 31;
++        range_max = 30;
++        precision = 0;
++        break;
++      case GL_LOW_INT:
++      case GL_MEDIUM_INT:
++        range_min = 15;
++        range_max = 14;
++        precision = 0;
++        break;
++      case GL_HIGH_FLOAT:
++      default:
++        break;
++    }
++    return MakeGarbageCollected<WebGLShaderPrecisionFormat>(
++        range_min, range_max, precision);
++  }
++
+   GLint range[2] = {0, 0};
+   GLint precision = 0;
+   ContextGL()->GetShaderPrecisionFormat(shader_type, precision_type, range,
+@@ -4810,6 +4841,21 @@
+     if (ExtensionSupportedAndAllowed(tracker)) {
+       result.push_back(tracker->ExtensionName());
+     }
++  }
++
++  if (!ungoogled::CurrentPersona().webgl_real &&
++      !ungoogled::CurrentPersona().webgl_extensions.empty()) {
++    Vector<String> filtered;
++    for (const std::string& allowed :
++         ungoogled::CurrentPersona().webgl_extensions) {
++      const String extension = String::FromUtf8(allowed);
++      for (const String& supported : result) {
++        if (supported == extension) {
++          filtered.push_back(extension);
++          break;
++        }
++      }
++    }
++    return filtered;
+   }
+ 
+   return result;

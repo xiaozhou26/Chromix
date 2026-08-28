@@ -1,0 +1,37 @@
+diff --git a/components/ungoogled/farble_seed.h b/components/ungoogled/farble_seed.h
+--- /dev/null
++++ b/components/ungoogled/farble_seed.h
+@@ -0,0 +1,33 @@
++#ifndef COMPONENTS_UNGOOGLED_FARBLE_SEED_H_
++#define COMPONENTS_UNGOOGLED_FARBLE_SEED_H_
++
++#include <cstdint>
++#include <string>
++#include <string_view>
++
++#include "base/component_export.h"
++
++namespace ungoogled {
++
++// Returns a deterministic 64-bit per-site farbling seed derived from the global
++// --fingerprint command-line seed mixed with |registrable_domain| (eTLD+1).
++// Same (global_seed, registrable_domain) -> same value across runs/processes
++// (uses base::PersistentHash, stable cross-run/platform). Distinct domains
++// decorrelate. Empty |registrable_domain| hashes to a stable fallback.
++COMPONENT_EXPORT(UNGOOGLED)
++uint64_t GetFarbleSeed64(std::string_view registrable_domain);
++
++// Decimal-ASCII rendering of GetFarbleSeed64, for surfaces that concatenate the
++// seed into std::hash<std::string> per-pixel keys.
++COMPONENT_EXPORT(UNGOOGLED)
++std::string GetFarbleSeedString(std::string_view registrable_domain);
++
++// Whether per-eTLD+1 fingerprint NOISE (canvas/WebGL/audio/client-rect farbling) is active.
++// True by default; --disable-fingerprint-noise turns it OFF so those surfaces return their
++// natural unperturbed values. Identity spoofs (UA/screen/GPU strings) are unaffected.
++COMPONENT_EXPORT(UNGOOGLED)
++bool FingerprintNoiseEnabled();
++
++}  // namespace ungoogled
++
++#endif  // COMPONENTS_UNGOOGLED_FARBLE_SEED_H_

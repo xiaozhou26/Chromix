@@ -1,0 +1,53 @@
+diff --git a/components/ungoogled/farble_seed.cc b/components/ungoogled/farble_seed.cc
+--- /dev/null
++++ b/components/ungoogled/farble_seed.cc
+@@ -0,0 +1,49 @@
++#include "components/ungoogled/farble_seed.h"
++
++#include "base/containers/span.h"
++#include "base/hash/hash.h"
++#include "base/uxr_config.h"
++#include "base/strings/string_number_conversions.h"
++
++namespace ungoogled {
++
++namespace {
++
++uint32_t GlobalSeed() {
++  const base::UxrConfig& config = base::UxrConfig::GetInstance();
++  const std::string fingerprint = config.Get("uxr-webgl-fingerprint");
++  if (fingerprint.empty())
++    return 0u;
++  uint64_t parsed = 0;
++  if (base::StringToUint64(fingerprint, &parsed))
++    return static_cast<uint32_t>(parsed);
++  return base::PersistentHash(fingerprint);
++}
++
++}  // namespace
++
++uint64_t GetFarbleSeed64(std::string_view registrable_domain) {
++  const uint32_t global_seed = GlobalSeed();
++  const uint32_t dhash =
++      base::PersistentHash(registrable_domain);
++  const uint32_t high = dhash + global_seed - 1u;
++  const uint32_t low = base::PersistentHash(base::byte_span_from_ref(high));
++  uint64_t seed64 = (static_cast<uint64_t>(high) << 32) ^
++                    static_cast<uint64_t>(low) ^
++                    (static_cast<uint64_t>(global_seed) << 16);
++  return seed64;
++}
++
++std::string GetFarbleSeedString(std::string_view registrable_domain) {
++  return base::NumberToString(GetFarbleSeed64(registrable_domain));
++}
++
++bool FingerprintNoiseEnabled() {
++  static const bool enabled = [] {
++    const base::UxrConfig& config = base::UxrConfig::GetInstance();
++    return !config.Has("uxr-disable-fingerprint-noise");
++  }();
++  return enabled;
++}
++
++}  // namespace ungoogled

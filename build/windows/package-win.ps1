@@ -62,6 +62,32 @@ foreach ($source in $runtimeCandidates) {
 "%~dp0chrome.exe" %*
 '@ | Set-Content -Encoding ASCII (Join-Path $Bundle "chromix.cmd")
 
+$dll = Join-Path $Bundle "chrome.dll"
+$bytes = [IO.File]::ReadAllBytes($dll)
+$ascii = [Text.Encoding]::ASCII.GetString($bytes)
+$utf16 = [Text.Encoding]::Unicode.GetString($bytes)
+$forbiddenMarkers = @(
+  "NVIDIA GeForce RTX 3060",
+  "Google Inc. (NVIDIA Corporation)"
+)
+foreach ($marker in $forbiddenMarkers) {
+  if ($ascii.Contains($marker) -or $utf16.Contains($marker)) {
+    throw "chrome.dll contains forbidden WebGL identity marker: $marker"
+  }
+}
+$requiredMarkers = @(
+  "Google Inc. (Intel)",
+  "ANGLE (Intel, Intel(R) UHD Graphics 770",
+  "uxr-webgl-vendor",
+  "uxr-webgl-renderer"
+)
+foreach ($marker in $requiredMarkers) {
+  if (-not ($ascii.Contains($marker) -or $utf16.Contains($marker))) {
+    throw "chrome.dll is missing required WebGL persona marker: $marker"
+  }
+}
+Write-Host "==> chrome.dll WebGL persona marker scan passed"
+
 $asset = Join-Path $Dest "chromix-win-x64.zip"
 Remove-Item $asset -ErrorAction SilentlyContinue
 Compress-Archive -Path $Bundle -DestinationPath $asset

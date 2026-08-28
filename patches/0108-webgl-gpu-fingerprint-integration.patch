@@ -1,0 +1,72 @@
+diff --git a/third_party/blink/renderer/modules/webgl/webgl_rendering_context_base.cc b/third_party/blink/renderer/modules/webgl/webgl_rendering_context_base.cc
+index 0c855b5..141346f 100644
+--- a/third_party/blink/renderer/modules/webgl/webgl_rendering_context_base.cc
++++ b/third_party/blink/renderer/modules/webgl/webgl_rendering_context_base.cc
+@@ -113,6 +113,7 @@
+ #include "third_party/blink/renderer/modules/webgl/ext_shader_texture_lod.h"
+ #include "third_party/blink/renderer/modules/webgl/ext_texture_filter_anisotropic.h"
+ #include "third_party/blink/renderer/modules/webgl/gl_string_query.h"
++#include "third_party/blink/renderer/modules/webgl/gpu_fingerprint.h"
+ #include "third_party/blink/renderer/modules/webgl/oes_element_index_uint.h"
+ #include "third_party/blink/renderer/modules/webgl/oes_standard_derivatives.h"
+ #include "third_party/blink/renderer/modules/webgl/oes_texture_float.h"
+@@ -4556,10 +4557,28 @@ ScriptValue WebGLRenderingContextBase::getParameter(ScriptState* script_state,
+       return ScriptValue::CreateNull(script_state->GetIsolate());
+     case WebGLDebugRendererInfo::kUnmaskedRendererWebgl:
+       if (ExtensionEnabled(kWebGLDebugRendererInfoName)) {
+-        if (!ungoogled::CurrentPersona().webgl_real)
+-          return WebGLAny(script_state, String(ungoogled::CurrentPersona().webgl_renderer));
+-        return WebGLAny(script_state,
+-                        String(ContextGL()->GetString(GL_RENDERER)));
++        if (ungoogled::CurrentPersona().webgl_real)
++          return WebGLAny(script_state,
++                          String(ContextGL()->GetString(GL_RENDERER)));
++        const std::string configured_renderer =
++            ungoogled::CurrentPersona().webgl_renderer;
++        if (!ungoogled::CurrentPersona().webgl_fingerprint &&
++            ungoogled::CurrentPersona().webgl_identity_explicit &&
++            !configured_renderer.empty())
++          return WebGLAny(script_state, String(configured_renderer));
++        const SecurityOrigin* origin =
++            GetExecutionContext() ? GetExecutionContext()->GetSecurityOrigin()
++                                  : nullptr;
++        if (ungoogled::CurrentPersona().webgl_fingerprint) {
++          const std::string fingerprint_renderer =
++              GetGLRendererStringForFingerprint(
++                  ungoogled::GetFarbleSeed64(
++                      origin ? origin->RegistrableDomain().Utf8()
++                             : std::string()));
++          if (!fingerprint_renderer.empty())
++            return WebGLAny(script_state, String(fingerprint_renderer));
++        }
++        return WebGLAny(script_state, String(configured_renderer));
+       }
+       SynthesizeGLError(
+           GL_INVALID_ENUM, "getParameter",
+@@ -4567,10 +4586,22 @@ ScriptValue WebGLRenderingContextBase::getParameter(ScriptState* script_state,
+       return ScriptValue::CreateNull(script_state->GetIsolate());
+     case WebGLDebugRendererInfo::kUnmaskedVendorWebgl:
+       if (ExtensionEnabled(kWebGLDebugRendererInfoName)) {
+-        if (!ungoogled::CurrentPersona().webgl_real)
+-          return WebGLAny(script_state, String(ungoogled::CurrentPersona().webgl_vendor));
+-        return WebGLAny(script_state,
+-                        String(ContextGL()->GetString(GL_VENDOR)));
++        if (ungoogled::CurrentPersona().webgl_real)
++          return WebGLAny(script_state,
++                          String(ContextGL()->GetString(GL_VENDOR)));
++        const std::string configured_vendor =
++            ungoogled::CurrentPersona().webgl_vendor;
++        if (!ungoogled::CurrentPersona().webgl_fingerprint &&
++            ungoogled::CurrentPersona().webgl_identity_explicit &&
++            !configured_vendor.empty())
++          return WebGLAny(script_state, String(configured_vendor));
++        if (ungoogled::CurrentPersona().webgl_fingerprint) {
++          const std::string fingerprint_vendor =
++              GetGLVendorStringForFingerprint();
++          if (!fingerprint_vendor.empty())
++            return WebGLAny(script_state, String(fingerprint_vendor));
++        }
++        return WebGLAny(script_state, String(configured_vendor));
+       }
+       SynthesizeGLError(
+           GL_INVALID_ENUM, "getParameter",

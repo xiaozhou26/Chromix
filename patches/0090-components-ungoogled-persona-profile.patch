@@ -1,0 +1,12 @@
+diff --git a/components/ungoogled/BUILD.gn b/components/ungoogled/BUILD.gn
+--- a/components/ungoogled/BUILD.gn
++++ b/components/ungoogled/BUILD.gn
+@@ -4,4 +4,7 @@ component("ungoogled_switches") {
+   sources = [
++    "persona_profile.h",
++    "persona_profile.cc",
++    "farble_seed.h",
++    "farble_seed.cc",
++    "fingerprint_data.h",
+     "ungoogled_switches.h",
+     "ungoogled_switches.cc",

@@ -22,10 +22,12 @@ index 0000000..0000000 100644
  #include "components/viz/common/gpu/raster_context_provider.h"
  #include "components/viz/common/resources/shared_image_format_utils.h"
  #include "device/vr/buildflags/buildflags.h"
-@@ -258,6 +262,68 @@
+@@ -258,6 +262,72 @@
    return real_values;
  }
  
++constexpr uint32_t kBridgeDisabledCanvasId = 0xffffffffu;
++
 +uint32_t EnsureBridgeWebGL(canvas_bridge::CanvasBridgeClient* bridge,
 +                           uint32_t& canvas_id,
 +                           int width,
@@ -54,6 +56,8 @@ index 0000000..0000000 100644
 +    return;
 +  canvas_bridge::WebGLOpMessage message;
 +  message.canvas_id = EnsureBridgeWebGL(bridge, canvas_id, width, height);
++  if (message.canvas_id == 0)
++    return;
 +  message.op = op;
 +  message.ints = std::move(ints);
 +  message.floats = std::move(floats);

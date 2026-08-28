@@ -1,0 +1,122 @@
+diff --git a/third_party/blink/renderer/modules/webgl/webgl_rendering_context_base.cc b/third_party/blink/renderer/modules/webgl/webgl_rendering_context_base.cc
+index 256920a..ad51cf8 100644
+--- a/third_party/blink/renderer/modules/webgl/webgl_rendering_context_base.cc
++++ b/third_party/blink/renderer/modules/webgl/webgl_rendering_context_base.cc
+@@ -278,6 +278,8 @@ GLint PersonaMaxVaryingVectors(gpu::gles2::GLES2Interface* gl) {
+       ungoogled::CurrentPersona().webgl_max_varying_vectors);
+ }
+ 
++constexpr uint32_t kBridgeDisabledCanvasId = 0xffffffffu;
++
+ uint32_t EnsureBridgeWebGL(canvas_bridge::CanvasBridgeClient* bridge,
+                            uint32_t& canvas_id,
+                            int width,
+@@ -337,6 +339,8 @@ void RecordWebGLCreate(uint32_t op,
+                        int height) {
+   auto* bridge = canvas_bridge::CanvasBridgeClient::Get();
+   if (!bridge || !bridge->Connected() ||
++      canvas_id == kBridgeDisabledCanvasId)
++    return;
+   object->SetBridgeId(++counter);
+   RecordWebGLOp(op, {static_cast<int32_t>(object->BridgeId())}, {}, canvas_id,
+                 width, height);
+@@ -1578,6 +1582,9 @@ void WebGLRenderingContextBase::InitializeNewContext() {
+   DCHECK(!isContextLost());
+   DCHECK(GetDrawingBuffer());
+ 
++  if (!BridgeAllowedForThisContext())
++    bridge_canvas_id_ = kBridgeDisabledCanvasId;
++
+   marked_canvas_dirty_ = false;
+   must_paint_to_canvas_ = false;
+   active_texture_unit_ = 0;
+@@ -3366,7 +3373,11 @@ WebGLBuffer* WebGLRenderingContextBase::createBuffer() {
+ }
+ 
+ WebGLFramebuffer* WebGLRenderingContextBase::createFramebuffer() {
+-  return MakeGarbageCollected<WebGLFramebuffer>(this);
++  auto* framebuffer = MakeGarbageCollected<WebGLFramebuffer>(this);
++  RecordWebGLCreate(static_cast<uint32_t>(canvas_bridge::WebGLOp::kCreateFramebuffer),
++                    framebuffer, bridge_webgl_obj_counter_, bridge_canvas_id_,
++                    drawingBufferWidth(), drawingBufferHeight());
++  return framebuffer;
+ }
+ 
+ WebGLTexture* WebGLRenderingContextBase::createTexture() {
+@@ -3384,7 +3395,11 @@ WebGLProgram* WebGLRenderingContextBase::createProgram() {
+ }
+ 
+ WebGLRenderbuffer* WebGLRenderingContextBase::createRenderbuffer() {
+-  return MakeGarbageCollected<WebGLRenderbuffer>(this);
++  auto* renderbuffer = MakeGarbageCollected<WebGLRenderbuffer>(this);
++  RecordWebGLCreate(static_cast<uint32_t>(canvas_bridge::WebGLOp::kCreateRenderbuffer),
++                    renderbuffer, bridge_webgl_obj_counter_, bridge_canvas_id_,
++                    drawingBufferWidth(), drawingBufferHeight());
++  return renderbuffer;
+ }
+ 
+ void WebGLRenderingContextBase::SetBoundVertexArrayObject(
+@@ -3442,6 +3457,9 @@ void WebGLRenderingContextBase::deleteBuffer(WebGLBuffer* buffer) {
+   if (!DeleteObject(buffer))
+     return;
+   RemoveBoundBuffer(buffer);
++  RecordWebGLOp(static_cast<uint32_t>(canvas_bridge::WebGLOp::kDeleteObject),
++                {static_cast<int32_t>(buffer->BridgeId())}, {},
++                bridge_canvas_id_, drawingBufferWidth(), drawingBufferHeight());
+   buffers_.erase(buffer);
+ }
+ 
+@@ -3455,6 +3473,9 @@ void WebGLRenderingContextBase::deleteFramebuffer(
+   }
+   if (!DeleteObject(framebuffer))
+     return;
++  RecordWebGLOp(static_cast<uint32_t>(canvas_bridge::WebGLOp::kDeleteObject),
++                {static_cast<int32_t>(framebuffer->BridgeId())}, {},
++                bridge_canvas_id_, drawingBufferWidth(), drawingBufferHeight());
+   if (framebuffer == framebuffer_binding_) {
+     framebuffer_binding_ = nullptr;
+     // Have to call drawingBuffer()->bind() here to bind back to internal fbo.
+@@ -3463,6 +3484,9 @@ void WebGLRenderingContextBase::deleteFramebuffer(
+ }
+ 
+ void WebGLRenderingContextBase::deleteProgram(WebGLProgram* program) {
+-  DeleteObject(program);
++  if (DeleteObject(program))
++    RecordWebGLOp(static_cast<uint32_t>(canvas_bridge::WebGLOp::kDeleteObject),
++                  {static_cast<int32_t>(program->BridgeId())}, {},
++                  bridge_canvas_id_, drawingBufferWidth(), drawingBufferHeight());
+   // We don't reset m_currentProgram to 0 here because the deletion of the
+   // current program is delayed.
+@@ -3472,5 +3496,8 @@ void WebGLRenderingContextBase::deleteRenderbuffer(
+     WebGLRenderbuffer* renderbuffer) {
+   if (!DeleteObject(renderbuffer))
+     return;
++  RecordWebGLOp(static_cast<uint32_t>(canvas_bridge::WebGLOp::kDeleteObject),
++                {static_cast<int32_t>(renderbuffer->BridgeId())}, {},
++                bridge_canvas_id_, drawingBufferWidth(), drawingBufferHeight());
+   if (renderbuffer == renderbuffer_binding_) {
+     renderbuffer_binding_ = nullptr;
+@@ -3485,4 +3512,7 @@ void WebGLRenderingContextBase::deleteShader(WebGLShader* shader) {
+-  DeleteObject(shader);
++  if (DeleteObject(shader))
++    RecordWebGLOp(static_cast<uint32_t>(canvas_bridge::WebGLOp::kDeleteObject),
++                  {static_cast<int32_t>(shader->BridgeId())}, {},
++                  bridge_canvas_id_, drawingBufferWidth(), drawingBufferHeight());
+ }
+ 
+ void WebGLRenderingContextBase::deleteTexture(WebGLTexture* texture) {
+@@ -3499,6 +3529,9 @@ void WebGLRenderingContextBase::deleteTexture(WebGLTexture* texture) {
+ 
+   if (!DeleteObject(texture))
+     return;
++  RecordWebGLOp(static_cast<uint32_t>(canvas_bridge::WebGLOp::kDeleteObject),
++                {static_cast<int32_t>(texture->BridgeId())}, {},
++                bridge_canvas_id_, drawingBufferWidth(), drawingBufferHeight());
+ 
+   int max_bound_texture_index = -1;
+   for (wtf_size_t i = 0; i < one_plus_max_non_default_texture_unit_; ++i) {
+@@ -9380 +9413,4 @@ void WebGLRenderingContextBase::DispatchContextLostEvent(TimerBase*) {
++  bridge_canvas_id_ = 0;
++  bridge_webgl_obj_counter_ = 0;
++  bridge_webgl_unsupported_ = false;
+   // WebXR spec: When the WebGL context is lost, set the xr compatible boolean

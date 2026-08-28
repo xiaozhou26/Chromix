@@ -1,0 +1,40 @@
+diff --git a/third_party/blink/renderer/modules/webgl/gpu_info.h b/third_party/blink/renderer/modules/webgl/gpu_info.h
+--- /dev/null
++++ b/third_party/blink/renderer/modules/webgl/gpu_info.h
+@@ -0,0 +1,36 @@
++#ifndef THIRD_PARTY_BLINK_RENDERER_MODULES_WEBGL_GPU_INFO_H_
++#define THIRD_PARTY_BLINK_RENDERER_MODULES_WEBGL_GPU_INFO_H_
++
++#include <string>
++#include <vector>
++
++namespace blink {
++
++// Structure to hold GPU information
++struct GpuInfo {
++  std::string model_name;
++  std::string device_id;
++  std::string renderer_string;
++};
++
++// Returns the number of available GPUs in our database
++size_t GetGpuCount();
++
++// Returns GPU info for a given index
++const GpuInfo& GetGpuInfo(size_t index);
++
++// Helper function to get a macOS GPU model string
++std::string GetMacosGpuString(size_t index);
++
++// Helper function to get a Linux GPU renderer string
++std::string GetLinuxGpuString(const std::string& model_name);
++
++// Generate Windows GPU info for a specific index
++GpuInfo GetWindowsGpuInfo(size_t index);
++
++// Access to all Windows GPU info
++const std::vector<GpuInfo>& GetWindowsGpuInfoList();
++
++}  // namespace blink
++
++#endif  // THIRD_PARTY_BLINK_RENDERER_MODULES_WEBGL_GPU_INFO_H_

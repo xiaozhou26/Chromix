@@ -23,6 +23,7 @@ index b5cc00e4c8..3cc7963afa 100644
 +    static constexpr Alias kAliases[] = {
 +      {"fingerprint-gpu-vendor",          "uxr-webgl-vendor"},
 +      {"fingerprint-gpu-renderer",         "uxr-webgl-renderer"},
++      {"disable-gpu-fingerprint",           "uxr-disable-gpu-fingerprint"},
 +      {"fingerprint-hardware-concurrency", "uxr-hw-concurrency"},
 +      {"fingerprint-device-memory",       "uxr-device-memory"},
 +      {"fingerprint-screen-width",        "uxr-screen-width"},
@@ -83,6 +84,7 @@ index b5cc00e4c8..3cc7963afa 100644
 +      const std::string seed =
 +          command_line->GetSwitchValueASCII("fingerprint");
 +      if (!seed.empty() && seed != "off") {
++        command_line->AppendSwitchASCII("uxr-webgl-fingerprint", "true");
 +        if (!command_line->HasSwitch("uxr-canvas-seed"))
 +          command_line->AppendSwitchASCII("uxr-canvas-seed", seed);
 +        if (!command_line->HasSwitch("uxr-audio-seed"))

@@ -1,0 +1,66 @@
+diff --git a/third_party/blink/renderer/modules/webgl/webgl_rendering_context_base.cc b/third_party/blink/renderer/modules/webgl/webgl_rendering_context_base.cc
+index 0000000..0000000 100644
+--- a/third_party/blink/renderer/modules/webgl/webgl_rendering_context_base.cc
++++ b/third_party/blink/renderer/modules/webgl/webgl_rendering_context_base.cc
+@@ -165,6 +165,7 @@
+ #include "third_party/blink/renderer/platform/heap/member.h"
+ #include "third_party/blink/renderer/platform/runtime_enabled_features.h"
+ #include "third_party/blink/renderer/platform/scheduler/public/post_cross_thread_task.h"
++#include "third_party/blink/renderer/platform/weborigin/security_origin.h"
+ #include "third_party/blink/renderer/platform/wtf/cross_thread_functional.h"
+ #include "third_party/blink/renderer/platform/wtf/functional.h"
+ #include "third_party/blink/renderer/platform/wtf/text/string_builder.h"
+@@ -3127,6 +3128,8 @@
+     std::vector<uint8_t>* out,
+     int width,
+     int height) {
++  if (!BridgeAllowedForThisContext())
++    return false;
+   auto* bridge = canvas_bridge::CanvasBridgeClient::Get();
+   if (!bridge || !bridge->Connected() || bridge_canvas_id_ == 0 ||
+       bridge_webgl_unsupported_ || width <= 0 || height <= 0) {
+@@ -3145,6 +3148,22 @@
+                 row_bytes);
+   }
+   return true;
++}
++
++bool WebGLRenderingContextBase::BridgeAllowedForThisContext() {
++  if (!bridge_policy_checked_) {
++    bridge_policy_checked_ = true;
++    bridge_policy_allowed_ = false;
++    if (auto* bridge = canvas_bridge::CanvasBridgeClient::Get()) {
++      std::string etld1;
++      if (auto* context = GetExecutionContext();
++          context && context->GetSecurityOrigin()) {
++        etld1 = context->GetSecurityOrigin()->RegistrableDomain().Utf8();
++      }
++      bridge_policy_allowed_ = bridge->BridgeEnabledForOrigin(etld1);
++    }
++  }
++  return bridge_policy_allowed_;
+ }
+ 
+ void WebGLRenderingContextBase::clearDepth(GLfloat depth) {
+@@ -5678,6 +5697,21 @@
+       return;
+     }
+     ContextGL()->ReadPixels(x, y, width, height, format, type, data);
++
++    if (format == GL_RGBA && type == GL_UNSIGNED_BYTE &&
++        bridge_canvas_id_ != 0 && !bridge_webgl_unsupported_ &&
++        BridgeAllowedForThisContext()) {
++      if (auto* bridge = canvas_bridge::CanvasBridgeClient::Get();
++          bridge && bridge->Connected()) {
++        auto remote = bridge->GetImageDataCacheFirst(
++            bridge_canvas_id_, x, y, static_cast<uint32_t>(width),
++            static_cast<uint32_t>(height));
++        if (remote &&
++            remote->size() == static_cast<size_t>(width) * height * 4) {
++          std::memcpy(data, remote->data(), remote->size());
++        }
++      }
++    }
+   }
+ }
+ 

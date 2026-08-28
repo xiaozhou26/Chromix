@@ -247,7 +247,7 @@ if ($FromArtifact) {
   & $sevenZip x "C:\restore\tree.7z.001" -o"$Root" -y | Select-Object -Last 3
   if ($LASTEXITCODE -ne 0) { throw "7z restore failed" }
   Remove-Item C:\restore -Recurse -Force -ErrorAction SilentlyContinue
-  & "$PSScriptRoot\update-restored-source.ps1" -Src $Src
+  & "$PSScriptRoot\update-restored-source.ps1" -Src $Src -OutDir $OutDir
 }
 
 if (-not (Test-Path (Join-Path $Src ".chromix-source-ready"))) {

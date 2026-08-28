@@ -1,0 +1,12 @@
+diff --git a/third_party/blink/renderer/modules/BUILD.gn b/third_party/blink/renderer/modules/BUILD.gn
+index 0000000..0000000 100644
+--- a/third_party/blink/renderer/modules/BUILD.gn
++++ b/third_party/blink/renderer/modules/BUILD.gn
+@@ -200,6 +200,7 @@ component("modules") {
+   deps = [
+     ":make_modules_generated",
+     "//build:android_buildflags",
++    "//components/ungoogled",
+     "//cc",
+     "//components/webrtc:thread_wrapper",
+     "//gin",
