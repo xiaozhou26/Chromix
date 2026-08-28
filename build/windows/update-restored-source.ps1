@@ -1109,15 +1109,14 @@ Normalize-RestoredSource `
         $content,
         '(?ms)\r?\n\s*if \(base::UxrConfig::GetInstance\(\)\.Has\("uxr-webgl-fullparams"\).*?String\("WebGL 2\.0 \(OpenGL ES 3\.0 Chromium\)"\)\);\s*\}',
         "")
-    $helperPattern = '(?ms)\r?\n\s*GLint ClampWebGL2PersonaLimit\s*\(gpu::gles2::GLES2Interface\*\s*gl,.*?\r?\n\s*\}\s*\r?\n\s*GLint WebGL2PersonaVaryingVectors\s*\(gpu::gles2::GLES2Interface\*\s*gl\)\s*\{.*?\r?\n\s*\}\s*'
-    $matches = [regex]::Matches($content, $helperPattern)
-    if ($content -match 'GLint ClampPersonaLimit\(') {
-      for ($index = $matches.Count - 1; $index -ge 0; $index--) {
-        $match = $matches[$index]
-        $content = $content.Remove($match.Index, $match.Length)
-      }
-    } elseif ($matches.Count -gt 1) {
-      for ($index = $matches.Count - 1; $index -ge 1; $index--) {
+    $legacyPatterns = @(
+      '(?ms)^[ \t]*GLint ClampWebGL2PersonaLimit\s*\([^)]*\)\s*\{.*?^[ \t]*\}',
+      '(?ms)^[ \t]*GLint WebGL2PersonaVaryingVectors\s*\([^)]*\)\s*\{.*?^[ \t]*\}'
+    )
+    foreach ($legacyPattern in $legacyPatterns) {
+      $matches = [regex]::Matches($content, $legacyPattern)
+      $removeFrom = if ($content -match 'GLint ClampPersonaLimit\(') { 0 } else { 1 }
+      for ($index = $matches.Count - 1; $index -ge $removeFrom; $index--) {
         $match = $matches[$index]
         $content = $content.Remove($match.Index, $match.Length)
       }
