@@ -1091,6 +1091,12 @@ Normalize-RestoredSource `
         $content,
         '(?ms)\r?\n\s*if \(base::UxrConfig::GetInstance\(\)\.Has\("uxr-webgl-fullparams"\).*?String\("WebGL 2\.0 \(OpenGL ES 3\.0 Chromium\)"\)\);\s*\}',
         "")
+    if ($content -match 'GLint ClampPersonaLimit\(') {
+      $content = [regex]::Replace(
+          $content,
+          '(?ms)\r?\nGLint ClampWebGL2PersonaLimit\(gpu::gles2::GLES2Interface\* gl,.*?\r?\n\}\r?\n\r?\nGLint WebGL2PersonaVaryingVectors\(gpu::gles2::GLES2Interface\* gl\) \{.*?\r?\n\}\r?\n',
+          "`r`n")
+    }
     return [regex]::Replace(
         $content,
         '(?m)^\s*#include "base/uxr_config\.h"\s*\r?\n',
