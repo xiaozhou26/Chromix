@@ -215,6 +215,7 @@ class RestoredSourceUpdateRegressionTest(unittest.TestCase):
         self.assertLess(current, stale)
         self.assertIn("Normalize-RestoredSource", update_source)
         self.assertIn("normalized restored source", update_source)
+        self.assertIn("already current or not applicable", update_source)
         self.assertIn("UxrFontFamilyIsGeneric", update_source)
 
     def test_resume_accepts_historical_webgl_persona_markers(self):

@@ -33,7 +33,8 @@ function Set-SourceReplacement {
     return
   }
   if ($NewText -eq "") {
-    throw "resume source migration has unknown state (expected legacy text or an explicit current marker): $RelativePath"
+    Write-Host "==> restored source migration already current or not applicable: $RelativePath"
+    return
   }
   throw "resume source migration has unknown state (expected legacy text or current marker): $RelativePath"
 }
