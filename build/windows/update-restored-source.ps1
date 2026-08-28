@@ -17,6 +17,11 @@ function Set-SourceReplacement {
     throw "resume source file is missing: $RelativePath"
   }
   $content = [IO.File]::ReadAllText($path)
+  if ($content.Contains($OldText)) {
+    [IO.File]::WriteAllText($path, $content.Replace($OldText, $NewText))
+    Write-Host "==> updated restored source: $RelativePath"
+    return
+  }
   if ($NewText -ne "" -and $content.Contains($NewText)) {
     Write-Host "==> restored source already current: $RelativePath"
     return
@@ -26,11 +31,6 @@ function Set-SourceReplacement {
       Write-Host "==> restored source already current: $RelativePath"
       return
     }
-  }
-  if ($content.Contains($OldText)) {
-    [IO.File]::WriteAllText($path, $content.Replace($OldText, $NewText))
-    Write-Host "==> updated restored source: $RelativePath"
-    return
   }
   if ($NewText -eq "") {
     Write-Host "==> restored source migration already current or not applicable: $RelativePath"
