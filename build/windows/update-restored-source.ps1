@@ -10,13 +10,26 @@ function Set-SourceReplacement {
     [Parameter(Mandatory)] [string]$RelativePath,
     [Parameter(Mandatory)] [string]$OldText,
     [Parameter(Mandatory)] [AllowEmptyString()] [string]$NewText,
-    [string[]]$CurrentMarker = @()
+    [string[]]$CurrentMarker = @(),
+    [switch]$PreferCurrentMarker
   )
   $path = Join-Path $Src $RelativePath
   if (-not (Test-Path -LiteralPath $path -PathType Leaf)) {
     throw "resume source file is missing: $RelativePath"
   }
   $content = [IO.File]::ReadAllText($path)
+  if ($PreferCurrentMarker) {
+    if ($NewText -ne "" -and $content.Contains($NewText)) {
+      Write-Host "==> restored source already current: $RelativePath"
+      return
+    }
+    foreach ($marker in $CurrentMarker) {
+      if ($marker -ne "" -and $content.Contains($marker)) {
+        Write-Host "==> restored source already current: $RelativePath"
+        return
+      }
+    }
+  }
   if ($content.Contains($OldText)) {
     [IO.File]::WriteAllText($path, $content.Replace($OldText, $NewText))
     Write-Host "==> updated restored source: $RelativePath"
@@ -863,11 +876,11 @@ Set-SourceReplacement `
                         String(WebGLPersonaVendor().c_str()));
 '@
 
-Set-SourceReplacement `
+Normalize-RestoredSource `
   -RelativePath "third_party\blink\renderer\modules\webgl\webgl2_rendering_context_base.cc" `
-  -OldText 'const GLuint64 kMaxClientWaitTimeout = 0u;' `
-  -NewText @'
-const GLuint64 kMaxClientWaitTimeout = 0u;
+  -Transform {
+    param($content)
+    $helper = @'
 
 GLint ClampWebGL2PersonaLimit(gpu::gles2::GLES2Interface* gl,
                               GLenum pname,
@@ -882,6 +895,25 @@ GLint WebGL2PersonaVaryingVectors(gpu::gles2::GLES2Interface* gl) {
   return ClampWebGL2PersonaLimit(gl, GL_MAX_VARYING_VECTORS, 30);
 }
 '@
+    $helperPattern = '(?ms)\r?\n\s*GLint ClampWebGL2PersonaLimit\s*\(gpu::gles2::GLES2Interface\*\s*gl,.*?\r?\n\s*\}\s*\r?\n\s*GLint WebGL2PersonaVaryingVectors\s*\(gpu::gles2::GLES2Interface\*\s*gl\)\s*\{.*?\r?\n\s*\}\s*'
+    $matches = [regex]::Matches($content, $helperPattern)
+    if ($content -match 'GLint ClampPersonaLimit\(') {
+      for ($index = $matches.Count - 1; $index -ge 0; $index--) {
+        $match = $matches[$index]
+        $content = $content.Remove($match.Index, $match.Length)
+      }
+    } elseif ($matches.Count -eq 0) {
+      $content = $content.Replace(
+          'const GLuint64 kMaxClientWaitTimeout = 0u;',
+          'const GLuint64 kMaxClientWaitTimeout = 0u;' + $helper)
+    } elseif ($matches.Count -gt 1) {
+      for ($index = $matches.Count - 1; $index -ge 1; $index--) {
+        $match = $matches[$index]
+        $content = $content.Remove($match.Index, $match.Length)
+      }
+    }
+    return $content
+  }
 
 Set-SourceReplacement `
   -RelativePath "third_party\blink\renderer\modules\webgl\webgl2_rendering_context_base.cc" `
@@ -1091,11 +1123,11 @@ Normalize-RestoredSource `
         $content,
         '(?ms)\r?\n\s*if \(base::UxrConfig::GetInstance\(\)\.Has\("uxr-webgl-fullparams"\).*?String\("WebGL 2\.0 \(OpenGL ES 3\.0 Chromium\)"\)\);\s*\}',
         "")
-    if ($content -match 'GLint ClampPersonaLimit\(') {
-      $content = [regex]::Replace(
-          $content,
-          '(?ms)\r?\nGLint ClampWebGL2PersonaLimit\(gpu::gles2::GLES2Interface\* gl,.*?\r?\n\}\r?\n\r?\nGLint WebGL2PersonaVaryingVectors\(gpu::gles2::GLES2Interface\* gl\) \{.*?\r?\n\}\r?\n',
-          "`r`n")
+    $helperPattern = '(?ms)\r?\nGLint ClampWebGL2PersonaLimit\(gpu::gles2::GLES2Interface\* gl,\s*GLenum pname,\s*GLint persona_value\)\s*\{.*?\r?\n\}\s*\r?\n\r?\nGLint WebGL2PersonaVaryingVectors\(gpu::gles2::GLES2Interface\* gl\)\s*\{\s*return ClampWebGL2PersonaLimit\(gl,\s*GL_MAX_VARYING_VECTORS,\s*30\);\s*\r?\n\}'
+    while ([regex]::Matches($content, $helperPattern).Count -gt 1) {
+      $matches = [regex]::Matches($content, $helperPattern)
+      $duplicate = $matches[$matches.Count - 1]
+      $content = $content.Remove($duplicate.Index, $duplicate.Length)
     }
     return [regex]::Replace(
         $content,
