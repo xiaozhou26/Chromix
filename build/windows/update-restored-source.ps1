@@ -898,7 +898,7 @@ GLint WebGL2PersonaVaryingVectors(gpu::gles2::GLES2Interface* gl) {
   -CurrentMarker @(
     'GLint ClampWebGL2PersonaLimit',
     'GLint ClampPersonaLimit'
-  )
+  ) `
   -PreferCurrentMarker
 
 Set-SourceReplacement `
