@@ -216,6 +216,10 @@ class RestoredSourceUpdateRegressionTest(unittest.TestCase):
         self.assertIn("Normalize-RestoredSource", update_source)
         self.assertIn("normalized restored source", update_source)
         self.assertIn("already current or not applicable", update_source)
+        self.assertNotIn(
+            "resume source migration has unknown state (expected legacy text or current marker)",
+            update_source,
+        )
         self.assertIn("UxrFontFamilyIsGeneric", update_source)
 
     def test_resume_accepts_historical_webgl_persona_markers(self):

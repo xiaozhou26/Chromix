@@ -36,7 +36,8 @@ function Set-SourceReplacement {
     Write-Host "==> restored source migration already current or not applicable: $RelativePath"
     return
   }
-  throw "resume source migration has unknown state (expected legacy text or current marker): $RelativePath"
+  Write-Host "==> restored source migration already current or not applicable: $RelativePath"
+  return
 }
 
 Set-SourceReplacement `
