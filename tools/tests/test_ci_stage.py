@@ -227,6 +227,8 @@ class RestoredSourceUpdateRegressionTest(unittest.TestCase):
         self.assertIn('[switch]$PreferCurrentMarker', update_source)
         self.assertIn("GLint ClampWebGL2PersonaLimit", update_source)
         self.assertIn("GLint ClampPersonaLimit", update_source)
+        self.assertIn("$helperPattern", update_source)
+        self.assertIn("-PreferCurrentMarker", update_source)
 
     def test_resume_accepts_historical_webgl_persona_markers(self):
         update_source = RESTORED_SOURCE_UPDATE.read_text(encoding="utf-8")
