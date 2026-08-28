@@ -31,6 +31,11 @@ on:
           - '10'
           - '11'
           - '12'
+      resume_tree_stage:
+        description: 'Stage number of the cached tree to restore for a resumed run'
+        required: false
+        default: ''
+        type: string
 
 permissions:
   contents: read
@@ -143,7 +148,7 @@ jobs:
         if: ${{ inputs.resume_run_id != '' && inputs.resume_stage == '2' }}
         uses: actions/download-artifact@v4
         with:
-          pattern: tree-s1-attempt-*-part*
+          pattern: tree-s${{ inputs.resume_tree_stage != '' && inputs.resume_tree_stage || '1' }}-attempt-*-part*
           merge-multiple: true
           path: C:\restore
           github-token: ${{ github.token }}
@@ -224,7 +229,7 @@ jobs:
         if: ${{ inputs.resume_run_id != '' && inputs.resume_stage == '3' }}
         uses: actions/download-artifact@v4
         with:
-          pattern: tree-s2-attempt-*-part*
+          pattern: tree-s${{ inputs.resume_tree_stage != '' && inputs.resume_tree_stage || '2' }}-attempt-*-part*
           merge-multiple: true
           path: C:\restore
           github-token: ${{ github.token }}
@@ -305,7 +310,7 @@ jobs:
         if: ${{ inputs.resume_run_id != '' && inputs.resume_stage == '4' }}
         uses: actions/download-artifact@v4
         with:
-          pattern: tree-s3-attempt-*-part*
+          pattern: tree-s${{ inputs.resume_tree_stage != '' && inputs.resume_tree_stage || '3' }}-attempt-*-part*
           merge-multiple: true
           path: C:\restore
           github-token: ${{ github.token }}
@@ -386,7 +391,7 @@ jobs:
         if: ${{ inputs.resume_run_id != '' && inputs.resume_stage == '5' }}
         uses: actions/download-artifact@v4
         with:
-          pattern: tree-s4-attempt-*-part*
+          pattern: tree-s${{ inputs.resume_tree_stage != '' && inputs.resume_tree_stage || '4' }}-attempt-*-part*
           merge-multiple: true
           path: C:\restore
           github-token: ${{ github.token }}
@@ -467,7 +472,7 @@ jobs:
         if: ${{ inputs.resume_run_id != '' && inputs.resume_stage == '6' }}
         uses: actions/download-artifact@v4
         with:
-          pattern: tree-s5-attempt-*-part*
+          pattern: tree-s${{ inputs.resume_tree_stage != '' && inputs.resume_tree_stage || '5' }}-attempt-*-part*
           merge-multiple: true
           path: C:\restore
           github-token: ${{ github.token }}
@@ -548,7 +553,7 @@ jobs:
         if: ${{ inputs.resume_run_id != '' && inputs.resume_stage == '7' }}
         uses: actions/download-artifact@v4
         with:
-          pattern: tree-s6-attempt-*-part*
+          pattern: tree-s${{ inputs.resume_tree_stage != '' && inputs.resume_tree_stage || '6' }}-attempt-*-part*
           merge-multiple: true
           path: C:\restore
           github-token: ${{ github.token }}
@@ -629,7 +634,7 @@ jobs:
         if: ${{ inputs.resume_run_id != '' && inputs.resume_stage == '8' }}
         uses: actions/download-artifact@v4
         with:
-          pattern: tree-s7-attempt-*-part*
+          pattern: tree-s${{ inputs.resume_tree_stage != '' && inputs.resume_tree_stage || '7' }}-attempt-*-part*
           merge-multiple: true
           path: C:\restore
           github-token: ${{ github.token }}
@@ -710,7 +715,7 @@ jobs:
         if: ${{ inputs.resume_run_id != '' && inputs.resume_stage == '9' }}
         uses: actions/download-artifact@v4
         with:
-          pattern: tree-s8-attempt-*-part*
+          pattern: tree-s${{ inputs.resume_tree_stage != '' && inputs.resume_tree_stage || '8' }}-attempt-*-part*
           merge-multiple: true
           path: C:\restore
           github-token: ${{ github.token }}
@@ -791,7 +796,7 @@ jobs:
         if: ${{ inputs.resume_run_id != '' && inputs.resume_stage == '10' }}
         uses: actions/download-artifact@v4
         with:
-          pattern: tree-s9-attempt-*-part*
+          pattern: tree-s${{ inputs.resume_tree_stage != '' && inputs.resume_tree_stage || '9' }}-attempt-*-part*
           merge-multiple: true
           path: C:\restore
           github-token: ${{ github.token }}
@@ -872,7 +877,7 @@ jobs:
         if: ${{ inputs.resume_run_id != '' && inputs.resume_stage == '11' }}
         uses: actions/download-artifact@v4
         with:
-          pattern: tree-s10-attempt-*-part*
+          pattern: tree-s${{ inputs.resume_tree_stage != '' && inputs.resume_tree_stage || '10' }}-attempt-*-part*
           merge-multiple: true
           path: C:\restore
           github-token: ${{ github.token }}
@@ -953,7 +958,7 @@ jobs:
         if: ${{ inputs.resume_run_id != '' && inputs.resume_stage == '12' }}
         uses: actions/download-artifact@v4
         with:
-          pattern: tree-s11-attempt-*-part*
+          pattern: tree-s${{ inputs.resume_tree_stage != '' && inputs.resume_tree_stage || '11' }}-attempt-*-part*
           merge-multiple: true
           path: C:\restore
           github-token: ${{ github.token }}

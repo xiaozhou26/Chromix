@@ -141,7 +141,10 @@ class ResumeWorkflowRegressionTest(unittest.TestCase):
                 f"inputs.resume_run_id == '' || inputs.resume_stage != '{stage}'",
                 self.source,
             )
-            self.assertIn(f"pattern: tree-s{stage - 1}-attempt-*-part*", self.source)
+            self.assertIn(
+                f"pattern: tree-s{stage - 1}-attempt-",
+                self.source,
+            )
         self.assertEqual(self.source.count("Download tree from previous run"), 11)
 
     def test_every_stage_uploads_a_tree_on_success_or_failure(self):
@@ -169,6 +172,11 @@ class ResumeWorkflowRegressionTest(unittest.TestCase):
         self.assertEqual(self.source.count("github-token: ${{ github.token }}"), 11)
         self.assertEqual(self.source.count("run-id: ${{ inputs.resume_run_id }}"), 11)
         self.assertEqual(self.source.count("merge-multiple: true"), 22)
+        self.assertIn("resume_tree_stage:", self.source)
+        self.assertIn(
+            "pattern: tree-s${{ inputs.resume_tree_stage != '' && inputs.resume_tree_stage || '11' }}-attempt-*-part*",
+            self.source,
+        )
         self.assertNotIn("download-stage-artifacts.ps1", self.source)
 
 
