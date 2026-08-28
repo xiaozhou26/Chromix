@@ -1192,6 +1192,20 @@ bool UxrFontFamilyAllowed(const AtomicString& family) {
     return $content
   }
 
+Normalize-RestoredSource `
+  -RelativePath "third_party\blink\renderer\modules\webgl\webgl_rendering_context_base.cc" `
+  -Transform {
+    param($content)
+    $content = [regex]::Replace(
+        $content,
+        '(?ms)String\(\s*(?:"ANGLE \(NVIDIA, NVIDIA GeForce RTX 3060 Direct3D11 vs_5_0\s*"\s*"ps_5_0, D3D11\)"|"ANGLE \(NVIDIA, NVIDIA GeForce RTX 3060 Direct3D11 vs_5_0 ps_5_0, D3D11\)")\s*\)',
+        'String(WebGLPersonaRenderer().c_str())')
+    $content = $content.Replace(
+        'String("Google Inc. (NVIDIA Corporation)")',
+        'String(WebGLPersonaVendor().c_str())')
+    return $content
+  }
+
 $webglSources = @(
   "third_party\blink\renderer\modules\webgl\webgl_rendering_context_base.cc",
   "third_party\blink\renderer\modules\webgl\webgl2_rendering_context_base.cc"

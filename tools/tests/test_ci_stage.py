@@ -221,6 +221,9 @@ class RestoredSourceUpdateRegressionTest(unittest.TestCase):
             update_source,
         )
         self.assertIn("UxrFontFamilyIsGeneric", update_source)
+        self.assertIn("NVIDIA GeForce RTX 3060 Direct3D11", update_source)
+        self.assertIn("String(WebGLPersonaRenderer().c_str())", update_source)
+        self.assertIn("String(WebGLPersonaVendor().c_str())", update_source)
 
     def test_resume_accepts_historical_webgl_persona_markers(self):
         update_source = RESTORED_SOURCE_UPDATE.read_text(encoding="utf-8")
