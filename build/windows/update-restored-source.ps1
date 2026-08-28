@@ -1127,7 +1127,11 @@ Normalize-RestoredSource `
         '(?ms)\r?\n\s*if \(UxrFontHidden\(family\).*?\r?\n\s*\}',
         "")
     if ($content -notmatch '#include "base/strings/string_split\.h"') {
-      $include = "#include \"base/strings/string_split.h\"`r`n#include \"base/strings/string_util.h\"`r`n#include \"base/uxr_config.h\"`r`n"
+      $include = @'
+#include "base/strings/string_split.h"
+#include "base/strings/string_util.h"
+#include "base/uxr_config.h"
+'@ + "`r`n"
       $content = $content.Replace('#include "base/timer/elapsed_timer.h"', $include + '#include "base/timer/elapsed_timer.h"')
     }
     if ($content -notmatch 'bool UxrFontFamilyAllowed\(') {
