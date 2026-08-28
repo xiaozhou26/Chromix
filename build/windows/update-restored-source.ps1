@@ -1060,3 +1060,129 @@ Set-SourceReplacement `
       return WebGLAny(script_state, ClampWebGL2PersonaLimit(
                                         ContextGL(), pname, 16384));
 '@
+
+function Normalize-RestoredSource {
+  param(
+    [Parameter(Mandatory)] [string]$RelativePath,
+    [Parameter(Mandatory)] [scriptblock]$Transform
+  )
+  $path = Join-Path $Src $RelativePath
+  if (-not (Test-Path -LiteralPath $path -PathType Leaf)) {
+    throw "resume source file is missing: $RelativePath"
+  }
+  $content = [IO.File]::ReadAllText($path)
+  $updated = & $Transform $content
+  if ($updated -ne $content) {
+    [IO.File]::WriteAllText($path, $updated)
+    Write-Host "==> normalized restored source: $RelativePath"
+  }
+}
+
+Normalize-RestoredSource `
+  -RelativePath "third_party\blink\renderer\modules\webgl\webgl2_rendering_context_base.cc" `
+  -Transform {
+    param($content)
+    $content = [regex]::Replace(
+        $content,
+        '(?ms)\r?\n\s*// Normalize GLSL/VERSION so WebGL2 matches the spoofed renderer\..*?\r?\n\s*\}',
+        "")
+    $content = [regex]::Replace(
+        $content,
+        '(?ms)\r?\n\s*if \(base::UxrConfig::GetInstance\(\)\.Has\("uxr-webgl-fullparams"\).*?String\("WebGL 2\.0 \(OpenGL ES 3\.0 Chromium\)"\)\);\s*\}',
+        "")
+    return [regex]::Replace(
+        $content,
+        '(?m)^\s*#include "base/uxr_config\.h"\s*\r?\n',
+        "")
+  }
+
+Normalize-RestoredSource `
+  -RelativePath "third_party\blink\renderer\core\html\canvas\text_metrics.cc" `
+  -Transform {
+    param($content)
+    $content = [regex]::Replace(
+        $content,
+        '(?ms)\r?\n\s*// UXR: seeded, value-dependent sub-pixel jitter for TextMetrics\..*?\r?\n\s*void TextMetrics::Update',
+        "`r`nvoid TextMetrics::Update")
+    $content = [regex]::Replace(
+        $content,
+        '(?ms)\r?\n\s*// UXR: apply per-persona jitter so TextMetrics is not a stable measurement fingerprint\..*?\r?\n\s*\}\s*\r?\n\}',
+        "`r`n}")
+    $content = [regex]::Replace($content, '(?m)^\s*#include <cmath>\s*\r?\n', "")
+    $content = [regex]::Replace($content, '(?m)^\s*#include "base/bit_cast\.h"\s*\r?\n', "")
+    $content = [regex]::Replace($content, '(?m)^\s*#include "base/strings/string_number_conversions\.h".*\r?\n', "")
+    return [regex]::Replace($content, '(?m)^\s*#include "base/uxr_config\.h".*\r?\n', "")
+  }
+
+Normalize-RestoredSource `
+  -RelativePath "third_party\blink\renderer\platform\fonts\font_cache.cc" `
+  -Transform {
+    param($content)
+    $content = [regex]::Replace(
+        $content,
+        '(?ms)\r?\n\s*namespace \{\s*// UXR: persona font availability\..*?\r?\n\}\s*// namespace\s*\r?\n',
+        "`r`n")
+    $content = [regex]::Replace(
+        $content,
+        '(?ms)\r?\n\s*if \(UxrFontHidden\(family\).*?\r?\n\s*\}',
+        "")
+    if ($content -notmatch '#include "base/strings/string_split\.h"') {
+      $include = "#include \"base/strings/string_split.h\"`r`n#include \"base/strings/string_util.h\"`r`n#include \"base/uxr_config.h\"`r`n"
+      $content = $content.Replace('#include "base/timer/elapsed_timer.h"', $include + '#include "base/timer/elapsed_timer.h"')
+    }
+    if ($content -notmatch 'bool UxrFontFamilyAllowed\(') {
+      $helper = @'
+
+namespace {
+
+bool UxrFontFamilyIsGeneric(const AtomicString& family) {
+  const std::string name = family.GetString().ToAsciiLower().Utf8();
+  static constexpr const char* kGenericFamilies[] = {
+      "serif", "sans-serif", "monospace", "cursive", "fantasy",
+      "system-ui", "math", "emoji", "fangsong", "ui-serif",
+      "ui-sans-serif", "ui-monospace", "ui-rounded", "ui-fangsong",
+      "-webkit-body", "-webkit-pictograph", "-webkit-system-font",
+      "-webkit-control"};
+  for (const char* generic : kGenericFamilies) {
+    if (name == generic)
+      return true;
+  }
+  return false;
+}
+
+bool UxrFontFamilyAllowed(const AtomicString& family) {
+  if (family.empty() || UxrFontFamilyIsGeneric(family))
+    return true;
+  const std::string requested = family.GetString().Utf8();
+  const std::string whitelist =
+      base::UxrConfig::GetInstance().Get("uxr-font-whitelist");
+  if (!whitelist.empty()) {
+    for (const std::string& entry : base::SplitString(
+             whitelist, ",", base::TRIM_WHITESPACE,
+             base::SPLIT_WANT_NONEMPTY)) {
+      if (base::EqualsCaseInsensitiveASCII(entry, requested))
+        return true;
+    }
+    return false;
+  }
+  const std::string persona =
+      base::UxrConfig::GetInstance().Get("uxr-platform");
+  if (!base::EqualsCaseInsensitiveASCII(persona, "windows") &&
+      !base::EqualsCaseInsensitiveASCII(persona, "win32"))
+    return true;
+  static constexpr const char* kWindowsFamilies[] = {
+      "Arial", "Calibri", "Cambria", "Consolas", "Courier New", "Georgia",
+      "Segoe UI", "Segoe UI Emoji", "Tahoma", "Times New Roman", "Verdana"};
+  for (const char* allowed : kWindowsFamilies) {
+    if (base::EqualsCaseInsensitiveASCII(allowed, requested))
+      return true;
+  }
+  return false;
+}
+
+}  // namespace
+'@
+      $content = $content.Replace('namespace blink {', 'namespace blink {' + $helper)
+    }
+    return $content
+  }

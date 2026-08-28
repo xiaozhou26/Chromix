@@ -202,8 +202,9 @@ class RestoredSourceUpdateRegressionTest(unittest.TestCase):
         current = update_source.index('$content.Contains($NewText)')
         stale = update_source.index('$content.Contains($OldText)')
         self.assertLess(current, stale)
-        self.assertIn('Write-Host "==> restored source migration not applicable: $RelativePath"', update_source)
-        self.assertNotIn('throw "restored source does not contain the expected old or new text: $RelativePath"', update_source)
+        self.assertIn("Normalize-RestoredSource", update_source)
+        self.assertIn("normalized restored source", update_source)
+        self.assertIn("UxrFontFamilyIsGeneric", update_source)
 
     def test_resume_accepts_historical_webgl_persona_markers(self):
         update_source = RESTORED_SOURCE_UPDATE.read_text(encoding="utf-8")
