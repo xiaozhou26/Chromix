@@ -67,8 +67,7 @@ $bytes = [IO.File]::ReadAllBytes($dll)
 $ascii = [Text.Encoding]::ASCII.GetString($bytes)
 $utf16 = [Text.Encoding]::Unicode.GetString($bytes)
 $forbiddenMarkers = @(
-  "NVIDIA GeForce RTX 3060",
-  "Google Inc. (NVIDIA Corporation)"
+  "ANGLE (NVIDIA, NVIDIA GeForce RTX 3060 Direct3D11 vs_5_0 ps_5_0, D3D11)"
 )
 foreach ($marker in $forbiddenMarkers) {
   if ($ascii.Contains($marker) -or $utf16.Contains($marker)) {

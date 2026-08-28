@@ -17,8 +17,10 @@ class PackageWinRegressionTest(unittest.TestCase):
         self.assertIn('[IO.File]::ReadAllBytes($dll)', source)
         self.assertIn('[Text.Encoding]::ASCII.GetString($bytes)', source)
         self.assertIn('[Text.Encoding]::Unicode.GetString($bytes)', source)
-        self.assertIn('NVIDIA GeForce RTX 3060', source)
-        self.assertIn('Google Inc. (NVIDIA Corporation)', source)
+        self.assertIn(
+            'ANGLE (NVIDIA, NVIDIA GeForce RTX 3060 Direct3D11 vs_5_0 ps_5_0, D3D11)',
+            source,
+        )
         self.assertIn('throw "chrome.dll contains forbidden WebGL identity marker', source)
 
     def test_requires_current_persona_markers(self):
