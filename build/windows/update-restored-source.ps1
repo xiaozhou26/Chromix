@@ -1190,6 +1190,20 @@ bool UxrFontFamilyAllowed(const AtomicString& family) {
     return $content
   }
 
+$webglSources = @(
+  "third_party\blink\renderer\modules\webgl\webgl_rendering_context_base.cc",
+  "third_party\blink\renderer\modules\webgl\webgl2_rendering_context_base.cc"
+)
+$touchTime = [DateTime]::UtcNow.AddSeconds(2)
+foreach ($relativePath in $webglSources) {
+  $path = Join-Path $Src $relativePath
+  if (-not (Test-Path -LiteralPath $path -PathType Leaf)) {
+    throw "resume source file is missing: $relativePath"
+  }
+  [IO.File]::SetLastWriteTimeUtc($path, $touchTime)
+  Write-Host "==> touched restored WebGL source: $relativePath"
+}
+
 $webglObjDir = Join-Path $OutDir "obj\third_party\blink\renderer\modules\webgl"
 if (Test-Path -LiteralPath $webglObjDir -PathType Container) {
   $staleObjects = @(Get-ChildItem -LiteralPath $webglObjDir -Recurse -File -Include "*.obj","*.pch" -ErrorAction SilentlyContinue)

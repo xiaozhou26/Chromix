@@ -235,6 +235,15 @@ class RestoredSourceUpdateRegressionTest(unittest.TestCase):
         self.assertIn('update-restored-source.ps1" -Src $Src -OutDir $OutDir', stage)
         self.assertIn('chromix-webgl-objects-invalidated.txt', update)
         self.assertIn('removed $($staleObjects.Count) restored WebGL object files', update)
+        self.assertIn('SetLastWriteTimeUtc', update)
+        self.assertIn(
+            'third_party\\blink\\renderer\\modules\\webgl\\webgl_rendering_context_base.cc',
+            update,
+        )
+        self.assertIn(
+            'third_party\\blink\\renderer\\modules\\webgl\\webgl2_rendering_context_base.cc',
+            update,
+        )
 
 
 if __name__ == "__main__":
