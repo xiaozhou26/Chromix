@@ -57,7 +57,7 @@ index 44527d0a7b..45affa329c 100644
    }
    return features;
  }
-@@ -96,5 +96,50 @@ GPUAdapter::GPUAdapter(
+@@ -96,5 +96,44 @@ GPUAdapter::GPUAdapter(
    vendor_ = String::FromUtf8(info.vendor);
    architecture_ = String::FromUtf8(info.architecture);
 +
@@ -72,12 +72,6 @@ index 44527d0a7b..45affa329c 100644
 +  } else if (!use_real_gpu) {
 +    std::string webgl_vendor = base::ToLowerASCII(
 +        uxr_config.Get("uxr-webgl-vendor"));
-+    if (webgl_vendor.empty() &&
-+        uxr_config.Has("uxr-webgl-fingerprint")) {
-+      const std::string platform =
-+          base::ToLowerASCII(uxr_config.Get("uxr-platform"));
-+      webgl_vendor = platform == "macos" ? "apple" : "nvidia";
-+    }
 +    if (webgl_vendor.empty())
 +      webgl_vendor = "intel";
 +    if (webgl_vendor.find("nvidia") != std::string::npos)

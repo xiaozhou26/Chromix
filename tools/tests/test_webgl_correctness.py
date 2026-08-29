@@ -85,7 +85,13 @@ class WebGLCorrectnessRegressionTest(unittest.TestCase):
         self.assertNotIn("Google Inc. (NVIDIA Corporation)", self.webgl1)
         self.assertIn("webgl_real", self.webgl1)
 
-    def test_webgl1_complete_limits_are_downward_clamped(self):
+    def test_domrect_uses_native_shared_geometry(self):
+        domrect_patch = (REPO / "patches" /
+                         "0010-third_party-blink-renderer-core-dom-element-cc.patch")
+        text = domrect_patch.read_text(encoding="utf-8")
+        self.assertNotIn("UxrJitterQuads", text)
+        self.assertNotIn("uxr-canvas-seed", text)
+
         self.assertIn("ClampPersonaLimit", self.webgl1)
         self.assertIn("ClampPersonaLimitF", self.webgl1)
         self.assertIn("PersonaViewport", self.webgl1)

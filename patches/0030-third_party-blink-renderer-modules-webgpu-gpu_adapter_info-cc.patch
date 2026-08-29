@@ -13,7 +13,7 @@ index 9d155705c1..b8f0e0b8f0 100644
  #include "third_party/blink/renderer/modules/webgpu/gpu_memory_heap_info.h"
  #include "third_party/blink/renderer/modules/webgpu/gpu_subgroup_matrix_config.h"
  
-@@ -34,7 +37,62 @@ GPUAdapterInfo::GPUAdapterInfo(const String& vendor,
+@@ -34,7 +37,56 @@ GPUAdapterInfo::GPUAdapterInfo(const String& vendor,
        type_(type),
        d3d_shader_model_(d3d_shader_model),
        vk_driver_version_(vk_driver_version),
@@ -38,12 +38,6 @@ index 9d155705c1..b8f0e0b8f0 100644
 +  if (!base::UxrConfig::GetInstance().Has("uxr-webgpu-vendor")) {
 +    std::string webgl_vendor = base::ToLowerASCII(
 +        base::UxrConfig::GetInstance().Get("uxr-webgl-vendor"));
-+    if (webgl_vendor.empty() &&
-+        base::UxrConfig::GetInstance().Has("uxr-webgl-fingerprint")) {
-+      const std::string platform = base::ToLowerASCII(
-+          base::UxrConfig::GetInstance().Get("uxr-platform"));
-+      webgl_vendor = platform == "macos" ? "apple" : "nvidia";
-+    }
 +    if (webgl_vendor.empty())
 +      webgl_vendor = "intel";
 +    if (webgl_vendor.find("nvidia") != std::string::npos) {
