@@ -214,6 +214,9 @@ class RestoredSourceUpdateRegressionTest(unittest.TestCase):
         stale = update_source.index('$content.Contains($OldText)')
         self.assertGreater(current, stale)
         self.assertIn("Normalize-RestoredSource", update_source)
+        normalize_definition = update_source.index("function Normalize-RestoredSource {")
+        first_normalize_call = update_source.index("Normalize-RestoredSource `")
+        self.assertLess(normalize_definition, first_normalize_call)
         self.assertIn("normalized restored source", update_source)
         self.assertIn("already current or not applicable", update_source)
         self.assertNotIn(

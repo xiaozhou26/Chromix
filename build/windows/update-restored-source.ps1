@@ -53,6 +53,23 @@ function Set-SourceReplacement {
   return
 }
 
+function Normalize-RestoredSource {
+  param(
+    [Parameter(Mandatory)] [string]$RelativePath,
+    [Parameter(Mandatory)] [scriptblock]$Transform
+  )
+  $path = Join-Path $Src $RelativePath
+  if (-not (Test-Path -LiteralPath $path -PathType Leaf)) {
+    throw "resume source file is missing: $RelativePath"
+  }
+  $content = [IO.File]::ReadAllText($path)
+  $updated = & $Transform $content
+  if ($updated -ne $content) {
+    [IO.File]::WriteAllText($path, $updated)
+    Write-Host "==> normalized restored source: $RelativePath"
+  }
+}
+
 Set-SourceReplacement `
   -RelativePath "third_party\blink\renderer\modules\mediarecorder\media_recorder.cc" `
   -OldText "const std::string ph_type = type.LowerASCII().Utf8();" `
@@ -1079,23 +1096,6 @@ Set-SourceReplacement `
       return WebGLAny(script_state, ClampWebGL2PersonaLimit(
                                         ContextGL(), pname, 16384));
 '@
-
-function Normalize-RestoredSource {
-  param(
-    [Parameter(Mandatory)] [string]$RelativePath,
-    [Parameter(Mandatory)] [scriptblock]$Transform
-  )
-  $path = Join-Path $Src $RelativePath
-  if (-not (Test-Path -LiteralPath $path -PathType Leaf)) {
-    throw "resume source file is missing: $RelativePath"
-  }
-  $content = [IO.File]::ReadAllText($path)
-  $updated = & $Transform $content
-  if ($updated -ne $content) {
-    [IO.File]::WriteAllText($path, $updated)
-    Write-Host "==> normalized restored source: $RelativePath"
-  }
-}
 
 Normalize-RestoredSource `
   -RelativePath "third_party\blink\renderer\modules\webgl\webgl2_rendering_context_base.cc" `
