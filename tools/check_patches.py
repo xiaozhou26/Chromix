@@ -126,6 +126,7 @@ def check_bodies(rep: Report, patches_dir: Path, verbose: bool) -> None:
     malformed: list[str] = []
     bad_switch: list[str] = []
     brand_hits: list[str] = []
+    zero_index_existing: list[str] = []
 
     for p in _patch_files(patches_dir):
         text = p.read_text(encoding="utf-8", errors="replace")
@@ -137,6 +138,9 @@ def check_bodies(rep: Report, patches_dir: Path, verbose: bool) -> None:
 
         if len(diff_headers) != 1:
             multi_file.append(f"{p.name} ({len(diff_headers)} files)")
+        if re.search(r"^index 0000000(?:\.\.0+)? 100644$", text, re.MULTILINE) and not re.search(
+                r"^(?:new file mode|--- /dev/null)$", text, re.MULTILINE):
+            zero_index_existing.append(p.name)
         if not (diff_headers and has_minus and has_plus and has_hunk):
             malformed.append(p.name)
 
@@ -158,6 +162,9 @@ def check_bodies(rep: Report, patches_dir: Path, verbose: bool) -> None:
               f"all patches touch one file" if not multi_file else f"multi-file: {multi_file}")
     rep.check("well-formed", not malformed,
               "all patches parse" if not malformed else f"malformed: {malformed}")
+    rep.check("existing-file-index", not zero_index_existing,
+              "existing-file patches carry modification indices" if not zero_index_existing
+              else f"zero blob index on existing-file patch: {zero_index_existing}")
     rep.check("uxr-only-switches", not bad_switch,
               "all switches use the uxr- prefix" if not bad_switch else f"non-uxr: {bad_switch}")
     rep.check("no-brand-literals", not brand_hits,

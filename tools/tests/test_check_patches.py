@@ -127,6 +127,15 @@ def test_well_formed_missing_headers(tmp_path):
     assert cp.run_checks(write_set(tmp_path, patches)).failures == ["well-formed"]
 
 
+def test_existing_file_zero_index_is_rejected(tmp_path):
+    body = make_patch("core/alpha.cc").replace(
+        "index 1234567..89abcde 100644", "index 0000000..0000000 100644"
+    )
+    assert cp.run_checks(write_set(tmp_path, {"0001-alpha.patch": body})).failures == [
+        "existing-file-index"
+    ]
+
+
 # --------------------------------------------------------------------------- uxr-only-switches
 def test_uxr_only_rejects_non_uxr_switch(tmp_path):
     patches = {"0001-alpha.patch": make_patch(

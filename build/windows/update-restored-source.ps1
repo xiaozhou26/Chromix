@@ -1222,6 +1222,8 @@ Normalize-RestoredSource `
         "")
   }
 
+Normalize-RestoredSource `
+  -RelativePath "third_party\blink\renderer\platform\fonts\font_cache.cc" `
   -Transform {
     param($content)
     $content = [regex]::Replace(
