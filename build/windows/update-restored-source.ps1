@@ -1177,7 +1177,51 @@ Normalize-RestoredSource `
   }
 
 Normalize-RestoredSource `
-  -RelativePath "third_party\blink\renderer\platform\fonts\font_cache.cc" `
+  -RelativePath "third_party\blink\renderer\core\dom\element.cc" `
+  -Transform {
+    param($content)
+    $content = [regex]::Replace(
+        $content,
+        '(?ms)\r?\nnamespace \{\s*// UXR: seeded sub-pixel DOMRect jitter\..*?\r?\n\}\s*// namespace\s*\r?\n',
+        "`r`n")
+    $content = [regex]::Replace(
+        $content,
+        '(?m)^\s*#include "base/bit_cast\.h"\s*\r?\n',
+        "")
+    $content = [regex]::Replace(
+        $content,
+        '(?m)^\s*#include "base/strings/string_number_conversions\.h"\s*\r?\n',
+        "")
+    $content = [regex]::Replace(
+        $content,
+        '(?m)^\s*#include "base/uxr_config\.h"\s*\r?\n',
+        "")
+    return [regex]::Replace(
+        $content,
+        '(?m)^\s*UxrJitterQuads\(quads\);\s*// UXR\s*\r?\n',
+        "")
+  }
+
+Normalize-RestoredSource `
+  -RelativePath "third_party\blink\renderer\modules\webgpu\gpu_adapter_info.cc" `
+  -Transform {
+    param($content)
+    return [regex]::Replace(
+        $content,
+        '(?ms)\r?\n    if \(webgl_vendor\.empty\(\) &&\s+base::UxrConfig::GetInstance\(\)\.Has\("uxr-webgl-fingerprint"\)\) \{\s+const std::string platform = base::ToLowerASCII\(\s+base::UxrConfig::GetInstance\(\)\.Get\("uxr-platform"\)\);\s+webgl_vendor = platform == "macos" \? "apple" : "nvidia";\s+\}',
+        "")
+  }
+
+Normalize-RestoredSource `
+  -RelativePath "third_party\blink\renderer\modules\webgpu\gpu_adapter.cc" `
+  -Transform {
+    param($content)
+    return [regex]::Replace(
+        $content,
+        '(?ms)\r?\n    if \(webgl_vendor\.empty\(\) &&\s+uxr_config\.Has\("uxr-webgl-fingerprint"\)\) \{\s+const std::string platform =\s+base::ToLowerASCII\(uxr_config\.Get\("uxr-platform"\)\);\s+webgl_vendor = platform == "macos" \? "apple" : "nvidia";\s+\}',
+        "")
+  }
+
   -Transform {
     param($content)
     $content = [regex]::Replace(
@@ -1308,7 +1352,10 @@ const std::string& WebGLPersonaRenderer() {
 
 $webglSources = @(
   "third_party\blink\renderer\modules\webgl\webgl_rendering_context_base.cc",
-  "third_party\blink\renderer\modules\webgl\webgl2_rendering_context_base.cc"
+  "third_party\blink\renderer\modules\webgl\webgl2_rendering_context_base.cc",
+  "third_party\blink\renderer\core\dom\element.cc",
+  "third_party\blink\renderer\modules\webgpu\gpu_adapter_info.cc",
+  "third_party\blink\renderer\modules\webgpu\gpu_adapter.cc"
 )
 $touchTime = [DateTime]::UtcNow.AddSeconds(2)
 foreach ($relativePath in $webglSources) {
@@ -1320,14 +1367,20 @@ foreach ($relativePath in $webglSources) {
   Write-Host "==> touched restored WebGL source: $relativePath"
 }
 
-$webglObjDir = Join-Path $OutDir "obj\third_party\blink\renderer\modules\webgl"
-if (Test-Path -LiteralPath $webglObjDir -PathType Container) {
-  $staleObjects = @(Get-ChildItem -LiteralPath $webglObjDir -Recurse -File -Include "*.obj","*.pch" -ErrorAction SilentlyContinue)
-  if ($staleObjects.Count -gt 0) {
-    $staleObjects | Remove-Item -Force
-    Write-Host "==> removed $($staleObjects.Count) restored WebGL object files"
+$webglObjDirs = @(
+  (Join-Path $OutDir "obj\third_party\blink\renderer\modules\webgl"),
+  (Join-Path $OutDir "obj\third_party\blink\renderer\core\dom"),
+  (Join-Path $OutDir "obj\third_party\blink\renderer\modules\webgpu")
+)
+foreach ($webglObjDir in $webglObjDirs) {
+  if (Test-Path -LiteralPath $webglObjDir -PathType Container) {
+    $staleObjects = @(Get-ChildItem -LiteralPath $webglObjDir -Recurse -File -Include "*.obj","*.pch" -ErrorAction SilentlyContinue)
+    if ($staleObjects.Count -gt 0) {
+      $staleObjects | Remove-Item -Force
+      Write-Host "==> removed $($staleObjects.Count) restored renderer object files from $webglObjDir"
+    }
   }
 }
-$webglObjManifest = Join-Path $OutDir "chromix-webgl-objects-invalidated.txt"
-"restored WebGL object files invalidated at $(Get-Date -Format o)" |
+$webglObjManifest = Join-Path $OutDir "chromix-renderer-objects-invalidated.txt"
+"restored renderer object files invalidated at $(Get-Date -Format o)" |
   Set-Content -Encoding ASCII $webglObjManifest

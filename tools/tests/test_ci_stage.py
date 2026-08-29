@@ -227,6 +227,11 @@ class RestoredSourceUpdateRegressionTest(unittest.TestCase):
         self.assertIn("NVIDIA GeForce RTX 3060 Direct3D11", update_source)
         self.assertIn("String(WebGLPersonaRenderer().c_str())", update_source)
         self.assertIn("String(WebGLPersonaVendor().c_str())", update_source)
+        self.assertIn("UxrJitterQuads", update_source)
+        self.assertIn('third_party\\blink\\renderer\\core\\dom\\element.cc', update_source)
+        self.assertIn('third_party\\blink\\renderer\\modules\\webgpu\\gpu_adapter_info.cc', update_source)
+        self.assertIn('third_party\\blink\\renderer\\modules\\webgpu\\gpu_adapter.cc', update_source)
+        self.assertIn('chromix-renderer-objects-invalidated.txt', update_source)
         self.assertIn("$namespaceMarker", update_source)
         self.assertIn("$content.Insert($namespaceIndex + $namespaceMarker.Length, $helper)", update_source)
         self.assertIn('[switch]$PreferCurrentMarker', update_source)
@@ -263,8 +268,8 @@ class RestoredSourceUpdateRegressionTest(unittest.TestCase):
         stage = CI_STAGE.read_text(encoding="utf-8")
         update = RESTORED_SOURCE_UPDATE.read_text(encoding="utf-8")
         self.assertIn('update-restored-source.ps1" -Src $Src -OutDir $OutDir', stage)
-        self.assertIn('chromix-webgl-objects-invalidated.txt', update)
-        self.assertIn('removed $($staleObjects.Count) restored WebGL object files', update)
+        self.assertIn('chromix-renderer-objects-invalidated.txt', update)
+        self.assertIn('removed $($staleObjects.Count) restored renderer object files', update)
         self.assertIn('SetLastWriteTimeUtc', update)
         self.assertIn(
             'third_party\\blink\\renderer\\modules\\webgl\\webgl_rendering_context_base.cc',
