@@ -1109,16 +1109,47 @@ Normalize-RestoredSource `
         $content,
         '(?ms)\r?\n\s*if \(base::UxrConfig::GetInstance\(\)\.Has\("uxr-webgl-fullparams"\).*?String\("WebGL 2\.0 \(OpenGL ES 3\.0 Chromium\)"\)\);\s*\}',
         "")
-    $legacyPatterns = @(
-      '(?ms)^[ \t]*GLint ClampWebGL2PersonaLimit\s*\([^)]*\)\s*\{.*?^[ \t]*\}',
-      '(?ms)^[ \t]*GLint WebGL2PersonaVaryingVectors\s*\([^)]*\)\s*\{.*?^[ \t]*\}'
+    $legacyFunctions = @(
+      @{ Name = "ClampWebGL2PersonaLimit"; ReturnType = "GLint" },
+      @{ Name = "WebGL2PersonaVaryingVectors"; ReturnType = "GLint" }
     )
-    foreach ($legacyPattern in $legacyPatterns) {
-      $matches = [regex]::Matches($content, $legacyPattern)
-      $removeFrom = if ($content -match 'GLint ClampPersonaLimit\(') { 0 } else { 1 }
-      for ($index = $matches.Count - 1; $index -ge $removeFrom; $index--) {
-        $match = $matches[$index]
-        $content = $content.Remove($match.Index, $match.Length)
+    $hasCurrentClamp = $content -match '(?m)^\s*GLint\s+ClampPersonaLimit\s*\('
+    foreach ($legacyFunction in $legacyFunctions) {
+      $signaturePattern = '(?m)^[ \t]*' +
+          [regex]::Escape($legacyFunction.ReturnType) + '\s+' +
+          [regex]::Escape($legacyFunction.Name) + '\s*\('
+      $matches = [regex]::Matches($content, $signaturePattern)
+      $keepCount = if ($hasCurrentClamp) { 0 } else { 1 }
+      for ($index = $matches.Count - 1; $index -ge $keepCount; $index--) {
+        $start = $matches[$index].Index
+        $openBrace = $content.IndexOf('{', $start)
+        if ($openBrace -lt 0) {
+          continue
+        }
+        $depth = 0
+        $end = -1
+        for ($position = $openBrace; $position -lt $content.Length; $position++) {
+          switch ($content[$position]) {
+            '{' { $depth++ }
+            '}' {
+              $depth--
+              if ($depth -eq 0) {
+                $end = $position + 1
+                break
+              }
+            }
+          }
+          if ($end -ge 0) {
+            break
+          }
+        }
+        if ($end -ge 0) {
+          while ($end -lt $content.Length -and
+                 ($content[$end] -eq "`r" -or $content[$end] -eq "`n")) {
+            $end++
+          }
+          $content = $content.Remove($start, $end - $start)
+        }
       }
     }
     return [regex]::Replace(

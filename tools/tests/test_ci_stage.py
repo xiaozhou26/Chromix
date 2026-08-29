@@ -227,7 +227,10 @@ class RestoredSourceUpdateRegressionTest(unittest.TestCase):
         self.assertIn('[switch]$PreferCurrentMarker', update_source)
         self.assertIn("GLint ClampWebGL2PersonaLimit", update_source)
         self.assertIn("GLint ClampPersonaLimit", update_source)
-        self.assertIn("$legacyPatterns", update_source)
+        self.assertIn("$legacyFunctions", update_source)
+        self.assertIn("$hasCurrentClamp", update_source)
+        self.assertIn("[regex]::Escape($legacyFunction.Name)", update_source)
+        self.assertIn("$content.IndexOf('{', $start)", update_source)
         self.assertIn("GLint WebGL2PersonaVaryingVectors", update_source)
         self.assertIn("-PreferCurrentMarker", update_source)
 
