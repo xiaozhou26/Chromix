@@ -1,4 +1,4 @@
-"""Linux Fontconfig wiring for the bundled metric-compatible font clones."""
+"""Linux Fontconfig wiring for the bundled Windows font assets."""
 from __future__ import annotations
 
 import os

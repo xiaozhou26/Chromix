@@ -38,12 +38,10 @@ class FontCorrectnessRegressionTest(unittest.TestCase):
         self.assertIn("UxrFontFamilyAllowed(creation_params.Family())", self.fonts)
         self.assertNotIn("UxrFontHidden(family)", self.fonts)
 
-    def test_linux_windows_persona_maps_missing_families_to_bundle(self):
-        self.assertIn("UxrLinuxWindowsFontSubstitute", self.fonts)
-        self.assertIn('{"Trebuchet MS", "Arial"}', self.fonts)
-        self.assertIn('{"Cascadia Code", "Consolas"}', self.fonts)
-        self.assertIn('{"Segoe UI Symbol", "Segoe UI"}', self.fonts)
-        self.assertIn("BUILDFLAG(IS_LINUX)", self.fonts)
+    def test_linux_windows_persona_keeps_real_families_visible(self):
+        self.assertIn("kBundledWindowsFamilies", self.fonts)
+        for family in ("Arial Narrow", "MS Gothic", "Segoe UI Light", "Wingdings 3", "ＭＳ ゴシック"):
+            self.assertIn(f'"{family}"', self.fonts)
 
     def test_generics_keep_native_resolution(self):
         for family in ("serif", "sans-serif", "monospace", "system-ui", "emoji"):
@@ -55,17 +53,25 @@ class FontCorrectnessRegressionTest(unittest.TestCase):
         self.assertNotIn("base/uxr_config.h", self.metrics)
         self.assertIn("actual shaped and rendered font", self.metrics)
 
-    def test_fortress_font_bundle_has_license_and_windows_names(self):
+    def test_windows_font_bundle_has_provenance_and_expected_formats(self):
         self.assertTrue((FONTS / "NOTICE").is_file())
-        self.assertTrue((FONTS / "FORTRESS-LICENSE").is_file())
         self.assertTrue((FONTS / "SOURCE.md").is_file())
+        self.assertTrue((FONTS / "fonts.conf.template").is_file())
+        font_files = [p for p in FONTS.iterdir() if p.is_file()]
+        self.assertGreaterEqual(len(font_files), 150)
+        self.assertTrue(any(p.suffix.lower() == ".ttc" for p in font_files))
+        self.assertTrue(any(p.suffix.lower() == ".fon" for p in font_files))
         for family in ("Arial", "Calibri", "Cambria", "Consolas", "SegoeUI", "Tahoma", "TimesNewRoman", "Verdana"):
             self.assertTrue(any(FONTS.glob(f"{family}-*.ttf")), family)
-        self.assertNotIn("ATTRIBUTION.md", " ".join(p.name for p in FONTS.iterdir()))
+        self.assertNotIn("FORTRESS-LICENSE", " ".join(p.name for p in font_files))
+        self.assertNotIn("ATTRIBUTION.md", " ".join(p.name for p in font_files))
 
-    def test_linux_package_bundles_fonts_and_launcher(self):
-        for text in ("fonts.conf.template", "FONTCONFIG_FILE", "NOTICE", "FORTRESS-LICENSE", "SOURCE.md"):
+    def test_linux_package_bundles_supported_font_formats_and_launcher(self):
+        for text in ("fonts.conf.template", "FONTCONFIG_FILE", "NOTICE", "SOURCE.md", "*.ttc"):
             self.assertIn(text, self.linux_package)
+        self.assertIn("-iname '*.ttf'", self.linux_package)
+        self.assertIn("-iname '*.ttc'", self.linux_package)
+        self.assertNotIn("FORTRESS-LICENSE", self.linux_package)
         self.assertIn("exec \"$HERE/chrome\"", self.linux_package)
 
     def test_windows_package_does_not_install_or_register_clone_fonts(self):

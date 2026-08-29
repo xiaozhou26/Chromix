@@ -56,19 +56,18 @@ if [ ! -e "$STAGE/v8_context_snapshot.bin" ] && [ ! -e "$STAGE/snapshot_blob.bin
   exit 1
 fi
 
-if ! compgen -G "$FONTS_SRC/*.ttf" >/dev/null || \
+if ! find "$FONTS_SRC" -maxdepth 1 -type f \( -iname '*.ttf' -o -iname '*.ttc' \) -print -quit | grep -q . || \
    [ ! -f "$FONTS_SRC/fonts.conf.template" ] || \
    [ ! -f "$FONTS_SRC/NOTICE" ] || \
-   [ ! -f "$FONTS_SRC/FORTRESS-LICENSE" ] || \
    [ ! -f "$FONTS_SRC/SOURCE.md" ]; then
   echo "font bundle is incomplete: $FONTS_SRC" >&2
   exit 1
 fi
-cp -a "$FONTS_SRC"/*.ttf "$FONTS_SRC/fonts.conf.template" \
-  "$FONTS_SRC/NOTICE" "$FONTS_SRC/FORTRESS-LICENSE" "$FONTS_SRC/SOURCE.md" "$STAGE/fonts/"
-if compgen -G "$FONTS_SRC/*.otf" >/dev/null; then
-  cp -a "$FONTS_SRC"/*.otf "$STAGE/fonts/"
-fi
+# Only modern TrueType/OpenType assets are loaded by the Linux bundle. Legacy
+# .fon files remain available in the source asset directory but are excluded.
+find "$FONTS_SRC" -maxdepth 1 -type f \( -iname '*.ttf' -o -iname '*.ttc' \) -exec cp -a {} "$STAGE/fonts/" \;
+cp -a "$FONTS_SRC/fonts.conf.template" "$FONTS_SRC/NOTICE" \
+  "$FONTS_SRC/SOURCE.md" "$STAGE/fonts/"
 
 cat > "$STAGE/chromix" <<'EOF'
 #!/usr/bin/env bash

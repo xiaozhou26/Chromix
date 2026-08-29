@@ -1,4 +1,4 @@
-// Linux Fontconfig wiring for the bundled metric-compatible font clones.
+// Linux Fontconfig wiring for the bundled Windows font assets.
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { homedir, tmpdir } from "node:os";
