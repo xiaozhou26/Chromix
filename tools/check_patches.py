@@ -13,7 +13,8 @@ so CI can gate every PR:
   2. numbering      - files are NNNN-*.patch, contiguous from 0001, no gaps, no duplicates.
   3. single-surface - each patch touches exactly ONE file (one `diff --git`). The project
                       rule is one patch per file so rebases stay legible.
-  4. well-formed    - each patch has a `diff --git` header, ---/+++ file headers, and >=1 hunk.
+  4. well-formed    - each patch has a `diff --git` header, ---/+++ file headers, >=1 hunk,
+                      and every hunk's declared line counts match its body.
   5. uxr-only       - any command-line switch a patch introduces uses the de-branded `uxr-`
                       prefix (or the `fingerprint-*` unified CLI alias). A `--fortress-*` /
                       `--tilion-*` switch would bake a brand token into the binary and is
@@ -143,6 +144,24 @@ def check_bodies(rep: Report, patches_dir: Path, verbose: bool) -> None:
             zero_index_existing.append(p.name)
         if not (diff_headers and has_minus and has_plus and has_hunk):
             malformed.append(p.name)
+        else:
+            hunk_indexes = [i for i, line in enumerate(lines) if line.startswith("@@")]
+            for hunk_index, line_index in enumerate(hunk_indexes):
+                match = re.match(
+                    r"^@@ -(\d+)(?:,(\d+))? \+(\d+)(?:,(\d+))? @@",
+                    lines[line_index],
+                )
+                if not match:
+                    malformed.append(p.name)
+                    break
+                end = hunk_indexes[hunk_index + 1] if hunk_index + 1 < len(hunk_indexes) else len(lines)
+                body = lines[line_index + 1:end]
+                old_count = sum(line.startswith((" ", "-")) for line in body)
+                new_count = sum(line.startswith((" ", "+")) for line in body)
+                expected = (int(match.group(2) or 1), int(match.group(4) or 1))
+                if (old_count, new_count) != expected:
+                    malformed.append(p.name)
+                    break
 
         for ln in lines:
             if not ln.startswith("+") or ln.startswith("+++"):

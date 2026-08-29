@@ -12,10 +12,12 @@ index 3b1a90d..910b0d7 100644
  #include "build/build_config.h"
  #include "skia/ext/font_utils.h"
  #include "third_party/blink/public/common/features.h"
-@@ -79,6 +82,91 @@
-
+@@ -79,6 +82,75 @@
+-
++
  namespace blink {
-
+-
++
 +namespace {
 +
 +bool UxrFontFamilyIsGeneric(const AtomicString& family) {
@@ -87,8 +89,9 @@ index 3b1a90d..910b0d7 100644
 +
  const char kColorEmojiLocale[] = "und-Zsye";
  const char kMonoEmojiLocale[] = "und-Zsym";
-
-@@ -156,6 +244,16 @@ const FontPlatformData* FontCache::GetFontPlatformData(
+-
++
+@@ -156,6 +244,15 @@ const FontPlatformData* FontCache::GetFontPlatformData(
      const FontDescription& font_description,
      const FontFaceCreationParams& creation_params,
      AlternateFontName alternate_font_name) {
@@ -102,5 +105,6 @@ index 3b1a90d..910b0d7 100644
 +  }
 +
    TRACE_EVENT0("fonts", "FontCache::GetFontPlatformData");
-
+-
++
  #if !BUILDFLAG(IS_MAC)

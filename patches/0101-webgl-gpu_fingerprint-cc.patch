@@ -1,7 +1,7 @@
 diff --git a/third_party/blink/renderer/modules/webgl/gpu_fingerprint.cc b/third_party/blink/renderer/modules/webgl/gpu_fingerprint.cc
 --- /dev/null
 +++ b/third_party/blink/renderer/modules/webgl/gpu_fingerprint.cc
-@@ -0,0 +1,114 @@
+@@ -0,0 +1,92 @@
 +#include "third_party/blink/renderer/modules/webgl/gpu_fingerprint.h"
 +
 +#include "base/strings/string_number_conversions.h"

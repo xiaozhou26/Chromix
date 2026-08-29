@@ -40,7 +40,7 @@ index 1111111..2222222 100644
    GLint range[2] = {0, 0};
    GLint precision = 0;
    ContextGL()->GetShaderPrecisionFormat(shader_type, precision_type, range,
-@@ -4810,6 +4841,21 @@
+@@ -4810,6 +4841,22 @@
      if (ExtensionSupportedAndAllowed(tracker)) {
        result.push_back(tracker->ExtensionName());
      }

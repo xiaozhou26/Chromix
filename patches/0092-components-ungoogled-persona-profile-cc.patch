@@ -2,7 +2,7 @@ diff --git a/components/ungoogled/persona_profile.cc b/components/ungoogled/pers
 new file mode 100644
 --- /dev/null
 +++ b/components/ungoogled/persona_profile.cc
-@@ -0,0 +1,125 @@
+@@ -0,0 +1,134 @@
 +// Copyright 2026.
 +#include "components/ungoogled/persona_profile.h"
 +

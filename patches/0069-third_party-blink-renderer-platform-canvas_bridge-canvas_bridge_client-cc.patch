@@ -2,7 +2,7 @@ diff --git a/third_party/blink/renderer/platform/canvas_bridge/canvas_bridge_cli
 new file mode 100644
 --- /dev/null
 +++ b/third_party/blink/renderer/platform/canvas_bridge/canvas_bridge_client.cc
-@@ -0,0 +1,629 @@
+@@ -0,0 +1,625 @@
 +// Copyright 2026.
 +// Use of this source code is governed by a BSD-style license.
 +#include "third_party/blink/renderer/platform/canvas_bridge/canvas_bridge_client.h"

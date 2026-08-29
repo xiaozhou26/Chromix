@@ -110,7 +110,7 @@ index 1111111..2222222 100644
    switch (pname) {
      case GL_SHADING_LANGUAGE_VERSION:
        return WebGLAny(
-@@ -4822,26 +4877,30 @@
+@@ -4822,26 +4877,34 @@
      case GL_FRAGMENT_SHADER_DERIVATIVE_HINT:
        return GetUnsignedIntParameter(script_state, pname);
      case GL_MAX_3D_TEXTURE_SIZE:
@@ -157,7 +157,7 @@ index 1111111..2222222 100644
      case GL_MAX_ELEMENT_INDEX:
        return GetInt64Parameter(script_state, pname);
      case GL_MAX_ELEMENTS_INDICES:
-@@ -4850,22 +4909,26 @@
+@@ -4850,22 +4909,28 @@
        return GetIntParameter(script_state, pname);
      case GL_MAX_FRAGMENT_INPUT_COMPONENTS:
        return WebGLAny(script_state,
@@ -195,7 +195,7 @@ index 1111111..2222222 100644
 +          ContextGL(), GL_MAX_TRANSFORM_FEEDBACK_INTERLEAVED_COMPONENTS,
 +          ungoogled::CurrentPersona().webgl_max_transform_feedback_interleaved_components));
      case GL_MAX_TRANSFORM_FEEDBACK_SEPARATE_ATTRIBS:
-@@ -4875,18 +4938,21 @@
+@@ -4875,20 +4938,20 @@
      case GL_MAX_UNIFORM_BLOCK_SIZE:
 -      return WebGLAny(script_state, ClampPersonaLimit(
 -          ContextGL(), GL_MAX_UNIFORM_BLOCK_SIZE,

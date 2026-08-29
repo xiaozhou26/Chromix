@@ -10,7 +10,7 @@ index b5cc00e4c8..3cc7963afa 100644
  #include <memory>
  #include <optional>
  
-@@ -161,6 +162,117 @@ int ChromeMain(int argc, const char** argv) {
+@@ -161,6 +162,119 @@ int ChromeMain(int argc, const char** argv) {
  
    base::CommandLine* command_line(base::CommandLine::ForCurrentProcess());
  
