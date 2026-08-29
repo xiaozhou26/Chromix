@@ -227,6 +227,8 @@ class RestoredSourceUpdateRegressionTest(unittest.TestCase):
         self.assertIn("NVIDIA GeForce RTX 3060 Direct3D11", update_source)
         self.assertIn("String(WebGLPersonaRenderer().c_str())", update_source)
         self.assertIn("String(WebGLPersonaVendor().c_str())", update_source)
+        self.assertIn("$namespaceMarker", update_source)
+        self.assertIn("$content.Insert($namespaceIndex + $namespaceMarker.Length, $helper)", update_source)
         self.assertIn('[switch]$PreferCurrentMarker', update_source)
         self.assertIn("GLint ClampWebGL2PersonaLimit", update_source)
         self.assertIn("GLint ClampPersonaLimit", update_source)

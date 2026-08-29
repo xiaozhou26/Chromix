@@ -1264,6 +1264,45 @@ Normalize-RestoredSource `
     $content = $content.Replace(
         'String("Google Inc. (NVIDIA Corporation)")',
         'String(WebGLPersonaVendor().c_str())')
+    if ($content -notmatch '(?m)^const std::string& WebGLPersonaVendor\(') {
+      $helper = @'
+
+constexpr char kDefaultWebGLVendor[] = "Google Inc. (Intel)";
+constexpr char kDefaultWebGLRenderer[] =
+    "ANGLE (Intel, Intel(R) UHD Graphics 770 (0x0000A780) Direct3D11 "
+    "vs_5_0 ps_5_0, D3D11)";
+
+const std::string& WebGLPersonaVendor() {
+  static const std::string vendor = [] {
+    const auto& config = base::UxrConfig::GetInstance();
+    const std::string configured_vendor = config.Get("uxr-webgl-vendor");
+    const std::string configured_renderer = config.Get("uxr-webgl-renderer");
+    return !configured_vendor.empty() && !configured_renderer.empty()
+               ? configured_vendor
+               : std::string(kDefaultWebGLVendor);
+  }();
+  return vendor;
+}
+
+const std::string& WebGLPersonaRenderer() {
+  static const std::string renderer = [] {
+    const auto& config = base::UxrConfig::GetInstance();
+    const std::string configured_vendor = config.Get("uxr-webgl-vendor");
+    const std::string configured_renderer = config.Get("uxr-webgl-renderer");
+    return !configured_vendor.empty() && !configured_renderer.empty()
+               ? configured_renderer
+               : std::string(kDefaultWebGLRenderer);
+  }();
+  return renderer;
+}
+'@
+      $namespaceMarker = 'namespace blink {'
+      $namespaceIndex = $content.IndexOf($namespaceMarker)
+      if ($namespaceIndex -lt 0) {
+        throw "resume source namespace marker is missing: third_party\\blink\\renderer\\modules\\webgl\\webgl_rendering_context_base.cc"
+      }
+      $content = $content.Insert($namespaceIndex + $namespaceMarker.Length, $helper)
+    }
     return $content
   }
 
