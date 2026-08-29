@@ -57,3 +57,54 @@ index 44527d0a7b..45affa329c 100644
    }
    return features;
  }
+@@ -96,5 +96,50 @@ GPUAdapter::GPUAdapter(
+   vendor_ = String::FromUtf8(info.vendor);
+   architecture_ = String::FromUtf8(info.architecture);
++
++  // UXR: derive WebGPU identity from the final WebGL persona before either
++  // GPUAdapterInfo constructor is selected. Explicit WebGPU values win.
++  const base::UxrConfig& uxr_config = base::UxrConfig::GetInstance();
++  const bool use_real_gpu =
++      uxr_config.Has("uxr-webgl-real") ||
++      uxr_config.Has("uxr-disable-gpu-fingerprint");
++  if (uxr_config.Has("uxr-webgpu-vendor")) {
++    vendor_ = String(uxr_config.Get("uxr-webgpu-vendor").c_str());
++  } else if (!use_real_gpu) {
++    std::string webgl_vendor = base::ToLowerASCII(
++        uxr_config.Get("uxr-webgl-vendor"));
++    if (webgl_vendor.empty() &&
++        uxr_config.Has("uxr-webgl-fingerprint")) {
++      const std::string platform =
++          base::ToLowerASCII(uxr_config.Get("uxr-platform"));
++      webgl_vendor = platform == "macos" ? "apple" : "nvidia";
++    }
++    if (webgl_vendor.empty())
++      webgl_vendor = "intel";
++    if (webgl_vendor.find("nvidia") != std::string::npos)
++      vendor_ = "nvidia";
++    else if (webgl_vendor.find("intel") != std::string::npos)
++      vendor_ = "intel";
++    else if (webgl_vendor.find("amd") != std::string::npos ||
++             webgl_vendor.find("ati") != std::string::npos ||
++             webgl_vendor.find("radeon") != std::string::npos)
++      vendor_ = "amd";
++    else if (webgl_vendor.find("apple") != std::string::npos)
++      vendor_ = "apple";
++  }
++  if (uxr_config.Has("uxr-webgpu-architecture")) {
++    architecture_ =
++        String(uxr_config.Get("uxr-webgpu-architecture").c_str());
++  } else if (!use_real_gpu) {
++    const std::string webgpu_vendor = base::ToLowerASCII(vendor_.Utf8());
++    if (webgpu_vendor == "nvidia")
++      architecture_ = "ampere";
++    else if (webgpu_vendor == "intel")
++      architecture_ = "gen-12-lp";
++    else if (webgpu_vendor == "amd")
++      architecture_ = "rdna2";
++    else if (webgpu_vendor == "apple")
++      architecture_ = "apple";
++  }
+   if (info.deviceID <= 0xffff) {
+     device_ = String::Format("0x%04x", info.deviceID);
+   } else {
