@@ -1,10 +1,12 @@
 diff --git a/third_party/blink/renderer/core/dom/element.cc b/third_party/blink/renderer/core/dom/element.cc
-index 5227c6bdfc..d31f5d6a21 100644
+index 5227c6b..5ec5590 100644
 --- a/third_party/blink/renderer/core/dom/element.cc
 +++ b/third_party/blink/renderer/core/dom/element.cc
-@@ -3449,4 +3449,5 @@ void Element::ClientQuads(Vector<gfx::QuadF>& quads) const {
-    if (element_layout_object->IsBoxModelObject() ||
-        element_layout_object->IsBR()) {
-      element_layout_object->AbsoluteQuads(quads);
+@@ -3449,6 +3449,7 @@ void Element::ClientQuads(Vector<gfx::QuadF>& quads) const {
+   if (element_layout_object->IsBoxModelObject() ||
+       element_layout_object->IsBR()) {
+     element_layout_object->AbsoluteQuads(quads);
 +    // UXR: keep Element and Range geometry on the native shared path.
-    }
+   }
+ }
+
