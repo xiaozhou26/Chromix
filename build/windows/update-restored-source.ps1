@@ -67,7 +67,7 @@ function Ensure-NewFileFromPatch {
   if (-not (Test-Path -LiteralPath $patchPath -PathType Leaf)) {
     throw "resume source patch is missing: $PatchRelativePath"
   }
-  $targetHeader = "+++ b/$($RelativePath.Replace('\\', '/'))"
+  $targetHeader = "+++ b/$($RelativePath.Replace('\', '/'))"
   $added = [Collections.Generic.List[string]]::new()
   $collect = $false
   foreach ($line in Get-Content -LiteralPath $patchPath) {
