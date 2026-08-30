@@ -283,24 +283,32 @@ index 1111111..2222222 100644
      case GL_TEXTURE_BINDING_2D:
        return WebGLAny(
            script_state,
-@@ -4404,8 +4471,10 @@
+@@ -4404,8 +4471,14 @@
        return ScriptValue::CreateNull(script_state->GetIsolate());
      case WebGLDebugRendererInfo::kUnmaskedRendererWebgl:
        if (ExtensionEnabled(kWebGLDebugRendererInfoName)) {
-+        if (!ungoogled::CurrentPersona().webgl_real)
-+          return WebGLAny(script_state, String(ungoogled::CurrentPersona().webgl_renderer));
++        if (!ungoogled::CurrentPersona().webgl_real) {
++          // Preserve the native query path before returning the persona value.
++          (void)ContextGL()->GetString(GL_RENDERER);
++          return WebGLAny(script_state,
++                          String(ungoogled::CurrentPersona().webgl_renderer));
++        }
          return WebGLAny(script_state,
 -                        String(WebGLPersonaRenderer().c_str()));
 +                        String(ContextGL()->GetString(GL_RENDERER)));
        }
        SynthesizeGLError(
            GL_INVALID_ENUM, "getParameter",
-@@ -4413,8 +4482,10 @@
+@@ -4413,8 +4482,14 @@
        return ScriptValue::CreateNull(script_state->GetIsolate());
      case WebGLDebugRendererInfo::kUnmaskedVendorWebgl:
        if (ExtensionEnabled(kWebGLDebugRendererInfoName)) {
-+        if (!ungoogled::CurrentPersona().webgl_real)
-+          return WebGLAny(script_state, String(ungoogled::CurrentPersona().webgl_vendor));
++        if (!ungoogled::CurrentPersona().webgl_real) {
++          // Preserve the native query path before returning the persona value.
++          (void)ContextGL()->GetString(GL_VENDOR);
++          return WebGLAny(script_state,
++                          String(ungoogled::CurrentPersona().webgl_vendor));
++        }
          return WebGLAny(script_state,
 -                        String(WebGLPersonaVendor().c_str()));
 +                        String(ContextGL()->GetString(GL_VENDOR)));
