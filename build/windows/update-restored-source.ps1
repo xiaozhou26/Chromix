@@ -425,6 +425,15 @@ Set-SourceReplacement `
 
 Ensure-SourceText `
   -RelativePath "third_party\blink\renderer\modules\webgl\webgl_rendering_context_base.cc" `
+  -Anchor '#include "build/build_config.h"' `
+  -Text "`r`n#include `"components/ungoogled/farble_seed.h`"`r`n#include `"components/ungoogled/persona_profile.h`"" `
+  -CurrentMarker @(
+    '#include "components/ungoogled/farble_seed.h"',
+    '#include "components/ungoogled/persona_profile.h"'
+  )
+
+Ensure-SourceText `
+  -RelativePath "third_party\blink\renderer\modules\webgl\webgl_rendering_context_base.cc" `
   -Anchor 'case WebGLDebugRendererInfo::kUnmaskedRendererWebgl:' `
   -Text ("`r`n" + @'
         if (!ungoogled::CurrentPersona().webgl_real) {

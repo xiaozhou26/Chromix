@@ -208,6 +208,8 @@ class RestoredSourceUpdateRegressionTest(unittest.TestCase):
         self.assertIn("kWindowsFamilies", update_source)
         self.assertIn('Get("uxr-platform")', update_source)
         self.assertIn("base::SplitString", update_source)
+        self.assertIn("#include \"components/ungoogled/farble_seed.h\"", update_source)
+        self.assertIn("#include \"components/ungoogled/persona_profile.h\"", update_source)
         self.assertIn("FontCache::GetFontPlatformData", update_source)
         self.assertIn("TextMetrics::Update", update_source)
         current = update_source.rindex('$content.Contains($NewText)')
