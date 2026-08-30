@@ -1206,20 +1206,115 @@ Normalize-RestoredSource `
   -RelativePath "third_party\blink\renderer\modules\webgpu\gpu_adapter_info.cc" `
   -Transform {
     param($content)
-    return [regex]::Replace(
-        $content,
-        '(?ms)\r?\n    if \(webgl_vendor\.empty\(\) &&\s+base::UxrConfig::GetInstance\(\)\.Has\("uxr-webgl-fingerprint"\)\) \{\s+const std::string platform = base::ToLowerASCII\(\s+base::UxrConfig::GetInstance\(\)\.Get\("uxr-platform"\)\);\s+webgl_vendor = platform == "macos" \? "apple" : "nvidia";\s+\}',
-        "")
+    $identity = @'
+  // UXR: WebGPU identity follows the active WebGL persona. Explicit WebGPU
+  // values win; otherwise the default persona is Intel and the adapter is not
+  // exposed as a fallback adapter.
+  if (base::UxrConfig::GetInstance().Has("uxr-webgpu-vendor")) {
+    vendor_ = String(base::UxrConfig::GetInstance().Get("uxr-webgpu-vendor").c_str());
+    is_fallback_adapter_ = false;
+  }
+  if (base::UxrConfig::GetInstance().Has("uxr-webgpu-architecture")) {
+    architecture_ =
+        String(base::UxrConfig::GetInstance().Get("uxr-webgpu-architecture").c_str());
+  }
+  if (base::UxrConfig::GetInstance().Has("uxr-webgpu-description")) {
+    description_ =
+        String(base::UxrConfig::GetInstance().Get("uxr-webgpu-description").c_str());
+  }
+  if (!base::UxrConfig::GetInstance().Has("uxr-webgpu-vendor")) {
+    std::string webgl_vendor = base::ToLowerASCII(
+        base::UxrConfig::GetInstance().Get("uxr-webgl-vendor"));
+    if (webgl_vendor.empty())
+      webgl_vendor = "intel";
+    if (webgl_vendor.find("nvidia") != std::string::npos) {
+      vendor_ = "nvidia";
+      is_fallback_adapter_ = false;
+    } else if (webgl_vendor.find("intel") != std::string::npos) {
+      vendor_ = "intel";
+      is_fallback_adapter_ = false;
+    } else if (webgl_vendor.find("amd") != std::string::npos ||
+               webgl_vendor.find("ati") != std::string::npos ||
+               webgl_vendor.find("radeon") != std::string::npos) {
+      vendor_ = "amd";
+      is_fallback_adapter_ = false;
+    } else if (webgl_vendor.find("apple") != std::string::npos) {
+      vendor_ = "apple";
+      is_fallback_adapter_ = false;
+    }
+  }
+  if (!base::UxrConfig::GetInstance().Has("uxr-webgpu-architecture")) {
+    const std::string webgpu_vendor = base::ToLowerASCII(vendor_.Utf8());
+    if (webgpu_vendor == "nvidia")
+      architecture_ = "ampere";
+    else if (webgpu_vendor == "intel")
+      architecture_ = "gen-12-lp";
+    else if (webgpu_vendor == "amd")
+      architecture_ = "rdna2";
+    else if (webgpu_vendor == "apple")
+      architecture_ = "apple";
+  }
+'@
+    $pattern = '(?ms)(GPUAdapterInfo::GPUAdapterInfo\(.*?power_preference_\(power_preference\))\s*\{.*?\r?\n\}\s*\r?\n(?=\s*void GPUAdapterInfo::AppendMemoryHeapInfo)'
+    $match = [regex]::Match($content, $pattern)
+    if ($match.Success) {
+      $replacement = "$($match.Groups[1].Value) {`r`n$identity`r`n}`r`n"
+      return $content.Remove($match.Index, $match.Length).Insert($match.Index, $replacement)
+    }
+    return $content
   }
 
 Normalize-RestoredSource `
   -RelativePath "third_party\blink\renderer\modules\webgpu\gpu_adapter.cc" `
   -Transform {
     param($content)
-    return [regex]::Replace(
-        $content,
-        '(?ms)\r?\n    if \(webgl_vendor\.empty\(\) &&\s+uxr_config\.Has\("uxr-webgl-fingerprint"\)\) \{\s+const std::string platform =\s+base::ToLowerASCII\(uxr_config\.Get\("uxr-platform"\)\);\s+webgl_vendor = platform == "macos" \? "apple" : "nvidia";\s+\}',
-        "")
+    $identity = @'
+  // UXR: WebGPU identity follows the active WebGL persona. Explicit WebGPU
+  // values win; otherwise the default persona is Intel.
+  const base::UxrConfig& uxr_config = base::UxrConfig::GetInstance();
+  const bool use_real_gpu =
+      uxr_config.Has("uxr-webgl-real") ||
+      uxr_config.Has("uxr-disable-gpu-fingerprint");
+  if (uxr_config.Has("uxr-webgpu-vendor")) {
+    vendor_ = String(uxr_config.Get("uxr-webgpu-vendor").c_str());
+  } else if (!use_real_gpu) {
+    std::string webgl_vendor =
+        base::ToLowerASCII(uxr_config.Get("uxr-webgl-vendor"));
+    if (webgl_vendor.empty())
+      webgl_vendor = "intel";
+    if (webgl_vendor.find("nvidia") != std::string::npos)
+      vendor_ = "nvidia";
+    else if (webgl_vendor.find("intel") != std::string::npos)
+      vendor_ = "intel";
+    else if (webgl_vendor.find("amd") != std::string::npos ||
+             webgl_vendor.find("ati") != std::string::npos ||
+             webgl_vendor.find("radeon") != std::string::npos)
+      vendor_ = "amd";
+    else if (webgl_vendor.find("apple") != std::string::npos)
+      vendor_ = "apple";
+  }
+  if (uxr_config.Has("uxr-webgpu-architecture")) {
+    architecture_ =
+        String(uxr_config.Get("uxr-webgpu-architecture").c_str());
+  } else if (!use_real_gpu) {
+    const std::string webgpu_vendor = base::ToLowerASCII(vendor_.Utf8());
+    if (webgpu_vendor == "nvidia")
+      architecture_ = "ampere";
+    else if (webgpu_vendor == "intel")
+      architecture_ = "gen-12-lp";
+    else if (webgpu_vendor == "amd")
+      architecture_ = "rdna2";
+    else if (webgpu_vendor == "apple")
+      architecture_ = "apple";
+  }
+'@
+    $pattern = '(?ms)(GPUAdapter::GPUAdapter\(.*?\)\s*:\s*DawnObject\(.*?\)\s*\{.*?vendor_\s*=\s*String::FromUtf8\(info\.vendor\);\s*architecture_\s*=\s*String::FromUtf8\(info\.architecture\);)(.*?)(?=\r?\n\s*if \(info\.deviceID <= 0xffff\))'
+    $match = [regex]::Match($content, $pattern)
+    if ($match.Success) {
+      $replacement = "$($match.Groups[1].Value)`r`n$identity"
+      return $content.Remove($match.Index, $match.Length).Insert($match.Index, $replacement)
+    }
+    return $content
   }
 
 Normalize-RestoredSource `

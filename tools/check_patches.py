@@ -146,6 +146,7 @@ def check_bodies(rep: Report, patches_dir: Path, verbose: bool) -> None:
             malformed.append(p.name)
         else:
             hunk_indexes = [i for i, line in enumerate(lines) if line.startswith("@@")]
+            diff_boundaries = [i for i, line in enumerate(lines) if line.startswith("diff --git ")]
             for hunk_index, line_index in enumerate(hunk_indexes):
                 match = re.match(
                     r"^@@ -(\d+)(?:,(\d+))? \+(\d+)(?:,(\d+))? @@",
@@ -154,7 +155,9 @@ def check_bodies(rep: Report, patches_dir: Path, verbose: bool) -> None:
                 if not match:
                     malformed.append(p.name)
                     break
-                end = hunk_indexes[hunk_index + 1] if hunk_index + 1 < len(hunk_indexes) else len(lines)
+                next_hunk = hunk_indexes[hunk_index + 1] if hunk_index + 1 < len(hunk_indexes) else len(lines)
+                next_diff = next((boundary for boundary in diff_boundaries if boundary > line_index), len(lines))
+                end = min(next_hunk, next_diff)
                 body = lines[line_index + 1:end]
                 old_count = sum(line.startswith((" ", "-")) for line in body)
                 new_count = sum(line.startswith((" ", "+")) for line in body)

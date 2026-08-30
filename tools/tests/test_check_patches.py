@@ -32,8 +32,9 @@ def make_patch(path="src/foo.cc", added=("  int x = 0;",), *,
         lines.append(" context below")
     if second_file:  # a second `diff --git` -> two surfaces in one patch
         lines += [f"diff --git a/{second_file} b/{second_file}",
+                  f"index 1234567..89abcde 100644",
                   f"--- a/{second_file}", f"+++ b/{second_file}",
-                  "@@ -1 +1,2 @@", " ctx", "+  added"]
+                  "@@ -1,2 +1,3 @@", " ctx", "+  added", " ctx"]
     return "\n".join(lines) + "\n"
 
 
