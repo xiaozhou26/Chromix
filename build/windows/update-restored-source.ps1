@@ -423,9 +423,31 @@ Set-SourceReplacement `
   }
 '@
 
-Ensure-SourceListEntries `
-  -RelativePath "components\ungoogled\BUILD.gn" `
-  -Entries @("persona_profile.h", "persona_profile.cc")
+Ensure-SourceText `
+  -RelativePath "third_party\blink\renderer\modules\webgl\webgl_rendering_context_base.cc" `
+  -Anchor 'case WebGLDebugRendererInfo::kUnmaskedRendererWebgl:' `
+  -Text @'
+        if (!ungoogled::CurrentPersona().webgl_real) {
+          // Keep the native GL query in the hot path without exposing its value.
+          (void)ContextGL()->GetString(GL_RENDERER);
+          return WebGLAny(script_state,
+                          String(ungoogled::CurrentPersona().webgl_renderer));
+        }
+'@ `
+  -CurrentMarker 'Keep the native GL query in the hot path'
+
+Ensure-SourceText `
+  -RelativePath "third_party\blink\renderer\modules\webgl\webgl_rendering_context_base.cc" `
+  -Anchor 'case WebGLDebugRendererInfo::kUnmaskedVendorWebgl:' `
+  -Text @'
+        if (!ungoogled::CurrentPersona().webgl_real) {
+          // Keep the native GL query in the hot path without exposing its value.
+          (void)ContextGL()->GetString(GL_VENDOR);
+          return WebGLAny(script_state,
+                          String(ungoogled::CurrentPersona().webgl_vendor));
+        }
+'@ `
+  -CurrentMarker 'Keep the native GL query in the hot path'
 
 Ensure-NewFileFromPatch `
   -PatchRelativePath "patches/0091-components-ungoogled-persona-profile-h.patch" `

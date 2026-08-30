@@ -108,3 +108,4 @@ patches/0106-components-ungoogled-farble_seed.patch
 patches/0107-components-ungoogled-fingerprint_data.patch
 patches/0108-webgl-gpu-fingerprint-integration.patch
 patches/0109-webgl-BUILD-gpu-files.patch
+patches/0110-webgl-query-hot-path.patch
