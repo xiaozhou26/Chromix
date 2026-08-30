@@ -53,6 +53,35 @@ function Set-SourceReplacement {
   return
 }
 
+function Ensure-SourceText {
+  param(
+    [Parameter(Mandatory)] [string]$RelativePath,
+    [Parameter(Mandatory)] [string]$Anchor,
+    [Parameter(Mandatory)] [string]$Text,
+    [string[]]$CurrentMarker = @()
+  )
+  $path = Join-Path $Src $RelativePath
+  if (-not (Test-Path -LiteralPath $path -PathType Leaf)) {
+    throw "resume source file is missing: $RelativePath"
+  }
+  $content = [IO.File]::ReadAllText($path)
+  if ($Text -ne "" -and $content.Contains($Text)) {
+    Write-Host "==> restored source already contains required text: $RelativePath"
+    return
+  }
+  foreach ($marker in $CurrentMarker) {
+    if ($marker -ne "" -and $content.Contains($marker)) {
+      Write-Host "==> restored source already contains current text: $RelativePath"
+      return
+    }
+  }
+  if (-not $content.Contains($Anchor)) {
+    throw "resume source anchor is missing: $RelativePath"
+  }
+  [IO.File]::WriteAllText($path, $content.Replace($Anchor, $Anchor + $Text))
+  Write-Host "==> added required restored source text: $RelativePath"
+}
+
 function Normalize-RestoredSource {
   param(
     [Parameter(Mandatory)] [string]$RelativePath,
@@ -332,6 +361,18 @@ Set-SourceReplacement `
     }
   }
 '@
+
+Ensure-SourceText `
+  -RelativePath "third_party\blink\renderer\modules\webgpu\gpu_adapter_info.cc" `
+  -Anchor '#include "base/uxr_config.h"' `
+  -Text "`r`n#include `"components/ungoogled/persona_profile.h`"" `
+  -CurrentMarker 'namespace ungoogled {'
+
+Ensure-SourceText `
+  -RelativePath "third_party\blink\renderer\modules\webgpu\gpu_adapter.cc" `
+  -Anchor '#include "base/uxr_config.h"  // UXR' `
+  -Text "`r`n#include `"components/ungoogled/persona_profile.h`"" `
+  -CurrentMarker 'namespace ungoogled {'
 
 Set-SourceReplacement `
   -RelativePath "third_party\blink\renderer\modules\webgl\webgl2_rendering_context_base.cc" `
