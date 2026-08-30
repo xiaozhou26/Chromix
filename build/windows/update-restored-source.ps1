@@ -458,7 +458,7 @@ Ensure-SourceText `
 
 Ensure-SourceListEntries `
   -RelativePath "components\ungoogled\BUILD.gn" `
-  -Entries @("persona_profile.h", "persona_profile.cc")
+  -Entries @("persona_profile.h", "persona_profile.cc", "farble_seed.h", "farble_seed.cc", "fingerprint_data.h")
 
 Ensure-NewFileFromPatch `
   -PatchRelativePath "patches/0091-components-ungoogled-persona-profile-h.patch" `
@@ -467,6 +467,18 @@ Ensure-NewFileFromPatch `
 Ensure-NewFileFromPatch `
   -PatchRelativePath "patches/0092-components-ungoogled-persona-profile-cc.patch" `
   -RelativePath "components\ungoogled\persona_profile.cc"
+
+Ensure-NewFileFromPatch `
+  -PatchRelativePath "patches/0106-components-ungoogled-farble_seed.patch" `
+  -RelativePath "components\ungoogled\farble_seed.h"
+
+Ensure-NewFileFromPatch `
+  -PatchRelativePath "patches/0105-components-ungoogled-farble_seed.patch" `
+  -RelativePath "components\ungoogled\farble_seed.cc"
+
+Ensure-NewFileFromPatch `
+  -PatchRelativePath "patches/0107-components-ungoogled-fingerprint_data.patch" `
+  -RelativePath "components\ungoogled\fingerprint_data.h"
 
 Ensure-SourceText `
   -RelativePath "third_party\blink\renderer\modules\webgpu\gpu_adapter_info.cc" `
