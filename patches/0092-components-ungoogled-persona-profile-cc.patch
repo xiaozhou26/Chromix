@@ -2,17 +2,73 @@ diff --git a/components/ungoogled/persona_profile.cc b/components/ungoogled/pers
 new file mode 100644
 --- /dev/null
 +++ b/components/ungoogled/persona_profile.cc
-@@ -0,0 +1,134 @@
+@@ -0,0 +1,191 @@
 +// Copyright 2026.
 +#include "components/ungoogled/persona_profile.h"
 +
++#include <array>
++#include <cstddef>
++#include <cstdint>
 +#include <mutex>
++#include <random>
 +
 +#include "base/strings/string_number_conversions.h"
 +#include "base/uxr_config.h"
 +
 +namespace ungoogled {
 +namespace {
++
++struct WebGLGPU {
++  const char* vendor;
++  const char* renderer;
++  double weight;
++};
++
++// Clearcote's desktop GPU pool, selected once from the launch fingerprint.
++// The selected identity is shared by WebGL 1, WebGL 2, and WebGPU.
++constexpr std::array<WebGLGPU, 3> kWebGLGPUs = {{
++    {"Google Inc. (Intel)",
++     "ANGLE (Intel, Intel(R) UHD Graphics 770 (0x0000A780) Direct3D11 "
++     "vs_5_0 ps_5_0, D3D11)",
++     0.50},
++    {"Google Inc. (NVIDIA)",
++     "ANGLE (NVIDIA, NVIDIA GeForce RTX 3060 Direct3D11 vs_5_0 ps_5_0, "
++     "D3D11)",
++     0.35},
++    {"Google Inc. (AMD)",
++     "ANGLE (AMD, AMD Radeon(TM) Graphics (0x000015D8) Direct3D11 vs_5_0 "
++     "ps_5_0, D3D11)",
++     0.15},
++}};
++
++uint64_t SeedFromConfig(const base::UxrConfig& config) {
++  uint64_t seed = 0;
++  const std::string raw = config.Get("uxr-canvas-seed");
++  if (raw.empty() || !base::StringToUint64(raw, &seed))
++    return 0;
++  return seed;
++}
++
++const WebGLGPU& SelectSeededWebGLGPU(const base::UxrConfig& config) {
++  const uint64_t seed = SeedFromConfig(config);
++  if (seed == 0)
++    return kWebGLGPUs[0];
++
++  std::mt19937_64 rng(seed);
++  const std::array<double, 3> weights = {0.50, 0.35, 0.15};
++  std::discrete_distribution<size_t> distribution(weights.begin(),
++                                                   weights.end());
++  return kWebGLGPUs[distribution(rng)];
++}
++
++void OverrideWebGLGPU(PersonaProfile* profile,
++                      const base::UxrConfig& config) {
++  if (profile->webgl_real || profile->webgl_identity_explicit)
++    return;
++  const WebGLGPU& gpu = SelectSeededWebGLGPU(config);
++  profile->webgl_vendor = gpu.vendor;
++  profile->webgl_renderer = gpu.renderer;
++}
 +
 +void OverrideInt(const base::UxrConfig& config, const char* key, int* value) {
 +  int parsed = 0;
@@ -63,6 +119,7 @@ new file mode 100644
 +  p.webgl_fingerprint = ConfigSwitchEnabled(config, "uxr-webgl-fingerprint");
 +  p.webgl_real = ConfigSwitchEnabled(config, "uxr-webgl-real") ||
 +                 ConfigSwitchEnabled(config, "uxr-disable-gpu-fingerprint");
++  OverrideWebGLGPU(&p, config);
 +  const std::string platform = config.Get("uxr-platform");
 +  p.mobile = platform == "android" || platform == "Android";
 +

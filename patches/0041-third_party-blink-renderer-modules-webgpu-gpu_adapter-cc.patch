@@ -2,7 +2,7 @@ diff --git a/third_party/blink/renderer/modules/webgpu/gpu_adapter.cc b/third_pa
 index 44527d0a7b..45affa329c 100644
 --- a/third_party/blink/renderer/modules/webgpu/gpu_adapter.cc
 +++ b/third_party/blink/renderer/modules/webgpu/gpu_adapter.cc
-@@ -5,6 +5,12 @@
+@@ -5,6 +5,13 @@
  #include "third_party/blink/renderer/modules/webgpu/gpu_adapter.h"
  
 +#include <set>
@@ -12,6 +12,7 @@ index 44527d0a7b..45affa329c 100644
 +#include "base/strings/string_util.h"
  #include "services/metrics/public/cpp/ukm_builders.h"
 +#include "base/uxr_config.h"  // UXR
++#include "components/ungoogled/persona_profile.h"
  #include "third_party/blink/renderer/bindings/core/v8/script_promise_resolver.h"
  #include "third_party/blink/renderer/bindings/core/v8/v8_object_builder.h"
  #include "third_party/blink/renderer/bindings/modules/v8/v8_gpu_device_descriptor.h"
@@ -70,10 +71,10 @@ index 44527d0a7b..45affa329c 100644
 +  if (uxr_config.Has("uxr-webgpu-vendor")) {
 +    vendor_ = String(uxr_config.Get("uxr-webgpu-vendor").c_str());
 +  } else if (!use_real_gpu) {
-+    std::string webgl_vendor =
-+        String(uxr_config.Get("uxr-webgl-vendor").c_str()).ToAsciiLower().Utf8();
-+    if (webgl_vendor.empty())
-+      webgl_vendor = "intel";
++    const std::string webgl_vendor =
++        String(ungoogled::CurrentPersona().webgl_vendor.c_str())
++            .ToAsciiLower()
++            .Utf8();
 +    if (webgl_vendor.find("nvidia") != std::string::npos)
 +      vendor_ = "nvidia";
 +    else if (webgl_vendor.find("intel") != std::string::npos)

@@ -1,95 +1,24 @@
 diff --git a/third_party/blink/renderer/modules/webgl/gpu_fingerprint.cc b/third_party/blink/renderer/modules/webgl/gpu_fingerprint.cc
 --- /dev/null
 +++ b/third_party/blink/renderer/modules/webgl/gpu_fingerprint.cc
-@@ -0,0 +1,92 @@
+@@ -0,0 +1,21 @@
 +#include "third_party/blink/renderer/modules/webgl/gpu_fingerprint.h"
 +
-+#include "base/strings/string_number_conversions.h"
-+#include "base/strings/string_util.h"
-+#include "base/uxr_config.h"
-+#include "components/ungoogled/fingerprint_data.h"
-+#include "components/ungoogled/ungoogled_switches.h"
-+#include "third_party/blink/renderer/modules/webgl/gpu_info.h"
-+
-+// GPU deviceID信息可以在这里查询
-+// 570.144是驱动号，替换成最新的驱动号
-+// https://download.nvidia.com/XFree86/Linux-x86_64/570.144/README/supportedchips.html
-+// https://deviceandbrowserinfo.com/data/fingerprints/attribute/webGLRenderer
-+// https://devicehunt.com/view/type/pci/vendor/10DE
++#include "components/ungoogled/persona_profile.h"
 +
 +namespace blink {
 +
-+using ungoogled::fingerprint::kMacosGpuModelCount;
-+
-+namespace {
-+
-+// Returns the appropriate GL_VENDOR string based on platform
-+std::string GetGLVendorString(const std::string& platform) {
-+  if (platform == "macos") {
-+    return "Google Inc. (Apple)";
-+  } else if (platform == "linux") {
-+    return "Google Inc. (NVIDIA Corporation)";
-+  } else {
-+    // Windows
-+    return "Google Inc. (NVIDIA)";
-+  }
-+}
-+
-+// Returns a GL_RENDERER string based on platform and a per-site farbling seed.
-+std::string GetGLRendererString(const std::string& platform,
-+                                uint64_t effective_seed) {
-+  if (platform == "macos") {
-+    // Use helper function to get macOS GPU string
-+    return GetMacosGpuString(effective_seed % kMacosGpuModelCount);
-+  } else if (platform == "linux") {
-+    // For Linux, get the basic GPU model but format for Linux
-+    size_t model_index = effective_seed % GetGpuCount();
-+    // Get the Windows GPU info to extract the model name
-+    const GpuInfo& gpu_info = GetGpuInfo(model_index);
-+    // Format for Linux (no device ID, different suffix)
-+    return GetLinuxGpuString(gpu_info.model_name);
-+  } else {
-+    // Default to Windows format
-+    return GetGpuInfo(effective_seed % GetGpuCount()).renderer_string;
-+  }
-+}
-+
-+}  // namespace
-+
-+// Public functions that will be used in WebGL code
 +std::string GetGLVendorStringForFingerprint() {
-+  const base::UxrConfig& config = base::UxrConfig::GetInstance();
-+  if (config.Has("uxr-disable-gpu-fingerprint"))
-+    return "";
-+
-+  const std::string configured = config.Get("uxr-webgl-vendor");
-+  if (!configured.empty())
-+    return configured;
-+
-+  if (config.Has("uxr-webgl-fingerprint")) {
-+    std::string platform = base::ToLowerASCII(config.Get("uxr-platform"));
-+    if (platform.empty())
-+      platform = "windows";
-+    return GetGLVendorString(platform);
-+  }
++  const auto& persona = ungoogled::CurrentPersona();
++  if (!persona.webgl_real)
++    return persona.webgl_vendor;
 +  return "";
 +}
 +
-+std::string GetGLRendererStringForFingerprint(uint64_t effective_seed) {
-+  const base::UxrConfig& config = base::UxrConfig::GetInstance();
-+  if (config.Has("uxr-disable-gpu-fingerprint"))
-+    return "";
-+
-+  const std::string configured = config.Get("uxr-webgl-renderer");
-+  if (!configured.empty())
-+    return configured;
-+
-+  if (config.Has("uxr-webgl-fingerprint")) {
-+    std::string platform = base::ToLowerASCII(config.Get("uxr-platform"));
-+    if (platform.empty())
-+      platform = "windows";
-+    return GetGLRendererString(platform, effective_seed);
-+  }
++std::string GetGLRendererStringForFingerprint(uint64_t /*effective_seed*/) {
++  const auto& persona = ungoogled::CurrentPersona();
++  if (!persona.webgl_real)
++    return persona.webgl_renderer;
 +  return "";
 +}
 +

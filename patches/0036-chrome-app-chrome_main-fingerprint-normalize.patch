@@ -10,7 +10,7 @@ index b5cc00e4c8..3cc7963afa 100644
  #include <memory>
  #include <optional>
  
-@@ -161,6 +162,119 @@ int ChromeMain(int argc, const char** argv) {
+@@ -161,6 +162,121 @@ int ChromeMain(int argc, const char** argv) {
  
    base::CommandLine* command_line(base::CommandLine::ForCurrentProcess());
  
@@ -85,6 +85,8 @@ index b5cc00e4c8..3cc7963afa 100644
 +          command_line->GetSwitchValueASCII("fingerprint");
 +      if (!seed.empty() && seed != "off") {
 +        command_line->AppendSwitchASCII("uxr-webgl-fingerprint", "true");
++        if (!command_line->HasSwitch("uxr-fingerprint-seed"))
++          command_line->AppendSwitchASCII("uxr-fingerprint-seed", seed);
 +        if (!command_line->HasSwitch("uxr-canvas-seed"))
 +          command_line->AppendSwitchASCII("uxr-canvas-seed", seed);
 +        if (!command_line->HasSwitch("uxr-audio-seed"))

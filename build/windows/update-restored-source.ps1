@@ -1207,28 +1207,15 @@ Normalize-RestoredSource `
   -Transform {
     param($content)
     $identity = @'
-  // UXR: WebGPU identity follows the active WebGL persona. Explicit WebGPU
-  // values win; otherwise the default persona is Intel and the adapter is not
-  // exposed as a fallback adapter.
+  // UXR: WebGPU identity follows the final startup WebGL persona.
+  // Explicit WebGPU values win; otherwise both surfaces use CurrentPersona().
+  const auto& persona = ungoogled::CurrentPersona();
   if (base::UxrConfig::GetInstance().Has("uxr-webgpu-vendor")) {
     vendor_ = String(base::UxrConfig::GetInstance().Get("uxr-webgpu-vendor").c_str());
     is_fallback_adapter_ = false;
-  }
-  if (base::UxrConfig::GetInstance().Has("uxr-webgpu-architecture")) {
-    architecture_ =
-        String(base::UxrConfig::GetInstance().Get("uxr-webgpu-architecture").c_str());
-  }
-  if (base::UxrConfig::GetInstance().Has("uxr-webgpu-description")) {
-    description_ =
-        String(base::UxrConfig::GetInstance().Get("uxr-webgpu-description").c_str());
-  }
-  if (!base::UxrConfig::GetInstance().Has("uxr-webgpu-vendor")) {
-    std::string webgl_vendor =
-        String(base::UxrConfig::GetInstance().Get("uxr-webgl-vendor").c_str())
-            .ToAsciiLower()
-            .Utf8();
-    if (webgl_vendor.empty())
-      webgl_vendor = "intel";
+  } else if (!persona.webgl_real) {
+    const std::string webgl_vendor =
+        String(persona.webgl_vendor.c_str()).ToAsciiLower().Utf8();
     if (webgl_vendor.find("nvidia") != std::string::npos) {
       vendor_ = "nvidia";
       is_fallback_adapter_ = false;
@@ -1245,7 +1232,10 @@ Normalize-RestoredSource `
       is_fallback_adapter_ = false;
     }
   }
-  if (!base::UxrConfig::GetInstance().Has("uxr-webgpu-architecture")) {
+  if (base::UxrConfig::GetInstance().Has("uxr-webgpu-architecture")) {
+    architecture_ =
+        String(base::UxrConfig::GetInstance().Get("uxr-webgpu-architecture").c_str());
+  } else if (!persona.webgl_real) {
     const std::string webgpu_vendor = vendor_.ToAsciiLower().Utf8();
     if (webgpu_vendor == "nvidia")
       architecture_ = "ampere";
@@ -1271,19 +1261,16 @@ Normalize-RestoredSource `
   -Transform {
     param($content)
     $identity = @'
-  // UXR: WebGPU identity follows the active WebGL persona. Explicit WebGPU
-  // values win; otherwise the default persona is Intel.
+  // UXR: WebGPU identity follows the final startup WebGL persona.
+  // Explicit WebGPU values win; otherwise both surfaces use CurrentPersona().
   const base::UxrConfig& uxr_config = base::UxrConfig::GetInstance();
-  const bool use_real_gpu =
-      uxr_config.Has("uxr-webgl-real") ||
-      uxr_config.Has("uxr-disable-gpu-fingerprint");
+  const auto& persona = ungoogled::CurrentPersona();
+  const bool use_real_gpu = persona.webgl_real;
   if (uxr_config.Has("uxr-webgpu-vendor")) {
     vendor_ = String(uxr_config.Get("uxr-webgpu-vendor").c_str());
   } else if (!use_real_gpu) {
-    std::string webgl_vendor =
-        String(uxr_config.Get("uxr-webgl-vendor").c_str()).ToAsciiLower().Utf8();
-    if (webgl_vendor.empty())
-      webgl_vendor = "intel";
+    const std::string webgl_vendor =
+        String(persona.webgl_vendor.c_str()).ToAsciiLower().Utf8();
     if (webgl_vendor.find("nvidia") != std::string::npos)
       vendor_ = "nvidia";
     else if (webgl_vendor.find("intel") != std::string::npos)

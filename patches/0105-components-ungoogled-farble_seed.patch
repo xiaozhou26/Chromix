@@ -1,13 +1,13 @@
 diff --git a/components/ungoogled/farble_seed.cc b/components/ungoogled/farble_seed.cc
 --- /dev/null
 +++ b/components/ungoogled/farble_seed.cc
-@@ -0,0 +1,49 @@
+@@ -0,0 +1,51 @@
 +#include "components/ungoogled/farble_seed.h"
 +
 +#include "base/containers/span.h"
 +#include "base/hash/hash.h"
-+#include "base/uxr_config.h"
 +#include "base/strings/string_number_conversions.h"
++#include "base/uxr_config.h"
 +
 +namespace ungoogled {
 +
@@ -15,7 +15,9 @@ diff --git a/components/ungoogled/farble_seed.cc b/components/ungoogled/farble_s
 +
 +uint32_t GlobalSeed() {
 +  const base::UxrConfig& config = base::UxrConfig::GetInstance();
-+  const std::string fingerprint = config.Get("uxr-webgl-fingerprint");
++  std::string fingerprint = config.Get("uxr-fingerprint-seed");
++  if (fingerprint.empty())
++    fingerprint = config.Get("uxr-canvas-seed");
 +  if (fingerprint.empty())
 +    return 0u;
 +  uint64_t parsed = 0;
