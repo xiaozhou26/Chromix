@@ -90,6 +90,30 @@ function Ensure-NewFileFromPatch {
   Write-Host "==> restored missing source file from patch: $RelativePath"
 }
 
+function Ensure-SourceListEntries {
+  param(
+    [Parameter(Mandatory)] [string]$RelativePath,
+    [Parameter(Mandatory)] [string[]]$Entries
+  )
+  $path = Join-Path $Src $RelativePath
+  if (-not (Test-Path -LiteralPath $path -PathType Leaf)) {
+    throw "resume source file is missing: $RelativePath"
+  }
+  $content = [IO.File]::ReadAllText($path)
+  $missing = @($Entries | Where-Object { -not $content.Contains(('"' + $_ + '"')) })
+  if ($missing.Count -eq 0) {
+    Write-Host "==> restored source list already current: $RelativePath"
+    return
+  }
+  $anchor = '  sources = ['
+  if (-not $content.Contains($anchor)) {
+    throw "resume source list anchor is missing: $RelativePath"
+  }
+  $insert = ($missing | ForEach-Object { "    `"$_`",`r`n" }) -join ''
+  [IO.File]::WriteAllText($path, $content.Replace($anchor, $anchor + "`r`n" + $insert))
+  Write-Host "==> added restored source list entries: $RelativePath"
+}
+
 function Ensure-SourceText {
   param(
     [Parameter(Mandatory)] [string]$RelativePath,
@@ -398,6 +422,10 @@ Set-SourceReplacement `
     }
   }
 '@
+
+Ensure-SourceListEntries `
+  -RelativePath "components\ungoogled\BUILD.gn" `
+  -Entries @("persona_profile.h", "persona_profile.cc")
 
 Ensure-NewFileFromPatch `
   -PatchRelativePath "patches/0091-components-ungoogled-persona-profile-h.patch" `
