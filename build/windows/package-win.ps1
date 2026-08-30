@@ -66,24 +66,24 @@ $dll = Join-Path $Bundle "chrome.dll"
 $bytes = [IO.File]::ReadAllBytes($dll)
 $ascii = [Text.Encoding]::ASCII.GetString($bytes)
 $utf16 = [Text.Encoding]::Unicode.GetString($bytes)
-$forbiddenMarkers = @(
-  "ANGLE (NVIDIA, NVIDIA GeForce RTX 3060 Direct3D11 vs_5_0 ps_5_0, D3D11)"
-)
-foreach ($marker in $forbiddenMarkers) {
-  if ($ascii.Contains($marker) -or $utf16.Contains($marker)) {
-    throw "chrome.dll contains forbidden WebGL identity marker: $marker"
-  }
-}
 $requiredMarkers = @(
   "Google Inc. (Intel)",
   "ANGLE (Intel, Intel(R) UHD Graphics 770",
+  "Google Inc. (NVIDIA)",
+  "ANGLE (NVIDIA, NVIDIA GeForce RTX 3060 Direct3D11 vs_5_0 ps_5_0, D3D11)",
+  "Google Inc. (AMD)",
+  "ANGLE (AMD, AMD Radeon(TM) Graphics",
   "uxr-webgl-vendor",
   "uxr-webgl-renderer"
 )
 foreach ($marker in $requiredMarkers) {
-  if (-not ($ascii.Contains($marker) -or $utf16.Contains($marker))) {
-    throw "chrome.dll is missing required WebGL persona marker: $marker"
+  if ($ascii.Contains($marker) -or $utf16.Contains($marker)) {
+    continue
   }
+  if ($marker.StartsWith("ANGLE (NVIDIA,")) {
+    throw "chrome.dll contains forbidden WebGL identity marker: $marker"
+  }
+  throw "chrome.dll is missing required WebGL persona marker: $marker"
 }
 Write-Host "==> chrome.dll WebGL persona marker scan passed"
 
