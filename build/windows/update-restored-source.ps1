@@ -53,6 +53,43 @@ function Set-SourceReplacement {
   return
 }
 
+function Ensure-NewFileFromPatch {
+  param(
+    [Parameter(Mandatory)] [string]$PatchRelativePath,
+    [Parameter(Mandatory)] [string]$RelativePath
+  )
+  $path = Join-Path $Src $RelativePath
+  if (Test-Path -LiteralPath $path -PathType Leaf) {
+    Write-Host "==> restored source file already exists: $RelativePath"
+    return
+  }
+  $patchPath = Join-Path $Repo $PatchRelativePath
+  if (-not (Test-Path -LiteralPath $patchPath -PathType Leaf)) {
+    throw "resume source patch is missing: $PatchRelativePath"
+  }
+  $targetHeader = "+++ b/$($RelativePath.Replace('\\', '/'))"
+  $added = [Collections.Generic.List[string]]::new()
+  $collect = $false
+  foreach ($line in Get-Content -LiteralPath $patchPath) {
+    if ($line -eq $targetHeader) {
+      $collect = $true
+      continue
+    }
+    if ($collect -and $line.StartsWith('diff --git ')) {
+      break
+    }
+    if ($collect -and $line.StartsWith('+') -and -not $line.StartsWith('+++')) {
+      $added.Add($line.Substring(1))
+    }
+  }
+  if ($added.Count -eq 0) {
+    throw "resume source patch has no new-file content: $PatchRelativePath"
+  }
+  New-Item -ItemType Directory -Force -Path (Split-Path $path) | Out-Null
+  [IO.File]::WriteAllText($path, ($added -join [Environment]::NewLine) + [Environment]::NewLine)
+  Write-Host "==> restored missing source file from patch: $RelativePath"
+}
+
 function Ensure-SourceText {
   param(
     [Parameter(Mandatory)] [string]$RelativePath,
@@ -361,6 +398,14 @@ Set-SourceReplacement `
     }
   }
 '@
+
+Ensure-NewFileFromPatch `
+  -PatchRelativePath "patches/0091-components-ungoogled-persona-profile-h.patch" `
+  -RelativePath "components\ungoogled\persona_profile.h"
+
+Ensure-NewFileFromPatch `
+  -PatchRelativePath "patches/0092-components-ungoogled-persona-profile-cc.patch" `
+  -RelativePath "components\ungoogled\persona_profile.cc"
 
 Ensure-SourceText `
   -RelativePath "third_party\blink\renderer\modules\webgpu\gpu_adapter_info.cc" `
