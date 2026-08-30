@@ -31,7 +31,7 @@ index 44527d0a7b..45affa329c 100644
 +    for (const auto& ph_token : base::SplitString(
 +             ph_allow_raw, ",", base::TRIM_WHITESPACE,
 +             base::SPLIT_WANT_NONEMPTY)) {
-+      ph_allowed.insert(base::ToLowerASCII(ph_token));
++      ph_allowed.insert(String(ph_token.c_str()).ToAsciiLower().Utf8());
 +    }
 +  }
 +  const bool ph_filter = !ph_allowed.empty();
@@ -46,7 +46,7 @@ index 44527d0a7b..45affa329c 100644
 +      if (ph_filter) {
 +        const V8GPUFeatureName ph_name(feature_name_enum_optional.value());
 +        const std::string ph_str = std::string(ph_name.AsString().Utf8());
-+        if (!ph_allowed.contains(base::ToLowerASCII(ph_str))) {
++        if (!ph_allowed.contains(String(ph_str.c_str()).ToAsciiLower().Utf8())) {
 +          continue;  // persona does not advertise this exact feature token
 +        }
 +      }
@@ -70,8 +70,8 @@ index 44527d0a7b..45affa329c 100644
 +  if (uxr_config.Has("uxr-webgpu-vendor")) {
 +    vendor_ = String(uxr_config.Get("uxr-webgpu-vendor").c_str());
 +  } else if (!use_real_gpu) {
-+    std::string webgl_vendor = base::ToLowerASCII(
-+        uxr_config.Get("uxr-webgl-vendor"));
++    std::string webgl_vendor =
++        String(uxr_config.Get("uxr-webgl-vendor").c_str()).ToAsciiLower().Utf8();
 +    if (webgl_vendor.empty())
 +      webgl_vendor = "intel";
 +    if (webgl_vendor.find("nvidia") != std::string::npos)
@@ -89,7 +89,7 @@ index 44527d0a7b..45affa329c 100644
 +    architecture_ =
 +        String(uxr_config.Get("uxr-webgpu-architecture").c_str());
 +  } else if (!use_real_gpu) {
-+    const std::string webgpu_vendor = base::ToLowerASCII(vendor_.Utf8());
++    const std::string webgpu_vendor = vendor_.ToAsciiLower().Utf8();
 +    if (webgpu_vendor == "nvidia")
 +      architecture_ = "ampere";
 +    else if (webgpu_vendor == "intel")

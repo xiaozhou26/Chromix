@@ -13,7 +13,7 @@ index 9d155705c1..b8f0e0b8f0 100644
  #include "third_party/blink/renderer/modules/webgpu/gpu_memory_heap_info.h"
  #include "third_party/blink/renderer/modules/webgpu/gpu_subgroup_matrix_config.h"
  
-@@ -34,7 +37,56 @@ GPUAdapterInfo::GPUAdapterInfo(const String& vendor,
+@@ -34,7 +37,58 @@ GPUAdapterInfo::GPUAdapterInfo(const String& vendor,
        type_(type),
        d3d_shader_model_(d3d_shader_model),
        vk_driver_version_(vk_driver_version),
@@ -36,8 +36,10 @@ index 9d155705c1..b8f0e0b8f0 100644
 +        String(base::UxrConfig::GetInstance().Get("uxr-webgpu-description").c_str());
 +  }
 +  if (!base::UxrConfig::GetInstance().Has("uxr-webgpu-vendor")) {
-+    std::string webgl_vendor = base::ToLowerASCII(
-+        base::UxrConfig::GetInstance().Get("uxr-webgl-vendor"));
++    std::string webgl_vendor =
++        String(base::UxrConfig::GetInstance().Get("uxr-webgl-vendor").c_str())
++            .ToAsciiLower()
++            .Utf8();
 +    if (webgl_vendor.empty())
 +      webgl_vendor = "intel";
 +    if (webgl_vendor.find("nvidia") != std::string::npos) {
@@ -57,7 +59,7 @@ index 9d155705c1..b8f0e0b8f0 100644
 +    }
 +  }
 +  if (!base::UxrConfig::GetInstance().Has("uxr-webgpu-architecture")) {
-+    const std::string webgpu_vendor = base::ToLowerASCII(vendor_.Utf8());
++    const std::string webgpu_vendor = vendor_.ToAsciiLower().Utf8();
 +    if (webgpu_vendor == "nvidia")
 +      architecture_ = "ampere";
 +    else if (webgpu_vendor == "intel")

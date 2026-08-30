@@ -1223,8 +1223,10 @@ Normalize-RestoredSource `
         String(base::UxrConfig::GetInstance().Get("uxr-webgpu-description").c_str());
   }
   if (!base::UxrConfig::GetInstance().Has("uxr-webgpu-vendor")) {
-    std::string webgl_vendor = base::ToLowerASCII(
-        base::UxrConfig::GetInstance().Get("uxr-webgl-vendor"));
+    std::string webgl_vendor =
+        String(base::UxrConfig::GetInstance().Get("uxr-webgl-vendor").c_str())
+            .ToAsciiLower()
+            .Utf8();
     if (webgl_vendor.empty())
       webgl_vendor = "intel";
     if (webgl_vendor.find("nvidia") != std::string::npos) {
@@ -1244,7 +1246,7 @@ Normalize-RestoredSource `
     }
   }
   if (!base::UxrConfig::GetInstance().Has("uxr-webgpu-architecture")) {
-    const std::string webgpu_vendor = base::ToLowerASCII(vendor_.Utf8());
+    const std::string webgpu_vendor = vendor_.ToAsciiLower().Utf8();
     if (webgpu_vendor == "nvidia")
       architecture_ = "ampere";
     else if (webgpu_vendor == "intel")
@@ -1279,7 +1281,7 @@ Normalize-RestoredSource `
     vendor_ = String(uxr_config.Get("uxr-webgpu-vendor").c_str());
   } else if (!use_real_gpu) {
     std::string webgl_vendor =
-        base::ToLowerASCII(uxr_config.Get("uxr-webgl-vendor"));
+        String(uxr_config.Get("uxr-webgl-vendor").c_str()).ToAsciiLower().Utf8();
     if (webgl_vendor.empty())
       webgl_vendor = "intel";
     if (webgl_vendor.find("nvidia") != std::string::npos)
@@ -1297,7 +1299,7 @@ Normalize-RestoredSource `
     architecture_ =
         String(uxr_config.Get("uxr-webgpu-architecture").c_str());
   } else if (!use_real_gpu) {
-    const std::string webgpu_vendor = base::ToLowerASCII(vendor_.Utf8());
+    const std::string webgpu_vendor = vendor_.ToAsciiLower().Utf8();
     if (webgpu_vendor == "nvidia")
       architecture_ = "ampere";
     else if (webgpu_vendor == "intel")
