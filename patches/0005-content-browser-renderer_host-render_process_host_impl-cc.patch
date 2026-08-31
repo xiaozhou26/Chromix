@@ -26,13 +26,17 @@ index 2a8abef097..abb5b9d422 100644
  
    if (run_renderer_in_process()) {
      CHECK(g_renderer_main_thread_factory, base::NotFatalUntil::M152);
-@@ -3826,6 +3843,9 @@ void RenderProcessHostImpl::PropagateBrowserCommandLineToRenderer(
+@@ -3826,9 +3843,13 @@ void RenderProcessHostImpl::PropagateBrowserCommandLineToRenderer(
    // Propagate the following switches to the renderer command line (along
    // with any associated values) if present in the browser command line.
    static const char* const kSwitchNames[] = {
-+      // UXR Layer 2: propagate persona switches to the renderer so renderer-side
-+      // getters (navigator.*, WebGL) can read them. Web-undetectable: pages cannot
-+      // read /proc/cmdline, and the host is ours.
++      // UXR Layer 2: propagate UA persona switches before renderer
++      // initialization so navigator.userAgent and userAgentData share them.
++      "uxr-ua-full-version",
++      "uxr-ua-brand",
+       // UXR Layer 2: propagate persona switches to the renderer so renderer-side
+       // getters (navigator.*, WebGL) can read them. Web-undetectable: pages cannot
+       // read /proc/cmdline, and the host is ours.
        switches::kDisableInProcessStackTraces,
        sandbox::policy::switches::kDisableLandlockSandbox,
        sandbox::policy::switches::kDisableSeccompFilterSandbox,
