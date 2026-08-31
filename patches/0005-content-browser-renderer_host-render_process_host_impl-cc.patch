@@ -2,11 +2,12 @@ diff --git a/content/browser/renderer_host/render_process_host_impl.cc b/content
 index 2a8abef097..abb5b9d422 100644
 --- a/content/browser/renderer_host/render_process_host_impl.cc
 +++ b/content/browser/renderer_host/render_process_host_impl.cc
-@@ -2005,6 +2005,20 @@ bool RenderProcessHostImpl::Init() {
+@@ -2005,9 +2005,54 @@ bool RenderProcessHostImpl::Init() {
    uint64_t trace_id = base::Token::CreateRandom().high();
    TRACE_EVENT("navigation", "RenderProcessHostImpl::Init",
                perfetto::Flow::Global(trace_id));
-+  // UXR: deliver persona config before InitializeRenderer caches UA values.
++  // UXR: forward persona/seed config to the renderer over IPC (read from the
++  // BROWSER command line), so these values never land on the renderer cmdline.
 +  {
 +    base::flat_map<std::string, std::string> uxr_cfg;
 +    for (const auto& sw :
@@ -20,10 +21,45 @@ index 2a8abef097..abb5b9d422 100644
 +      GetRendererInterface()->SetUxrConfig(std::move(uxr_cfg));
 +    }
 +  }
++  std::string effective_user_agent =
++      GetContentClient()->browser()->GetUserAgent();
++  blink::UserAgentMetadata effective_user_agent_metadata =
++      GetContentClient()->browser()->GetUserAgentMetadata();
++  const std::string ua_full_version =
++      base::CommandLine::ForCurrentProcess()->GetSwitchValueASCII(
++          "uxr-ua-full-version");
++  base::Version parsed_ua_version(ua_full_version);
++  if (parsed_ua_version.IsValid()) {
++    const std::string ua_major_version =
++        base::NumberToString(parsed_ua_version.components()[0]);
++    const size_t product_separator = effective_user_agent.find('/');
++    if (product_separator != std::string::npos) {
++      const std::string ua_product_version =
++          base::FeatureList::IsEnabled(
++              blink::features::kReduceUserAgentMinorVersion)
++              ? ua_major_version + ".0.0.0"
++              : ua_full_version;
++      effective_user_agent.replace(product_separator + 1, std::string::npos,
++                                   ua_product_version);
++    }
++    effective_user_agent_metadata.full_version = ua_full_version;
++    for (auto& brand : effective_user_agent_metadata.brand_version_list) {
++      if (brand.brand == "Chromium" || brand.brand == "Google Chrome")
++        brand.version = ua_major_version;
++    }
++    for (auto& brand : effective_user_agent_metadata.brand_full_version_list) {
++      if (brand.brand == "Chromium" || brand.brand == "Google Chrome")
++        brand.version = ua_full_version;
++    }
++  }
    GetRendererInterface()->InitializeRenderer(
-       GetContentClient()->browser()->GetUserAgent(),
-       GetContentClient()->browser()->GetUserAgentMetadata(),
-@@ -3826,6 +3840,10 @@ void RenderProcessHostImpl::PropagateBrowserCommandLineToRenderer(
+-      GetContentClient()->browser()->GetUserAgent(),
+-      GetContentClient()->browser()->GetUserAgentMetadata(),
++      effective_user_agent, effective_user_agent_metadata,
+       storage_partition_impl_->cors_exempt_header_list(),
+       GetContentClient()->browser()->GetOriginTrialsSettings(), cpu_tier,
+       trace_id);
+@@ -3826,6 +3871,10 @@ void RenderProcessHostImpl::PropagateBrowserCommandLineToRenderer(
    // Propagate the following switches to the renderer command line (along
    // with any associated values) if present in the browser command line.
    static const char* const kSwitchNames[] = {

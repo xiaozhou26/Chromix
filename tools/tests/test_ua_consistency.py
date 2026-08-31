@@ -73,13 +73,13 @@ def test_renderer_receives_ua_config_before_initialize_renderer():
     assert host.index(config_call) < host.index(initialize_call)
 
 
-def test_ua_switches_are_propagated_to_renderer_command_line():
+def test_renderer_initialization_rebuilds_ua_and_brand_versions_from_override():
     host = (PATCHES / "0005-content-browser-renderer_host-render_process_host_impl-cc.patch").read_text(
         encoding="utf-8"
     )
-    propagate_hunk = host[host.index("PropagateBrowserCommandLineToRenderer"):]
-    assert '"uxr-ua-full-version",' in propagate_hunk
-    assert '"uxr-ua-brand",' in propagate_hunk
+    assert "effective_user_agent_metadata.full_version = ua_full_version;" in host
+    assert "effective_user_agent.replace(product_separator + 1" in host
+    assert "brand_full_version_list" in host
 
 
 def test_version_override_alias_remains_the_single_cli_entry_point():
