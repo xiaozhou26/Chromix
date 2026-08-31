@@ -48,7 +48,9 @@ def test_fingerprint_data_has_no_stale_browser_version_constants():
 
 def test_ua_version_override_is_shared_by_product_and_brand_metadata():
     ua = added_lines("0004-components-embedder_support-user_agent_utils-cc.patch")
+    assert "#include \"base/uxr_config.h\"" in ua
     assert "GetEffectiveUserAgentFullVersion" in ua
+    assert "UxrConfig::GetInstance().Get(\"uxr-ua-full-version\")" in ua
     assert "GetEffectiveUserAgentMajorVersion" in ua
     assert "GetUserAgentBrandList(" in ua
     assert "metadata.full_version = GetEffectiveUserAgentFullVersion()" in ua
