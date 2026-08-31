@@ -232,6 +232,8 @@ class RestoredSourceUpdateRegressionTest(unittest.TestCase):
         self.assertIn("NVIDIA GeForce RTX 3060 Direct3D11", update_source)
         self.assertIn("String(WebGLPersonaRenderer().c_str())", update_source)
         self.assertIn("String(WebGLPersonaVendor().c_str())", update_source)
+        self.assertIn("String(ungoogled::CurrentPersona().webgl_vendor)", update_source)
+        self.assertIn("String(ungoogled::CurrentPersona().webgl_renderer)", update_source)
         self.assertIn("UxrJitterQuads", update_source)
         self.assertIn('third_party\\blink\\renderer\\core\\dom\\element.cc', update_source)
         self.assertIn('third_party\\blink\\renderer\\modules\\webgpu\\gpu_adapter_info.cc', update_source)

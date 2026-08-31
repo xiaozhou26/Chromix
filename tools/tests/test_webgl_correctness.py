@@ -19,6 +19,7 @@ GPU_FP_CC = REPO / "patches" / "0101-webgl-gpu_fingerprint-cc.patch"
 GPU_INFO_CC = REPO / "patches" / "0103-webgl-gpu_info-cc.patch"
 FARBLE_CC = REPO / "patches" / "0105-components-ungoogled-farble_seed.patch"
 GPU_INTEGRATION = REPO / "patches" / "0108-webgl-gpu-fingerprint-integration.patch"
+GPU_HOT_PATH = REPO / "patches" / "0110-webgl-query-hot-path.patch"
 
 
 def added_lines(patch: str) -> str:
@@ -46,9 +47,9 @@ class WebGLCorrectnessRegressionTest(unittest.TestCase):
         cls.gpu_info_cc = added_lines(GPU_INFO_CC.read_text(encoding="utf-8"))
         cls.farble_cc = added_lines(FARBLE_CC.read_text(encoding="utf-8"))
         cls.integration = added_lines(GPU_INTEGRATION.read_text(encoding="utf-8"))
+        cls.hot_path = added_lines(GPU_HOT_PATH.read_text(encoding="utf-8"))
         cls.client_cc = added_lines(BRIDGE_CLIENT_CC.read_text(encoding="utf-8"))
         cls.client_h = added_lines(BRIDGE_CLIENT_H.read_text(encoding="utf-8"))
-
 
     def test_persona_fields_are_declared_and_registered(self):
         self.assertIn("webgl_max_combined_texture_image_units", self.persona_h)
@@ -64,13 +65,34 @@ class WebGLCorrectnessRegressionTest(unittest.TestCase):
         self.assertIn("GetGLVendorStringForFingerprint", self.integration)
         self.assertIn("effective_seed", self.gpu_fp_cc)
 
+    def test_gpu_identity_uses_one_canonical_persona(self):
+        self.assertIn("profile->webgl_vendor = gpu.vendor", self.persona_cc)
+        self.assertIn("profile->webgl_renderer = gpu.renderer", self.persona_cc)
+        self.assertIn("CurrentPersona().webgl_vendor", self.integration)
+        self.assertIn("CurrentPersona().webgl_renderer", self.integration)
+        self.assertIn("std::call_once", self.persona_cc)
+        self.assertIn("return WebGLAny(script_state,", self.hot_path)
+        self.assertIn("String(ungoogled::CurrentPersona().webgl_vendor)", self.hot_path)
+
+    def test_explicit_webgl_identity_precedes_seeded_selection(self):
+        self.assertIn("if (!vendor.empty() && !renderer.empty())", self.persona_cc)
+        self.assertIn("p.webgl_identity_explicit = true", self.persona_cc)
+        self.assertIn(
+            "if (profile->webgl_real || profile->webgl_identity_explicit)",
+            self.persona_cc,
+        )
+        self.assertIn("!ungoogled::CurrentPersona().webgl_fingerprint", self.integration)
+        self.assertIn("CurrentPersona().webgl_identity_explicit", self.integration)
+        self.assertIn("String(configured_renderer)", self.integration)
+        self.assertIn("String(configured_vendor)", self.integration)
+
     def test_readback_noise_contract(self):
         self.assertIn("bridge_substituted = true", self.readback_noise)
         self.assertIn("!bridge_substituted", self.readback_noise)
         self.assertIn("format == GL_RGBA", self.readback_noise)
         self.assertIn("type == GL_UNSIGNED_BYTE", self.readback_noise)
         self.assertIn("FingerprintNoiseEnabled()", self.readback_noise)
-        self.assertIn("for (int channel = 0; channel < 3; ++channel)", self.readback_noise)
+        self.assertIn("for (int channel = 0; channel < 3; ++channel", self.readback_noise)
 
     def test_farble_seed_and_gpu_table_are_present(self):
         self.assertIn("GlobalSeed()", self.farble_cc)
@@ -86,12 +108,10 @@ class WebGLCorrectnessRegressionTest(unittest.TestCase):
         self.assertIn("webgl_real", self.webgl1)
 
     def test_domrect_uses_native_shared_geometry(self):
-        domrect_patch = (REPO / "patches" /
-                         "0010-third_party-blink-renderer-core-dom-element-cc.patch")
+        domrect_patch = REPO / "patches" / "0010-third_party-blink-renderer-core-dom-element-cc.patch"
         text = domrect_patch.read_text(encoding="utf-8")
         self.assertNotIn("UxrJitterQuads", text)
         self.assertNotIn("uxr-canvas-seed", text)
-
         self.assertIn("ClampPersonaLimit", self.webgl1)
         self.assertIn("ClampPersonaLimitF", self.webgl1)
         self.assertIn("PersonaViewport", self.webgl1)

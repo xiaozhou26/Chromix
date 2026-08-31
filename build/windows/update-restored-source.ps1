@@ -452,9 +452,28 @@ Ensure-SourceText `
         if (!ungoogled::CurrentPersona().webgl_real) {
           // Keep the native GL vendor query in the hot path without exposing its value.
           (void)ContextGL()->GetString(GL_VENDOR);
+          return WebGLAny(script_state,
+                          String(ungoogled::CurrentPersona().webgl_vendor));
         }
 '@) `
   -CurrentMarker 'Keep the native GL vendor query in the hot path'
+
+Set-SourceReplacement `
+  -RelativePath "third_party\blink\renderer\modules\webgl\webgl_rendering_context_base.cc" `
+  -OldText @'
+        if (!ungoogled::CurrentPersona().webgl_real) {
+          // Keep the native GL vendor query in the hot path without exposing its value.
+          (void)ContextGL()->GetString(GL_VENDOR);
+        }
+'@ `
+  -NewText @'
+        if (!ungoogled::CurrentPersona().webgl_real) {
+          // Keep the native GL vendor query in the hot path without exposing its value.
+          (void)ContextGL()->GetString(GL_VENDOR);
+          return WebGLAny(script_state,
+                          String(ungoogled::CurrentPersona().webgl_vendor));
+        }
+'@
 
 Ensure-SourceListEntries `
   -RelativePath "components\ungoogled\BUILD.gn" `
