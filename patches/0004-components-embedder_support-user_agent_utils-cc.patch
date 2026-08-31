@@ -1,21 +1,97 @@
 diff --git a/components/embedder_support/user_agent_utils.cc b/components/embedder_support/user_agent_utils.cc
-index 608bea5cb3..e0d4161875 100644
+index 70a0260..67b7c5c 100644
 --- a/components/embedder_support/user_agent_utils.cc
 +++ b/components/embedder_support/user_agent_utils.cc
-@@ -215,9 +215,9 @@ const blink::UserAgentBrandList GetUserAgentBrandFullVersionListInternal(
+@@ -154,6 +154,39 @@ const std::string& GetWindowsPlatformVersion() {
+ }
+ #endif  // BUILDFLAG(IS_WIN)
+ 
++const std::string& GetEffectiveUserAgentFullVersion() {
++  static const base::NoDestructor<std::string> version([] {
++    const base::CommandLine* command_line =
++        base::CommandLine::ForCurrentProcess();
++    if (command_line->HasSwitch("uxr-ua-full-version")) {
++      const std::string override_version =
++          command_line->GetSwitchValueASCII("uxr-ua-full-version");
++      base::Version parsed_version(override_version);
++      if (parsed_version.IsValid())
++        return override_version;
++    }
++    return std::string(version_info::GetVersionNumber());
++  }());
++  return *version;
++}
++
++const std::string& GetEffectiveUserAgentMajorVersion() {
++  static const base::NoDestructor<std::string> major_version([] {
++    base::Version version(GetEffectiveUserAgentFullVersion());
++    DCHECK(version.IsValid());
++    return base::NumberToString(version.components()[0]);
++  }());
++  return *major_version;
++}
++
++std::string ReplaceProductVersion(const std::string& product,
++                                  const std::string& version) {
++  const size_t separator = product.find('/');
++  if (separator == std::string::npos)
++    return product;
++  return base::StrCat({product.substr(0, separator + 1), version});
++}
++
+ const blink::UserAgentBrandList GetUserAgentBrandList(
+     const std::string& major_version,
+     const std::string& full_version,
+@@ -183,10 +216,10 @@ const blink::UserAgentBrandList GetUserAgentBrandList(
+ // GetVersionNumber()
+ const blink::UserAgentBrandList GetUserAgentBrandMajorVersionListInternal(
+     std::optional<blink::UserAgentBrandVersion> additional_brand_version) {
+-  return GetUserAgentBrandList(version_info::GetMajorVersionNumber(),
+-                               std::string(version_info::GetVersionNumber()),
+-                               blink::UserAgentBrandVersionType::kMajorVersion,
+-                               additional_brand_version);
++  return GetUserAgentBrandList(
++      GetEffectiveUserAgentMajorVersion(), GetEffectiveUserAgentFullVersion(),
++      blink::UserAgentBrandVersionType::kMajorVersion,
++      additional_brand_version);
+ }
+ 
+ // For desktop and android:
+@@ -205,19 +238,26 @@ bool ShouldSendUserAgentUnifiedPlatform() {
+ // GetVersionNumber()
+ const blink::UserAgentBrandList GetUserAgentBrandFullVersionListInternal(
+     std::optional<blink::UserAgentBrandVersion> additional_brand_version) {
+-  return GetUserAgentBrandList(version_info::GetMajorVersionNumber(),
+-                               std::string(version_info::GetVersionNumber()),
+-                               blink::UserAgentBrandVersionType::kFullVersion,
+-                               additional_brand_version);
++  return GetUserAgentBrandList(
++      GetEffectiveUserAgentMajorVersion(), GetEffectiveUserAgentFullVersion(),
++      blink::UserAgentBrandVersionType::kFullVersion,
++      additional_brand_version);
+ }
+ 
+ // Internal function to handle return the full or "reduced" user agent string,
  // depending on the Reduce User-Agent reduction phase features.
  std::string GetUserAgentInternal() {
    std::string product = GetProductAndVersion();
 -  if (base::CommandLine::ForCurrentProcess()->HasSwitch(kHeadless)) {
 -    product.insert(0, "Headless");
 -  }
++  const std::string& full_version = GetEffectiveUserAgentFullVersion();
++  const std::string& major_version = GetEffectiveUserAgentMajorVersion();
++  const std::string user_agent_version =
++      base::FeatureList::IsEnabled(blink::features::kReduceUserAgentMinorVersion)
++          ? base::StrCat({major_version, ".0.0.0"})
++          : full_version;
++  product = ReplaceProductVersion(product, user_agent_version);
 +  // UXR patch #2: never prepend "Headless" to the product. Under --headless the
 +  // stock code makes the UA "HeadlessChrome/...", a blatant automation tell. We keep
 +  // it as real "Chrome/...".
  
  #if BUILDFLAG(IS_ANDROID) || BUILDFLAG(IS_IOS)
    if (base::CommandLine::ForCurrentProcess()->HasSwitch(kUseMobileUserAgent)) {
-@@ -299,6 +299,18 @@ std::string GetUserAgentPlatform() {
+@@ -299,6 +339,18 @@ std::string GetUserAgentPlatform() {
  }
  
  std::string GetUnifiedPlatform() {
@@ -34,7 +110,7 @@ index 608bea5cb3..e0d4161875 100644
  #if BUILDFLAG(IS_ANDROID) || BUILDFLAG(IS_CHROMEOS)
    // This constant is only used on Android (desktop) and Linux.
    constexpr char kUnifiedPlatformChromeOSX64[] = "X11; CrOS x86_64 14541.0.0";
-@@ -505,6 +517,21 @@ blink::UserAgentBrandList GenerateBrandVersionList(
+@@ -505,6 +557,21 @@ blink::UserAgentBrandList GenerateBrandVersionList(
    if (brand) {
      brand_version_list.emplace_back(brand.value(), version);
    }
@@ -56,7 +132,7 @@ index 608bea5cb3..e0d4161875 100644
    if (additional_brand_version) {
      brand_version_list.emplace_back(additional_brand_version.value());
    }
-@@ -603,6 +630,12 @@ std::string GetPlatformVersion() {
+@@ -603,6 +670,12 @@ std::string GetPlatformVersion() {
  }
  
  std::string GetPlatformForUAMetadata() {
@@ -69,7 +145,15 @@ index 608bea5cb3..e0d4161875 100644
  #if BUILDFLAG(IS_ANDROID)
    if (base::android::device_info::is_desktop() ||
        base::android::device_info::is_xr()) {
-@@ -670,6 +703,24 @@ blink::UserAgentMetadata GetUserAgentMetadata(bool only_low_entropy_ch) {
+@@ -663,13 +736,29 @@ blink::UserAgentMetadata GetUserAgentMetadata(bool only_low_entropy_ch) {
+   // High entropy client hints.
+   metadata.brand_full_version_list =
+       GetUserAgentBrandFullVersionListInternal(std::nullopt);
+-  metadata.full_version = std::string(version_info::GetVersionNumber());
++  metadata.full_version = GetEffectiveUserAgentFullVersion();
+   metadata.architecture = GetCpuArchitecture();
+   metadata.model = BuildModelInfo();
+   metadata.form_factors = GetFormFactorsClientHint(metadata, metadata.mobile);
    metadata.bitness = GetCpuBitness();
    metadata.wow64 = IsWoW64();
    metadata.platform_version = GetPlatformVersion();
@@ -86,8 +170,6 @@ index 608bea5cb3..e0d4161875 100644
 +      metadata.model = p_cmd->GetSwitchValueASCII("uxr-ua-model");
 +    if (p_cmd->HasSwitch("uxr-ua-platform-version"))
 +      metadata.platform_version = p_cmd->GetSwitchValueASCII("uxr-ua-platform-version");
-+    if (p_cmd->HasSwitch("uxr-ua-full-version"))
-+      metadata.full_version = p_cmd->GetSwitchValueASCII("uxr-ua-full-version");
 +    if (p_cmd->HasSwitch("uxr-ua-wow64"))
 +      metadata.wow64 = (p_cmd->GetSwitchValueASCII("uxr-ua-wow64") == "true");
 +  }

@@ -1,12 +1,15 @@
 diff --git a/components/ungoogled/fingerprint_data.h b/components/ungoogled/fingerprint_data.h
+new file mode 100644
 --- /dev/null
 +++ b/components/ungoogled/fingerprint_data.h
-@@ -0,0 +1,176 @@
+@@ -0,0 +1,150 @@
 +// Copyright (c) 2020 The ungoogled-chromium Authors. All rights reserved.
 +// Use of this source code is governed by a BSD-style license that can be
 +// found in the LICENSE file.
 +
 +// Fingerprint data constants for browser/platform spoofing.
++
++#include <cstddef>
 +
 +#ifndef COMPONENTS_UNGOOGLED_FINGERPRINT_DATA_H_
 +#define COMPONENTS_UNGOOGLED_FINGERPRINT_DATA_H_
@@ -22,34 +25,6 @@ diff --git a/components/ungoogled/fingerprint_data.h b/components/ungoogled/fing
 +constexpr const char* kEdgeDisplayName = "Microsoft Edge";
 +constexpr const char* kOperaDisplayName = "Opera";
 +constexpr const char* kVivaldiDisplayName = "Vivaldi";
-+
-+// =============================================================================
-+// Browser Default Versions
-+// =============================================================================
-+
-+// Chromium version list (for seed-based selection)
-+constexpr const char* kChromiumVersions[] = {
-+    "149.0.7827.114",
-+    "149.0.7827.89",
-+    "149.0.7827.66",
-+    "149.0.7827.58"
-+};
-+
-+// Default versions for Client Hints (Sec-CH-UA)
-+constexpr const char* kChromeDefaultVersion = "149.0.7827.114";
-+constexpr const char* kEdgeDefaultVersion = "149.0.3650.65";
-+constexpr const char* kOperaDefaultVersion = "126.0.5748.0";
-+constexpr const char* kVivaldiDefaultVersion = "7.7.3851.66";
-+
-+// Default versions for User-Agent string suffix
-+constexpr const char* kEdgeUAVersion = "149.0.0.0";
-+constexpr const char* kOperaUAVersion = "126.0.0.0";
-+constexpr const char* kVivaldiUAVersion = "7.7.3851.66";
-+
-+// User-Agent string suffixes
-+constexpr const char* kEdgeUASuffix = " Edg/";
-+constexpr const char* kOperaUASuffix = " OPR/";
-+constexpr const char* kVivaldiUASuffix = " Vivaldi/";
 +
 +// =============================================================================
 +// Platform Constants
@@ -103,7 +78,7 @@ diff --git a/components/ungoogled/fingerprint_data.h b/components/ungoogled/fing
 +    "M4 Pro"
 +};
 +
-+constexpr size_t kMacosGpuModelCount = sizeof(kMacosGpuModels) / sizeof(kMacosGpuModels[0]);
++constexpr std::size_t kMacosGpuModelCount = sizeof(kMacosGpuModels) / sizeof(kMacosGpuModels[0]);
 +
 +// GPU model info structure
 +struct GpuModelInfo {
@@ -172,7 +147,7 @@ diff --git a/components/ungoogled/fingerprint_data.h b/components/ungoogled/fing
 +    {"GeForce RTX 5090 Laptop GPU", "0x00002C58"},
 +};
 +
-+constexpr size_t kGpuModelCount = sizeof(kGpuModels) / sizeof(kGpuModels[0]);
++constexpr std::size_t kGpuModelCount = sizeof(kGpuModels) / sizeof(kGpuModels[0]);
 +
 +}  // namespace fingerprint
 +}  // namespace ungoogled
