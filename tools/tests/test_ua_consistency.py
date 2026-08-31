@@ -59,6 +59,8 @@ def test_ua_version_override_is_shared_by_product_and_brand_metadata():
 def test_version_override_rewrites_product_version_before_building_ua():
     ua = added_lines("0004-components-embedder_support-user_agent_utils-cc.patch")
     assert "ReplaceProductVersion" in ua
+    assert 'product.find("Chrome/")' in ua
+    assert 'product.find("Chromium/")' in ua
     assert "user_agent_version" in ua
     assert "product = ReplaceProductVersion(product, user_agent_version)" in ua
 
@@ -96,3 +98,5 @@ def test_browser_override_rewrite_has_required_version_include_and_cache_migrati
     )
     assert "render_process_host_impl.cc" in update
     assert "effective_user_agent_metadata.full_version = ua_full_version;" in update
+    assert "user_agent_utils.cc" in update
+    assert "GetEffectiveUserAgentFullVersion" in update

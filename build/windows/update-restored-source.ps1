@@ -4,6 +4,7 @@ param(
   [string]$OutDir = (Join-Path $Src "out\Chromix")
 )
 $ErrorActionPreference = "Stop"
+$Repo = (Resolve-Path (Join-Path $PSScriptRoot "..\..")).Path
 
 function Set-SourceReplacement {
   param(
@@ -160,52 +161,156 @@ function Normalize-RestoredSource {
   }
 }
 
-# The stage-3 cache may predate the latest UA rewrite in patch 0005. Migrate the
-# already-patched browser source before ninja so the cache remains incremental.
-Set-SourceReplacement `
-  -RelativePath "content\browser\renderer_host\render_process_host_impl.cc" `
-  -OldText '#include "base/metrics/user_metrics.h"' `
-  -NewText "#include `"base/metrics/user_metrics.h`"`r`n#include `"base/version.h`""
+function Replace-RegexOnce {
+  param(
+    [Parameter(Mandatory)] [string]$Content,
+    [Parameter(Mandatory)] [string]$Pattern,
+    [Parameter(Mandatory)] [string]$Replacement,
+    [Parameter(Mandatory)] [string]$Description
+  )
+  $regex = [Text.RegularExpressions.Regex]::new(
+    $Pattern,
+    [Text.RegularExpressions.RegexOptions]::Singleline)
+  $match = $regex.Match($Content)
+  if (-not $match.Success) {
+    throw "resume source migration anchor is missing: $Description"
+  }
+  if ($regex.Matches($Content).Count -ne 1) {
+    throw "resume source migration anchor is ambiguous: $Description"
+  }
+  return $Content.Substring(0, $match.Index) + $Replacement +
+    $Content.Substring($match.Index + $match.Length)
+}
 
-$oldUaInit = @'
-  // UXR: deliver persona config before InitializeRenderer caches UA values.
-  {
-    base::flat_map<std::string, std::string> uxr_cfg;
-    for (const auto& sw :
-         base::CommandLine::ForCurrentProcess()->GetSwitches()) {
-      if (sw.first.compare(0, 4, "uxr-") == 0) {
-        uxr_cfg[sw.first] =
-            base::CommandLine::ForCurrentProcess()->GetSwitchValueASCII(sw.first);
+
+# The stage-3 cache may predate the latest UA rewrite in patches 0004/0005.
+# Migrate the already-patched browser source before ninja so the cache remains incremental.
+$uaHelperPath = Join-Path $Src "components\embedder_support\user_agent_utils.cc"
+if (-not (Test-Path -LiteralPath $uaHelperPath -PathType Leaf)) {
+  throw "resume source file is missing: components\embedder_support\user_agent_utils.cc"
+}
+$uaHelper = [IO.File]::ReadAllText($uaHelperPath)
+$uaHelper = $uaHelper.Replace("`r`n", "`n")
+if (-not $uaHelper.Contains('#include "base/uxr_config.h"')) {
+  $uaHelper = Replace-RegexOnce $uaHelper `
+    '(?m)^#include <cstddef>\n' `
+    ('#include <cstddef>' + "`n" + '#include "base/uxr_config.h"' + "`n") `
+    "user_agent_utils.cc UXR config include"
+}
+
+if (-not $uaHelper.Contains("GetEffectiveUserAgentFullVersion()")) {
+  $helper = @'
+const std::string& GetEffectiveUserAgentFullVersion() {
+  static const base::NoDestructor<std::string> version([] {
+    std::string override_version =
+        base::UxrConfig::GetInstance().Get("uxr-ua-full-version");
+    if (override_version.empty()) {
+      const base::CommandLine* command_line =
+          base::CommandLine::ForCurrentProcess();
+      if (command_line->HasSwitch("uxr-ua-full-version")) {
+        override_version =
+            command_line->GetSwitchValueASCII("uxr-ua-full-version");
       }
     }
-    if (!uxr_cfg.empty()) {
-      GetRendererInterface()->SetUxrConfig(std::move(uxr_cfg));
-    }
-  }
-  GetRendererInterface()->InitializeRenderer(
-      GetContentClient()->browser()->GetUserAgent(),
-      GetContentClient()->browser()->GetUserAgentMetadata(),
-      storage_partition_impl_->cors_exempt_header_list(),
-      GetContentClient()->browser()->GetOriginTrialsSettings(), cpu_tier,
-      trace_id);
+    base::Version parsed_version(override_version);
+    if (parsed_version.IsValid())
+      return override_version;
+    return std::string(version_info::GetVersionNumber());
+  }());
+  return *version;
+}
+
+const std::string& GetEffectiveUserAgentMajorVersion() {
+  static const base::NoDestructor<std::string> major_version([] {
+    base::Version version(GetEffectiveUserAgentFullVersion());
+    DCHECK(version.IsValid());
+    return base::NumberToString(version.components()[0]);
+  }());
+  return *major_version;
+}
+
 '@
+  $uaHelper = Replace-RegexOnce $uaHelper `
+    '(?m)^const blink::UserAgentBrandList GetUserAgentBrandList\(\n' `
+    ($helper + "`nconst blink::UserAgentBrandList GetUserAgentBrandList(`n") `
+    "user_agent_utils.cc effective-version helpers"
+}
 
-$newUaInit = @'
-  // UXR: forward persona/seed config to the renderer over IPC (read from the
-  // BROWSER command line), so these values never land on the renderer cmdline.
-  {
-    base::flat_map<std::string, std::string> uxr_cfg;
-    for (const auto& sw :
-         base::CommandLine::ForCurrentProcess()->GetSwitches()) {
-      if (sw.first.compare(0, 4, "uxr-") == 0) {
-        uxr_cfg[sw.first] =
-            base::CommandLine::ForCurrentProcess()->GetSwitchValueASCII(sw.first);
-      }
-    }
-    if (!uxr_cfg.empty()) {
-      GetRendererInterface()->SetUxrConfig(std::move(uxr_cfg));
-    }
+if (-not $uaHelper.Contains('product.find("Chrome/")')) {
+  $productFunction = @'
+std::string ReplaceProductVersion(const std::string& product,
+                                  const std::string& version) {
+  size_t separator = product.find("Chrome/");
+  if (separator == std::string::npos)
+    separator = product.find("Chromium/");
+  if (separator == std::string::npos)
+    return product;
+  separator = product.find('/', separator);
+  return base::StrCat({product.substr(0, separator + 1), version});
+}
+'@
+  $productPattern = '(?s)std::string ReplaceProductVersion\(.*?\n\}\n\n(?=const blink::UserAgentBrandList GetUserAgentBrandList)'
+  if ($uaHelper.Contains('std::string ReplaceProductVersion')) {
+    $uaHelper = Replace-RegexOnce $uaHelper `
+      $productPattern `
+      $productFunction `
+      "user_agent_utils.cc product-version replacement"
+  } else {
+    $uaHelper = Replace-RegexOnce $uaHelper `
+      '(?m)^const blink::UserAgentBrandList GetUserAgentBrandList\(\n' `
+      ($productFunction + "`nconst blink::UserAgentBrandList GetUserAgentBrandList(`n") `
+      "user_agent_utils.cc product-version insertion"
   }
+}
+
+$uaHelper = [Text.RegularExpressions.Regex]::Replace(
+  $uaHelper,
+  '(?s)return GetUserAgentBrandList\(version_info::GetMajorVersionNumber\(\),\s*std::string\(version_info::GetVersionNumber\(\)\),\s*blink::UserAgentBrandVersionType::kMajorVersion,\s*additional_brand_version\);',
+  "return GetUserAgentBrandList(`n      GetEffectiveUserAgentMajorVersion(), GetEffectiveUserAgentFullVersion(),`n      blink::UserAgentBrandVersionType::kMajorVersion,`n      additional_brand_version);",
+  [Text.RegularExpressions.RegexOptions]::Singleline)
+$uaHelper = [Text.RegularExpressions.Regex]::Replace(
+  $uaHelper,
+  '(?s)return GetUserAgentBrandList\(version_info::GetMajorVersionNumber\(\),\s*std::string\(version_info::GetVersionNumber\(\)\),\s*blink::UserAgentBrandVersionType::kFullVersion,\s*additional_brand_version\);',
+  "return GetUserAgentBrandList(`n      GetEffectiveUserAgentMajorVersion(), GetEffectiveUserAgentFullVersion(),`n      blink::UserAgentBrandVersionType::kFullVersion,`n      additional_brand_version);",
+  [Text.RegularExpressions.RegexOptions]::Singleline)
+
+if (-not $uaHelper.Contains('product = ReplaceProductVersion(product, user_agent_version);')) {
+  $uaInternal = @'
+std::string GetUserAgentInternal() {
+  std::string product = GetProductAndVersion();
+  const std::string& full_version = GetEffectiveUserAgentFullVersion();
+  const std::string& major_version = GetEffectiveUserAgentMajorVersion();
+  const std::string user_agent_version =
+      base::FeatureList::IsEnabled(blink::features::kReduceUserAgentMinorVersion)
+          ? base::StrCat({major_version, ".0.0.0"})
+          : full_version;
+  product = ReplaceProductVersion(product, user_agent_version);
+
+#if BUILDFLAG(IS_ANDROID) || BUILDFLAG(IS_IOS)
+'@
+  $uaHelper = Replace-RegexOnce $uaHelper `
+    '(?s)std::string GetUserAgentInternal\(\) \{.*?#if BUILDFLAG\(IS_ANDROID\) \|\| BUILDFLAG\(IS_IOS\)\n' `
+    $uaInternal `
+    "user_agent_utils.cc legacy UA construction"
+}
+
+$uaHelper = $uaHelper.Replace(
+  'metadata.full_version = std::string(version_info::GetVersionNumber());',
+  'metadata.full_version = GetEffectiveUserAgentFullVersion();')
+[IO.File]::WriteAllText($uaHelperPath, $uaHelper)
+Write-Host "==> normalized restored source: components\embedder_support\user_agent_utils.cc"
+
+$hostPath = Join-Path $Src "content\browser\renderer_host\render_process_host_impl.cc"
+$host = [IO.File]::ReadAllText($hostPath).Replace("`r`n", "`n")
+if (-not $host.Contains('#include "base/version.h"')) {
+  $host = Replace-RegexOnce $host `
+    '(?m)^#include "base/metrics/user_metrics\.h"\n' `
+    ('#include "base/metrics/user_metrics.h"' + "`n" + '#include "base/version.h"' + "`n") `
+    "render_process_host_impl.cc version include"
+}
+
+if (-not $host.Contains('effective_user_agent_metadata.full_version = ua_full_version;')) {
+  $effectiveInit = @'
   std::string effective_user_agent =
       GetContentClient()->browser()->GetUserAgent();
   blink::UserAgentMetadata effective_user_agent_metadata =
@@ -217,14 +322,16 @@ $newUaInit = @'
   if (parsed_ua_version.IsValid()) {
     const std::string ua_major_version =
         base::NumberToString(parsed_ua_version.components()[0]);
-    const size_t product_separator = effective_user_agent.find('/');
+    const size_t product_separator = effective_user_agent.find("Chrome/");
     if (product_separator != std::string::npos) {
       const std::string ua_product_version =
           base::FeatureList::IsEnabled(
               blink::features::kReduceUserAgentMinorVersion)
               ? ua_major_version + ".0.0.0"
               : ua_full_version;
-      effective_user_agent.replace(product_separator + 1, std::string::npos,
+      const size_t version_start =
+          effective_user_agent.find('/', product_separator);
+      effective_user_agent.replace(version_start + 1, std::string::npos,
                                    ua_product_version);
     }
     effective_user_agent_metadata.full_version = ua_full_version;
@@ -237,26 +344,47 @@ $newUaInit = @'
         brand.version = ua_full_version;
     }
   }
-  GetRendererInterface()->InitializeRenderer(
-      effective_user_agent, effective_user_agent_metadata,
-      storage_partition_impl_->cors_exempt_header_list(),
-      GetContentClient()->browser()->GetOriginTrialsSettings(), cpu_tier,
-      trace_id);
 '@
+  $host = Replace-RegexOnce $host `
+    '(?m)^  GetRendererInterface\(\)->InitializeRenderer\(\n' `
+    ($effectiveInit + '  GetRendererInterface()->InitializeRenderer(' + "`n") `
+    "render_process_host_impl.cc effective UA initialization"
+  $host = $host.Replace(
+    "      GetContentClient()->browser()->GetUserAgent(),`n      GetContentClient()->browser()->GetUserAgentMetadata(),",
+    "      effective_user_agent, effective_user_agent_metadata,")
+}
 
-Set-SourceReplacement `
-  -RelativePath "content\browser\renderer_host\render_process_host_impl.cc" `
-  -OldText $oldUaInit `
-  -NewText $newUaInit `
-  -CurrentMarker 'effective_user_agent_metadata.full_version = ua_full_version;' `
-  -PreferCurrentMarker
+if (-not $host.Contains('GetRendererInterface()->SetUxrConfig')) {
+  $configBlock = @'
+  // UXR: forward persona/seed config to the renderer over IPC.
+  {
+    base::flat_map<std::string, std::string> uxr_cfg;
+    for (const auto& sw :
+         base::CommandLine::ForCurrentProcess()->GetSwitches()) {
+      if (sw.first.compare(0, 4, "uxr-") == 0) {
+        uxr_cfg[sw.first] =
+            base::CommandLine::ForCurrentProcess()->GetSwitchValueASCII(sw.first);
+      }
+    }
+    if (!uxr_cfg.empty()) {
+      GetRendererInterface()->SetUxrConfig(std::move(uxr_cfg));
+    }
+  }
+'@
+  $host = Replace-RegexOnce $host `
+    '(?s)(TRACE_EVENT\("navigation", "RenderProcessHostImpl::Init",\s*perfetto::Flow::Global\(trace_id\)\);\n)' `
+    ('$1' + $configBlock) `
+    "render_process_host_impl.cc renderer config propagation"
+}
 
-Set-SourceReplacement `
-  -RelativePath "content\browser\renderer_host\render_process_host_impl.cc" `
-  -OldText '      switches::kDisableInProcessStackTraces,' `
-  -NewText "      `"uxr-ua-full-version`",`r`n      `"uxr-ua-brand`",`r`n      switches::kDisableInProcessStackTraces," `
-  -CurrentMarker '      "uxr-ua-full-version",' `
-  -PreferCurrentMarker
+if (-not $host.Contains('      "uxr-ua-full-version",')) {
+  $host = Replace-RegexOnce $host `
+    '(?s)(void RenderProcessHostImpl::PropagateBrowserCommandLineToRenderer\(.*?static const char\* const kSwitchNames\[\] = \{\n)' `
+    ('$1' + ('      "uxr-ua-full-version",' + "`n" + '      "uxr-ua-brand",' + "`n")) `
+    "render_process_host_impl.cc UA switch propagation"
+}
+[IO.File]::WriteAllText($hostPath, $host)
+Write-Host "==> normalized restored source: content\browser\renderer_host\render_process_host_impl.cc"
 
 Set-SourceReplacement `
   -RelativePath "third_party\blink\renderer\modules\mediarecorder\media_recorder.cc" `

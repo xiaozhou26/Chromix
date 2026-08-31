@@ -10,7 +10,7 @@ index 70a0260..2e54f7b 100644
  #include <optional>
  #include <string>
  #include <vector>
-@@ -154,6 +155,43 @@ const std::string& GetWindowsPlatformVersion() {
+@@ -154,6 +155,46 @@ const std::string& GetWindowsPlatformVersion() {
  }
  #endif  // BUILDFLAG(IS_WIN)
  
@@ -45,16 +45,19 @@ index 70a0260..2e54f7b 100644
 +
 +std::string ReplaceProductVersion(const std::string& product,
 +                                  const std::string& version) {
-+  const size_t separator = product.find('/');
++  size_t separator = product.find("Chrome/");
++  if (separator == std::string::npos)
++    separator = product.find("Chromium/");
 +  if (separator == std::string::npos)
 +    return product;
++  separator = product.find('/', separator);
 +  return base::StrCat({product.substr(0, separator + 1), version});
 +}
 +
  const blink::UserAgentBrandList GetUserAgentBrandList(
      const std::string& major_version,
      const std::string& full_version,
-@@ -183,10 +221,10 @@ const blink::UserAgentBrandList GetUserAgentBrandList(
+@@ -183,10 +224,10 @@ const blink::UserAgentBrandList GetUserAgentBrandList(
  // GetVersionNumber()
  const blink::UserAgentBrandList GetUserAgentBrandMajorVersionListInternal(
      std::optional<blink::UserAgentBrandVersion> additional_brand_version) {
@@ -69,7 +72,7 @@ index 70a0260..2e54f7b 100644
  }
  
  // For desktop and android:
-@@ -205,19 +243,26 @@ bool ShouldSendUserAgentUnifiedPlatform() {
+@@ -205,19 +246,26 @@ bool ShouldSendUserAgentUnifiedPlatform() {
  // GetVersionNumber()
  const blink::UserAgentBrandList GetUserAgentBrandFullVersionListInternal(
      std::optional<blink::UserAgentBrandVersion> additional_brand_version) {
@@ -103,7 +106,7 @@ index 70a0260..2e54f7b 100644
  
  #if BUILDFLAG(IS_ANDROID) || BUILDFLAG(IS_IOS)
    if (base::CommandLine::ForCurrentProcess()->HasSwitch(kUseMobileUserAgent)) {
-@@ -299,6 +344,18 @@ std::string GetUserAgentPlatform() {
+@@ -299,6 +347,18 @@ std::string GetUserAgentPlatform() {
  }
  
  std::string GetUnifiedPlatform() {
@@ -122,7 +125,7 @@ index 70a0260..2e54f7b 100644
  #if BUILDFLAG(IS_ANDROID) || BUILDFLAG(IS_CHROMEOS)
    // This constant is only used on Android (desktop) and Linux.
    constexpr char kUnifiedPlatformChromeOSX64[] = "X11; CrOS x86_64 14541.0.0";
-@@ -505,6 +562,21 @@ blink::UserAgentBrandList GenerateBrandVersionList(
+@@ -505,6 +565,21 @@ blink::UserAgentBrandList GenerateBrandVersionList(
    if (brand) {
      brand_version_list.emplace_back(brand.value(), version);
    }
@@ -144,7 +147,7 @@ index 70a0260..2e54f7b 100644
    if (additional_brand_version) {
      brand_version_list.emplace_back(additional_brand_version.value());
    }
-@@ -603,6 +675,12 @@ std::string GetPlatformVersion() {
+@@ -603,6 +678,12 @@ std::string GetPlatformVersion() {
  }
  
  std::string GetPlatformForUAMetadata() {
@@ -157,7 +160,7 @@ index 70a0260..2e54f7b 100644
  #if BUILDFLAG(IS_ANDROID)
    if (base::android::device_info::is_desktop() ||
        base::android::device_info::is_xr()) {
-@@ -663,13 +741,29 @@ blink::UserAgentMetadata GetUserAgentMetadata(bool only_low_entropy_ch) {
+@@ -663,13 +744,29 @@ blink::UserAgentMetadata GetUserAgentMetadata(bool only_low_entropy_ch) {
    // High entropy client hints.
    metadata.brand_full_version_list =
        GetUserAgentBrandFullVersionListInternal(std::nullopt);
