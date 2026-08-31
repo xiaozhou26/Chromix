@@ -81,7 +81,18 @@ def test_renderer_initialization_rebuilds_ua_and_brand_versions_from_override():
     assert "effective_user_agent.replace(product_separator + 1" in host
     assert "brand_full_version_list" in host
 
-
 def test_version_override_alias_remains_the_single_cli_entry_point():
     main = added_lines("0036-chrome-app-chrome_main-fingerprint-normalize.patch")
     assert '"fingerprint-brand-version",        "uxr-ua-full-version"' in main
+
+
+def test_browser_override_rewrite_has_required_version_include_and_cache_migration():
+    host = (PATCHES / "0005-content-browser-renderer_host-render_process_host_impl-cc.patch").read_text(
+        encoding="utf-8"
+    )
+    assert '+#include "base/version.h"' in host
+    update = (ROOT / "build" / "windows" / "update-restored-source.ps1").read_text(
+        encoding="utf-8"
+    )
+    assert "render_process_host_impl.cc" in update
+    assert "effective_user_agent_metadata.full_version = ua_full_version;" in update

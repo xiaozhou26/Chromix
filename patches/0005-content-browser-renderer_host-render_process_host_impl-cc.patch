@@ -2,7 +2,15 @@ diff --git a/content/browser/renderer_host/render_process_host_impl.cc b/content
 index 2a8abef097..abb5b9d422 100644
 --- a/content/browser/renderer_host/render_process_host_impl.cc
 +++ b/content/browser/renderer_host/render_process_host_impl.cc
-@@ -2005,9 +2005,54 @@ bool RenderProcessHostImpl::Init() {
+@@ -48,6 +48,7 @@
+ #include "base/metrics/persistent_memory_allocator.h"
+ #include "base/metrics/statistics_recorder.h"
+ #include "base/metrics/user_metrics.h"
++#include "base/version.h"
+ #include "base/no_destructor.h"
+ #include "base/notreached.h"
+ #include "base/numerics/safe_conversions.h"
+@@ -2005,9 +2006,54 @@ bool RenderProcessHostImpl::Init() {
    uint64_t trace_id = base::Token::CreateRandom().high();
    TRACE_EVENT("navigation", "RenderProcessHostImpl::Init",
                perfetto::Flow::Global(trace_id));
@@ -59,7 +67,7 @@ index 2a8abef097..abb5b9d422 100644
        storage_partition_impl_->cors_exempt_header_list(),
        GetContentClient()->browser()->GetOriginTrialsSettings(), cpu_tier,
        trace_id);
-@@ -3826,6 +3871,10 @@ void RenderProcessHostImpl::PropagateBrowserCommandLineToRenderer(
+@@ -3826,6 +3872,10 @@ void RenderProcessHostImpl::PropagateBrowserCommandLineToRenderer(
    // Propagate the following switches to the renderer command line (along
    // with any associated values) if present in the browser command line.
    static const char* const kSwitchNames[] = {

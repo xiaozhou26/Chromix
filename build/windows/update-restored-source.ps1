@@ -160,6 +160,104 @@ function Normalize-RestoredSource {
   }
 }
 
+# The stage-3 cache may predate the latest UA rewrite in patch 0005. Migrate the
+# already-patched browser source before ninja so the cache remains incremental.
+Set-SourceReplacement `
+  -RelativePath "content\browser\renderer_host\render_process_host_impl.cc" `
+  -OldText '#include "base/metrics/user_metrics.h"' `
+  -NewText "#include `"base/metrics/user_metrics.h`"`r`n#include `"base/version.h`""
+
+$oldUaInit = @'
+  // UXR: deliver persona config before InitializeRenderer caches UA values.
+  {
+    base::flat_map<std::string, std::string> uxr_cfg;
+    for (const auto& sw :
+         base::CommandLine::ForCurrentProcess()->GetSwitches()) {
+      if (sw.first.compare(0, 4, "uxr-") == 0) {
+        uxr_cfg[sw.first] =
+            base::CommandLine::ForCurrentProcess()->GetSwitchValueASCII(sw.first);
+      }
+    }
+    if (!uxr_cfg.empty()) {
+      GetRendererInterface()->SetUxrConfig(std::move(uxr_cfg));
+    }
+  }
+  GetRendererInterface()->InitializeRenderer(
+      GetContentClient()->browser()->GetUserAgent(),
+      GetContentClient()->browser()->GetUserAgentMetadata(),
+      storage_partition_impl_->cors_exempt_header_list(),
+      GetContentClient()->browser()->GetOriginTrialsSettings(), cpu_tier,
+      trace_id);
+'@
+
+$newUaInit = @'
+  // UXR: forward persona/seed config to the renderer over IPC (read from the
+  // BROWSER command line), so these values never land on the renderer cmdline.
+  {
+    base::flat_map<std::string, std::string> uxr_cfg;
+    for (const auto& sw :
+         base::CommandLine::ForCurrentProcess()->GetSwitches()) {
+      if (sw.first.compare(0, 4, "uxr-") == 0) {
+        uxr_cfg[sw.first] =
+            base::CommandLine::ForCurrentProcess()->GetSwitchValueASCII(sw.first);
+      }
+    }
+    if (!uxr_cfg.empty()) {
+      GetRendererInterface()->SetUxrConfig(std::move(uxr_cfg));
+    }
+  }
+  std::string effective_user_agent =
+      GetContentClient()->browser()->GetUserAgent();
+  blink::UserAgentMetadata effective_user_agent_metadata =
+      GetContentClient()->browser()->GetUserAgentMetadata();
+  const std::string ua_full_version =
+      base::CommandLine::ForCurrentProcess()->GetSwitchValueASCII(
+          "uxr-ua-full-version");
+  base::Version parsed_ua_version(ua_full_version);
+  if (parsed_ua_version.IsValid()) {
+    const std::string ua_major_version =
+        base::NumberToString(parsed_ua_version.components()[0]);
+    const size_t product_separator = effective_user_agent.find('/');
+    if (product_separator != std::string::npos) {
+      const std::string ua_product_version =
+          base::FeatureList::IsEnabled(
+              blink::features::kReduceUserAgentMinorVersion)
+              ? ua_major_version + ".0.0.0"
+              : ua_full_version;
+      effective_user_agent.replace(product_separator + 1, std::string::npos,
+                                   ua_product_version);
+    }
+    effective_user_agent_metadata.full_version = ua_full_version;
+    for (auto& brand : effective_user_agent_metadata.brand_version_list) {
+      if (brand.brand == "Chromium" || brand.brand == "Google Chrome")
+        brand.version = ua_major_version;
+    }
+    for (auto& brand : effective_user_agent_metadata.brand_full_version_list) {
+      if (brand.brand == "Chromium" || brand.brand == "Google Chrome")
+        brand.version = ua_full_version;
+    }
+  }
+  GetRendererInterface()->InitializeRenderer(
+      effective_user_agent, effective_user_agent_metadata,
+      storage_partition_impl_->cors_exempt_header_list(),
+      GetContentClient()->browser()->GetOriginTrialsSettings(), cpu_tier,
+      trace_id);
+'@
+
+Set-SourceReplacement `
+  -RelativePath "content\browser\renderer_host\render_process_host_impl.cc" `
+  -OldText $oldUaInit `
+  -NewText $newUaInit `
+  -CurrentMarker 'effective_user_agent_metadata.full_version = ua_full_version;' `
+  -PreferCurrentMarker
+
+Set-SourceReplacement `
+  -RelativePath "content\browser\renderer_host\render_process_host_impl.cc" `
+  -OldText '      switches::kDisableInProcessStackTraces,' `
+  -NewText "      `"uxr-ua-full-version`",`r`n      `"uxr-ua-brand`",`r`n      switches::kDisableInProcessStackTraces," `
+  -CurrentMarker '      "uxr-ua-full-version",' `
+  -PreferCurrentMarker
+
 Set-SourceReplacement `
   -RelativePath "third_party\blink\renderer\modules\mediarecorder\media_recorder.cc" `
   -OldText "const std::string ph_type = type.LowerASCII().Utf8();" `
