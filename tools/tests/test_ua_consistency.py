@@ -63,6 +63,25 @@ def test_version_override_rewrites_product_version_before_building_ua():
     assert "product = ReplaceProductVersion(product, user_agent_version)" in ua
 
 
+def test_renderer_receives_ua_config_before_initialize_renderer():
+    host = (PATCHES / "0005-content-browser-renderer_host-render_process_host_impl-cc.patch").read_text(
+        encoding="utf-8"
+    )
+    config_call = 'GetRendererInterface()->SetUxrConfig(std::move(uxr_cfg));'
+    initialize_call = "GetRendererInterface()->InitializeRenderer("
+    assert host.count(config_call) == 1
+    assert host.index(config_call) < host.index(initialize_call)
+
+
+def test_ua_switches_are_propagated_to_renderer_command_line():
+    host = (PATCHES / "0005-content-browser-renderer_host-render_process_host_impl-cc.patch").read_text(
+        encoding="utf-8"
+    )
+    propagate_hunk = host[host.index("PropagateBrowserCommandLineToRenderer"):]
+    assert '"uxr-ua-full-version",' in propagate_hunk
+    assert '"uxr-ua-brand",' in propagate_hunk
+
+
 def test_version_override_alias_remains_the_single_cli_entry_point():
     main = added_lines("0036-chrome-app-chrome_main-fingerprint-normalize.patch")
     assert '"fingerprint-brand-version",        "uxr-ua-full-version"' in main

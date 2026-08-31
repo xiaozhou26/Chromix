@@ -2,19 +2,16 @@ diff --git a/content/browser/renderer_host/render_process_host_impl.cc b/content
 index 2a8abef097..abb5b9d422 100644
 --- a/content/browser/renderer_host/render_process_host_impl.cc
 +++ b/content/browser/renderer_host/render_process_host_impl.cc
-@@ -2011,6 +2011,23 @@ bool RenderProcessHostImpl::Init() {
-       storage_partition_impl_->cors_exempt_header_list(),
-       GetContentClient()->browser()->GetOriginTrialsSettings(), cpu_tier,
-       trace_id);
-+  // UXR: forward persona/seed config to the renderer over IPC (read from the
-+  // BROWSER command line), so these values never land on the renderer cmdline.
+@@ -2005,6 +2005,20 @@ bool RenderProcessHostImpl::Init() {
+   uint64_t trace_id = base::Token::CreateRandom().high();
+   TRACE_EVENT("navigation", "RenderProcessHostImpl::Init",
+               perfetto::Flow::Global(trace_id));
++  // UXR: deliver persona config before InitializeRenderer caches UA values.
 +  {
 +    base::flat_map<std::string, std::string> uxr_cfg;
 +    for (const auto& sw :
 +         base::CommandLine::ForCurrentProcess()->GetSwitches()) {
 +      if (sw.first.compare(0, 4, "uxr-") == 0) {
-+        // GetSwitchValueASCII returns std::string on all platforms; on Windows
-+        // sw.second is a std::wstring and won't assign to std::string directly.
 +        uxr_cfg[sw.first] =
 +            base::CommandLine::ForCurrentProcess()->GetSwitchValueASCII(sw.first);
 +      }
@@ -23,10 +20,10 @@ index 2a8abef097..abb5b9d422 100644
 +      GetRendererInterface()->SetUxrConfig(std::move(uxr_cfg));
 +    }
 +  }
- 
-   if (run_renderer_in_process()) {
-     CHECK(g_renderer_main_thread_factory, base::NotFatalUntil::M152);
-@@ -3826,9 +3843,13 @@ void RenderProcessHostImpl::PropagateBrowserCommandLineToRenderer(
+   GetRendererInterface()->InitializeRenderer(
+       GetContentClient()->browser()->GetUserAgent(),
+       GetContentClient()->browser()->GetUserAgentMetadata(),
+@@ -3826,6 +3840,10 @@ void RenderProcessHostImpl::PropagateBrowserCommandLineToRenderer(
    // Propagate the following switches to the renderer command line (along
    // with any associated values) if present in the browser command line.
    static const char* const kSwitchNames[] = {
@@ -34,9 +31,6 @@ index 2a8abef097..abb5b9d422 100644
 +      // initialization so navigator.userAgent and userAgentData share them.
 +      "uxr-ua-full-version",
 +      "uxr-ua-brand",
-       // UXR Layer 2: propagate persona switches to the renderer so renderer-side
-       // getters (navigator.*, WebGL) can read them. Web-undetectable: pages cannot
-       // read /proc/cmdline, and the host is ours.
        switches::kDisableInProcessStackTraces,
        sandbox::policy::switches::kDisableLandlockSandbox,
        sandbox::policy::switches::kDisableSeccompFilterSandbox,
