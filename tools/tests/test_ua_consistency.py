@@ -80,7 +80,7 @@ def test_renderer_initialization_rebuilds_ua_and_brand_versions_from_override():
         encoding="utf-8"
     )
     assert "effective_user_agent_metadata.full_version = ua_full_version;" in host
-    assert "effective_user_agent.replace(product_separator + 1" in host
+    assert "effective_user_agent.replace(version_start + 1" in host
     assert "brand_full_version_list" in host
 
 def test_version_override_alias_remains_the_single_cli_entry_point():

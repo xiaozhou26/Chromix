@@ -10,7 +10,7 @@ index 2a8abef097..abb5b9d422 100644
  #include "base/no_destructor.h"
  #include "base/notreached.h"
  #include "base/numerics/safe_conversions.h"
-@@ -2005,9 +2006,54 @@ bool RenderProcessHostImpl::Init() {
+@@ -2005,9 +2006,56 @@ bool RenderProcessHostImpl::Init() {
    uint64_t trace_id = base::Token::CreateRandom().high();
    TRACE_EVENT("navigation", "RenderProcessHostImpl::Init",
                perfetto::Flow::Global(trace_id));
@@ -40,14 +40,16 @@ index 2a8abef097..abb5b9d422 100644
 +  if (parsed_ua_version.IsValid()) {
 +    const std::string ua_major_version =
 +        base::NumberToString(parsed_ua_version.components()[0]);
-+    const size_t product_separator = effective_user_agent.find('/');
++    const size_t product_separator = effective_user_agent.find("Chrome/");
 +    if (product_separator != std::string::npos) {
 +      const std::string ua_product_version =
 +          base::FeatureList::IsEnabled(
 +              blink::features::kReduceUserAgentMinorVersion)
 +              ? ua_major_version + ".0.0.0"
 +              : ua_full_version;
-+      effective_user_agent.replace(product_separator + 1, std::string::npos,
++      const size_t version_start =
++          effective_user_agent.find('/', product_separator);
++      effective_user_agent.replace(version_start + 1, std::string::npos,
 +                                   ua_product_version);
 +    }
 +    effective_user_agent_metadata.full_version = ua_full_version;
