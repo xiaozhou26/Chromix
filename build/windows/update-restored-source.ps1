@@ -288,8 +288,9 @@ std::string GetUserAgentInternal() {
 
 #if BUILDFLAG(IS_ANDROID) || BUILDFLAG(IS_IOS)
 '@
+# PowerShell here-strings do not include a newline after the closing content line.
+$uaInternal += "`n"
   $uaHelper = Replace-RegexOnce $uaHelper `
-    '(?s)std::string GetUserAgentInternal\(\) \{.*?#if BUILDFLAG\(IS_ANDROID\) \|\| BUILDFLAG\(IS_IOS\)\n' `
     $uaInternal `
     "user_agent_utils.cc legacy UA construction"
 }
