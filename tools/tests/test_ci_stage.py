@@ -258,6 +258,10 @@ class RestoredSourceUpdateRegressionTest(unittest.TestCase):
         self.assertIn("[regex]::Escape($legacyFunction.Name)", update_source)
         self.assertIn("$content.IndexOf('{', $start)", update_source)
         self.assertIn("GLint WebGL2PersonaVaryingVectors", update_source)
+        self.assertIn("kUseMobileUserAgent", update_source)
+        self.assertIn("components\\embedder_support\\user_agent_utils.cc", update_source)
+        self.assertIn("BUILDFLAG\\(IS_ANDROID\\)", update_source)
+        self.assertIn("$($match.Groups[1].Value)", update_source)
         self.assertIn("-PreferCurrentMarker", update_source)
 
     def test_resume_accepts_historical_webgl_persona_markers(self):

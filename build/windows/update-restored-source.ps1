@@ -1608,6 +1608,19 @@ Normalize-RestoredSource `
   }
 
 Normalize-RestoredSource `
+  -RelativePath "components\embedder_support\user_agent_utils.cc" `
+  -Transform {
+    param($content)
+    return [regex]::Replace(
+        $content,
+        '(?m)^(#if BUILDFLAG\(IS_ANDROID\) \|\| BUILDFLAG\(IS_IOS\))[ \t]+(if \(base::CommandLine::ForCurrentProcess\(\)->HasSwitch\(kUseMobileUserAgent\)\) \{)',
+        {
+          param($match)
+          "$($match.Groups[1].Value)`r`n$($match.Groups[2].Value)"
+        })
+  }
+
+Normalize-RestoredSource `
   -RelativePath "third_party\blink\renderer\modules\webgpu\gpu_adapter_info.cc" `
   -Transform {
     param($content)
