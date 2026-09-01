@@ -180,8 +180,12 @@ class ResumeWorkflowRegressionTest(unittest.TestCase):
         self.assertNotIn("download-stage-artifacts.ps1", self.source)
 
 
-class RestoredSourceUpdateRegressionTest(unittest.TestCase):
-    def test_resume_updates_stale_media_recorder_source(self):
+    def test_resume_source_update_avoids_powershell_host_automatic_variable(self):
+        update_source = RESTORED_SOURCE_UPDATE.read_text(encoding="utf-8")
+        self.assertNotRegex(update_source, r"(?im)^\s*\$host\s*=")
+        self.assertIn("$hostSource", update_source)
+
+
         stage_source = CI_STAGE.read_text(encoding="utf-8")
         update_source = RESTORED_SOURCE_UPDATE.read_text(encoding="utf-8")
         restore = stage_source.index('& $sevenZip x "C:\\restore\\tree.7z.001"')

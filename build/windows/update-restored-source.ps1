@@ -301,15 +301,15 @@ $uaHelper = $uaHelper.Replace(
 Write-Host "==> normalized restored source: components\embedder_support\user_agent_utils.cc"
 
 $hostPath = Join-Path $Src "content\browser\renderer_host\render_process_host_impl.cc"
-$host = [IO.File]::ReadAllText($hostPath).Replace("`r`n", "`n")
-if (-not $host.Contains('#include "base/version.h"')) {
-  $host = Replace-RegexOnce $host `
+$hostSource = [IO.File]::ReadAllText($hostPath).Replace("`r`n", "`n")
+if (-not $hostSource.Contains('#include "base/version.h"')) {
+  $hostSource = Replace-RegexOnce $hostSource `
     '(?m)^#include "base/metrics/user_metrics\.h"\n' `
     ('#include "base/metrics/user_metrics.h"' + "`n" + '#include "base/version.h"' + "`n") `
     "render_process_host_impl.cc version include"
 }
 
-if (-not $host.Contains('effective_user_agent_metadata.full_version = ua_full_version;')) {
+if (-not $hostSource.Contains('effective_user_agent_metadata.full_version = ua_full_version;')) {
   $effectiveInit = @'
   std::string effective_user_agent =
       GetContentClient()->browser()->GetUserAgent();
@@ -345,16 +345,16 @@ if (-not $host.Contains('effective_user_agent_metadata.full_version = ua_full_ve
     }
   }
 '@
-  $host = Replace-RegexOnce $host `
+  $hostSource = Replace-RegexOnce $hostSource `
     '(?m)^  GetRendererInterface\(\)->InitializeRenderer\(\n' `
     ($effectiveInit + '  GetRendererInterface()->InitializeRenderer(' + "`n") `
     "render_process_host_impl.cc effective UA initialization"
-  $host = $host.Replace(
+  $hostSource = $hostSource.Replace(
     "      GetContentClient()->browser()->GetUserAgent(),`n      GetContentClient()->browser()->GetUserAgentMetadata(),",
     "      effective_user_agent, effective_user_agent_metadata,")
 }
 
-if (-not $host.Contains('GetRendererInterface()->SetUxrConfig')) {
+if (-not $hostSource.Contains('GetRendererInterface()->SetUxrConfig')) {
   $configBlock = @'
   // UXR: forward persona/seed config to the renderer over IPC.
   {
@@ -371,19 +371,19 @@ if (-not $host.Contains('GetRendererInterface()->SetUxrConfig')) {
     }
   }
 '@
-  $host = Replace-RegexOnce $host `
+  $hostSource = Replace-RegexOnce $hostSource `
     '(?s)(TRACE_EVENT\("navigation", "RenderProcessHostImpl::Init",\s*perfetto::Flow::Global\(trace_id\)\);\n)' `
     ('$1' + $configBlock) `
     "render_process_host_impl.cc renderer config propagation"
 }
 
-if (-not $host.Contains('      "uxr-ua-full-version",')) {
-  $host = Replace-RegexOnce $host `
+if (-not $hostSource.Contains('      "uxr-ua-full-version",')) {
+  $hostSource = Replace-RegexOnce $hostSource `
     '(?s)(void RenderProcessHostImpl::PropagateBrowserCommandLineToRenderer\(.*?static const char\* const kSwitchNames\[\] = \{\n)' `
     ('$1' + ('      "uxr-ua-full-version",' + "`n" + '      "uxr-ua-brand",' + "`n")) `
     "render_process_host_impl.cc UA switch propagation"
 }
-[IO.File]::WriteAllText($hostPath, $host)
+[IO.File]::WriteAllText($hostPath, $hostSource)
 Write-Host "==> normalized restored source: content\browser\renderer_host\render_process_host_impl.cc"
 
 Set-SourceReplacement `
