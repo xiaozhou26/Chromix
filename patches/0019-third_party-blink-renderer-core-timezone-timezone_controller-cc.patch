@@ -1,17 +1,16 @@
 diff --git a/third_party/blink/renderer/core/timezone/timezone_controller.cc b/third_party/blink/renderer/core/timezone/timezone_controller.cc
-index 48eb8d2fbd..073d4ddd8d 100644
+index 270c78bfd0..9c911c6ab9 100644
 --- a/third_party/blink/renderer/core/timezone/timezone_controller.cc
 +++ b/third_party/blink/renderer/core/timezone/timezone_controller.cc
-@@ -4,6 +4,8 @@
- 
+@@ -5,6 +5,7 @@
  #include "third_party/blink/renderer/core/timezone/timezone_controller.h"
  
-+#include "base/command_line.h"  // UXR
+ #include "base/command_line.h"
 +#include "base/uxr_config.h"
  #include "base/feature_list.h"
  #include "mojo/public/cpp/bindings/pending_remote.h"
  #include "mojo/public/cpp/bindings/remote.h"
-@@ -245,12 +247,25 @@ void TimeZoneController::OnTimeZoneChange(const String& timezone_id) {
+@@ -253,12 +254,25 @@ void TimeZoneController::OnTimeZoneChange(const String& timezone_id) {
  
    base::AutoLock locker(instance().lock_);
  

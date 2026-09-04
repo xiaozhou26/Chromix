@@ -7,6 +7,12 @@ REPO = Path(__file__).resolve().parents[2]
 CI_STAGE = REPO / "build" / "windows" / "ci-stage.ps1"
 WORKFLOW = REPO / ".github" / "workflows" / "build-win-x64-github.yml"
 RESTORED_SOURCE_UPDATE = REPO / "build" / "windows" / "update-restored-source.ps1"
+PREPARE_UNGOOGLED = REPO / "build" / "windows" / "prepare-ungoogled.ps1"
+TIMEZONE_PATCH = (
+    REPO
+    / "patches"
+    / "0019-third_party-blink-renderer-core-timezone-timezone_controller-cc.patch"
+)
 
 
 def invoke_tracked_source() -> str:
@@ -330,6 +336,25 @@ class RestoredSourceUpdateRegressionTest(unittest.TestCase):
             r'(?s)if \(\$restoredVersion -and .*?\) \{.*?Remove-Item \$Src '
             r'-Recurse -Force\s+\} else \{\s+& "\$PSScriptRoot\\update-restored-source\.ps1"',
         )
+
+    def test_interrupted_chromix_patch_layer_resumes_without_discarding_source(self):
+        prepare = PREPARE_UNGOOGLED.read_text(encoding="utf-8")
+        self.assertIn('$interruptedLayer -eq "chromix"', prepare)
+        self.assertIn("retrying interrupted Chromix patch application in place", prepare)
+        self.assertIn("--reverse --dry-run", prepare)
+        self.assertIn("patch content already present after recovery", prepare)
+        self.assertIn('Get-ChildItem $Src -Filter "*.rej"', prepare)
+        recovery = prepare.index('$interruptedLayer -eq "chromix"')
+        discard = prepare.index("Remove-Item $Src -Recurse -Force", recovery)
+        else_branch = prepare.index("} else {", recovery)
+        self.assertGreater(discard, else_branch)
+
+    def test_timezone_patch_matches_chromium_152_include_context(self):
+        patch = TIMEZONE_PATCH.read_text(encoding="utf-8")
+        self.assertIn('#include "base/command_line.h"', patch)
+        self.assertIn('+#include "base/uxr_config.h"', patch)
+        self.assertNotIn('+#include "base/command_line.h"', patch)
+        self.assertIn("String effective_id = timezone_id;", patch)
 
     def test_resume_passes_output_directory_and_invalidates_webgl_objects(self):
         stage = CI_STAGE.read_text(encoding="utf-8")

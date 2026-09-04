@@ -140,8 +140,23 @@ function Invoke-ChromixPatches {
     if (-not $rel) { continue }
     $patch = Join-Path $Repo $rel
     Write-Host "    $rel"
-    Invoke-Checked $PatchExe @("-p1", "--batch", "--forward", "-i", $patch) $Src
+    Assert-Budget "$PatchExe -p1 --batch --forward -i $patch"
+    Push-Location $Src
+    try {
+      & $PatchExe -p1 --batch --forward -i $patch
+      if ($LASTEXITCODE -ne 0) {
+        & $PatchExe -p1 --batch --reverse --dry-run -i $patch | Out-Null
+        if ($LASTEXITCODE -ne 0) {
+          throw "$PatchExe could neither finish nor verify $rel"
+        }
+        Write-Host "      patch content already present after recovery"
+      }
+    } finally {
+      Pop-Location
+    }
   }
+  Get-ChildItem $Src -Filter "*.rej" -Recurse -File -ErrorAction SilentlyContinue |
+    Remove-Item -Force
 }
 
 $patchSetKey = Get-PatchSetKey
@@ -155,8 +170,16 @@ if (Test-Path (Join-Path $Src ".chromix-source-ready")) {
   throw "prepared source key is $preparedKey, expected $versionKey; use a clean work directory"
 }
 if (Test-Path (Join-Path $Src ".chromix-layer-in-progress")) {
-  Write-Host "==> discarding a source tree interrupted during patch application"
-  Remove-Item $Src -Recurse -Force
+  $interruptedLayer = (Get-Content (Join-Path $Src ".chromix-layer-in-progress") -Raw).Trim()
+  if ($interruptedLayer -eq "chromix") {
+    Write-Host "==> retrying interrupted Chromix patch application in place"
+    Get-ChildItem $Src -Filter "*.rej" -Recurse -File -ErrorAction SilentlyContinue |
+      Remove-Item -Force
+    Remove-Item (Join-Path $Src ".chromix-layer-in-progress") -Force
+  } else {
+    Write-Host "==> discarding a source tree interrupted during $interruptedLayer application"
+    Remove-Item $Src -Recurse -Force
+  }
 }
 
 New-Item -ItemType Directory -Force -Path $Root, $Tooling, $DownloadCache | Out-Null
