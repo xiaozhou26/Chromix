@@ -1,18 +1,16 @@
 diff --git a/third_party/blink/renderer/modules/webgl/webgl_rendering_context_base.cc b/third_party/blink/renderer/modules/webgl/webgl_rendering_context_base.cc
-index cb167de..8b3fbfe 100644
+index 5789d84227..1665f32acd 100644
 --- a/third_party/blink/renderer/modules/webgl/webgl_rendering_context_base.cc
 +++ b/third_party/blink/renderer/modules/webgl/webgl_rendering_context_base.cc
 @@ -28,8 +28,10 @@
  #include <inttypes.h>
--
-+
+ 
  #include <array>
 +#include <cstring>
  #include <memory>
  #include <utility>
 +#include <vector>
--
-+
+ 
  #include "base/bit_cast.h"
  #include "base/byte_size.h"
 @@ -46,6 +48,8 @@
@@ -24,13 +22,10 @@ index cb167de..8b3fbfe 100644
  #include "components/viz/common/gpu/raster_context_provider.h"
  #include "components/viz/common/resources/shared_image_format_utils.h"
  #include "device/vr/buildflags/buildflags.h"
-@@ -258,6 +262,72 @@
+@@ -255,6 +259,70 @@
    return real_values;
  }
--
-+
-+constexpr uint32_t kBridgeDisabledCanvasId = 0xffffffffu;
-+
+ 
 +uint32_t EnsureBridgeWebGL(canvas_bridge::CanvasBridgeClient* bridge,
 +                           uint32_t& canvas_id,
 +                           int width,
@@ -98,7 +93,7 @@ index cb167de..8b3fbfe 100644
  enum class WebGLANGLEImplementation {
    // These values are persisted to logs. Entries should not be renumbered and
    // numeric values should never be reused.
-@@ -2604,6 +2670,8 @@
+@@ -2592,6 +2660,8 @@
      return;
    }
    active_texture_unit_ = texture - GL_TEXTURE0;
@@ -106,9 +101,8 @@ index cb167de..8b3fbfe 100644
 +                drawingBufferWidth(), drawingBufferHeight());
    ContextGL()->ActiveTexture(texture);
  }
--
-+
-@@ -2617,6 +2685,9 @@
+ 
+@@ -2605,6 +2675,9 @@
                        "shader attachment already has shader");
      return;
    }
@@ -118,7 +112,7 @@ index cb167de..8b3fbfe 100644
    ContextGL()->AttachShader(ObjectOrZero(program), ObjectOrZero(shader));
    shader->OnAttached();
  }
-@@ -2633,6 +2704,9 @@
+@@ -2621,6 +2694,9 @@
                        "reserved prefix");
      return;
    }
@@ -128,7 +122,7 @@ index cb167de..8b3fbfe 100644
    ContextGL()->BindAttribLocation(ObjectOrZero(program), index,
                                    name.Utf8().c_str());
  }
-@@ -2672,6 +2746,9 @@
+@@ -2663,6 +2739,9 @@
      return;
    if (!ValidateAndUpdateBufferBindTarget("bindBuffer", target, buffer))
      return;
@@ -137,26 +131,22 @@ index cb167de..8b3fbfe 100644
 +                bridge_canvas_id_, drawingBufferWidth(), drawingBufferHeight());
    ContextGL()->BindBuffer(target, ObjectOrZero(buffer));
  }
--
-+
-@@ -2712,6 +2789,10 @@
-                       "textures can not be used with multiple targets");
+ 
+@@ -2713,6 +2792,10 @@
      return;
    }
-+
+ 
 +  RecordWebGLOp(60u, {static_cast<int32_t>(target),
 +                      static_cast<int32_t>(texture ? texture->BridgeId() : 0)}, {},
 +                bridge_canvas_id_, drawingBufferWidth(), drawingBufferHeight());
--
 +
    if (target == GL_TEXTURE_2D) {
      texture_units_[active_texture_unit_].texture2d_binding_ = texture;
-@@ -2839,6 +2920,21 @@
--
-+
+   } else if (target == GL_TEXTURE_CUBE_MAP) {
+@@ -2839,6 +2922,21 @@
+ 
    buffer->SetSize(size);
--
-+
+ 
 +  if (auto* bridge = canvas_bridge::CanvasBridgeClient::Get();
 +      bridge && bridge->Connected()) {
 +    if (data && size > 0) {
@@ -174,28 +164,26 @@ index cb167de..8b3fbfe 100644
 +  }
    ContextGL()->BufferData(target, static_cast<GLsizeiptr>(size), data, usage);
  }
--
-+
-@@ -2956,6 +3052,9 @@
-     SynthesizeGLError(GL_INVALID_FRAMEBUFFER_OPERATION, "clear", reason);
+ 
+@@ -2957,6 +3055,9 @@
      return;
    }
-+
+ 
 +  RecordWebGLOp(82u, {static_cast<int32_t>(mask)}, {}, bridge_canvas_id_,
 +                drawingBufferWidth(), drawingBufferHeight());
--
 +
    if (!mask) {
      // Use OnErrorMessage because it's both rate-limited and obeys the
-@@ -3004,7 +3103,33 @@
+     // webGLErrorsToConsole setting.
+@@ -3004,9 +3105,35 @@
    clear_color_[1] = g;
    clear_color_[2] = b;
    clear_color_[3] = a;
 +  RecordWebGLOp(81u, {}, {r, g, b, a}, bridge_canvas_id_,
 +                drawingBufferWidth(), drawingBufferHeight());
    ContextGL()->ClearColor(r, g, b, a);
-+}
-+
+ }
+ 
 +bool WebGLRenderingContextBase::ReadBridgePixels(
 +    std::vector<uint8_t>* out,
 +    int width,
@@ -218,11 +206,12 @@ index cb167de..8b3fbfe 100644
 +                row_bytes);
 +  }
 +  return true;
- }
--
++}
 +
  void WebGLRenderingContextBase::clearDepth(GLfloat depth) {
-@@ -3037,6 +3162,8 @@
+   if (isContextLost())
+     return;
+@@ -3037,6 +3164,8 @@
  void WebGLRenderingContextBase::compileShader(WebGLShader* shader) {
    if (!ValidateWebGLProgramOrShader("compileShader", shader))
      return;
@@ -230,9 +219,8 @@ index cb167de..8b3fbfe 100644
 +                bridge_canvas_id_, drawingBufferWidth(), drawingBufferHeight());
    ContextGL()->CompileShader(ObjectOrZero(shader));
  }
--
-+
-@@ -3196,6 +3323,8 @@
+ 
+@@ -3198,6 +3327,8 @@
  WebGLBuffer* WebGLRenderingContextBase::createBuffer() {
    auto* buffer = MakeGarbageCollected<WebGLBuffer>(this);
    buffers_.insert(buffer);
@@ -240,12 +228,10 @@ index cb167de..8b3fbfe 100644
 +                    drawingBufferWidth(), drawingBufferHeight());
    return buffer;
  }
--
-+
-@@ -3204,11 +3333,17 @@
+ 
+@@ -3206,11 +3337,17 @@
  }
--
-+
+ 
  WebGLTexture* WebGLRenderingContextBase::createTexture() {
 -  return MakeGarbageCollected<WebGLTexture>(this);
 +  auto* texture = MakeGarbageCollected<WebGLTexture>(this);
@@ -253,8 +239,7 @@ index cb167de..8b3fbfe 100644
 +                    drawingBufferWidth(), drawingBufferHeight());
 +  return texture;
  }
--
-+
+ 
  WebGLProgram* WebGLRenderingContextBase::createProgram() {
 -  return MakeGarbageCollected<WebGLProgram>(this);
 +  auto* program = MakeGarbageCollected<WebGLProgram>(this);
@@ -262,14 +247,12 @@ index cb167de..8b3fbfe 100644
 +                    drawingBufferWidth(), drawingBufferHeight());
 +  return program;
  }
--
-+
+ 
  WebGLRenderbuffer* WebGLRenderingContextBase::createRenderbuffer() {
-@@ -3228,7 +3363,15 @@
+@@ -3230,7 +3367,15 @@
      return nullptr;
    }
--
-+
+ 
 -  return MakeGarbageCollected<WebGLShader>(this, type);
 +  auto* shader = MakeGarbageCollected<WebGLShader>(this, type);
 +  if (auto* bridge = canvas_bridge::CanvasBridgeClient::Get();
@@ -281,24 +264,21 @@ index cb167de..8b3fbfe 100644
 +  }
 +  return shader;
  }
--
-+
+ 
  void WebGLRenderingContextBase::cullFace(GLenum mode) {
-@@ -3504,6 +3647,8 @@
+@@ -3504,6 +3649,8 @@
    if (!ValidateDrawArrays("drawArrays"))
      return;
--
-+
+ 
 +  RecordWebGLOp(90u, {static_cast<int32_t>(mode), first, count}, {},
 +                bridge_canvas_id_, drawingBufferWidth(), drawingBufferHeight());
    DrawWrapper("drawArrays", CanvasPerformanceMonitor::DrawType::kDrawArrays,
                [&]() { ContextGL()->DrawArrays(mode, first, count); });
  }
-@@ -3515,6 +3660,10 @@
+@@ -3515,6 +3662,10 @@
    if (!ValidateDrawElements("drawElements", type, offset))
      return;
--
-+
+ 
 +  RecordWebGLOp(91u, {static_cast<int32_t>(mode), count,
 +                      static_cast<int32_t>(type), static_cast<int32_t>(offset)},
 +                {}, bridge_canvas_id_, drawingBufferWidth(),
@@ -306,17 +286,16 @@ index cb167de..8b3fbfe 100644
    DrawWrapper("drawElements", CanvasPerformanceMonitor::DrawType::kDrawElements,
                [&]() {
                  ContextGL()->DrawElements(
-@@ -3583,6 +3732,8 @@
+@@ -3583,6 +3734,8 @@
      return;
    }
--
-+
+ 
 +  RecordWebGLOp(30u, {static_cast<int32_t>(index)}, {}, bridge_canvas_id_,
 +                drawingBufferWidth(), drawingBufferHeight());
    bound_vertex_array_object_->SetAttribEnabled(index, true);
    ContextGL()->EnableVertexAttribArray(index);
  }
-@@ -3682,6 +3833,8 @@
+@@ -3692,6 +3845,8 @@
      return;
    if (!ValidateTextureBinding("generateMipmap", target))
      return;
@@ -324,9 +303,8 @@ index cb167de..8b3fbfe 100644
 +                drawingBufferWidth(), drawingBufferHeight());
    ContextGL()->GenerateMipmap(target);
  }
--
-+
-@@ -4897,7 +5050,17 @@
+ 
+@@ -4907,7 +5062,17 @@
        ObjectOrZero(program), name.Utf8().c_str());
    if (uniform_location == -1)
      return nullptr;
@@ -343,20 +321,18 @@ index cb167de..8b3fbfe 100644
 +  }
 +  return location;
  }
--
-+
+ 
  ScriptValue WebGLRenderingContextBase::getVertexAttrib(
-@@ -5117,6 +5280,8 @@
+@@ -5127,6 +5292,8 @@
      return;
    }
--
-+
+ 
 +  RecordWebGLOp(14u, {static_cast<int32_t>(program->BridgeId())}, {},
 +                bridge_canvas_id_, drawingBufferWidth(), drawingBufferHeight());
    GLuint query = 0u;
    if (ExtensionEnabled(kKHRParallelShaderCompileName)) {
      ContextGL()->GenQueriesEXT(1, &query);
-@@ -5517,6 +5682,9 @@
+@@ -5527,6 +5694,9 @@
      return;
    String ascii_string = ReplaceNonASCII(string).Result();
    shader->SetSource(string);
@@ -366,7 +342,7 @@ index cb167de..8b3fbfe 100644
    DCHECK(ascii_string.Is8Bit() && ascii_string.ContainsOnlyAsciiOrEmpty());
    const GLchar* shader_data = base::as_chars(ascii_string.Span8()).data();
    const GLint shader_length = ascii_string.length();
-@@ -5819,6 +5987,9 @@
+@@ -5829,6 +5999,9 @@
                                   params.type, pixels);
        break;
    }
@@ -374,14 +350,12 @@ index cb167de..8b3fbfe 100644
 +    bridge_webgl_unsupported_ = true;
 +  bridge_tex_handled_ = false;
  }
--
-+
+ 
  void WebGLRenderingContextBase::TexImageStaticBitmapImage(
-@@ -6100,6 +6271,28 @@
+@@ -6110,6 +6283,28 @@
      return;
    }
--
-+
+ 
 +  if (bridge_canvas_id_ != 0 &&
 +      (params.function_id == kTexImage2D ||
 +       params.function_id == kTexSubImage2D)) {
@@ -407,7 +381,7 @@ index cb167de..8b3fbfe 100644
    ScopedUnpackParametersResetRestore temporary_reset_unpack(
        this, change_unpack_params);
    TexImageBase(params, data.data());
-@@ -6981,12 +7174,18 @@
+@@ -6994,12 +7189,18 @@
  void WebGLRenderingContextBase::texParameterf(GLenum target,
                                                GLenum pname,
                                                GLfloat param) {
@@ -416,8 +390,7 @@ index cb167de..8b3fbfe 100644
 +                drawingBufferWidth(), drawingBufferHeight());
    TexParameter(target, pname, param, 0, true);
  }
--
-+
+ 
  void WebGLRenderingContextBase::texParameteri(GLenum target,
                                                GLenum pname,
                                                GLint param) {
@@ -426,65 +399,54 @@ index cb167de..8b3fbfe 100644
 +                bridge_canvas_id_, drawingBufferWidth(), drawingBufferHeight());
    TexParameter(target, pname, 0, param, false);
  }
--
-+
-@@ -7234,6 +7433,8 @@
+ 
+@@ -7247,6 +7448,8 @@
      return;
    }
--
-+
+ 
 +  RecordWebGLOp(40u, {static_cast<int32_t>(location->BridgeId())}, {x},
 +                bridge_canvas_id_, drawingBufferWidth(), drawingBufferHeight());
    ContextGL()->Uniform1f(location->Location(), x);
  }
--
-+
-@@ -7259,6 +7460,8 @@
+ 
+@@ -7272,6 +7475,8 @@
      return;
    }
--
-+
+ 
 +  RecordWebGLOp(44u, {static_cast<int32_t>(location->BridgeId()), x}, {},
 +                bridge_canvas_id_, drawingBufferWidth(), drawingBufferHeight());
    ContextGL()->Uniform1i(location->Location(), x);
  }
--
-+
-@@ -7285,6 +7488,8 @@
+ 
+@@ -7298,6 +7503,8 @@
      return;
    }
--
-+
+ 
 +  RecordWebGLOp(41u, {static_cast<int32_t>(location->BridgeId())}, {x, y},
 +                bridge_canvas_id_, drawingBufferWidth(), drawingBufferHeight());
    ContextGL()->Uniform2f(location->Location(), x, y);
  }
--
-+
-@@ -7338,6 +7543,8 @@
+ 
+@@ -7351,6 +7558,8 @@
      return;
    }
--
-+
+ 
 +  RecordWebGLOp(42u, {static_cast<int32_t>(location->BridgeId())}, {x, y, z},
 +                bridge_canvas_id_, drawingBufferWidth(), drawingBufferHeight());
    ContextGL()->Uniform3f(location->Location(), x, y, z);
  }
--
-+
-@@ -7393,6 +7600,9 @@
+ 
+@@ -7406,6 +7615,9 @@
      return;
    }
--
-+
+ 
 +  RecordWebGLOp(43u, {static_cast<int32_t>(location->BridgeId())},
 +                {x, y, z, w}, bridge_canvas_id_, drawingBufferWidth(),
 +                drawingBufferHeight());
    ContextGL()->Uniform4f(location->Location(), x, y, z, w);
  }
--
-+
-@@ -7476,6 +7686,13 @@
+ 
+@@ -7489,6 +7701,13 @@
                                         v, 16, 0, v.size(), &data, &length)) {
      return;
    }
@@ -497,24 +459,21 @@ index cb167de..8b3fbfe 100644
 +                drawingBufferWidth(), drawingBufferHeight());
    ContextGL()->UniformMatrix4fv(location->Location(), length, transpose, data);
  }
--
-+
-@@ -7487,6 +7704,9 @@
+ 
+@@ -7503,6 +7722,9 @@
      return;
    }
--
-+
+ 
 +  RecordWebGLOp(15u, {static_cast<int32_t>(program ? program->BridgeId() : 0)},
 +                {}, bridge_canvas_id_, drawingBufferWidth(),
 +                drawingBufferHeight());
    if (current_program_ != program) {
      if (current_program_)
        current_program_->OnDetached(ContextGL());
-@@ -7616,6 +7836,10 @@
+@@ -7632,6 +7854,10 @@
      return;
    }
--
-+
+ 
 +  RecordWebGLOp(32u, {static_cast<int32_t>(index), size,
 +                      static_cast<int32_t>(type), normalized ? 1 : 0, stride,
 +                      static_cast<int32_t>(offset)}, {}, bridge_canvas_id_,
@@ -522,7 +481,7 @@ index cb167de..8b3fbfe 100644
    bound_vertex_array_object_->SetArrayBufferForAttrib(
        index, bound_array_buffer_.Get());
    ContextGL()->VertexAttribPointer(
-@@ -7643,6 +7867,8 @@
+@@ -7659,6 +7885,8 @@
                                           GLsizei height) {
    if (isContextLost())
      return;
@@ -530,5 +489,4 @@ index cb167de..8b3fbfe 100644
 +                drawingBufferWidth(), drawingBufferHeight());
    ContextGL()->Viewport(x, y, width, height);
  }
--
-+
+ 

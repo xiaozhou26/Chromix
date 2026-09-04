@@ -140,10 +140,10 @@ function Invoke-ChromixPatches {
     if (-not $rel) { continue }
     $patch = Join-Path $Repo $rel
     Write-Host "    $rel"
-    Assert-Budget "$PatchExe -p1 --batch --forward -i $patch"
+    Assert-Budget "$PatchExe -p1 --batch --forward --force -i $patch"
     Push-Location $Src
     try {
-      & $PatchExe -p1 --batch --forward -i $patch
+      & $PatchExe -p1 --batch --forward --force -i $patch
       if ($LASTEXITCODE -ne 0) {
         & $PatchExe -p1 --batch --reverse --dry-run -i $patch | Out-Null
         if ($LASTEXITCODE -ne 0) {

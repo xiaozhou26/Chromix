@@ -1,5 +1,5 @@
 diff --git a/third_party/blink/renderer/modules/webgl/webgl_rendering_context_base.cc b/third_party/blink/renderer/modules/webgl/webgl_rendering_context_base.cc
-index ad51cf8..0c855b5 100644
+index 948d2c5a57..9ad328e586 100644
 --- a/third_party/blink/renderer/modules/webgl/webgl_rendering_context_base.cc
 +++ b/third_party/blink/renderer/modules/webgl/webgl_rendering_context_base.cc
 @@ -49,6 +49,7 @@
@@ -10,7 +10,7 @@ index ad51cf8..0c855b5 100644
  #include "components/ungoogled/persona_profile.h"
  #include "third_party/blink/renderer/platform/canvas_bridge/canvas_bridge_client.h"
  #include "third_party/blink/renderer/platform/canvas_bridge/canvas_bridge_codec.h"
-@@ -347,6 +348,35 @@ void RecordWebGLCreate(uint32_t op,
+@@ -342,6 +343,35 @@
  }
  
  
@@ -46,7 +46,7 @@ index ad51cf8..0c855b5 100644
  enum class WebGLANGLEImplementation {
    // These values are persisted to logs. Entries should not be renumbered and
    // numeric values should never be reused.
-@@ -5748,6 +5778,7 @@ void WebGLRenderingContextBase::ReadPixelsHelper(GLint x,
+@@ -5765,6 +5795,7 @@
      }
      ContextGL()->ReadPixels(x, y, width, height, format, type, data);
  
@@ -54,7 +54,7 @@ index ad51cf8..0c855b5 100644
      if (format == GL_RGBA && type == GL_UNSIGNED_BYTE &&
          bridge_canvas_id_ != 0 && !bridge_webgl_unsupported_ &&
          BridgeAllowedForThisContext()) {
-@@ -5759,10 +5790,22 @@ void WebGLRenderingContextBase::ReadPixelsHelper(GLint x,
+@@ -5776,9 +5807,21 @@
          if (remote &&
              remote->size() == static_cast<size_t>(width) * height * 4) {
            std::memcpy(data, remote->data(), remote->size());
@@ -62,7 +62,7 @@ index ad51cf8..0c855b5 100644
          }
        }
      }
- 
++
 +    if (!bridge_substituted && format == GL_RGBA &&
 +        type == GL_UNSIGNED_BYTE && !ungoogled::CurrentPersona().webgl_real &&
 +        ungoogled::FingerprintNoiseEnabled()) {
@@ -73,7 +73,6 @@ index ad51cf8..0c855b5 100644
 +          origin ? origin->RegistrableDomain().Utf8() : std::string());
 +      ApplyWebGLReadbackNoise(data, width, height, seed);
 +    }
-+
    }
  }
  

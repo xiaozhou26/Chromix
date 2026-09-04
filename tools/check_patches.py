@@ -127,6 +127,7 @@ def check_bodies(rep: Report, patches_dir: Path, verbose: bool) -> None:
     malformed: list[str] = []
     bad_switch: list[str] = []
     brand_hits: list[str] = []
+    trailing_whitespace: list[str] = []
     zero_index_existing: list[str] = []
 
     for p in _patch_files(patches_dir):
@@ -170,6 +171,8 @@ def check_bodies(rep: Report, patches_dir: Path, verbose: bool) -> None:
             if not ln.startswith("+") or ln.startswith("+++"):
                 continue
             added = _strip_comment(ln[1:])
+            if ln[1:].endswith((" ", "\t")):
+                trailing_whitespace.append(f"{p.name}: {ln[:70]}")
             for sw in SWITCH_RE.findall(added):
                 # `uxr-*` are the native persona switches; `fingerprint` / `fingerprint-*` is
                 # the unified user-facing CLI that maps to `uxr-*` (see patch 0036). All are
@@ -187,6 +190,9 @@ def check_bodies(rep: Report, patches_dir: Path, verbose: bool) -> None:
     rep.check("existing-file-index", not zero_index_existing,
               "existing-file patches carry modification indices" if not zero_index_existing
               else f"zero blob index on existing-file patch: {zero_index_existing}")
+    rep.check("added-line-whitespace", not trailing_whitespace,
+              "added source lines have no trailing whitespace" if not trailing_whitespace
+              else f"trailing whitespace: {trailing_whitespace}")
     rep.check("uxr-only-switches", not bad_switch,
               "all switches use the uxr- prefix" if not bad_switch else f"non-uxr: {bad_switch}")
     rep.check("no-brand-literals", not brand_hits,

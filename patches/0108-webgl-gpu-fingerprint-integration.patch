@@ -1,5 +1,5 @@
 diff --git a/third_party/blink/renderer/modules/webgl/webgl_rendering_context_base.cc b/third_party/blink/renderer/modules/webgl/webgl_rendering_context_base.cc
-index 0c855b5..141346f 100644
+index 9ad328e586..3ce117ad12 100644
 --- a/third_party/blink/renderer/modules/webgl/webgl_rendering_context_base.cc
 +++ b/third_party/blink/renderer/modules/webgl/webgl_rendering_context_base.cc
 @@ -113,6 +113,7 @@
@@ -10,16 +10,16 @@ index 0c855b5..141346f 100644
  #include "third_party/blink/renderer/modules/webgl/oes_element_index_uint.h"
  #include "third_party/blink/renderer/modules/webgl/oes_standard_derivatives.h"
  #include "third_party/blink/renderer/modules/webgl/oes_texture_float.h"
-@@ -4556,10 +4557,28 @@ ScriptValue WebGLRenderingContextBase::getParameter(ScriptState* script_state,
+@@ -4564,14 +4565,28 @@
        return ScriptValue::CreateNull(script_state->GetIsolate());
      case WebGLDebugRendererInfo::kUnmaskedRendererWebgl:
        if (ExtensionEnabled(kWebGLDebugRendererInfoName)) {
--        if (!ungoogled::CurrentPersona().webgl_real)
--          return WebGLAny(script_state, String(ungoogled::CurrentPersona().webgl_renderer));
--        return WebGLAny(script_state,
--                        String(ContextGL()->GetString(GL_RENDERER)));
+-        if (!ungoogled::CurrentPersona().webgl_real) {
+-          // Preserve the native query path before returning the persona value.
+-          (void)ContextGL()->GetString(GL_RENDERER);
 +        if (ungoogled::CurrentPersona().webgl_real)
-+          return WebGLAny(script_state,
+           return WebGLAny(script_state,
+-                          String(ungoogled::CurrentPersona().webgl_renderer));
 +                          String(ContextGL()->GetString(GL_RENDERER)));
 +        const std::string configured_renderer =
 +            ungoogled::CurrentPersona().webgl_renderer;
@@ -38,21 +38,23 @@ index 0c855b5..141346f 100644
 +                             : std::string()));
 +          if (!fingerprint_renderer.empty())
 +            return WebGLAny(script_state, String(fingerprint_renderer));
-+        }
+         }
+-        return WebGLAny(script_state,
+-                        String(ContextGL()->GetString(GL_RENDERER)));
 +        return WebGLAny(script_state, String(configured_renderer));
        }
        SynthesizeGLError(
            GL_INVALID_ENUM, "getParameter",
-@@ -4567,10 +4586,22 @@ ScriptValue WebGLRenderingContextBase::getParameter(ScriptState* script_state,
+@@ -4579,14 +4594,22 @@
        return ScriptValue::CreateNull(script_state->GetIsolate());
      case WebGLDebugRendererInfo::kUnmaskedVendorWebgl:
        if (ExtensionEnabled(kWebGLDebugRendererInfoName)) {
--        if (!ungoogled::CurrentPersona().webgl_real)
--          return WebGLAny(script_state, String(ungoogled::CurrentPersona().webgl_vendor));
--        return WebGLAny(script_state,
--                        String(ContextGL()->GetString(GL_VENDOR)));
+-        if (!ungoogled::CurrentPersona().webgl_real) {
+-          // Preserve the native query path before returning the persona value.
+-          (void)ContextGL()->GetString(GL_VENDOR);
 +        if (ungoogled::CurrentPersona().webgl_real)
-+          return WebGLAny(script_state,
+           return WebGLAny(script_state,
+-                          String(ungoogled::CurrentPersona().webgl_vendor));
 +                          String(ContextGL()->GetString(GL_VENDOR)));
 +        const std::string configured_vendor =
 +            ungoogled::CurrentPersona().webgl_vendor;
@@ -65,7 +67,9 @@ index 0c855b5..141346f 100644
 +              GetGLVendorStringForFingerprint();
 +          if (!fingerprint_vendor.empty())
 +            return WebGLAny(script_state, String(fingerprint_vendor));
-+        }
+         }
+-        return WebGLAny(script_state,
+-                        String(ContextGL()->GetString(GL_VENDOR)));
 +        return WebGLAny(script_state, String(configured_vendor));
        }
        SynthesizeGLError(

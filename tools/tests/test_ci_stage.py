@@ -356,6 +356,7 @@ class RestoredSourceUpdateRegressionTest(unittest.TestCase):
         prepare = PREPARE_UNGOOGLED.read_text(encoding="utf-8")
         self.assertIn('$interruptedLayer -eq "chromix"', prepare)
         self.assertIn("retrying interrupted Chromix patch application in place", prepare)
+        self.assertIn("--forward --force", prepare)
         self.assertIn("--reverse --dry-run", prepare)
         self.assertIn("patch content already present after recovery", prepare)
         self.assertIn('Get-ChildItem $Src -Filter "*.rej"', prepare)
@@ -370,6 +371,29 @@ class RestoredSourceUpdateRegressionTest(unittest.TestCase):
         self.assertIn('+#include "base/uxr_config.h"', patch)
         self.assertNotIn('+#include "base/command_line.h"', patch)
         self.assertIn("String effective_id = timezone_id;", patch)
+
+    def test_chromium_152_webgl_bridge_patches_use_rebased_contexts(self):
+        bridge = (
+            REPO
+            / "patches"
+            / "0082-third_party-blink-renderer-modules-webgl-webgl_rendering_context_base-cc.patch"
+        ).read_text(encoding="utf-8")
+        lifecycle = (REPO / "patches" / "0099-webgl-bridge-lifecycle-cc.patch").read_text(
+            encoding="utf-8"
+        )
+        readback = (REPO / "patches" / "0100-webgl-readback-noise.patch").read_text(
+            encoding="utf-8"
+        )
+        fingerprint = (
+            REPO / "patches" / "0108-webgl-gpu-fingerprint-integration.patch"
+        ).read_text(encoding="utf-8")
+        self.assertIn("RecordWebGLOp(63u", bridge)
+        self.assertIn("RecordWebGLOp(50u", bridge)
+        self.assertNotIn("kBridgeDisabledCanvasId", bridge)
+        self.assertIn("canvas_id == kBridgeDisabledCanvasId", lifecycle)
+        self.assertIn("bridge_substituted = true", readback)
+        self.assertIn("Preserve the native query path", fingerprint)
+        self.assertIn("GetGLRendererStringForFingerprint", fingerprint)
 
     def test_resume_passes_output_directory_and_invalidates_webgl_objects(self):
         stage = CI_STAGE.read_text(encoding="utf-8")

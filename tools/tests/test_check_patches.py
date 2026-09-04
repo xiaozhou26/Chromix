@@ -137,6 +137,18 @@ def test_existing_file_zero_index_is_rejected(tmp_path):
     ]
 
 
+def test_added_source_line_trailing_whitespace_is_rejected(tmp_path):
+    patches = {"0001-alpha.patch": make_patch("core/alpha.cc", added=("  int x = 0; ",))}
+    assert cp.run_checks(write_set(tmp_path, patches)).failures == [
+        "added-line-whitespace"
+    ]
+
+
+def test_blank_context_line_is_valid_patch_syntax(tmp_path):
+    body = make_patch("core/alpha.cc").replace(" context above", " ")
+    assert cp.run_checks(write_set(tmp_path, {"0001-alpha.patch": body})).failures == []
+
+
 # --------------------------------------------------------------------------- uxr-only-switches
 def test_uxr_only_rejects_non_uxr_switch(tmp_path):
     patches = {"0001-alpha.patch": make_patch(

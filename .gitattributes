@@ -5,7 +5,9 @@
 * text=auto
 
 # These MUST stay LF everywhere (scripts run under sh; patches are applied verbatim).
-*.patch   text eol=lf
+# Patch files contain single-space context lines that are valid unified-diff syntax;
+# tools/check_patches.py validates trailing whitespace in actual added source lines.
+*.patch   text eol=lf whitespace=-blank-at-eol,-blank-at-eof
 *.sh      text eol=lf
 *.py      text eol=lf
 *.js      text eol=lf
