@@ -136,7 +136,8 @@ function Invoke-PatchDirectory([string]$Directory) {
 
 function Invoke-ChromixPatches(
     [string]$ResumePatch = "",
-    [bool]$ResumePatchIsClean = $false) {
+    [bool]$ResumePatchIsClean = $false,
+    [string]$ResumePatchHash = "") {
   $resuming = [bool]$ResumePatch
   foreach ($line in Get-Content (Join-Path $Repo "patches\series")) {
     $rel = ($line -split "#", 2)[0].Trim()
@@ -147,11 +148,16 @@ function Invoke-ChromixPatches(
     }
 
     $patch = Join-Path $Repo $rel
+    $patchHash = (Get-FileHash -Algorithm SHA256 $patch).Hash.ToLowerInvariant()
     Write-Host "    $rel"
-    Set-Marker ".chromix-patch-in-progress" $rel
+    Set-Marker ".chromix-patch-in-progress" "$rel|$patchHash"
     Push-Location $Src
     try {
       if ($resuming) {
+        $patchChanged = $ResumePatchHash -and $ResumePatchHash -ne $patchHash
+        if ($patchChanged) {
+          Write-Host "      patch content changed since the interrupted attempt"
+        }
         if ($ResumePatchIsClean) {
           Assert-Budget "$PatchExe -p1 --batch --forward -i $patch"
           & $PatchExe -p1 --batch --forward -i $patch
@@ -160,24 +166,35 @@ function Invoke-ChromixPatches(
           }
           Write-Host "      rolled-back patch applied"
         } else {
-          Assert-Budget "$PatchExe -p1 --batch --reverse --dry-run -i $patch"
-          & $PatchExe -p1 --batch --reverse --dry-run -i $patch | Out-Null
+          Assert-Budget "$PatchExe -p1 --batch --forward --dry-run -i $patch"
+          & $PatchExe -p1 --batch --forward --dry-run -i $patch | Out-Null
           if ($LASTEXITCODE -eq 0) {
-            Write-Host "      interrupted patch was already complete"
-          } else {
-            Assert-Budget "$PatchExe -p1 --batch --reverse --force -i $patch"
-            & $PatchExe -p1 --batch --reverse --force -i $patch | Out-Null
-            Assert-Budget "$PatchExe -p1 --batch --forward --dry-run -i $patch"
-            & $PatchExe -p1 --batch --forward --dry-run -i $patch | Out-Null
-            if ($LASTEXITCODE -ne 0) {
-              throw "$PatchExe could not roll back interrupted patch $rel"
-            }
-            Assert-Budget "$PatchExe -p1 --batch --forward -i $patch"
             & $PatchExe -p1 --batch --forward -i $patch
             if ($LASTEXITCODE -ne 0) {
-              throw "$PatchExe failed to reapply interrupted patch $rel"
+              throw "$PatchExe failed to apply interrupted patch $rel"
             }
-            Write-Host "      interrupted patch rolled back and reapplied"
+            Write-Host "      interrupted patch had not changed the source"
+          } else {
+            if ($patchChanged) {
+              throw "interrupted patch content changed and the new patch cannot apply cleanly: $rel"
+            }
+            Assert-Budget "$PatchExe -p1 --batch --reverse --dry-run -i $patch"
+            & $PatchExe -p1 --batch --reverse --dry-run -i $patch | Out-Null
+            if ($LASTEXITCODE -eq 0) {
+              Write-Host "      interrupted patch was already complete"
+            } else {
+              Assert-Budget "$PatchExe -p1 --batch --reverse --force -i $patch"
+              & $PatchExe -p1 --batch --reverse --force -i $patch | Out-Null
+              & $PatchExe -p1 --batch --forward --dry-run -i $patch | Out-Null
+              if ($LASTEXITCODE -ne 0) {
+                throw "$PatchExe could not roll back interrupted patch $rel"
+              }
+              & $PatchExe -p1 --batch --forward -i $patch
+              if ($LASTEXITCODE -ne 0) {
+                throw "$PatchExe failed to reapply interrupted patch $rel"
+              }
+              Write-Host "      interrupted patch rolled back and reapplied"
+            }
           }
         }
         $resuming = $false
@@ -209,6 +226,7 @@ if (Test-Path (Join-Path $Src ".chromix-source-ready")) {
   throw "prepared source key is $preparedKey, expected $versionKey; use a clean work directory"
 }
 $resumeChromixPatch = ""
+$resumeChromixPatchHash = ""
 $resumeChromixPatchIsClean = $false
 if (Test-Path (Join-Path $Src ".chromix-layer-in-progress")) {
   $interruptedLayer = (Get-Content (Join-Path $Src ".chromix-layer-in-progress") -Raw).Trim()
@@ -218,7 +236,12 @@ if (Test-Path (Join-Path $Src ".chromix-layer-in-progress")) {
       Remove-Item -Force
     $patchProgress = Join-Path $Src ".chromix-patch-in-progress"
     if (Test-Path $patchProgress) {
-      $resumeChromixPatch = (Get-Content $patchProgress -Raw).Trim()
+      $patchProgressValue = (Get-Content $patchProgress -Raw).Trim()
+      $patchProgressParts = $patchProgressValue -split "\|", 2
+      $resumeChromixPatch = $patchProgressParts[0]
+      if ($patchProgressParts.Count -eq 2) {
+        $resumeChromixPatchHash = $patchProgressParts[1]
+      }
     } else {
       $legacyWebGL = Join-Path $Src "third_party\blink\renderer\modules\webgl\webgl_rendering_context_base.cc"
       if ((Test-Path $legacyWebGL) -and
@@ -342,7 +365,7 @@ if (-not (Test-Marker ".chromix-ungoogled-windows" $Revisions.UngoogledWindowsCo
 if (-not (Test-Marker ".chromix-patches" $patchSetKey)) {
   Write-Host "==> applying Chromix patches"
   Set-Marker ".chromix-layer-in-progress" "chromix"
-  Invoke-ChromixPatches $resumeChromixPatch $resumeChromixPatchIsClean
+  Invoke-ChromixPatches $resumeChromixPatch $resumeChromixPatchIsClean $resumeChromixPatchHash
   Set-Marker ".chromix-patches" $patchSetKey
   Remove-Item (Join-Path $Src ".chromix-layer-in-progress") -Force
 }

@@ -1,13 +1,12 @@
 diff --git a/tools/metrics/BUILD.gn b/tools/metrics/BUILD.gn
-index a1b2c3d..e4f5g6h 100644
+index 4cf523f9cd..6f992aea7d 100644
 --- a/tools/metrics/BUILD.gn
 +++ b/tools/metrics/BUILD.gn
-@@ -45,7 +45,7 @@
-   # for non-git checkouts.
-   # TODO(crbug.com/329080012): Remove this once dirmd works in non-git
-   # checkouts.
--  if (generate_location_tags) {
-+  if (generate_location_tags && path_exists("//.git")) {
-     deps += [ ":histograms_xml" ]
-   }
- }
+@@ -40,6 +40,7 @@
+     ":ukm_xml",
+   ]
+ 
++  # Keep this dependency gated for source tarballs without Git metadata.
+   # Only include histograms_xml if we have access to dirmd data, which
+   # is used to populate ownership information. This is disabled
+   # for non-git checkouts, as dirmd doesn't work on non-git checkout.
