@@ -16,7 +16,7 @@ diff --git a/third_party/blink/renderer/modules/webgl/BUILD.gn b/third_party/bli
    public_deps = [ "//device/vr/public/mojom:vr_service_blink" ]
    deps = [
      "//device/vr/buildflags",
-+    "//components/ungoogled",
++    "//components/ungoogled:ungoogled_switches",
      "//gpu/command_buffer/client:gles2_implementation",
      "//gpu/command_buffer/client:gles2_interface",
      "//third_party/blink/renderer/modules/webcodecs",

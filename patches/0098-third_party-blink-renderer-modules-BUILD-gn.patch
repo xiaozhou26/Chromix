@@ -6,7 +6,7 @@ index 1111111..2222222 100644
    deps = [
      ":make_modules_generated",
      "//build:android_buildflags",
-+    "//components/ungoogled",
++    "//components/ungoogled:ungoogled_switches",
      "//cc",
      "//components/webrtc:thread_wrapper",
      "//gin",

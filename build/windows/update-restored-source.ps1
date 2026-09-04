@@ -1854,6 +1854,16 @@ const std::string& WebGLPersonaRenderer() {
     return $content
   }
 
+Set-SourceReplacement `
+  -RelativePath "third_party\blink\renderer\modules\BUILD.gn" `
+  -OldText '"//components/ungoogled",' `
+  -NewText '"//components/ungoogled:ungoogled_switches",'
+
+Set-SourceReplacement `
+  -RelativePath "third_party\blink\renderer\modules\webgl\BUILD.gn" `
+  -OldText '"//components/ungoogled",' `
+  -NewText '"//components/ungoogled:ungoogled_switches",'
+
 $webglSources = @(
   "third_party\blink\renderer\modules\webgl\webgl_rendering_context_base.cc",
   "third_party\blink\renderer\modules\webgl\webgl2_rendering_context_base.cc",
