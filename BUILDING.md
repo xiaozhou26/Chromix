@@ -1,15 +1,15 @@
 # Building Chromix for Windows x64
 
 Chromix currently packages Windows x64 only. It builds on the pinned `ungoogled-chromium` source and Windows overlay,
-then applies the Chromium 151 patch series in `patches/series`.
+then applies the Chromium 152 patch series in `patches/series`.
 
 ## Pinned source layers
 
 | Layer | Version | Commit |
 |---|---|---|
-| Chromium | `151.0.7922.173` | source archive selected by ungoogled-chromium |
-| ungoogled-chromium | `151.0.7922.173-1` | `4087f48e6d66e55486fe7c3a634303559634ba3f` |
-| ungoogled-chromium-windows | `151.0.7922.173-1.1` | `63f51219bac808e0e5d1d5ba7958ad2aaa159dde` |
+| Chromium | `152.0.7977.75` | source archive selected by ungoogled-chromium |
+| ungoogled-chromium | `152.0.7977.75-1` | `cacf0f0fd2446a837528c54df1880b75874b9580` |
+| ungoogled-chromium-windows | `152.0.7977.75-1.1` | `c8b4eadc799fb40fb0d7acd30b542f130e1f0a17` |
 | Chromix patches | `patches/series` | content hash stored in source markers |
 
 The machine-readable pins are in `CHROMIUM_VERSION`, `UNGOOGLED_VERSION`,
@@ -55,6 +55,13 @@ Resume an interrupted compile with the same work directory:
 pwsh build/windows/build.ps1 -WorkDir D:\chromix-build -Resume -Jobs 8
 ```
 
+For GitHub Actions, stage 1 can optionally import a live `build-artifact` from a
+matching public `ungoogled-chromium-windows` x64 run. Set the workflow input
+`upstream_run_id` and repository secret `UPSTREAM_ACTIONS_TOKEN` (a token with
+Actions read access). The imported source and object tree is reused where GN and
+Ninja inputs remain compatible; Chromix patches and differing GN arguments
+invalidate affected outputs automatically.
+
 `-Resume` still validates the prepared source marker against the current
 ungoogled pins and patch-content hash. A stale or mixed source tree is rejected.
 
@@ -85,7 +92,7 @@ This creates `chromix-win-x64.zip` and `SHA256SUMS`. The archive contains
 
 ## Patch maintenance
 
-Chromix patches are Chromium 151 ports of the Clearcote-derived engine changes.
+Chromix patches are Chromium 152 ports of the Clearcote-derived engine changes.
 Clearcote is the behavioral reference, but its Chromium 149 patch files are
 rebased and split into one target file per patch before entering `patches/series`;
 applying the original directory on top would duplicate writers and target the

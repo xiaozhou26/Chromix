@@ -1,6 +1,6 @@
 {
   "name": "chromix",
-  "version": "151.0.7922.173",
+  "version": "152.0.7977.75",
   "description": "Drive the Chromix stealth Chromium engine with a CloakBrowser-compatible API.",
   "type": "module",
   "main": "index.js",

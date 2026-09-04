@@ -5,7 +5,7 @@
 #
 # Usage:  build/build-version.sh <chromium-version>
 #   e.g.  build/build-version.sh 149.0.7827.200
-#         build/build-version.sh 151.0.7922.173
+#         build/build-version.sh 152.0.7977.75
 #
 # Each version gets its own workdir  .chromix-build-<major>/  (each needs
 # ~100GB + hours). The patch series is 3-way applied; if a patch fails on an

@@ -10,6 +10,7 @@ param(
   [int]$StageIndex = 1,
   [int]$MaxStages = 12,
   [switch]$FromArtifact,
+  [string]$UpstreamArtifactPath = "",
   [switch]$ValidateOnly
 )
 $ErrorActionPreference = "Stop"
@@ -234,6 +235,52 @@ $env:DEPOT_TOOLS_WIN_TOOLCHAIN = "0"
 $env:DEPOT_TOOLS_METRICS = "0"
 $env:DEPOT_TOOLS_COLLECT_METRICS = "0"
 
+if ($UpstreamArtifactPath) {
+  if ($StageIndex -ne 1) { throw "upstream artifact import must start at stage 1" }
+  $upstreamExtract = "C:\upstream-build-artifact"
+  Remove-Item $upstreamExtract -Recurse -Force -ErrorAction SilentlyContinue
+  New-Item -ItemType Directory -Force -Path $upstreamExtract | Out-Null
+  Write-Host "==> importing ungoogled-chromium-windows artifact from $UpstreamArtifactPath"
+  $innerArchive = Join-Path $UpstreamArtifactPath "artifacts.zip"
+  if (-not (Test-Path $innerArchive)) { throw "upstream artifact does not contain artifacts.zip" }
+  Remove-Item $WorkDir -Recurse -Force -ErrorAction SilentlyContinue
+  New-Item -ItemType Directory -Force -Path $WorkDir | Out-Null
+  $sevenZip = Resolve-7Zip
+  & $sevenZip x $innerArchive -o"$WorkDir" -y | Select-Object -Last 3
+  if ($LASTEXITCODE -ne 0) { throw "upstream build tree extraction failed" }
+  $upstreamSrc = Join-Path $WorkDir "build\src"
+  if (-not (Test-Path (Join-Path $upstreamSrc "BUILD.gn"))) {
+    throw "upstream artifact is missing build/src/BUILD.gn"
+  }
+  $versionFile = Join-Path $upstreamSrc "chrome\VERSION"
+  if (-not (Test-Path $versionFile)) { throw "upstream artifact is missing chrome/VERSION" }
+  $versionParts = @{}
+  foreach ($line in Get-Content $versionFile) {
+    if ($line -match '^([A-Z]+)=(\d+)$') { $versionParts[$Matches[1]] = $Matches[2] }
+  }
+  $upstreamVersion = @("MAJOR", "MINOR", "BUILD", "PATCH") |
+    ForEach-Object { $versionParts[$_] }
+  $upstreamVersion = $upstreamVersion -join "."
+  if ($upstreamVersion -ne $Revisions.ChromiumVersion) {
+    throw "upstream artifact targets Chromium $upstreamVersion, expected $($Revisions.ChromiumVersion)"
+  }
+  Move-Item $upstreamSrc $Src
+  Remove-Item (Join-Path $WorkDir "build") -Recurse -Force -ErrorAction SilentlyContinue
+  $upstreamOut = Join-Path $Src "out\Default"
+  if (Test-Path $upstreamOut) {
+    New-Item -ItemType Directory -Force -Path (Split-Path $OutDir) | Out-Null
+    Move-Item $upstreamOut $OutDir
+  }
+  Set-Content -Path (Join-Path $Src ".chromix-source-unpacked") `
+    -Value $Revisions.ChromiumVersion -Encoding ASCII
+  Set-Content -Path (Join-Path $Src ".chromix-ungoogled-core") `
+    -Value $Revisions.UngoogledCommit -Encoding ASCII
+  Set-Content -Path (Join-Path $Src ".chromix-ungoogled-windows") `
+    -Value $Revisions.UngoogledWindowsCommit -Encoding ASCII
+  Remove-Item $upstreamExtract -Recurse -Force -ErrorAction SilentlyContinue
+  Write-Host "==> upstream Chromium source/object tree imported; Chromix patches remain to apply"
+}
+
 if ($FromArtifact -and -not (Test-Path "C:\restore\tree.7z.001")) {
   throw "resume artifact missing: C:\restore\tree.7z.001"
 }
@@ -247,7 +294,21 @@ if ($FromArtifact) {
   & $sevenZip x "C:\restore\tree.7z.001" -o"$Root" -y | Select-Object -Last 3
   if ($LASTEXITCODE -ne 0) { throw "7z restore failed" }
   Remove-Item C:\restore -Recurse -Force -ErrorAction SilentlyContinue
-  & "$PSScriptRoot\update-restored-source.ps1" -Src $Src -OutDir $OutDir
+
+  $unpackedMarker = Join-Path $Src ".chromix-source-unpacked"
+  $readyMarker = Join-Path $Src ".chromix-source-ready"
+  $restoredVersion = ""
+  if (Test-Path $unpackedMarker) {
+    $restoredVersion = (Get-Content $unpackedMarker -Raw).Trim()
+  } elseif (Test-Path $readyMarker) {
+    $restoredVersion = ((Get-Content $readyMarker -Raw).Trim() -split '\|', 2)[0]
+  }
+  if ($restoredVersion -and $restoredVersion -ne $Revisions.ChromiumVersion) {
+    Write-Host "==> restored tree targets Chromium $restoredVersion; preserving tooling/download_cache and removing incompatible src/out"
+    Remove-Item $Src -Recurse -Force
+  } else {
+    & "$PSScriptRoot\update-restored-source.ps1" -Src $Src -OutDir $OutDir
+  }
 }
 
 if (-not (Test-Path (Join-Path $Src ".chromix-source-ready"))) {

@@ -36,6 +36,11 @@ on:
         required: false
         default: ''
         type: string
+      upstream_run_id:
+        description: 'ungoogled-chromium-windows x64 run ID whose build-artifact should seed stage 1'
+        required: false
+        default: ''
+        type: string
 
 permissions:
   contents: read
@@ -53,7 +58,7 @@ env:
 jobs:
   validate:
     name: validate (source prep + gn gen + V8 Torque)
-    if: ${{ inputs.resume_run_id == '' }}
+    if: ${{ inputs.resume_run_id == '' && inputs.upstream_run_id == '' }}
     runs-on: windows-2022
     timeout-minutes: 150
     steps:
@@ -65,17 +70,26 @@ jobs:
   build-1:
     name: stage 1 (fetch + sync + first compile)
     needs: validate
-    if: needs.validate.result == 'success'
+    if: ${{ always() && inputs.resume_run_id == '' && ((inputs.upstream_run_id != '') || needs.validate.result == 'success') }}
     runs-on: windows-2022
     timeout-minutes: 355
     outputs:
       finished: ${{ steps.stage.outputs.finished }}
     steps:
       - uses: actions/checkout@v4
+      - name: Download upstream x64 build cache
+        if: ${{ inputs.upstream_run_id != '' }}
+        uses: actions/download-artifact@v4
+        with:
+          name: build-artifact
+          repository: ungoogled-software/ungoogled-chromium-windows
+          run-id: ${{ inputs.upstream_run_id }}
+          github-token: ${{ secrets.UPSTREAM_ACTIONS_TOKEN }}
+          path: C:\upstream
       - name: Run stage 1
         id: stage
         shell: powershell
-        run: build\windows\ci-stage.ps1 -StageIndex 1 -MaxStages 12
+        run: build\windows\ci-stage.ps1 -StageIndex 1 -MaxStages 12 ${{ inputs.upstream_run_id != '' && '-UpstreamArtifactPath C:\upstream' || '' }}
       - name: Ensure build tree snapshot
         if: ${{ always() && steps.stage.outputs.upload_parts != 'true' }}
         shell: powershell

@@ -134,7 +134,10 @@ class ResumeWorkflowRegressionTest(unittest.TestCase):
 
     def test_resume_skips_predecessors_and_starts_requested_stage(self):
         self.assertIn("resume_run_id:", self.source)
-        self.assertIn("if: ${{ inputs.resume_run_id == '' }}", self.source)
+        self.assertIn(
+            "if: ${{ inputs.resume_run_id == '' && inputs.upstream_run_id == '' }}",
+            self.source,
+        )
         for stage in range(2, 13):
             self.assertIn(f"inputs.resume_stage == '{stage}'", self.source)
             self.assertIn(
@@ -167,6 +170,14 @@ class ResumeWorkflowRegressionTest(unittest.TestCase):
             12,
         )
 
+    def test_upstream_cache_skips_standalone_validation_and_imports_stage_one(self):
+        self.assertIn("upstream_run_id:", self.source)
+        self.assertIn("inputs.resume_run_id == '' && inputs.upstream_run_id == ''", self.source)
+        self.assertIn("repository: ungoogled-software/ungoogled-chromium-windows", self.source)
+        self.assertIn("name: build-artifact", self.source)
+        self.assertIn("github-token: ${{ secrets.UPSTREAM_ACTIONS_TOKEN }}", self.source)
+        self.assertIn("-UpstreamArtifactPath C:\\upstream", self.source)
+
     def test_resume_uses_official_cross_run_artifact_download(self):
         self.assertIn("actions: read", self.source)
         self.assertEqual(self.source.count("github-token: ${{ github.token }}"), 11)
@@ -181,6 +192,22 @@ class ResumeWorkflowRegressionTest(unittest.TestCase):
 
 
 class RestoredSourceUpdateRegressionTest(unittest.TestCase):
+    def test_upstream_artifact_import_reuses_source_and_objects_before_chromix_patches(self):
+        stage = CI_STAGE.read_text(encoding="utf-8")
+        self.assertIn('[string]$UpstreamArtifactPath = ""', stage)
+        self.assertIn('Join-Path $UpstreamArtifactPath "artifacts.zip"', stage)
+        self.assertIn('Join-Path $WorkDir "build\\src"', stage)
+        self.assertIn('Join-Path $upstreamSrc "chrome\\VERSION"', stage)
+        self.assertIn('$upstreamVersion -ne $Revisions.ChromiumVersion', stage)
+        self.assertIn('upstream artifact targets Chromium $upstreamVersion', stage)
+        self.assertIn('Join-Path $Src "out\\Default"', stage)
+        self.assertIn('Move-Item $upstreamOut $OutDir', stage)
+        self.assertIn('Set-Content -Path (Join-Path $Src ".chromix-ungoogled-core")', stage)
+        self.assertIn('Set-Content -Path (Join-Path $Src ".chromix-ungoogled-windows")', stage)
+        imported = stage.index('if ($UpstreamArtifactPath) {')
+        prepare = stage.index('prepare-ungoogled.ps1', imported)
+        self.assertLess(imported, prepare)
+
     def test_resume_source_update_avoids_powershell_host_automatic_variable(self):
         update_source = RESTORED_SOURCE_UPDATE.read_text(encoding="utf-8")
         self.assertNotRegex(update_source, r"(?im)^\s*\$host\s*=")
@@ -282,6 +309,22 @@ class RestoredSourceUpdateRegressionTest(unittest.TestCase):
             "-CurrentMarker 'String(\"WebGL GLSL ES 3.00 "
             "(OpenGL ES GLSL ES 3.0 Chromium)\")'",
             update_source,
+        )
+
+    def test_resume_preserves_cache_but_discards_incompatible_chromium_source(self):
+        stage = CI_STAGE.read_text(encoding="utf-8")
+        self.assertIn('$unpackedMarker = Join-Path $Src ".chromix-source-unpacked"', stage)
+        self.assertIn('$readyMarker = Join-Path $Src ".chromix-source-ready"', stage)
+        self.assertIn('$restoredVersion -ne $Revisions.ChromiumVersion', stage)
+        self.assertIn(
+            'preserving tooling/download_cache and removing incompatible src/out',
+            stage,
+        )
+        self.assertIn('Remove-Item $Src -Recurse -Force', stage)
+        self.assertRegex(
+            stage,
+            r'(?s)if \(\$restoredVersion -and .*?\) \{.*?Remove-Item \$Src '
+            r'-Recurse -Force\s+\} else \{\s+& "\$PSScriptRoot\\update-restored-source\.ps1"',
         )
 
     def test_resume_passes_output_directory_and_invalidates_webgl_objects(self):

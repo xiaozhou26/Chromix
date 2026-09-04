@@ -34,7 +34,7 @@ from .api import (
     resolve_human_config,
 )
 
-__version__ = "151.0.7922.173"
+__version__ = "152.0.7977.75"
 
 __all__ = [
     "launch", "launch_async", "launch_context", "launch_context_async",

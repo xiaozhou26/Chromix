@@ -11,7 +11,7 @@ including inside worker and iframe realms where the upstream API permits it.
 - One patch per file, numbered contiguously from `0001`; `series` lists them in
   apply order (`build/apply-patches.sh` / `build/windows/build.ps1` consume it).
 - Clearcote patches are used as the behavioral reference, but are rebased and
-  split for pinned Chromium 151 rather than applied verbatim from its Chromium
+  split for pinned Chromium 152 rather than applied verbatim from its Chromium
   149 tree. Ports include detailed-screen coherence, geolocation,
   MediaCapabilities, the CDP infinite-expiry cookie fix, and opt-in ports of
   Runtime-domain suppression, Canvas/WebGL Bridge, and fake WebRTC srflx.

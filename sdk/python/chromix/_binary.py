@@ -15,10 +15,10 @@ from pathlib import Path
 
 _REPO = "xiaozhou26/Chromix"
 # Two release channels. "stable" = Chromium 149 (matches the version the mass of
-# real users run). "latest" = 151 (newest engine). See build/versions.txt.
+# real users run). "latest" = 152 (newest engine). See build/versions.txt.
 _CHANNELS = {
     "stable": {"tag": "v149.0.7827.200"},
-    "latest": {"tag": "v151.0.7922.173"},
+    "latest": {"tag": "v152.0.7977.75"},
 }
 _CACHE = Path(os.environ.get("CHROMIX_CACHE_DIR",
                              Path.home() / ".cache" / "chromix"))

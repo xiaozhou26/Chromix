@@ -34,7 +34,7 @@ enable_widevine = true
 target_cpu = "x64"
 target_os = "linux"
 
-# Broad-CPU compatibility (issue #20). Chromium 151's bundled clang auto-vectorizes
+# Broad-CPU compatibility (issue #20). Chromium's bundled clang auto-vectorizes
 # some baseline paths (e.g. PartitionAlloc's bucket-index lookup) with post-Haswell
 # instructions — LZCNT/TZCNT (BMI/ABM), AVX2, FMA. On pre-2013 CPUs that lack them
 # (e.g. Intel Sandy Bridge / Xeon E5-2600 v1) LZCNT/TZCNT silently decode as BSR/BSF
