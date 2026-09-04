@@ -232,7 +232,11 @@ if (Test-Path (Join-Path $Src ".chromix-layer-in-progress")) {
         try {
           & $PatchExe -p1 --batch --forward -i $legacyRollback
           if ($LASTEXITCODE -ne 0) {
-            throw "$PatchExe failed to roll back the legacy interrupted WebGL patch"
+            & $PatchExe -p1 --batch --reverse --dry-run -i $legacyRollback | Out-Null
+            if ($LASTEXITCODE -ne 0) {
+              throw "$PatchExe failed to roll back the legacy interrupted WebGL patch"
+            }
+            Write-Host "      legacy WebGL rollback target already present"
           }
         } finally {
           Pop-Location

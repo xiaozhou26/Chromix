@@ -363,6 +363,7 @@ class RestoredSourceUpdateRegressionTest(unittest.TestCase):
         self.assertIn("inferred legacy interrupted patch", prepare)
         self.assertIn("chromium-152-webgl-0082-partial.patch", prepare)
         self.assertIn("$resumeChromixPatchIsClean = $true", prepare)
+        self.assertIn("legacy WebGL rollback target already present", prepare)
         self.assertIn("rolled-back patch applied", prepare)
         self.assertIn("skipping completed $rel", prepare)
         self.assertIn("interrupted patch rolled back and reapplied", prepare)
