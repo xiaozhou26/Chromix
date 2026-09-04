@@ -248,9 +248,12 @@ if ($UpstreamArtifactPath) {
   $sevenZip = Resolve-7Zip
   & $sevenZip x $innerArchive -o"$WorkDir" -y | Select-Object -Last 3
   if ($LASTEXITCODE -ne 0) { throw "upstream build tree extraction failed" }
-  $upstreamSrc = Join-Path $WorkDir "build\src"
+  $upstreamSrc = Join-Path $WorkDir "src"
   if (-not (Test-Path (Join-Path $upstreamSrc "BUILD.gn"))) {
-    throw "upstream artifact is missing build/src/BUILD.gn"
+    $upstreamSrc = Join-Path $WorkDir "build\src"
+  }
+  if (-not (Test-Path (Join-Path $upstreamSrc "BUILD.gn"))) {
+    throw "upstream artifact is missing src/BUILD.gn"
   }
   $versionFile = Join-Path $upstreamSrc "chrome\VERSION"
   if (-not (Test-Path $versionFile)) { throw "upstream artifact is missing chrome/VERSION" }
@@ -264,7 +267,9 @@ if ($UpstreamArtifactPath) {
   if ($upstreamVersion -ne $Revisions.ChromiumVersion) {
     throw "upstream artifact targets Chromium $upstreamVersion, expected $($Revisions.ChromiumVersion)"
   }
-  Move-Item $upstreamSrc $Src
+  if ((Resolve-Path $upstreamSrc).Path -ne $Src) {
+    Move-Item $upstreamSrc $Src
+  }
   Remove-Item (Join-Path $WorkDir "build") -Recurse -Force -ErrorAction SilentlyContinue
   $upstreamOut = Join-Path $Src "out\Default"
   if (Test-Path $upstreamOut) {
