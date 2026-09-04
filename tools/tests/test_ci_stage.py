@@ -334,8 +334,23 @@ class RestoredSourceUpdateRegressionTest(unittest.TestCase):
         self.assertRegex(
             stage,
             r'(?s)if \(\$restoredVersion -and .*?\) \{.*?Remove-Item \$Src '
-            r'-Recurse -Force\s+\} else \{\s+& "\$PSScriptRoot\\update-restored-source\.ps1"',
+            r'-Recurse -Force\s+\} elseif \(Test-Path \$readyMarker\) \{\s+'
+            r'& "\$PSScriptRoot\\update-restored-source\.ps1"',
         )
+
+    def test_resume_defers_source_migrations_for_interrupted_patch_layers(self):
+        stage = CI_STAGE.read_text(encoding="utf-8")
+        self.assertIn("elseif (Test-Path $readyMarker)", stage)
+        self.assertIn(
+            "restored source is not ready; deferring migrations until patch preparation completes",
+            stage,
+        )
+        restore = stage.index('& $sevenZip x "C:\\restore\\tree.7z.001"')
+        ready_gate = stage.index("elseif (Test-Path $readyMarker)", restore)
+        migration = stage.index("update-restored-source.ps1", ready_gate)
+        prepare = stage.index("prepare-ungoogled.ps1", migration)
+        self.assertLess(ready_gate, migration)
+        self.assertLess(migration, prepare)
 
     def test_interrupted_chromix_patch_layer_resumes_without_discarding_source(self):
         prepare = PREPARE_UNGOOGLED.read_text(encoding="utf-8")

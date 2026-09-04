@@ -311,8 +311,10 @@ if ($FromArtifact) {
   if ($restoredVersion -and $restoredVersion -ne $Revisions.ChromiumVersion) {
     Write-Host "==> restored tree targets Chromium $restoredVersion; preserving tooling/download_cache and removing incompatible src/out"
     Remove-Item $Src -Recurse -Force
-  } else {
+  } elseif (Test-Path $readyMarker) {
     & "$PSScriptRoot\update-restored-source.ps1" -Src $Src -OutDir $OutDir
+  } else {
+    Write-Host "==> restored source is not ready; deferring migrations until patch preparation completes"
   }
 }
 
