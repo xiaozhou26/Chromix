@@ -19,29 +19,35 @@ function Set-SourceReplacement {
     throw "resume source file is missing: $RelativePath"
   }
   $content = [IO.File]::ReadAllText($path)
+  $normalizedContent = $content.Replace("`r`n", "`n")
+  $normalizedOldText = $OldText.Replace("`r`n", "`n")
+  $normalizedNewText = $NewText.Replace("`r`n", "`n")
   if ($PreferCurrentMarker) {
-    if ($NewText -ne "" -and $content.Contains($NewText)) {
+    if ($normalizedNewText -ne "" -and $normalizedContent.Contains($normalizedNewText)) {
       Write-Host "==> restored source already current: $RelativePath"
       return
     }
     foreach ($marker in $CurrentMarker) {
-      if ($marker -ne "" -and $content.Contains($marker)) {
+      $normalizedMarker = $marker.Replace("`r`n", "`n")
+      if ($normalizedMarker -ne "" -and $normalizedContent.Contains($normalizedMarker)) {
         Write-Host "==> restored source already current: $RelativePath"
         return
       }
     }
   }
-  if ($content.Contains($OldText)) {
-    [IO.File]::WriteAllText($path, $content.Replace($OldText, $NewText))
+  if ($normalizedContent.Contains($normalizedOldText)) {
+    [IO.File]::WriteAllText(
+      $path, $normalizedContent.Replace($normalizedOldText, $normalizedNewText))
     Write-Host "==> updated restored source: $RelativePath"
     return
   }
-  if ($NewText -ne "" -and $content.Contains($NewText)) {
+  if ($normalizedNewText -ne "" -and $normalizedContent.Contains($normalizedNewText)) {
     Write-Host "==> restored source already current: $RelativePath"
     return
   }
   foreach ($marker in $CurrentMarker) {
-    if ($marker -ne "" -and $content.Contains($marker)) {
+    $normalizedMarker = $marker.Replace("`r`n", "`n")
+    if ($normalizedMarker -ne "" -and $normalizedContent.Contains($normalizedMarker)) {
       Write-Host "==> restored source already current: $RelativePath"
       return
     }
