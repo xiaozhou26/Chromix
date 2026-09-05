@@ -1855,6 +1855,35 @@ const std::string& WebGLPersonaRenderer() {
   }
 
 Set-SourceReplacement `
+  -RelativePath "third_party\blink\renderer\modules\canvas\canvas2d\base_rendering_context_2d.cc" `
+  -OldText @'
+    if (origin && bridge->BridgeEnabledForOrigin(origin->RegistrableDomain().Utf8())) {
+    SkPixmap pixmap = image_data->GetSkPixmap();
+    auto pixels = bridge->GetImageDataCacheFirst(
+        EnsureBridgeCanvas(bridge, bridge_canvas_id_, Width(), Height()), sx, sy,
+        static_cast<uint32_t>(sw), static_cast<uint32_t>(sh));
+    if (pixels && pixels->size() == pixmap.computeByteSize()) {
+      std::memcpy(pixmap.writable_addr(), pixels->data(), pixels->size());
+      return image_data;
+    }
+  }
+'@ `
+  -NewText @'
+    if (origin &&
+        bridge->BridgeEnabledForOrigin(origin->RegistrableDomain().Utf8())) {
+      SkPixmap pixmap = image_data->GetSkPixmap();
+      auto pixels = bridge->GetImageDataCacheFirst(
+          EnsureBridgeCanvas(bridge, bridge_canvas_id_, Width(), Height()), sx,
+          sy, static_cast<uint32_t>(sw), static_cast<uint32_t>(sh));
+      if (pixels && pixels->size() == pixmap.computeByteSize()) {
+        std::memcpy(pixmap.writable_addr(), pixels->data(), pixels->size());
+        return image_data;
+      }
+    }
+  }
+'@
+
+Set-SourceReplacement `
   -RelativePath "third_party\blink\renderer\modules\BUILD.gn" `
   -OldText '"//components/ungoogled",' `
   -NewText '"//components/ungoogled:ungoogled_switches",'

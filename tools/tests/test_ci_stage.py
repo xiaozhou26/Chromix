@@ -13,6 +13,11 @@ TIMEZONE_PATCH = (
     / "patches"
     / "0019-third_party-blink-renderer-core-timezone-timezone_controller-cc.patch"
 )
+CANVAS2D_BRIDGE_PATCH = (
+    REPO
+    / "patches"
+    / "0076-third_party-blink-renderer-modules-canvas-canvas2d-base_rendering_context_2d-cc.patch"
+)
 
 
 def invoke_tracked_source() -> str:
@@ -286,6 +291,13 @@ class RestoredSourceUpdateRegressionTest(unittest.TestCase):
         self.assertIn('third_party\\blink\\renderer\\modules\\webgpu\\gpu_adapter.cc', update_source)
         self.assertIn('third_party\\blink\\renderer\\modules\\BUILD.gn', update_source)
         self.assertIn('third_party\\blink\\renderer\\modules\\webgl\\BUILD.gn', update_source)
+        self.assertIn(
+            'third_party\\blink\\renderer\\modules\\canvas\\canvas2d\\base_rendering_context_2d.cc',
+            update_source,
+        )
+        self.assertIn('bridge->BridgeEnabledForOrigin(origin->RegistrableDomain().Utf8())) {', update_source)
+        self.assertIn('      SkPixmap pixmap = image_data->GetSkPixmap();', update_source)
+        self.assertIn('    }\n  }\n\'@', update_source)
         self.assertIn('"//components/ungoogled",', update_source)
         self.assertIn('"//components/ungoogled:ungoogled_switches",', update_source)
         self.assertIn('chromix-renderer-objects-invalidated.txt', update_source)
@@ -304,6 +316,40 @@ class RestoredSourceUpdateRegressionTest(unittest.TestCase):
         self.assertIn("BUILDFLAG\\(IS_ANDROID\\)", update_source)
         self.assertIn("$($match.Groups[1].Value)", update_source)
         self.assertIn("-PreferCurrentMarker", update_source)
+
+    def test_canvas2d_bridge_patch_closes_readback_scope(self):
+        patch = CANVAS2D_BRIDGE_PATCH.read_text(encoding="utf-8")
+        bridge_block = re.search(
+            r"\+  if \(auto\* bridge = canvas_bridge::CanvasBridgeClient::Get\(\);"
+            r".*?\n   // Read pixels into \|image_data\|\.",
+            patch,
+            re.DOTALL,
+        )
+        self.assertIsNotNone(bridge_block)
+        block = bridge_block.group(0)
+        self.assertIn("+      SkPixmap pixmap = image_data->GetSkPixmap();", block)
+        self.assertRegex(block, r"\+    \}\n\+  \}\n\+\n   // Read pixels")
+        self.assertIn("TextMetrics* BaseRenderingContext2D::measureText", patch)
+        self.assertIn("bridge->RequestTextMetrics", patch)
+        self.assertLess(
+            patch.index("bridge->RequestTextMetrics"),
+            patch.index("Scale text metrics if enabled"),
+        )
+
+        update_source = RESTORED_SOURCE_UPDATE.read_text(encoding="utf-8")
+        migration = re.search(
+            r'-RelativePath "third_party\\blink\\renderer\\modules\\canvas\\canvas2d\\base_rendering_context_2d\.cc".*?'
+            r"-OldText @'\n(.*?)\n'@ `\n  -NewText @'\n(.*?)\n'@",
+            update_source,
+            re.DOTALL,
+        )
+        self.assertIsNotNone(migration)
+        old_text, new_text = migration.groups()
+        self.assertNotIn(old_text, new_text)
+        malformed = f"prefix\n{old_text}\nsuffix"
+        repaired = malformed.replace(old_text, new_text)
+        self.assertEqual(repaired.replace(old_text, new_text), repaired)
+        self.assertIn("    }\n  }", new_text)
 
     def test_resume_accepts_historical_webgl_persona_markers(self):
         update_source = RESTORED_SOURCE_UPDATE.read_text(encoding="utf-8")

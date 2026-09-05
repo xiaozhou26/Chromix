@@ -1,5 +1,5 @@
 diff --git a/third_party/blink/renderer/modules/canvas/canvas2d/base_rendering_context_2d.cc b/third_party/blink/renderer/modules/canvas/canvas2d/base_rendering_context_2d.cc
-index ced057c..e95e0e6 100644
+index 53a72a7fd418c6248ebf8a29fff0e4208c2ada39..1c7d1656be6d8d9e92651f2a8d6ddeb0b3482aae 100644
 --- a/third_party/blink/renderer/modules/canvas/canvas2d/base_rendering_context_2d.cc
 +++ b/third_party/blink/renderer/modules/canvas/canvas2d/base_rendering_context_2d.cc
 @@ -14,14 +14,17 @@
@@ -30,7 +30,7 @@ index ced057c..e95e0e6 100644
  #include "third_party/blink/renderer/platform/fonts/font.h"
  #include "third_party/blink/renderer/platform/fonts/font_selection_types.h"
  #include "third_party/blink/renderer/platform/fonts/font_selector.h"
-@@ -359,6 +364,83 @@ ImageData* BaseRenderingContext2D::getImageData(
+@@ -365,6 +371,83 @@ ImageData* BaseRenderingContext2D::getImageData(
  }
  perfetto::EventContext GetEventContext();
  
@@ -114,7 +114,7 @@ index ced057c..e95e0e6 100644
  ImageData* BaseRenderingContext2D::getImageDataInternal(
      int sx,
      int sy,
-@@ -500,6 +570,23 @@ ImageData* BaseRenderingContext2D::getImageDataInternal(
+@@ -506,6 +589,25 @@ ImageData* BaseRenderingContext2D::getImageDataInternal(
    if (!image_data)
      return nullptr;
  
@@ -124,21 +124,23 @@ index ced057c..e95e0e6 100644
 +        GetCanvasRenderingContextHost()->GetTopExecutionContext();
 +    const auto* origin =
 +        execution_context ? execution_context->GetSecurityOrigin() : nullptr;
-+    if (origin && bridge->BridgeEnabledForOrigin(origin->RegistrableDomain().Utf8())) {
-+    SkPixmap pixmap = image_data->GetSkPixmap();
-+    auto pixels = bridge->GetImageDataCacheFirst(
-+        EnsureBridgeCanvas(bridge, bridge_canvas_id_, Width(), Height()), sx, sy,
-+        static_cast<uint32_t>(sw), static_cast<uint32_t>(sh));
-+    if (pixels && pixels->size() == pixmap.computeByteSize()) {
-+      std::memcpy(pixmap.writable_addr(), pixels->data(), pixels->size());
-+      return image_data;
++    if (origin &&
++        bridge->BridgeEnabledForOrigin(origin->RegistrableDomain().Utf8())) {
++      SkPixmap pixmap = image_data->GetSkPixmap();
++      auto pixels = bridge->GetImageDataCacheFirst(
++          EnsureBridgeCanvas(bridge, bridge_canvas_id_, Width(), Height()), sx,
++          sy, static_cast<uint32_t>(sw), static_cast<uint32_t>(sh));
++      if (pixels && pixels->size() == pixmap.computeByteSize()) {
++        std::memcpy(pixmap.writable_addr(), pixels->data(), pixels->size());
++        return image_data;
++      }
 +    }
 +  }
 +
    // Read pixels into |image_data|.
    if (snapshot) {
      gfx::Rect snapshot_rect{snapshot->Size()};
-@@ -710,6 +792,7 @@ V8CanvasTextAlign BaseRenderingContext2D::textAlign() const {
+@@ -719,6 +821,7 @@ V8CanvasTextAlign BaseRenderingContext2D::textAlign() const {
  }
  
  void BaseRenderingContext2D::setTextAlign(const V8CanvasTextAlign align) {
@@ -146,7 +148,7 @@ index ced057c..e95e0e6 100644
    GetState().SetTextAlign(align.AsEnum());
  }
  
-@@ -719,6 +802,7 @@ V8CanvasTextBaseline BaseRenderingContext2D::textBaseline() const {
+@@ -728,6 +831,7 @@ V8CanvasTextBaseline BaseRenderingContext2D::textBaseline() const {
  
  void BaseRenderingContext2D::setTextBaseline(
      const V8CanvasTextBaseline baseline) {
@@ -154,7 +156,7 @@ index ced057c..e95e0e6 100644
    GetState().SetTextBaseline(baseline.AsEnum());
  }
  
-@@ -828,6 +912,7 @@ bool BaseRenderingContext2D::CurrentFontResolvedAndUpToDate() const {
+@@ -885,6 +989,7 @@ bool BaseRenderingContext2D::CurrentFontResolvedAndUpToDate() const {
  }
  
  void BaseRenderingContext2D::setFont(const String& new_font) {
@@ -162,7 +164,7 @@ index ced057c..e95e0e6 100644
    if (!WillSetFont()) [[unlikely]] {
      return;
    }
-@@ -889,6 +974,7 @@ void BaseRenderingContext2D::setDirection(const V8CanvasDirection direction) {
+@@ -946,6 +1051,7 @@ void BaseRenderingContext2D::setDirection(const V8CanvasDirection direction) {
  }
  
  void BaseRenderingContext2D::fillText(const String& text, double x, double y) {
@@ -170,7 +172,7 @@ index ced057c..e95e0e6 100644
    CanvasRenderingContext2DState& state = GetState();
    DrawTextInternal(text, x, y, CanvasRenderingContext2DState::kFillPaintType,
                     state.GetTextAlign(), state.GetTextBaseline(), 0,
-@@ -899,6 +985,7 @@ void BaseRenderingContext2D::fillText(const String& text,
+@@ -956,6 +1062,7 @@ void BaseRenderingContext2D::fillText(const String& text,
                                        double x,
                                        double y,
                                        double max_width) {
@@ -178,7 +180,7 @@ index ced057c..e95e0e6 100644
    CanvasRenderingContext2DState& state = GetState();
    DrawTextInternal(text, x, y, CanvasRenderingContext2DState::kFillPaintType,
                     state.GetTextAlign(), state.GetTextBaseline(), 0,
-@@ -945,6 +1032,7 @@ void BaseRenderingContext2D::fillTextCluster(
+@@ -1002,6 +1109,7 @@ void BaseRenderingContext2D::fillTextCluster(
  void BaseRenderingContext2D::strokeText(const String& text,
                                          double x,
                                          double y) {
@@ -186,7 +188,7 @@ index ced057c..e95e0e6 100644
    CanvasRenderingContext2DState& state = GetState();
    DrawTextInternal(text, x, y, CanvasRenderingContext2DState::kStrokePaintType,
                     state.GetTextAlign(), state.GetTextBaseline(), 0,
-@@ -955,6 +1043,7 @@ void BaseRenderingContext2D::strokeText(const String& text,
+@@ -1012,6 +1120,7 @@ void BaseRenderingContext2D::strokeText(const String& text,
                                          double x,
                                          double y,
                                          double max_width) {
@@ -194,7 +196,10 @@ index ced057c..e95e0e6 100644
    CanvasRenderingContext2DState& state = GetState();
    DrawTextInternal(text, x, y, CanvasRenderingContext2DState::kStrokePaintType,
                     state.GetTextAlign(), state.GetTextBaseline(), 0,
-@@ -1204,3 +1293,23 @@ TextMetrics* BaseRenderingContext2D::measureText(const String& text) {
+@@ -1259,6 +1368,26 @@ TextMetrics* BaseRenderingContext2D::measureText(const String& text) {
+       font, direction, state.GetTextBaseline(), state.GetTextAlign(), text,
+       host->GetPlainTextPainter());
+ 
 +  if (auto* bridge = canvas_bridge::CanvasBridgeClient::Get();
 +      bridge && bridge->Connected()) {
 +    const auto* execution_context =
