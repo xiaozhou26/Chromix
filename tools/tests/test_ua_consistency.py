@@ -53,7 +53,7 @@ def test_ua_version_override_is_shared_by_product_and_brand_metadata():
     assert "UxrConfig::GetInstance().Get(\"uxr-ua-full-version\")" in ua
     assert "GetEffectiveUserAgentMajorVersion" in ua
     assert "GetUserAgentBrandList(" in ua
-    assert "metadata.full_version = GetEffectiveUserAgentFullVersion()" in ua
+    assert "metadata.full_version = GetEffectiveBrowserBrandFullVersion()" in ua
 
 
 def test_version_override_rewrites_product_version_before_building_ua():
@@ -69,7 +69,7 @@ def test_renderer_receives_ua_config_before_initialize_renderer():
     host = (PATCHES / "0005-content-browser-renderer_host-render_process_host_impl-cc.patch").read_text(
         encoding="utf-8"
     )
-    config_call = 'GetRendererInterface()->SetUxrConfig(std::move(uxr_cfg));'
+    config_call = 'GetRendererInterface()->SetUxrConfig('
     initialize_call = "GetRendererInterface()->InitializeRenderer("
     assert host.count(config_call) == 1
     assert host.index(config_call) < host.index(initialize_call)
@@ -86,7 +86,7 @@ def test_renderer_initialization_preserves_browser_ua_and_metadata():
 
 def test_version_override_alias_remains_the_single_cli_entry_point():
     main = added_lines("0036-chrome-app-chrome_main-fingerprint-normalize.patch")
-    assert '"fingerprint-brand-version",        "uxr-ua-full-version"' in main
+    assert '"fingerprint-brand-version",        "uxr-ua-brand-version"' in main
 
 
 def test_legacy_windows_cache_migration_keeps_its_version_dependency():

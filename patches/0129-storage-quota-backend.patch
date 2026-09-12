@@ -1,0 +1,133 @@
+diff --git a/storage/browser/quota/quota_manager_impl.cc b/storage/browser/quota/quota_manager_impl.cc
+--- a/storage/browser/quota/quota_manager_impl.cc
++++ b/storage/browser/quota/quota_manager_impl.cc
+@@ -81,6 +81,21 @@
+ 
+ namespace {
+ 
++// Launch-local override shared by estimation, bucket allocation and writes.
++// Usage, per-bucket caps, disk exhaustion and explicit DevTools overrides stay
++// native. The switch is absent in --fingerprint=off mode.
++std::optional<int64_t> FingerprintStorageQuotaBytes() {
++  const std::string value = base::CommandLine::ForCurrentProcess()->
++      GetSwitchValueASCII("uxr-storage-quota");
++  uint64_t megabytes = 0;
++  constexpr uint64_t kMiB = 1024 * 1024;
++  if (value.empty() || value.find_first_not_of("0123456789") != std::string::npos ||
++      !base::StringToUint64(value, &megabytes) ||
++      megabytes > static_cast<uint64_t>(std::numeric_limits<int64_t>::max()) / kMiB)
++    return std::nullopt;
++  return static_cast<int64_t>(megabytes * kMiB);
++}
++
+ // These values are used in UMA, so the list should be append-only.
+ enum class DatabaseDisabledReason {
+   kRegisterStorageKeyFailed = 0,
+@@ -1198,6 +1213,13 @@
+                                         std::move(usage_breakdown));
+                 return;
+               }
++              // The gatherer has already applied the effective override.
++              // Do not replace it with static disk-based reporting.
++              if (is_override_enabled) {
++                std::move(callback).Run(status, usage, quota,
++                                        std::move(usage_breakdown));
++                return;
++              }
+               weak_this->GetDiskAvailabilityAndTempPoolSize(base::BindOnce(
+                   [](UsageAndQuotaWithBreakdownCallback callback,
+                      blink::mojom::QuotaStatusCode status, int64_t usage,
+@@ -1308,6 +1330,18 @@
+                         // If storage is unlimited, return the real quota value.
+                         if (is_storage_unlimited) {
+                           std::move(callback).Run(status, usage, quota);
++                          return;
++                        }
++
++                        // The effective override is already capped by the
++                        // requested bucket quota, including an explicit 0.
++                        // Preserve failures rather than reporting success.
++                        if (is_override_enabled) {
++                          if (status != blink::mojom::QuotaStatusCode::kOk) {
++                            std::move(callback).Run(status, 0, 0);
++                          } else {
++                            std::move(callback).Run(status, usage, quota);
++                          }
+                           return;
+                         }
+ 
+@@ -1377,14 +1411,21 @@
+ 
+   // Translates a UsageAndQuota result into a single number for the aggregator.
+   auto on_got_usage =
+-      [](base::OnceCallback<void(int64_t)> report_space_remaining,
++      [](base::WeakPtr<QuotaManagerImpl> weak_this,
++         const StorageKey& storage_key,
++         base::OnceCallback<void(int64_t)> report_space_remaining,
+          blink::mojom::QuotaStatusCode code, int64_t usage, int64_t quota) {
+         // Report the amount of allocated space remaining, or min() for an
+         // error, or max() if there's no limit.
+         int64_t leftover_space = 0;
+-        if (code != blink::mojom::QuotaStatusCode::kOk) {
++        if (!weak_this || code != blink::mojom::QuotaStatusCode::kOk) {
+           leftover_space = std::numeric_limits<int64_t>::min();
+-        } else if (quota == 0) {
++        } else if (quota == 0 &&
++                   !weak_this->GetQuotaOverrideForStorageKey(storage_key)
++                        .has_value()) {
++          // Native 0 can mean unlimited. An explicit override of 0
++          // means no allocation, not unlimited writes. Read at callback
++          // time, on the same sequence as the gatherer completion.
+           leftover_space = kNoLimit;
+         } else {
+           leftover_space = quota - usage;
+@@ -1393,14 +1434,18 @@
+       };
+ 
+   // Check the usage for the whole StorageKey.
+-  GetUsageAndQuota(bucket.storage_key,
+-                   base::BindOnce(on_got_usage, concurrent.CreateCallback()));
++  GetUsageAndQuota(
++      bucket.storage_key,
++      base::BindOnce(on_got_usage, weak_factory_.GetWeakPtr(),
++                     bucket.storage_key, concurrent.CreateCallback()));
+ 
+   // If this is the default bucket, we're done. Otherwise, additionally check
+   // the usage of the specific bucket against its quota.
+   if (!bucket.is_default) {
+     GetBucketUsageAndQuota(
+-        bucket.id, base::BindOnce(on_got_usage, concurrent.CreateCallback()));
++        bucket.id,
++        base::BindOnce(on_got_usage, weak_factory_.GetWeakPtr(),
++                       bucket.storage_key, concurrent.CreateCallback()));
+   }
+   std::move(concurrent).Done(std::move(aggregator));
+ }
+@@ -1682,6 +1727,9 @@
+     return kNoLimit;
+   }
+ 
++  if (const auto quota = FingerprintStorageQuotaBytes())
++    return *quota;
++
+   if (special_storage_policy_ && special_storage_policy_->IsStorageSessionOnly(
+                                      storage_key.origin().GetURL())) {
+     return settings.session_only_per_storage_key_quota;
+@@ -2378,10 +2426,14 @@
+ std::optional<int64_t> QuotaManagerImpl::GetQuotaOverrideForStorageKey(
+     const StorageKey& storage_key) {
+   DCHECK_CALLED_ON_VALID_SEQUENCE(sequence_checker_);
+-  if (!devtools_overrides_.contains(storage_key)) {
++  auto entry = devtools_overrides_.find(storage_key);
++  if (entry != devtools_overrides_.end())
++    return entry->second.quota_size;
++  // Keep privileged unlimited storage native, just like the allocation
++  // path in GetQuotaForStorageKey. Explicit DevTools overrides still win.
++  if (IsStorageUnlimited(storage_key))
+     return std::nullopt;
+-  }
+-  return devtools_overrides_[storage_key].quota_size;
++  return FingerprintStorageQuotaBytes();
+ }
+ 
+ void QuotaManagerImpl::CorruptDatabaseForTesting(

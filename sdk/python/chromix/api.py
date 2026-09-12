@@ -33,9 +33,11 @@ from ._binary import (
 )
 from ._fonts import apply_font_env, font_dir_whitelist_arg
 from ._persona import ensure_persona_geometry
+from ._fingerprint import normalize_fingerprint_args
 from ._network import (
     extract_proxy_url as _extract_proxy_url, geoip_http as _geoip_http,
     network_args as _network_args, split_proxy as _split_proxy,
+    lookup_proxy as _lookup_proxy, resolve_webrtc_args as _resolve_webrtc_args,
 )
 from .humanize import HumanConfig, HumanConfigOverrides, HumanPreset, resolve_human_config
 
@@ -242,11 +244,11 @@ def build_args(stealth_args: bool,
     if start_maximized and not any(
             k in seen for k in ("--start-maximized", "--window-size", "--window-position")):
         seen["--start-maximized"] = "--start-maximized"
-    return list(seen.values())
+    return normalize_fingerprint_args(list(seen.values()))
 
 
 # ---------------------------------------------------------------------------
-# GeoIP metadata (never used to synthesize WebRTC candidates)
+# GeoIP metadata and WebRTC presentation-address resolution
 # ---------------------------------------------------------------------------
 
 
@@ -301,7 +303,10 @@ def _prepare(headless, proxy, args, stealth_args, timezone, locale, geoip,
              release_channel=None, fonts_dir=None):
     args = _network_args(args, proxy)
     proxy_kwargs, proxy_extra = _resolve_proxy_config(proxy)
-    timezone, locale, _ = maybe_resolve_geoip(geoip, proxy, timezone, locale, args)
+    lookup_proxy = _lookup_proxy(args, proxy) if geoip else proxy
+    timezone, locale, exit_ip = maybe_resolve_geoip(geoip, lookup_proxy, timezone, locale, args)
+    args = _resolve_webrtc_args(args, lookup_proxy, exit_ip=exit_ip, geoip=geoip,
+                               lookup=_geoip_http)
     binary = ensure_binary(browser_version=browser_version,
                            release_channel=release_channel)
     # Widevine / DRM: enabled automatically when a CDM is present (same policy
@@ -510,13 +515,16 @@ def _split_context_kwargs(viewport, locale, color_scheme, user_agent, kwargs,
         ctx_kwargs["viewport"] = viewport
     elif ("viewport" not in ctx_kwargs and "no_viewport" not in ctx_kwargs):
         ctx_kwargs["viewport"] = (
-            {"width": geometry.get("outer_width", geometry["width"]),
-             "height": geometry["inner_height"]} if geometry else None
+            {"width": geometry.get("viewport_width", geometry.get("outer_width", geometry["width"])),
+             "height": geometry.get("viewport_height", geometry["inner_height"])} if geometry else None
         ) if headless else None
     if "viewport" in ctx_kwargs and ctx_kwargs["viewport"] is None:
         ctx_kwargs.setdefault("no_viewport", True)
     if (ctx_kwargs.get("viewport") is not None and not ctx_kwargs.get("no_viewport")
-            and geometry and geometry["dpr"] != 1):
+            and geometry):
+        # Playwright forwards these together to native device emulation. Without
+        # screen, it substitutes viewport dimensions and overrides launch geometry.
+        ctx_kwargs.setdefault("screen", {"width": geometry["width"], "height": geometry["height"]})
         ctx_kwargs.setdefault("device_scale_factor", geometry["dpr"])
     if locale:
         ctx_kwargs.setdefault("locale", locale)

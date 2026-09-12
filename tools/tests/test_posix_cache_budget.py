@@ -1,5 +1,4 @@
 """Exercise optional-cache deadlines without network access or compilation."""
-import fcntl
 import json
 import os
 from pathlib import Path
@@ -7,6 +6,11 @@ import shutil
 import subprocess
 import tempfile
 import unittest
+
+try:
+    import fcntl
+except ImportError:
+    raise unittest.SkipTest('POSIX flock/process-group tests require fcntl')
 
 REPO = Path(__file__).resolve().parents[2]
 BASH32 = Path.home() / ".local/bash-3.2-for-ci/bash"

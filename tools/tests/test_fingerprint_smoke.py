@@ -273,7 +273,7 @@ def test_normalized_platform_and_network_flags(platform, value):
     flags = smoke.browser_args({**scenario("on"), "platform": platform}, "http://127.0.0.1:9876", False)
     assert f"--fingerprint-platform={value}" in flags
     assert "--disable-background-networking" in flags
-    assert "--proxy-bypass-list=127.0.0.1:9876;<-loopback>" in flags
+    assert "--proxy-bypass-list=<-loopback>;127.0.0.1:9876" in flags
     assert "--no-sandbox" not in flags
 
 

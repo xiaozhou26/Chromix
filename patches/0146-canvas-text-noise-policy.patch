@@ -1,0 +1,13 @@
+diff --git a/third_party/blink/renderer/modules/canvas/canvas2d/base_rendering_context_2d.cc b/third_party/blink/renderer/modules/canvas/canvas2d/base_rendering_context_2d.cc
+--- a/third_party/blink/renderer/modules/canvas/canvas2d/base_rendering_context_2d.cc
++++ b/third_party/blink/renderer/modules/canvas/canvas2d/base_rendering_context_2d.cc
+@@ -1223,7 +1223,8 @@
+       host->GetPlainTextPainter());
+ 
+   // Scale text metrics if enabled
+-  if (RuntimeEnabledFeatures::FingerprintingCanvasMeasureTextNoiseEnabled()) {
++  if (!base::UxrConfig::GetInstance().Has("uxr-disable-fingerprint-noise") &&
++      RuntimeEnabledFeatures::FingerprintingCanvasMeasureTextNoiseEnabled()) {
+     if (HostAsOffscreenCanvas()) {
+       if (auto* window = DynamicTo<LocalDOMWindow>(GetTopExecutionContext())) {
+         if (window->GetFrame() && window->GetFrame()->GetDocument())

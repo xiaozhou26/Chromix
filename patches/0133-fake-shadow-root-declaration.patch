@@ -1,0 +1,11 @@
+diff --git a/third_party/blink/renderer/core/dom/element.h b/third_party/blink/renderer/core/dom/element.h
+--- a/third_party/blink/renderer/core/dom/element.h
++++ b/third_party/blink/renderer/core/dom/element.h
+@@ -1096,6 +1096,7 @@
+   ALWAYS_INLINE ShadowRoot* GetShadowRoot() const {
+     return HasShadowRoot() ? GetShadowRootInternal() : nullptr;
+   }
++  ShadowRoot* ShadowRootForBindings() const;
+   ShadowRoot* OpenShadowRoot() const;
+   ShadowRoot* ClosedShadowRoot() const;
+   ShadowRoot* AuthorShadowRoot() const;

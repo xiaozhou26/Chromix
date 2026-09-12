@@ -1,0 +1,109 @@
+diff --git a/third_party/blink/renderer/platform/fonts/skia/skia_text_metrics.cc b/third_party/blink/renderer/platform/fonts/skia/skia_text_metrics.cc
+--- a/third_party/blink/renderer/platform/fonts/skia/skia_text_metrics.cc
++++ b/third_party/blink/renderer/platform/fonts/skia/skia_text_metrics.cc
+@@ -4,15 +4,105 @@
+ 
+ #include "third_party/blink/renderer/platform/fonts/skia/skia_text_metrics.h"
+ 
++#include <algorithm>
++#include <array>
++#include <cmath>
++#include <cstdint>
++
++#include "base/strings/string_util.h"
++#include "base/uxr_config.h"
+ #include "base/containers/span.h"
+ #include "build/build_config.h"
+ #include "third_party/blink/renderer/platform/fonts/shaping/harfbuzz_face.h"
+ #include "third_party/blink/renderer/platform/wtf/math_extras.h"
+ #include "third_party/skia/include/core/SkFont.h"
++#include "third_party/skia/include/core/SkFontMetrics.h"
++#include "third_party/skia/include/core/SkString.h"
++#include "third_party/skia/include/core/SkTypeface.h"
+ #include "third_party/skia/include/core/SkPath.h"
+ #include "third_party/skia/include/core/SkStrikeRef.h"
+ 
+ namespace blink {
++
++bool SkFontApplyWindowsMetrics(const SkFont& font, SkFontMetrics* metrics) {
++#if BUILDFLAG(IS_LINUX)
++  const auto& config = base::UxrConfig::GetInstance();
++  const std::string value = config.Get("uxr-windows-font-metrics");
++  if (!metrics || !config.Has("uxr-windows-font-metrics") || value == "false" ||
++      value == "0" || config.Get("uxr-fingerprint-off") == "true")
++    return false;
++  const std::string platform = base::ToLowerASCII(config.Get("uxr-platform"));
++  const std::string ua_platform = base::ToLowerASCII(config.Get("uxr-ua-platform"));
++  if (platform != "windows" && platform != "win32" && ua_platform != "windows")
++    return false;
++  SkTypeface* face = font.getTypeface();
++  if (!face || !std::isfinite(font.getSize()) || font.getSize() <= 0)
++    return false;
++  // Check the resolved face, not the CSS request: Arial -> Liberation Sans
++  // fallback must remain a no-op when Windows fonts are not installed.
++  SkString family;
++  face->getFamilyName(&family);
++  constexpr const char* kWindowsFamilies[] = {
++      "Arial", "Arial Black", "Arial Narrow", "Calibri", "Cambria",
++      "Cambria Math", "Candara", "Comic Sans MS", "Consolas", "Constantia",
++      "Corbel", "Courier New", "Georgia", "Impact", "Lucida Console",
++      "Lucida Sans Unicode", "Microsoft Sans Serif", "Microsoft YaHei",
++      "Microsoft YaHei UI", "Microsoft JhengHei", "Microsoft JhengHei UI",
++      "Palatino Linotype", "Segoe UI", "Segoe UI Symbol", "Segoe UI Emoji",
++      "SimSun", "NSimSun", "SimHei", "Tahoma", "Times New Roman",
++      "Trebuchet MS", "Verdana", "Webdings", "Wingdings"};
++  bool installed_windows_face = false;
++  for (const char* name : kWindowsFamilies)
++    installed_windows_face |= base::EqualsCaseInsensitiveASCII(family.c_str(), name);
++  if (!installed_windows_face)
++    return false;
++
++  std::array<uint8_t, 96> os2 = {};
++  std::array<uint8_t, 10> hhea = {};
++  const size_t os2_size = face->getTableData(
++      SkSetFourByteTag('O', 'S', '/', '2'), 0, os2.size(), os2.data());
++  if (os2_size < 78 || face->getTableData(SkSetFourByteTag('h', 'h', 'e', 'a'),
++                                        0, hhea.size(), hhea.data()) != hhea.size())
++    return false;
++  // Static table values cannot reproduce MVAR adjustments of variable fonts.
++  if (face->getTableSize(SkSetFourByteTag('M', 'V', 'A', 'R')) != 0)
++    return false;
++  const int units_per_em = face->getUnitsPerEm();
++  if (units_per_em <= 0)
++    return false;
++  const auto u16 = [](const auto& bytes, size_t offset) -> uint16_t {
++    return (uint16_t{bytes[offset]} << 8) | bytes[offset + 1];
++  };
++  const auto i16 = [&](const auto& bytes, size_t offset) -> int {
++    const unsigned word = u16(bytes, offset);
++    return word >= 0x8000 ? static_cast<int>(word) - 0x10000 : static_cast<int>(word);
++  };
++  int ascent = u16(os2, 74);
++  int descent = u16(os2, 76);
++  int leading = std::max(0, i16(hhea, 4) - i16(hhea, 6) + i16(hhea, 8) - ascent - descent);
++  if (u16(os2, 62) & 0x80) {  // OS/2 USE_TYPO_METRICS
++    ascent = i16(os2, 68);
++    descent = -i16(os2, 70);
++    leading = std::max(0, i16(os2, 72));
++  }
++  if (ascent <= 0 || descent < 0)
++    return false;
++  const float scale = font.getSize() / units_per_em;
++  metrics->fAscent = -ascent * scale;
++  metrics->fDescent = descent * scale;
++  metrics->fLeading = leading * scale;
++  metrics->fAvgCharWidth = i16(os2, 2) * scale;
++  if (os2_size >= 90 && u16(os2, 0) >= 2) {
++    if (i16(os2, 86) > 0) metrics->fXHeight = i16(os2, 86) * scale;
++    if (i16(os2, 88) > 0) metrics->fCapHeight = i16(os2, 88) * scale;
++  }
++  return true;
++#else
++  (void)font;
++  (void)metrics;
++  return false;
++#endif
++}
+ 
+ void SkFontGetGlyphWidthForHarfBuzz(const SkStrikeRef& strike_ref,
+                                     bool subpixel,

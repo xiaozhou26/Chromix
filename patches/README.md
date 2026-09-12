@@ -10,10 +10,18 @@ gaps, including worker/iframe behavior, are tracked in
 [`FINGERPRINT_STATUS.md`](../FINGERPRINT_STATUS.md). A configured getter does not
 by itself change the underlying device, permission, rendering or network behavior.
 
-The network and storage patches now preserve native notifier/accounting behavior;
-their former getter-only overrides are retired. MediaCapabilities filters can
+Network Information preserves native notifier behavior; storage quota overrides
+now use the browser quota backend (`0129`), not isolated renderer getters.
+MediaCapabilities filters can
 only restrict native support, smoothness and power efficiency. GPU templates
 remain synthetic test records rather than a measured full-device pool.
+
+The current series contains **146 patches**. The [public flag contract](../docs/fingerprint-flags.md)
+documents fixed public defaults, GPU platform tuples, independent brand versions,
+quota, third-party cookies, closed author shadow roots, Windows font metrics,
+voice tables, local WebRTC presentation/auto and noise/off semantics. These are
+source/SDK implementations awaiting a matching rebuilt browser, not evidence
+that previously published packages contain them.
 
 Canvas patches `0121`–`0124` retain one prepared buffer across async encoding
 and remove random input mutation from the shared image encoder. Persona noise
@@ -29,7 +37,8 @@ changes still require a matching Chromium build and browser verification.
   149 tree. Ports include detailed-screen coherence, geolocation,
   MediaCapabilities, the CDP infinite-expiry cookie fix, and opt-in ports of
   Runtime-domain suppression and Canvas/WebGL Bridge. Fake WebRTC candidate
-  generation and candidate/SDP address rewriting are retired.
+  generation remains retired; `0139`–`0145` add explicit local presentation
+  rewriting and startup auto resolution without changing native ICE gathering.
 - High-risk Clearcote behaviors remain default-off. Enable them explicitly with:
   - `--uxr-devtools-runtime-suppression` to suppress selected V8 Runtime-domain
     observables; this can break console delivery and automation bindings.
@@ -37,8 +46,9 @@ changes still require a matching Chromium build and browser verification.
     `--uxr-canvas-bridge-unsafe`; this removes the renderer sandbox for bridge
     renderers and sends canvas/WebGL operations to that endpoint.
 - WebRTC uses actual ICE gathering and the native IP handling policy. The
-  SDKs reject the retired `webrtc-ip` and `webrtc-fake-srflx` options; they
-  default proxied launches to `disable_non_proxied_udp`. This does not supply
+  SDKs support `webrtc-ip=<IP|auto>` and reject retired `webrtc-fake-srflx`
+  options; they default proxied launches to `disable_non_proxied_udp`. They
+  resolve metadata through HTTP/HTTPS/SOCKS without direct fallback. This does not supply
   a full-network proxy or TLS/HTTP persona implementation.
 - All CLI switches the patches introduce use the de-branded `--uxr-*` prefix
   (the `--fingerprint-*` aliases from the SDKs are normalized to `--uxr-*` by

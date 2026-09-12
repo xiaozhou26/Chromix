@@ -9,5 +9,5 @@ index 2955d7d1cd..9ef074a880 100644
 +
 +  // UXR persona config delivered out-of-band (NOT via the renderer command
 +  // line) so persona values + seeds never appear in /proc/<renderer>/cmdline.
-+  SetUxrConfig(map<string, string> config);
++  SetUxrConfig(map<string, string> config, uint32 schema_version);
  };

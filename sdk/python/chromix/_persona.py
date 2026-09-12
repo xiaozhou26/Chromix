@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import math
 import random
+import re
 from typing import Any
 
 # Entries match GetSeededScreen's templates, not its C++ selection algorithm.
@@ -48,7 +49,9 @@ def pick_persona_screen(rand: random.Random | None = None) -> dict[str, Any]:
 
 class _SeededRandom(random.Random):
     def __init__(self, seed):
-        self._state = (seed ^ 0x7363726E) & 0xFFFFFFFF
+        # Preserve uint32 sequences, but do not silently randomize uint64 seeds.
+        folded = (seed & 0xFFFFFFFF) ^ (((seed >> 32) * 0x9E3779B1) & 0xFFFFFFFF)
+        self._state = (folded ^ 0x7363726E) & 0xFFFFFFFF
 
     def random(self):
         self._state = (self._state + 0x6D2B79F5) & 0xFFFFFFFF
@@ -63,45 +66,74 @@ def ensure_persona_geometry(args: list[str] | None,
     """Complete geometry; numeric seeds use the same generator as the Node SDK."""
     existing = {}
     for arg in args or []:
+        if not arg.startswith("--"):
+            continue
         key, sep, value = arg[2:].partition("=")
-        if sep:
+        if key and sep:
             existing[key] = value
-    for dim in ("width", "height"):
-        alias, key = f"fingerprint-screen-{dim}", f"uxr-screen-{dim}"
+    for alias, key in [(f"fingerprint-screen-{dim}", f"uxr-screen-{dim}") for dim in ("width", "height")] + [
+            ("fingerprint-taskbar-height", "uxr-taskbar-height")]:
+        if key in existing and alias in existing and existing[key] != existing[alias]:
+            raise ValueError(f"conflicting display aliases: {alias} and {key}")
         if key not in existing and alias in existing:
             existing[key] = existing[alias]
-    if rand is None:
-        try:
-            seed = int(existing.get("fingerprint", ""))
-            if 0 < seed <= 0xFFFFFFFF:
-                rand = _SeededRandom(seed)
-        except ValueError:
-            pass
+    raw = existing.get("fingerprint", "")
+    if raw and (not re.fullmatch(r"[0-9]{1,20}", raw) or not 0 < int(raw) <= 0xFFFFFFFFFFFFFFFF):
+        raise ValueError("synthetic geometry seed must be a nonzero decimal uint64")
+    if rand is None and raw:
+        rand = _SeededRandom(int(raw))
 
-    def number_at(key, zero=False):
+    def number_at(key, zero=False, integral=True, maximum=32768):
+        if key not in existing:
+            return None
+        syntax = r"[0-9]+" if integral else r"(?:[0-9]+(?:\.[0-9]*)?|\.[0-9]+)(?:[eE][+-]?[0-9]+)?"
+        if not re.fullmatch(syntax, existing[key]):
+            raise ValueError(f"invalid display value: {key}")
         try:
             value = float(existing.get(key, ""))
-            if math.isfinite(value) and (value >= 0 if zero else value > 0):
+            if (math.isfinite(value) and (value >= 0 if zero else value > 0)
+                    and value <= maximum and (not integral or value.is_integer())):
                 return int(value) if value.is_integer() else value
         except ValueError:
             pass
-        return None
+        raise ValueError(f"invalid display value: {key}")
 
     pick = pick_persona_screen(rand)
     w = number_at("uxr-screen-width") or pick["width"]
     h = number_at("uxr-screen-height") or pick["height"]
-    dpr = number_at("uxr-device-pixel-ratio") or pick["dpr"]
-    available = number_at("uxr-screen-avail-height")
+    dpr = number_at("uxr-device-pixel-ratio", integral=False, maximum=8) or pick["dpr"]
+    if dpr < 0.25:
+        raise ValueError("device pixel ratio must be in [0.25, 8]")
+    available_width = number_at("uxr-screen-avail-width", zero=True)
+    available = number_at("uxr-screen-avail-height", zero=True)
+    if ((available_width is not None and available_width > w)
+            or (available is not None and available > h)):
+        raise ValueError("available bounds exceed the screen")
     tb = number_at("uxr-taskbar-height", zero=True)
     if tb is None:
         tb = pick["taskbar"] if available is None else h - available
+    if tb > h or (available is not None and available != h - tb):
+        raise ValueError("taskbar and available height disagree")
     try:
-        window_size = [int(v) for v in existing.get("window-size", "").split(",")]
+        raw = existing.get("window-size", "")
+        if not re.fullmatch(r"[0-9]+,[0-9]+", raw):
+            raise ValueError("invalid window-size syntax")
+        window_size = [int(v) for v in raw.split(",")]
         valid_size = len(window_size) == 2 and all(v > 0 for v in window_size)
     except ValueError:
         valid_size = False
+    if "window-size" in existing and (not valid_size or max(window_size) > 32768):
+        raise ValueError("invalid native window-size")
     outer_width = number_at("uxr-outer-width") or (window_size[0] if valid_size else w)
     outer_height = number_at("uxr-outer-height") or (window_size[1] if valid_size else h - tb)
+    if outer_height <= CHROME_UI_STRIP:
+        raise ValueError("synthetic window is smaller than its configured UI strip")
+    if valid_size and (outer_width, outer_height) != tuple(window_size):
+        raise ValueError("native and persona window sizes disagree")
+    viewport_width = number_at("uxr-viewport-width")
+    viewport_height = number_at("uxr-viewport-height")
+    if (viewport_width is None) != (viewport_height is None):
+        raise ValueError("viewport dimensions must be supplied together")
     add = []
 
     def put(key, value):
@@ -115,7 +147,10 @@ def ensure_persona_geometry(args: list[str] | None,
     put("uxr-outer-width", outer_width)
     put("uxr-outer-height", outer_height)
     geometry = {"width": w, "height": h, "dpr": dpr, "taskbar": tb,
-                "avail_height": h - tb, "outer_width": outer_width,
+                "avail_height": h - tb, "avail_width": w if available_width is None else available_width,
+                "outer_width": outer_width,
                 "outer_height": outer_height,
+                "viewport_width": viewport_width or outer_width,
+                "viewport_height": viewport_height or outer_height - CHROME_UI_STRIP,
                 "inner_height": outer_height - CHROME_UI_STRIP}
     return add + list(args or []), geometry

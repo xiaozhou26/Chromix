@@ -3,7 +3,7 @@ new file mode 100644
 index 0000000000..6eead77d0f
 --- /dev/null
 +++ b/base/uxr_config.h
-@@ -0,0 +1,57 @@
+@@ -0,0 +1,90 @@
 +// Copyright 2026. Process-global persona config delivered to the renderer over
 +// IPC (NOT the command line) so persona values + seeds never appear in the
 +// renderer's /proc/cmdline. Populated once at renderer init; read-only after.
@@ -23,15 +23,45 @@ index 0000000000..6eead77d0f
 +template <typename T>
 +class NoDestructor;
 +
++// Validated DIP geometry. Zero sizes/scales retain the native backend value.
++struct BASE_EXPORT UxrDisplayConfig {
++  int width = 0;
++  int height = 0;
++  int available_width = 0;
++  int available_height = 0;
++  int viewport_width = 0;
++  int viewport_height = 0;
++  int outer_width = 0;
++  int outer_height = 0;
++  int window_x = 0;
++  int window_y = 0;
++  bool has_position = false;
++  double device_scale_factor = 0;
++  std::string orientation;
++  int orientation_angle = 0;
++  bool enabled() const {
++    return width > 0 || viewport_width > 0 || device_scale_factor > 0 ||
++           !orientation.empty();
++  }
++};
++
 +class BASE_EXPORT UxrConfig {
 + public:
++  static constexpr uint32_t kSchemaVersion = 1;
 +  static UxrConfig& GetInstance();
 +
 +  UxrConfig(const UxrConfig&) = delete;
 +  UxrConfig& operator=(const UxrConfig&) = delete;
 +
-+  // Called once in the renderer from the browser-delivered IPC message.
-+  void SetAll(const flat_map<std::string, std::string>& cfg);
++  // One immutable snapshot per browser launch, inherited before renderer init.
++  // Repeating the identical snapshot is idempotent; replacing it is rejected.
++  // A rejected input never publishes partial state.
++  bool SetAll(const flat_map<std::string, std::string>& cfg,
++              uint32_t schema_version = kSchemaVersion);
++  bool IsInitialized() const;
++  flat_map<std::string, std::string> Snapshot() const;
++  UxrDisplayConfig Display() const;
++  std::string ValidationError() const;
 +
 +  bool Has(const std::string& key) const;
 +  // Returns the value or "" if absent.
@@ -56,6 +86,9 @@ index 0000000000..6eead77d0f
 +
 +  mutable Lock lock_;
 +  flat_map<std::string, std::string> map_;
++  UxrDisplayConfig display_;
++  bool initialized_ = false;
++  std::string validation_error_;
 +};
 +
 +}  // namespace base

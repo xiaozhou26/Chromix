@@ -473,6 +473,22 @@ function Invoke-BoundedBrowser {
   }
 }
 
+function Invoke-FingerprintAcceptance([string]$Browser) {
+  $python = (Get-Command python -ErrorAction Stop).Source
+  $requirements = Join-Path $Repo "tools\fingerprint-requirements.txt"
+  $install = Invoke-Tracked -File $python -Cwd $Repo -TimeoutSec 300 `
+    -ArgList "-m pip install --disable-pip-version-check --timeout 30 --retries 1 -r `"$requirements`""
+  if ($install -ne 0) { throw "fingerprint audit dependency installation failed (exit $install)" }
+  $diagnostics = Join-Path $WorkDir ("fingerprint-diagnostics\runtime-" + [Guid]::NewGuid().ToString('N'))
+  $hash = (Get-FileHash -LiteralPath $Browser -Algorithm SHA256).Hash.ToLowerInvariant()
+  $script = Join-Path $Repo "tools\fingerprint_acceptance.py"
+  $arguments = "-X utf8 `"$script`" --browser `"$Browser`" --expected-sha256 $hash " +
+    "--expected-version $($Revisions.ChromiumVersion) --source-report `"$FingerprintSourceReport`" " +
+    "--source-root `"$Src`" --output-dir `"$diagnostics`""
+  $result = Invoke-Tracked -File $python -Cwd $Repo -ArgList $arguments -TimeoutSec 2100 -FullFailureOutput
+  if ($result -ne 0) { throw "fingerprint acceptance failed (exit $result); diagnostics: $diagnostics" }
+}
+
 function Verify-FinalBundle {
   $asset = Join-Path $Root "dist\chromix-win-x64.zip"
   $manifest = Join-Path $Root "dist\SHA256SUMS"
@@ -524,6 +540,8 @@ function Verify-FinalBundle {
     throw "extracted Windows browser did not render the smoke page"
   }
   Write-Host "==> Windows ZIP extraction, version, and headless smoke checks passed"
+  # Startup smoke cannot exercise fingerprint APIs or confirm a current patch stack.
+  Invoke-FingerprintAcceptance -Browser $chrome
 }
 
 Write-Host "==> Chromix CI stage $StageIndex | Chromium $($Revisions.ChromiumVersion) | remaining $(Get-RemainingMin) min"
@@ -756,6 +774,14 @@ for relative, keys in RESTORED.items():
     if ($LASTEXITCODE -ne 0) { throw "domain substitution failed" }
     Move-Item -LiteralPath $domainProgress -Destination $domainMarker
   }
+  # A matching readiness stamp is not proof that a resumed tree contains all
+  # revised patches. Verify actual hunks after legacy migrations/substitution.
+  $fingerprintDiagnostics = Join-Path $WorkDir "fingerprint-diagnostics"
+  New-Item -ItemType Directory -Force -Path $fingerprintDiagnostics | Out-Null
+  $FingerprintSourceReport = Join-Path $fingerprintDiagnostics ("source-" + [Guid]::NewGuid().ToString('N') + ".json")
+  & python -X utf8 (Join-Path $Repo "tools\verify_patch_stack.py") --src $Src --repo $Repo `
+    --core $UngoogledTooling --platform-tooling $WindowsTooling --platform windows --output $FingerprintSourceReport
+  if ($LASTEXITCODE -ne 0) { throw "restored source does not contain the current fingerprint patch stack" }
   & $gn gen $OutDir --fail-on-unused-args
   if ($LASTEXITCODE -ne 0) { throw "gn gen failed" }
   if ($RestoredUpstream) {

@@ -2,7 +2,7 @@ diff --git a/third_party/blink/renderer/core/frame/navigator_concurrent_hardware
 index f5c0db2d1b..782fd4d61a 100644
 --- a/third_party/blink/renderer/core/frame/navigator_concurrent_hardware.cc
 +++ b/third_party/blink/renderer/core/frame/navigator_concurrent_hardware.cc
-@@ -6,9 +6,32 @@
+@@ -6,9 +6,30 @@
  
  #include "base/system/sys_info.h"
  
@@ -14,10 +14,8 @@ index f5c0db2d1b..782fd4d61a 100644
  namespace blink {
  
  unsigned NavigatorConcurrentHardware::hardwareConcurrency() const {
-+  // Getter overrides do not configure worker scheduling or CPU resources.
-+  if (base::UxrConfig::GetInstance().Get("uxr-synthetic-device-tests") != "true")
-+    return static_cast<unsigned>(base::SysInfo::NumberOfProcessors());
-+  // UXR Layer 2: persona-driven via renderer cmdline switch.
++  // Public explicit/default overrides do not require synthetic-test mode.
++  // This reports a logical core budget; it does not pin host CPU resources.
 +  if (base::UxrConfig::GetInstance().Has("uxr-hw-concurrency")) {
 +    int v = 0;  // UXR P1-A: StringToInt + clamp [1,128]
 +    if (base::StringToInt(
@@ -25,7 +23,7 @@ index f5c0db2d1b..782fd4d61a 100644
 +        v > 0)
 +      return static_cast<unsigned>(v > 128 ? 128 : v);
 +  }
-+  // Synthetic core-count templates; an absent seed preserves the host value.
++  // Independent randomized hardware pools remain explicit test fixtures.
 +  {
 +    const int ph_pool =
 +        base::UxrConfig::GetInstance().GetSeededHwConcurrency();

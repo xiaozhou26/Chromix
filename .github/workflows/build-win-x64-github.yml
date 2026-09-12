@@ -24,6 +24,11 @@ on:
       - 'tools/restored_reuse_evidence.py'
       - 'tools/merge_gn_args.py'
       - 'tools/build_resources.py'
+      - 'tools/fingerprint*'
+      - 'tools/verify_patch_stack.py'
+      - 'tools/device_p0_audit.py'
+      - 'tools/canvas_chain_audit.py'
+      - 'sdk/python/chromix/device_probe.js'
       - '.github/workflows/build-win-x64-github.yml'
       - 'CHROMIUM_VERSION'
       - 'UNGOOGLED_VERSION'
@@ -229,6 +234,14 @@ jobs:
           if-no-files-found: warn
           retention-days: 3
           compression-level: 0
+      - name: Upload fingerprint diagnostics
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: fingerprint-win-x64-${{ github.job }}-attempt-${{ github.run_attempt }}
+          path: C:\c\chromix\fingerprint-diagnostics\
+          if-no-files-found: ignore
+          retention-days: 7
       - name: Upload final bundle
         if: steps.stage.outputs.finished == 'true'
         uses: actions/upload-artifact@v4
@@ -330,6 +343,14 @@ jobs:
           if-no-files-found: warn
           retention-days: 3
           compression-level: 0
+      - name: Upload fingerprint diagnostics
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: fingerprint-win-x64-${{ github.job }}-attempt-${{ github.run_attempt }}
+          path: C:\c\chromix\fingerprint-diagnostics\
+          if-no-files-found: ignore
+          retention-days: 7
       - name: Upload final bundle
         if: steps.stage.outputs.finished == 'true'
         uses: actions/upload-artifact@v4
@@ -431,6 +452,14 @@ jobs:
           if-no-files-found: warn
           retention-days: 3
           compression-level: 0
+      - name: Upload fingerprint diagnostics
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: fingerprint-win-x64-${{ github.job }}-attempt-${{ github.run_attempt }}
+          path: C:\c\chromix\fingerprint-diagnostics\
+          if-no-files-found: ignore
+          retention-days: 7
       - name: Upload final bundle
         if: steps.stage.outputs.finished == 'true'
         uses: actions/upload-artifact@v4
@@ -532,6 +561,14 @@ jobs:
           if-no-files-found: warn
           retention-days: 3
           compression-level: 0
+      - name: Upload fingerprint diagnostics
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: fingerprint-win-x64-${{ github.job }}-attempt-${{ github.run_attempt }}
+          path: C:\c\chromix\fingerprint-diagnostics\
+          if-no-files-found: ignore
+          retention-days: 7
       - name: Upload final bundle
         if: steps.stage.outputs.finished == 'true'
         uses: actions/upload-artifact@v4
@@ -633,6 +670,14 @@ jobs:
           if-no-files-found: warn
           retention-days: 3
           compression-level: 0
+      - name: Upload fingerprint diagnostics
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: fingerprint-win-x64-${{ github.job }}-attempt-${{ github.run_attempt }}
+          path: C:\c\chromix\fingerprint-diagnostics\
+          if-no-files-found: ignore
+          retention-days: 7
       - name: Upload final bundle
         if: steps.stage.outputs.finished == 'true'
         uses: actions/upload-artifact@v4
@@ -734,6 +779,14 @@ jobs:
           if-no-files-found: warn
           retention-days: 3
           compression-level: 0
+      - name: Upload fingerprint diagnostics
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: fingerprint-win-x64-${{ github.job }}-attempt-${{ github.run_attempt }}
+          path: C:\c\chromix\fingerprint-diagnostics\
+          if-no-files-found: ignore
+          retention-days: 7
       - name: Upload final bundle
         if: steps.stage.outputs.finished == 'true'
         uses: actions/upload-artifact@v4
@@ -835,6 +888,14 @@ jobs:
           if-no-files-found: warn
           retention-days: 3
           compression-level: 0
+      - name: Upload fingerprint diagnostics
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: fingerprint-win-x64-${{ github.job }}-attempt-${{ github.run_attempt }}
+          path: C:\c\chromix\fingerprint-diagnostics\
+          if-no-files-found: ignore
+          retention-days: 7
       - name: Upload final bundle
         if: steps.stage.outputs.finished == 'true'
         uses: actions/upload-artifact@v4
@@ -936,6 +997,14 @@ jobs:
           if-no-files-found: warn
           retention-days: 3
           compression-level: 0
+      - name: Upload fingerprint diagnostics
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: fingerprint-win-x64-${{ github.job }}-attempt-${{ github.run_attempt }}
+          path: C:\c\chromix\fingerprint-diagnostics\
+          if-no-files-found: ignore
+          retention-days: 7
       - name: Upload final bundle
         if: steps.stage.outputs.finished == 'true'
         uses: actions/upload-artifact@v4
@@ -1037,6 +1106,14 @@ jobs:
           if-no-files-found: warn
           retention-days: 3
           compression-level: 0
+      - name: Upload fingerprint diagnostics
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: fingerprint-win-x64-${{ github.job }}-attempt-${{ github.run_attempt }}
+          path: C:\c\chromix\fingerprint-diagnostics\
+          if-no-files-found: ignore
+          retention-days: 7
       - name: Upload final bundle
         if: steps.stage.outputs.finished == 'true'
         uses: actions/upload-artifact@v4
@@ -1138,6 +1215,14 @@ jobs:
           if-no-files-found: warn
           retention-days: 3
           compression-level: 0
+      - name: Upload fingerprint diagnostics
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: fingerprint-win-x64-${{ github.job }}-attempt-${{ github.run_attempt }}
+          path: C:\c\chromix\fingerprint-diagnostics\
+          if-no-files-found: ignore
+          retention-days: 7
       - name: Upload final bundle
         if: steps.stage.outputs.finished == 'true'
         uses: actions/upload-artifact@v4
@@ -1239,6 +1324,14 @@ jobs:
           if-no-files-found: warn
           retention-days: 3
           compression-level: 0
+      - name: Upload fingerprint diagnostics
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: fingerprint-win-x64-${{ github.job }}-attempt-${{ github.run_attempt }}
+          path: C:\c\chromix\fingerprint-diagnostics\
+          if-no-files-found: ignore
+          retention-days: 7
       - name: Upload final bundle
         if: steps.stage.outputs.finished == 'true'
         uses: actions/upload-artifact@v4
@@ -1340,6 +1433,14 @@ jobs:
           if-no-files-found: warn
           retention-days: 3
           compression-level: 0
+      - name: Upload fingerprint diagnostics
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: fingerprint-win-x64-${{ github.job }}-attempt-${{ github.run_attempt }}
+          path: C:\c\chromix\fingerprint-diagnostics\
+          if-no-files-found: ignore
+          retention-days: 7
       - name: Upload final bundle
         if: steps.stage.outputs.finished == 'true'
         uses: actions/upload-artifact@v4

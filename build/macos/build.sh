@@ -56,6 +56,13 @@ if [ "${CHROMIX_APPLY_DOMAIN_SUBSTITUTION:-1}" = 1 ] && [ ! -f "$SRC/.chromix-do
     -f "$WORK/tooling/ungoogled-chromium/domain_substitution.list" "$SRC"
   mv "$SRC/.chromix-domain-substitution-in-progress" "$SRC/.chromix-domain-substituted"
 fi
+# Verify real source content, not only intended-input stamps, before compiling.
+mkdir -p "$WORK/fingerprint-diagnostics"
+SOURCE_REPORT="$WORK/fingerprint-diagnostics/source-$(date +%s)-$$.json"
+python3 "$REPO/tools/verify_patch_stack.py" --src "$SRC" --repo "$REPO" \
+  --core "$WORK/tooling/ungoogled-chromium" \
+  --platform-tooling "$WORK/tooling/ungoogled-chromium-macos" --platform macos --output "$SOURCE_REPORT"
+cp "$SOURCE_REPORT" "$WORK/fingerprint-diagnostics/source-final.json"
 mkdir -p "$OUT"
 printf 'target_cpu = "%s"\nv8_target_cpu = "%s"\n' "$ARCH" "$ARCH" > "$WORK/target.gn"
 GN_INPUTS=("$WORK/tooling/ungoogled-chromium/flags.gn"

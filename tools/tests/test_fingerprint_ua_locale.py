@@ -25,7 +25,8 @@ def test_renderer_uses_browser_ua_without_rewriting_metadata():
     host = additions(5)
     assert "effective_user_agent.replace" not in host
     assert "effective_user_agent_metadata.full_version" not in host
-    assert "SetUxrConfig(std::move(uxr_cfg))" in host
+    assert "std::move(uxr_cfg), base::UxrConfig::kSchemaVersion" in host
+    assert "CHECK(snapshot.SetAll(uxr_cfg))" in host
 
 
 def test_language_getter_has_no_icu_or_v8_side_effects():
@@ -73,7 +74,7 @@ int main() {
 
 
 def compile_and_run(tmp_path, source):
-    compiler = shutil.which("c++")
+    compiler = os.environ.get("CXX") or shutil.which("clang++") or shutil.which("c++")
     if not compiler:
         pytest.skip("a C++ compiler is required for the small stub harness")
     cpp = tmp_path / "harness.cc"
@@ -138,7 +139,8 @@ int main() {
   Normalize(&cmd);
   assert(cmd.HasSwitch("uxr-disable-fingerprint-noise"));
   assert(cmd.GetSwitchValueASCII("uxr-fingerprint-seed") == "42");
-  assert(!cmd.HasSwitch("uxr-canvas-seed") && !cmd.HasSwitch("uxr-audio-seed"));
+  assert(cmd.GetSwitchValueASCII("uxr-canvas-seed") == "42");
+  assert(cmd.GetSwitchValueASCII("uxr-audio-seed") == "42");
   cmd.values = {{"fingerprint-noise", "true"}, {"uxr-canvas-seed", "42"}};
   Normalize(&cmd);
   assert(!cmd.HasSwitch("uxr-disable-fingerprint-noise"));
@@ -149,7 +151,7 @@ int main() {
 
 def test_seed_normalization_preserves_uint64_and_off(tmp_path):
     text = additions(36)
-    seed = block(text, '    if (command_line->HasSwitch("fingerprint"))')
+    seed = block(text, '    if (command_line->HasSwitch("fingerprint")) {\n      std::string seed =')
     off = block(text, '    if (command_line->HasSwitch("fingerprint") &&\n        command_line->GetSwitchValueASCII("fingerprint") == "off")')
     compile_and_run(tmp_path, COMMAND_LINE_STUB + r'''
 #include <cstdint>
@@ -205,9 +207,10 @@ int main() {
 ''')
 
 
-def test_retired_candidate_flags_do_not_reconfigure_browser_routing():
+def test_candidate_presentation_does_not_reconfigure_browser_routing():
     text = additions(36)
-    for retired in ("fingerprint-webrtc-ip", "fingerprint-webrtc-fake-srflx",
+    assert '{"fingerprint-webrtc-ip",' in text
+    for retired in ("fingerprint-webrtc-fake-srflx",
                     "uxr-webrtc-fake-srflx", "uxr-webrtc-policy"):
         assert retired not in text
 
@@ -227,7 +230,7 @@ int main() {
   auto* cmd = base::CommandLine::ForCurrentProcess();
   assert(Select(std::nullopt) == "Google Chrome");
   assert(Select("Google Chrome") == "Google Chrome");
-  cmd->values["fingerprint"] = "off";
+  cmd->values["uxr-fingerprint-off"] = "true";
   assert(!Select(std::nullopt));
   assert(Select("Existing Brand") == "Existing Brand");
   cmd->values.clear();
@@ -243,8 +246,11 @@ int main() {
 
 
 def test_explicit_off_restores_native_headless_product(tmp_path):
-    text = additions(4)
-    branch = block(text, '  if (command_line->GetSwitchValueASCII("fingerprint") == "off" &&')
+    # The insertion and closing brace are unchanged context in the regenerated
+    # patch, so take the new side of each hunk rather than additions alone.
+    text = '\n'.join(line[1:] for line in patch(4).read_text().splitlines()
+                     if line.startswith((' ', '+')) and not line.startswith('+++'))
+    branch = block(text, '  if (command_line->GetSwitchValueASCII("uxr-fingerprint-off") == "true" &&')
     compile_and_run(tmp_path, COMMAND_LINE_STUB + r'''
 const char* kHeadless = "headless";
 std::string Product() {
@@ -257,7 +263,7 @@ int main() {
   auto* cmd = base::CommandLine::ForCurrentProcess();
   cmd->values = {{"headless", ""}};
   assert(Product() == "Chrome/152.0.0.0");
-  cmd->values["fingerprint"] = "off";
+  cmd->values["uxr-fingerprint-off"] = "true";
   assert(Product() == "HeadlessChrome/152.0.0.0");
   cmd->values.erase("headless");
   assert(Product() == "Chrome/152.0.0.0");
@@ -276,7 +282,7 @@ def test_explicit_high_entropy_values_do_not_read_host(tmp_path):
     assignments = high_entropy_assignments()
     compile_and_run(tmp_path, COMMAND_LINE_STUB + r'''
 int host_reads = 0;
-std::string GetEffectiveUserAgentFullVersion() { return "153.1.2.3"; }
+std::string GetEffectiveBrowserBrandFullVersion() { return "153.1.2.3"; }
 std::string GetCpuArchitecture() { ++host_reads; return "host-arch"; }
 std::string BuildModelInfo() { ++host_reads; return "host-model"; }
 std::string GetCpuBitness() { ++host_reads; return "host-bits"; }
@@ -323,7 +329,7 @@ def test_fingerprint_aliases_preserve_explicit_native_switches(tmp_path):
     text = additions(36)
     start = text.index('    struct Alias ')
     aliases = text[start:text.index('    for (const auto& a : kAliases)', start)]
-    normalization = text[start:text.index('    if (command_line->HasSwitch("fingerprint-platform"))')]
+    normalization = text[start:text.index('    // Canonicalize the public off spellings')]
     compile_and_run(tmp_path, COMMAND_LINE_STUB + '''
 void Normalize(base::CommandLine* command_line) {
 ''' + normalization + '''
@@ -364,7 +370,7 @@ def test_platform_aliases_preserve_native_hints_and_fill_cross_os_templates(
         tmp_path, host_os, host_arch, host_bits):
     text = additions(36)
     start = text.index('    struct Alias ')
-    normalization = text[start:text.index('    if (command_line->HasSwitch("fingerprint"))')]
+    normalization = text[start:text.index('    if (command_line->HasSwitch("fingerprint")) {\n      std::string seed =')]
     off = block(text, '    if (command_line->HasSwitch("fingerprint") &&\n        command_line->GetSwitchValueASCII("fingerprint") == "off")')
     flags = '#define BUILDFLAG(flag) (BUILDFLAG_INTERNAL_##flag())\n'
     for flag, os_name in (("IS_WIN", "windows"), ("IS_MAC", "macos"), ("IS_LINUX", "linux")):
@@ -387,7 +393,7 @@ void Normalize(base::CommandLine* command_line) {
 ''' + normalization + off + r'''
 }
 int host_reads = 0;
-std::string GetEffectiveUserAgentFullVersion() { return "153.1.2.3"; }
+std::string GetEffectiveBrowserBrandFullVersion() { return "153.1.2.3"; }
 std::string GetCpuArchitecture() { ++host_reads; return kHostArch; }
 std::string BuildModelInfo() { ++host_reads; return "host-model"; }
 std::string GetCpuBitness() { ++host_reads; return kHostBits; }
@@ -407,7 +413,7 @@ void AssertOff(const base::CommandLine& cmd) {
   assert(cmd.HasSwitch("uxr-disable-fingerprint-noise"));
   for (const auto& [key, value] : cmd.values)
     assert(key.compare(0, 4, "uxr-") != 0 || key == "uxr-webgl-real" ||
-           key == "uxr-disable-fingerprint-noise");
+           key == "uxr-disable-fingerprint-noise" || key == "uxr-fingerprint-off");
 }
 int main() {
   const struct {
@@ -562,7 +568,7 @@ def test_patches_apply_strictly_to_supplied_real_upstream(tmp_path, platform):
     host = (tmp_path / "content/browser/renderer_host/render_process_host_impl.cc").read_text()
     assert "effective_user_agent.replace" not in host
     assert "effective_user_agent_metadata.full_version" not in host
-    assert host.index("SetUxrConfig(std::move(uxr_cfg))") < host.index("GetRendererInterface()->InitializeRenderer(")
+    assert host.index("GetRendererInterface()->SetUxrConfig(") < host.index("GetRendererInterface()->InitializeRenderer(")
     language = (tmp_path / "third_party/blink/renderer/core/frame/navigator_language.cc").read_text()
     assert "SetICUDefaultLocale" not in language
     assert "probe::ApplyAcceptLanguageOverride" in language

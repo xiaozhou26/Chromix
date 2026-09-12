@@ -259,6 +259,17 @@ echo "$DOM_OUTPUT"
 grep -qF '<p>chromix-smoke-ok</p>' <<<"$DOM_OUTPUT" ||
   die "smoke page marker missing from dumped DOM"
 
+NATIVE_BROWSER="$SMOKE_DIR/chromix/chrome"
+[ "$PLATFORM" = macos ] && NATIVE_BROWSER="$SMOKE_DIR/chromix/Chromium.app/Contents/MacOS/Chromium"
+"$TIMEOUT" -k 15s 300s python3 -m pip install --disable-pip-version-check --timeout 30 --retries 1 \
+  -r "$REPO/tools/fingerprint-requirements.txt" || die "fingerprint audit dependencies unavailable"
+BROWSER_HASH="$(python3 -c 'import hashlib,sys; print(hashlib.file_digest(open(sys.argv[1],"rb"),"sha256").hexdigest())' "$NATIVE_BROWSER")"
+"$TIMEOUT" -k 30s 2100s python3 "$REPO/tools/fingerprint_acceptance.py" \
+  --browser "$NATIVE_BROWSER" --expected-sha256 "$BROWSER_HASH" --expected-version "$CHROMIUM_VERSION_PIN" \
+  --source-report "$WORK/fingerprint-diagnostics/source-final.json" --source-root "$SRC" \
+  --output-dir "$WORK/fingerprint-diagnostics/runtime-s$STAGE_INDEX-$(date +%s)-$$" ||
+  die "fingerprint regression gate failed; see the separate diagnostic artifact"
+
 rm -rf "$SMOKE_DIR"
 emit runtime_verified true
 emit finished true

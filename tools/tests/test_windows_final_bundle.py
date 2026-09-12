@@ -58,6 +58,12 @@ function Invoke-BoundedBrowser {
   if ($env:TEST_BAD_DOM -eq "1") { return "<p>wrong page</p>" }
   return "<p>chromix-smoke-ok</p>"
 }
+function Invoke-FingerprintAcceptance {
+  param($Browser)
+  if ($Browser -ne (Join-Path $Root "smoke/chromix/chrome.exe")) { throw "wrong audit executable" }
+  Write-Host "MOCK_FINGERPRINT"
+  if ($env:TEST_BAD_FINGERPRINT -eq "1") { throw "fingerprint acceptance failed" }
+}
 ''' + source[start:end] + "\nVerify-FinalBundle\n")
 
     def make_archive(self, missing=None, versioned_dll=None):
@@ -85,6 +91,13 @@ function Invoke-BoundedBrowser {
         self.assertEqual(result.stdout.count("MOCK_DOM"), 1)
         self.assertLess(result.stdout.index("MOCK_VERSION:chrome.dll"), result.stdout.index("MOCK_DOM"))
         self.assertIn("headless smoke checks passed", result.stdout)
+        self.assertLess(result.stdout.index('MOCK_DOM'), result.stdout.index('MOCK_FINGERPRINT'))
+
+    def test_fingerprint_failure_is_not_hidden_by_startup_smoke(self):
+        result = self.verify(TEST_BAD_FINGERPRINT='1')
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn('MOCK_DOM', result.stdout)
+        self.assertIn('fingerprint acceptance failed', result.stderr)
 
     def test_missing_duplicate_and_mismatched_entries_stop_before_extraction(self):
         for value, error in (("", "no unique"),

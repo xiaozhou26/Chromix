@@ -1,0 +1,39 @@
+diff --git a/third_party/blink/renderer/core/frame/screen_metrics_emulator.cc b/third_party/blink/renderer/core/frame/screen_metrics_emulator.cc
+--- a/third_party/blink/renderer/core/frame/screen_metrics_emulator.cc
++++ b/third_party/blink/renderer/core/frame/screen_metrics_emulator.cc
+@@ -5,6 +5,7 @@
+ #include "third_party/blink/renderer/core/frame/screen_metrics_emulator.h"
+ 
+ #include "base/numerics/safe_conversions.h"
++#include "base/uxr_config.h"
+ #include "third_party/blink/public/common/widget/visual_properties.h"
+ #include "third_party/blink/renderer/core/frame/web_frame_widget_impl.h"
+ 
+@@ -155,11 +156,27 @@
+   }
+ 
+   display::ScreenInfos emulated_screen_infos = original_screen_infos_;
++  // An explicitly emulated screen is a single-screen backend. Update the list,
++  // not only getters, so ScreenDetailed, CSS and isExtended share this state.
++  if (!emulation_params_.screen_size.IsEmpty()) {
++    display::ScreenInfo current = emulated_screen_infos.current();
++    current.is_primary = true;
++    current.is_extended = false;
++    emulated_screen_infos.screen_infos.assign(1, current);
++  }
+   display::ScreenInfo& emulated_screen_info =
+       emulated_screen_infos.mutable_current();
+   emulated_screen_info.device_scale_factor = device_scale_factor;
+   emulated_screen_info.rect = screen_rect;
+   emulated_screen_info.available_rect = screen_rect;
++  const auto display = base::UxrConfig::GetInstance().Display();
++  // A later CDP screen override takes precedence over launch-time geometry.
++  if (display.width > 0 && screen_rect.width() == display.width &&
++      screen_rect.height() == display.height) {
++    emulated_screen_info.available_rect = gfx::Rect(
++        screen_rect.origin(), gfx::Size(display.available_width,
++                                      display.available_height));
++  }
+   emulated_screen_info.orientation_type = orientation_type;
+   emulated_screen_info.orientation_angle = orientation_angle;
+   frame_widget_->SetScreenInfoAndSize(emulated_screen_infos,

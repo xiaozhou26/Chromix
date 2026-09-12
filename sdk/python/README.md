@@ -66,9 +66,47 @@ Node SDK, and is published atomically for concurrent first launches. An
 explicit `--fingerprint=...` in `args` wins without creating or rewriting the
 file; `stealth_args=False` also skips seed I/O. Defaults claim the native
 persona: `linux`, `windows`, or `macos`. Default viewport geometry is native.
-Seeded synthetic geometry now requires `args=["--uxr-synthetic-device-tests=true"]`;
-that test-only mode retains deterministic cross-SDK templates. Explicit viewport
-options still win outside measured mode.
+The browser's public fingerprint mode supplies CPU/RAM 8/8, platform-specific
+screen/taskbar defaults and a 102400 MiB quota. The older seeded synthetic
+viewport/hardware pools require `args=["--uxr-synthetic-device-tests=true"]`;
+that separate test mode retains deterministic cross-SDK templates. Explicit
+viewport options still win outside measured mode.
+
+Explicit synthetic seeds accept nonzero decimal uint64 values, including values
+above `2**32`; Python and Node derive identical geometry. Malformed seeds, conflicting
+screen/taskbar aliases, invalid work areas and incomplete viewport pairs fail instead
+of silently choosing another template. `--uxr-viewport-width`/`--uxr-viewport-height`
+override the UI-strip template. Screen dimensions and DPR (including 1) are sent
+together with a configured viewport; `viewport=None` keeps native context geometry.
+The [launch display backend](../../docs/persona-cross-process-design.md) requires
+a browser rebuilt from the current patch stack.
+
+### Public fingerprint flags
+
+All listed public flags are passed through `args`: GPU vendor/renderer,
+hardware concurrency, device memory, screen/taskbar, brand/version/platform
+version, timezone/locale, storage quota, Windows font metrics, WebRTC IP/auto,
+noise/off, third-party cookies, Windows voice tables and `FakeShadowRoot`.
+See the [complete flag contract](../../docs/fingerprint-flags.md) for defaults
+and native-versus-SDK boundaries. These source changes require a rebuilt browser;
+updating this Python package alone does not upgrade an older executable.
+
+```python
+browser = launch(args=[
+    "--fingerprint=42",
+    "--fingerprint-brand=Edge",
+    "--fingerprint-brand-version=152.0.0.0",
+    "--fingerprint-noise=false",
+    "--fingerprint-allow-3p-cookies",
+    "--enable-blink-features=FakeShadowRoot",
+])
+```
+
+`--fingerprint=off` also accepts `false/0/disable/disabled` and strips the
+injected platform. Explicit timezone/locale and `geoip=True` still apply their
+regional settings; omit them for a native-persona comparison. `noise=false`
+keeps identity seeds and disables existing perturbation paths, not four new
+Canvas/WebGL/audio/client-rect noise implementations.
 
 ### Measured device launch
 
@@ -121,20 +159,31 @@ operations to the configured endpoint.
 ### Proxy and GeoIP behavior
 
 GeoIP is metadata, not a routing mechanism. The lookup uses the effective
-HTTP/HTTPS proxy and does not inherit environment proxies or `NO_PROXY`
-bypasses. Failed lookups do not fall back to the host connection. SOCKS
-remains a browser proxy option; use `geoip=False` and explicit `timezone`
-/ `locale` for SOCKS.
+HTTP/HTTPS/SOCKS proxy and does not inherit environment proxies or `NO_PROXY`
+bypasses. Failed lookups do not fall back to the host connection. Metadata
+transport supports SOCKS4/4a/5/5h, including SOCKS5 credentials. This does not
+add SOCKS authentication or every URL alias to Chromium/Playwright's proxy
+backend. SOCKS5/4a resolve destination names at the proxy; SOCKS4 uses local
+IPv4 DNS. Single raw `--proxy-server` routes are supported for lookup;
+PAC/auto-detect, route lists, empty raw proxies, raw proxy credentials and
+conflicting `--no-proxy-server` are rejected. If raw `--proxy-server` and a
+high-level proxy are both supplied, their endpoints must match (default ports
+and equivalent IPv6 spellings are normalized); use the high-level option for credentials.
 
 With a proxy, the SDK defaults to the native
 `--force-webrtc-ip-handling-policy=disable_non_proxied_udp` unless an explicit
 native policy was supplied. This does not guarantee the routing of all DNS,
 HTTP, QUIC or operating-system traffic.
 
-The SDK rejects `--fingerprint-webrtc-ip`, `--fingerprint-webrtc-fake-srflx`
-and `--fingerprint-webrtc-fake-srflx-allow-udp` (including `uxr` equivalents).
-GeoIP no longer appends an ICE address override. Its HTTP metadata service
-is unauthenticated and must not be treated as proof of an exit route.
+`--fingerprint-webrtc-ip=<IPv4|IPv6|auto>` is supported. Auto resolves before
+launch through the same effective proxy; `geoip=True` reuses its one lookup to
+append the exit IP unless an explicit IP wins. Off mode skips IP injection.
+The browser changes local candidate/SDP/stats presentation, not sockets or
+STUN success; remote addresses, zero placeholders and relay allocations remain
+native. `webrtc-fake-srflx` and `webrtc-fake-srflx-allow-udp` (including `uxr`
+equivalents) remain rejected. The SDK's HTTP metadata service is unauthenticated
+and is not proof of an exit route. Bare-browser auto uses its own bounded HTTPS
+startup resolver; see the [full resolution contract](../../docs/fingerprint-flags.md#webrtc-ip-and-proxy-resolution).
 
 GeoIP lookup failures now raise `ValueError`. The timeout defaults to 10
 seconds and accepts values greater than zero and at most 60. Python's
@@ -142,7 +191,7 @@ synchronous DNS/connection setup cannot always be interrupted at that
 deadline; a late connection is rejected before sending the GeoIP request.
 IANA timezone data must be installed for timezone validation. Creating a
 later context with another proxy does not recompute browser-level locale
-or timezone.
+or timezone/IP.
 
 ## CLI
 

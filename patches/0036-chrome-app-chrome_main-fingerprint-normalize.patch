@@ -21,7 +21,7 @@ index f3c06b9e10..b5bc89bcf7 100644
  #include "base/functional/callback_helpers.h"
  #include "base/no_destructor.h"
  #include "base/sampling_heap_profiler/poisson_allocation_sampler.h"
-@@ -196,6 +202,197 @@
+@@ -196,6 +202,341 @@
  
    base::CommandLine* command_line(base::CommandLine::ForCurrentProcess());
  
@@ -30,6 +30,20 @@ index f3c06b9e10..b5bc89bcf7 100644
 +  // Only the browser process (no --process-type) performs normalization;
 +  // child processes inherit the already-converted switches.
 +  if (!command_line->HasSwitch(switches::kProcessType)) {
++    // Canonicalize public booleans identically for direct and SDK launches.
++    for (const char* key : {"fingerprint-noise", "fingerprint-sapi-voices",
++                            "fingerprint-allow-3p-cookies", "fingerprint-windows-font-metrics"}) {
++      if (!command_line->HasSwitch(key))
++        continue;
++      const std::string value = base::ToLowerASCII(command_line->GetSwitchValueASCII(key));
++      if (value == "off" || value == "false" || value == "0" ||
++          value == "disable" || value == "disabled")
++        command_line->AppendSwitchASCII(key, "false");
++      else if (value.empty() || value == "true" || value == "1" ||
++               value == "on" || value == "enable" || value == "enabled")
++        command_line->AppendSwitchASCII(key, "true");
++    }
++
 +    struct Alias { const char* fp; const char* uxr; };
 +    static constexpr Alias kAliases[] = {
 +      {"fingerprint-gpu-vendor",          "uxr-webgl-vendor"},
@@ -40,11 +54,13 @@ index f3c06b9e10..b5bc89bcf7 100644
 +      {"fingerprint-screen-width",        "uxr-screen-width"},
 +      {"fingerprint-screen-height",       "uxr-screen-height"},
 +      {"fingerprint-brand",               "uxr-ua-brand"},
-+      {"fingerprint-brand-version",        "uxr-ua-full-version"},
++      {"fingerprint-brand-version",        "uxr-ua-brand-version"},
 +      {"fingerprint-platform-version",    "uxr-ua-platform-version"},
 +      {"fingerprint-timezone",            "uxr-timezone"},
 +      {"fingerprint-storage-quota",        "uxr-storage-quota"},
 +      {"fingerprint-taskbar-height",      "uxr-taskbar-height"},
++      {"fingerprint-windows-font-metrics", "uxr-windows-font-metrics"},
++      {"fingerprint-webrtc-ip",           "uxr-webrtc-ip"},
 +      {"fingerprint-geolocation",         "uxr-geolocation"},
 +      {"fingerprint-codec-h264",          "uxr-codec-h264"},
 +      {"fingerprint-codec-vp8",           "uxr-codec-vp8"},
@@ -68,6 +84,39 @@ index f3c06b9e10..b5bc89bcf7 100644
 +        !command_line->HasSwitch("uxr-languages")) {
 +      command_line->AppendSwitchASCII("uxr-languages",
 +          command_line->GetSwitchValueASCII("fingerprint-locale"));
++    }
++
++    // Canonicalize the public off spellings before any consumer sees them.
++    if (command_line->HasSwitch("fingerprint")) {
++      const std::string mode = base::ToLowerASCII(
++          command_line->GetSwitchValueASCII("fingerprint"));
++      if (mode == "off" || mode == "false" || mode == "0" ||
++          mode == "disable" || mode == "disabled") {
++        command_line->AppendSwitchASCII("fingerprint", "off");
++        command_line->RemoveSwitch("fingerprint-platform");
++      }
++    }
++
++    if (command_line->HasSwitch("uxr-ua-brand")) {
++      const std::string brand = base::ToLowerASCII(
++          command_line->GetSwitchValueASCII("uxr-ua-brand"));
++      if (brand == "chrome" || brand == "google chrome")
++        command_line->AppendSwitchASCII("uxr-ua-brand", "Google Chrome");
++      else if (brand == "edge" || brand == "microsoft edge")
++        command_line->AppendSwitchASCII("uxr-ua-brand", "Microsoft Edge");
++      else if (brand == "opera")
++        command_line->AppendSwitchASCII("uxr-ua-brand", "Opera");
++      else if (brand == "vivaldi")
++        command_line->AppendSwitchASCII("uxr-ua-brand", "Vivaldi");
++    }
++    // Chrome's brand version is its engine version. Other brands have their
++    // own version and must not change the Chromium token or GREASE seed.
++    const std::string brand = command_line->GetSwitchValueASCII("uxr-ua-brand");
++    if ((brand.empty() || brand == "Google Chrome" || brand == "Chromium") &&
++        command_line->HasSwitch("uxr-ua-brand-version") &&
++        !command_line->HasSwitch("uxr-ua-full-version")) {
++      command_line->AppendSwitchASCII("uxr-ua-full-version",
++          command_line->GetSwitchValueASCII("uxr-ua-brand-version"));
 +    }
 +
 +    if (command_line->HasSwitch("fingerprint-platform")) {
@@ -144,6 +193,7 @@ index f3c06b9e10..b5bc89bcf7 100644
 +        }
 +      }
 +      if (!seed.empty() && seed != "off") {
++        command_line->AppendSwitchASCII("uxr-fingerprint-enabled", "true");
 +        command_line->AppendSwitchASCII("uxr-webgl-fingerprint", "true");
 +        if (!command_line->HasSwitch("uxr-fingerprint-seed"))
 +          command_line->AppendSwitchASCII("uxr-fingerprint-seed", seed);
@@ -154,21 +204,73 @@ index f3c06b9e10..b5bc89bcf7 100644
 +      }
 +    }
 +
++    const bool public_fingerprint =
++        command_line->GetSwitchValueASCII("uxr-fingerprint-enabled") == "true";
++    if (public_fingerprint || command_line->HasSwitch("uxr-screen-width") ||
++        command_line->HasSwitch("uxr-screen-height") ||
++        command_line->HasSwitch("uxr-screen-avail-width") ||
++        command_line->HasSwitch("uxr-screen-avail-height") ||
++        command_line->HasSwitch("uxr-taskbar-height")) {
++      const auto append_default = [&](const char* key, const char* value) {
++        if (!command_line->HasSwitch(key))
++          command_line->AppendSwitchASCII(key, value);
++      };
++      std::string platform = base::ToLowerASCII(
++          command_line->GetSwitchValueASCII("uxr-ua-platform"));
++      if (platform.empty())
++        platform = base::ToLowerASCII(
++            command_line->GetSwitchValueASCII("uxr-platform"));
++      if (platform.empty()) {
++#if BUILDFLAG(IS_WIN)
++        platform = "windows";
++#elif BUILDFLAG(IS_MAC)
++        platform = "macos";
++#else
++        platform = "linux";
++#endif
++      }
++      const bool mac = platform == "macos" || platform == "macintel";
++      const bool win = platform == "windows" || platform == "win32";
++      // Public launch defaults are independent of noise seeds. Explicit
++      // synthetic tests retain their opt-in, seeded hardware/geometry pools.
++      if (command_line->GetSwitchValueASCII("uxr-synthetic-device-tests") != "true") {
++        if (public_fingerprint) {
++          append_default("uxr-hw-concurrency", "8");
++          append_default("uxr-device-memory", "8");
++        }
++        append_default("uxr-screen-width", mac ? "1440" : "1920");
++        append_default("uxr-screen-height", mac ? "900" : "1080");
++        if (!command_line->HasSwitch("uxr-screen-avail-height"))
++          append_default("uxr-taskbar-height", win ? "48" : mac ? "95" : "0");
++      }
++      if (public_fingerprint)
++        append_default("uxr-storage-quota", "102400");
++      if (public_fingerprint && win && !command_line->HasSwitch("fingerprint-sapi-voices"))
++        append_default("uxr-voices", "true");
++    }
++
 +    if (command_line->HasSwitch("fingerprint-noise") &&
 +        command_line->GetSwitchValueASCII("fingerprint-noise") == "false") {
-+      command_line->RemoveSwitch("uxr-canvas-seed");
-+      command_line->RemoveSwitch("uxr-audio-seed");
++      // Disable perturbation, not persona selection. All seeds stay intact.
 +      command_line->AppendSwitch("uxr-disable-fingerprint-noise");
 +    }
 +
-+    if (command_line->HasSwitch("fingerprint-sapi-voices") &&
-+        command_line->GetSwitchValueASCII("fingerprint-sapi-voices") ==
-+            "false") {
-+      command_line->RemoveSwitch("uxr-voices");
++    if (command_line->HasSwitch("fingerprint-sapi-voices")) {
++      const std::string value = base::ToLowerASCII(
++          command_line->GetSwitchValueASCII("fingerprint-sapi-voices"));
++      if (value == "false" || value == "0" || value == "off")
++        command_line->RemoveSwitch("uxr-voices");
++      else
++        command_line->AppendSwitchASCII("uxr-voices", "true");
 +    }
 +
 +    if (command_line->HasSwitch("fingerprint") &&
 +        command_line->GetSwitchValueASCII("fingerprint") == "off") {
++      // Explicit regional settings are independent of fingerprint spoofing.
++      const bool has_timezone = command_line->HasSwitch("uxr-timezone");
++      const bool has_languages = command_line->HasSwitch("uxr-languages");
++      const std::string timezone = command_line->GetSwitchValueASCII("uxr-timezone");
++      const std::string languages = command_line->GetSwitchValueASCII("uxr-languages");
 +      const auto& sws = command_line->GetSwitches();
 +      std::vector<std::string> uxr_keys;
 +      for (const auto& s : sws) {
@@ -177,6 +279,12 @@ index f3c06b9e10..b5bc89bcf7 100644
 +      }
 +      for (const auto& k : uxr_keys)
 +        command_line->RemoveSwitch(k);
++      command_line->AppendSwitchASCII("uxr-fingerprint-off", "true");
++      command_line->RemoveSwitch("fingerprint-platform");
++      if (has_timezone)
++        command_line->AppendSwitchASCII("uxr-timezone", timezone);
++      if (has_languages)
++        command_line->AppendSwitchASCII("uxr-languages", languages);
 +      // GPU identity and readback noise otherwise have enabled defaults.
 +      command_line->AppendSwitch("uxr-webgl-real");
 +      command_line->AppendSwitch("uxr-disable-fingerprint-noise");
@@ -210,9 +318,45 @@ index f3c06b9e10..b5bc89bcf7 100644
 +      }
 +    }
 +
-+    if (command_line->HasSwitch("fingerprint-allow-3p-cookies")) {
++    // Set actual native window bounds. Getter overrides cannot resize a window
++    // or supply valid negative monitor coordinates. Native caller flags win.
++    constexpr char kWindowSize[] = "window-size";
++    constexpr char kWindowPosition[] = "window-position";
++    if (command_line->HasSwitch("uxr-outer-width") &&
++        command_line->HasSwitch("uxr-outer-height") &&
++        !command_line->HasSwitch(kWindowSize)) {
 +      command_line->AppendSwitchASCII(
-+          "test-third-party-cookie-phaseout", "false");
++          kWindowSize, command_line->GetSwitchValueASCII("uxr-outer-width") +
++                           "," + command_line->GetSwitchValueASCII("uxr-outer-height"));
++    }
++    // An explicit native position must also win inside device emulation;
++    // otherwise the real window and its web-exposed position would disagree.
++    if (command_line->HasSwitch(kWindowPosition)) {
++      command_line->RemoveSwitch("uxr-window-x");
++      command_line->RemoveSwitch("uxr-window-y");
++    } else if ((command_line->HasSwitch("uxr-window-x") ||
++         command_line->HasSwitch("uxr-window-y")) &&
++        !command_line->HasSwitch(kWindowPosition)) {
++      const std::string x = command_line->HasSwitch("uxr-window-x")
++                                ? command_line->GetSwitchValueASCII("uxr-window-x") : "0";
++      const std::string y = command_line->HasSwitch("uxr-window-y")
++                                ? command_line->GetSwitchValueASCII("uxr-window-y") : "0";
++      command_line->AppendSwitchASCII(kWindowPosition, x + "," + y);
++    }
++
++    if (command_line->HasSwitch("fingerprint-allow-3p-cookies") &&
++        command_line->GetSwitchValueASCII("fingerprint-allow-3p-cookies") != "false" &&
++        command_line->GetSwitchValueASCII("fingerprint-allow-3p-cookies") != "0") {
++      // This native switch is presence-based: appending '=false' ENABLES the
++      // phaseout. CookieSettings consumes our explicit, non-persistent opt-in.
++      command_line->RemoveSwitch("test-third-party-cookie-phaseout");
++      command_line->AppendSwitchASCII("uxr-allow-3p-cookies", "true");
++      constexpr char kDisableFeatures[] = "disable-features";
++      std::string disabled = command_line->GetSwitchValueASCII(kDisableFeatures);
++      if (!disabled.empty())
++        disabled += ",";
++      disabled += "ForceThirdPartyCookieBlocking";
++      command_line->AppendSwitchASCII(kDisableFeatures, disabled);
 +    }
 +  }
 +

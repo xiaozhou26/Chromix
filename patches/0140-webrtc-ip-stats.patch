@@ -1,0 +1,29 @@
+diff --git a/third_party/blink/renderer/modules/peerconnection/rtc_stats_report.cc b/third_party/blink/renderer/modules/peerconnection/rtc_stats_report.cc
+--- a/third_party/blink/renderer/modules/peerconnection/rtc_stats_report.cc
++++ b/third_party/blink/renderer/modules/peerconnection/rtc_stats_report.cc
+@@ -3,6 +3,8 @@
+ // found in the LICENSE file.
+ 
+ #include "third_party/blink/renderer/modules/peerconnection/rtc_stats_report.h"
++
++#include "third_party/blink/renderer/platform/peerconnection/fingerprint_ip.h"
+ 
+ #include "base/compiler_specific.h"
+ #include "base/feature_list.h"
+@@ -518,6 +520,16 @@
+   // Non-standard and obsolete stats.
+   SET_STAT(webrtc_stat.is_remote, v8_stat->setIsRemote);
+   SET_STAT(webrtc_stat.ip, v8_stat->setIp);
++  if (std::string_view(webrtc_stat.type()) == "local-candidate" &&
++      (!webrtc_stat.candidate_type.has_value() || *webrtc_stat.candidate_type != "relay")) {
++    const std::string ip = FingerprintWebRtcIp();
++    if (!ip.empty()) {
++      if (webrtc_stat.address.has_value())
++        v8_stat->setAddress(String::FromUtf8(RewriteFingerprintAddress(*webrtc_stat.address, ip)));
++      if (webrtc_stat.ip.has_value())
++        v8_stat->setIp(String::FromUtf8(RewriteFingerprintAddress(*webrtc_stat.ip, ip)));
++    }
++  }
+   return v8_stat;
+ }
+ 

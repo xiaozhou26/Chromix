@@ -1,27 +1,33 @@
 diff --git a/third_party/blink/renderer/modules/peerconnection/rtc_peer_connection.cc b/third_party/blink/renderer/modules/peerconnection/rtc_peer_connection.cc
-index fe62cba2b1..371461a4d9 100644
 --- a/third_party/blink/renderer/modules/peerconnection/rtc_peer_connection.cc
 +++ b/third_party/blink/renderer/modules/peerconnection/rtc_peer_connection.cc
-@@ -47,6 +47,7 @@
+@@ -47,6 +47,8 @@
  #include "base/numerics/safe_conversions.h"
  #include "base/task/single_thread_task_runner.h"
  #include "base/task/thread_pool.h"
 +#include "base/uxr_config.h"
++#include "third_party/blink/renderer/platform/peerconnection/fingerprint_ip.h"
  #include "build/build_config.h"
  #include "build/buildflag.h"
  #include "services/metrics/public/cpp/ukm_builders.h"
-@@ -454,6 +455,26 @@
+@@ -454,6 +456,32 @@
          configuration->alwaysNegotiateDataChannels();
    }
  
 +  const auto& uxr_config = base::UxrConfig::GetInstance();
-+  if (uxr_config.Has("uxr-webrtc-ip") ||
-+      uxr_config.Has("uxr-webrtc-fake-srflx") ||
++  if (uxr_config.Has("uxr-webrtc-fake-srflx") ||
 +      uxr_config.Has("uxr-webrtc-fake-srflx-allow-udp")) {
 +    exception_state->ThrowDOMException(
 +        DOMExceptionCode::kNotSupportedError,
-+        "WebRTC address substitution is retired; configure a real proxy or "
-+        "TURN server and use uxr-webrtc-policy=disable_non_proxied_udp.");
++        "Synthetic STUN candidates are retired. Use fingerprint-webrtc-ip "
++        "for presentation and a real proxy or TURN server for routing.");
++    return web_configuration;
++  }
++  if (uxr_config.Has("uxr-webrtc-ip") && FingerprintWebRtcIp().empty()) {
++    exception_state->ThrowDOMException(
++        DOMExceptionCode::kNotSupportedError,
++        "fingerprint-webrtc-ip requires an IPv4/IPv6 literal; auto must "
++        "finish resolving before renderer startup.");
 +    return web_configuration;
 +  }
 +  const std::string uxr_policy = uxr_config.Get("uxr-webrtc-policy");
@@ -37,3 +43,107 @@ index fe62cba2b1..371461a4d9 100644
    return web_configuration;
  }
  
+@@ -1136,6 +1164,7 @@
+     }
+   }
+ 
++  sdp = RestoreFingerprintLocalSdp(sdp);
+   ExecutionContext* context = ExecutionContext::From(script_state);
+   ParsedSessionDescription parsed_sdp = ParsedSessionDescription::Parse(
+       session_description_init->type().AsString(), sdp);
+@@ -1232,6 +1261,7 @@
+     }
+   }
+ 
++  sdp = RestoreFingerprintLocalSdp(sdp);
+   ParsedSessionDescription parsed_sdp = ParsedSessionDescription::Parse(
+       session_description_init->hasType()
+           ? session_description_init->type().AsString()
+@@ -2524,6 +2554,22 @@
+   tracks_.insert(track->Component(), track);
+ }
+ 
++String RTCPeerConnection::RestoreFingerprintLocalSdp(const String& sdp) const {
++  const std::string ip = FingerprintWebRtcIp();
++  if (ip.empty() || sdp.empty())
++    return sdp;
++  const std::string shown = sdp.Utf8();
++  for (const String* native : {&last_offer_, &last_answer_,
++                               &fingerprint_pending_local_sdp_,
++                               &fingerprint_current_local_sdp_}) {
++    if (!native->empty() && RewriteFingerprintSdp(native->Utf8(), ip) == shown)
++      return *native;
++  }
++  // Caller-edited SDP keeps native validation; never guess which real address
++  // an arbitrary replacement should map to.
++  return sdp;
++}
++
+ void RTCPeerConnection::NoteSdpCreated(const RTCSessionDescriptionInit& desc) {
+   if (desc.type() == V8RTCSdpType::Enum::kOffer) {
+     last_offer_ = desc.sdp();
+@@ -2573,6 +2619,17 @@
+   DCHECK(!closed_);
+   DCHECK(GetExecutionContext()->IsContextThread());
+   DCHECK(platform_candidate);
++  const std::string ip = FingerprintWebRtcIp();
++  if (!ip.empty()) {
++    const std::string original = platform_candidate->Candidate().Utf8();
++    const std::string rewritten = RewriteFingerprintCandidate(original, ip);
++    if (rewritten != original) {
++      platform_candidate = MakeGarbageCollected<RTCIceCandidatePlatform>(
++          String::FromUtf8(rewritten), platform_candidate->SdpMid(),
++          platform_candidate->SdpMLineIndex(), platform_candidate->UsernameFragment(),
++          platform_candidate->Url());
++    }
++  }
+   RTCIceCandidate* ice_candidate = RTCIceCandidate::Create(platform_candidate);
+   MaybeDispatchEvent(RTCPeerConnectionIceEvent::Create(ice_candidate));
+ }
+@@ -2585,8 +2642,13 @@
+                                             const String& error_text) {
+   DCHECK(!closed_);
+   DCHECK(GetExecutionContext()->IsContextThread());
++  const std::string ip = FingerprintWebRtcIp();
++  const String shown_address = ip.empty() || address.IsNull() ? address :
++      String::FromUtf8(RewriteFingerprintAddress(address.Utf8(), ip));
++  const String shown_candidate = ip.empty() || host_candidate.IsNull() ? host_candidate :
++      String::FromUtf8(RewriteFingerprintCandidate(host_candidate.Utf8(), ip));
+   MaybeDispatchEvent(RTCPeerConnectionIceErrorEvent::Create(
+-      address, port, host_candidate, url, error_code, error_text));
++      shown_address, port, shown_candidate, url, error_code, error_text));
+ }
+ 
+ void RTCPeerConnection::DidChangeSessionDescriptions(
+@@ -2596,14 +2658,23 @@
+     RTCSessionDescriptionPlatform* current_remote_description) {
+   DCHECK(!closed_);
+   DCHECK(GetExecutionContext()->IsContextThread());
+-  pending_local_description_ =
+-      pending_local_description
+-          ? RTCSessionDescription::Create(pending_local_description)
+-          : nullptr;
+-  current_local_description_ =
+-      current_local_description
+-          ? RTCSessionDescription::Create(current_local_description)
+-          : nullptr;
++  const std::string ip = FingerprintWebRtcIp();
++  // Keep native values for exact local-description round trips. The copies
++  // returned to script must not replace libwebrtc's actual socket addresses.
++  fingerprint_pending_local_sdp_ = !ip.empty() && pending_local_description
++      ? pending_local_description->Sdp() : String();
++  fingerprint_current_local_sdp_ = !ip.empty() && current_local_description
++      ? current_local_description->Sdp() : String();
++  const auto local_description = [&](RTCSessionDescriptionPlatform* description)
++      -> RTCSessionDescription* {
++    if (!description) return nullptr;
++    if (ip.empty()) return RTCSessionDescription::Create(description);
++    return RTCSessionDescription::Create(
++        MakeGarbageCollected<RTCSessionDescriptionPlatform>(description->GetType(),
++            String::FromUtf8(RewriteFingerprintSdp(description->Sdp().Utf8(), ip))));
++  };
++  pending_local_description_ = local_description(pending_local_description);
++  current_local_description_ = local_description(current_local_description);
+   pending_remote_description_ =
+       pending_remote_description
+           ? RTCSessionDescription::Create(pending_remote_description)

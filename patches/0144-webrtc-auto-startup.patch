@@ -1,0 +1,158 @@
+diff --git a/chrome/browser/chrome_browser_main.cc b/chrome/browser/chrome_browser_main.cc
+--- a/chrome/browser/chrome_browser_main.cc
++++ b/chrome/browser/chrome_browser_main.cc
+@@ -13,6 +13,18 @@
+ #include "base/base_switches.h"
+ #include "base/check.h"
+ #include "base/command_line.h"
++#include "base/functional/bind.h"
++#include "base/run_loop.h"
++#include "base/strings/string_util.h"
++#include "base/uxr_config.h"
++#include "net/base/ip_address.h"
++#include "net/base/load_flags.h"
++#include "net/base/proxy_string_util.h"
++#include "net/proxy_resolution/proxy_config_with_annotation.h"
++#include "net/traffic_annotation/network_traffic_annotation.h"
++#include "services/network/public/cpp/originating_process_id.h"
++#include "services/network/public/cpp/resource_request.h"
++#include "services/network/public/cpp/simple_url_loader.h"
+ #include "base/feature_list.h"
+ #include "base/files/file_path.h"
+ #include "base/files/file_util.h"
+@@ -353,6 +365,125 @@
+ 
+ namespace {
+ 
++// Resolve an explicitly requested auto address once, before profiles or
++// renderer persona snapshots exist. A bounded startup RunLoop services the
++// network callbacks; no UI-thread socket blocking or profile-state mutation.
++bool ResolveFingerprintWebRtcAuto() {
++  auto* command_line = base::CommandLine::ForCurrentProcess();
++  if (command_line->GetSwitchValueASCII("uxr-fingerprint-off") == "true" ||
++      !base::EqualsCaseInsensitiveASCII(
++          command_line->GetSwitchValueASCII("uxr-webrtc-ip"), "auto"))
++    return true;
++  if (base::UxrConfig::GetInstance().IsInitialized()) {
++    LOG(ERROR) << "WebRTC auto must resolve before the persona snapshot.";
++    return false;
++  }
++  const bool direct = command_line->HasSwitch(switches::kNoProxyServer);
++  if (!direct && (command_line->HasSwitch(switches::kProxyPacUrl) ||
++                  command_line->HasSwitch(switches::kProxyAutoDetect))) {
++    LOG(ERROR) << "WebRTC auto requires a fixed proxy route, not PAC/auto-detect.";
++    return false;
++  }
++  const std::string proxy = direct ? "" :
++      command_line->GetSwitchValueASCII(switches::kProxyServer);
++  if (!direct && command_line->HasSwitch(switches::kProxyServer) &&
++      proxy.empty()) {
++    LOG(ERROR) << "WebRTC auto requires a non-empty explicit proxy route.";
++    return false;
++  }
++  net::ProxyChain chain;
++  if (!proxy.empty()) {
++    // A fallback list can silently change egress. Explicit authentication is
++    // resolved by SDK launchers; Chrome's proxy-server switch has no userinfo.
++    chain = net::ProxyUriToProxyChain(proxy, net::ProxyServer::SCHEME_HTTP);
++    if (proxy.find_first_of(";,=@ \t\r\n") != std::string::npos ||
++        !chain.IsValid() || chain.is_direct()) {
++      LOG(ERROR) << "WebRTC auto requires one HTTP/HTTPS/SOCKS proxy URI.";
++      return false;
++    }
++  }
++  constexpr auto annotation = net::DefineNetworkTrafficAnnotation(
++      "fingerprint_webrtc_auto", R"(
++        semantics {
++          sender: "Fingerprint WebRTC address resolver"
++          description: "Resolve the egress IP for a user-requested WebRTC presentation override."
++          trigger: "The user supplies fingerprint-webrtc-ip=auto at browser startup."
++          data: "No payload, cookies or browsing history; the service observes the connection IP."
++          destination: OTHER
++          destination_other: "https://api.ipify.org"
++        }
++        policy {
++          cookies_allowed: NO
++          setting: "Disabled unless explicitly requested on the command line."
++          policy_exception_justification: "Command-line opt-in only."
++        })");
++  auto* manager = SystemNetworkContextManager::GetInstance();
++  if (!manager) {
++    LOG(ERROR) << "WebRTC auto requires the system network context.";
++    return false;
++  }
++  mojo::Remote<network::mojom::NetworkContext> context;
++  mojo::Remote<network::mojom::URLLoaderFactory> factory;
++  network::mojom::URLLoaderFactory* selected_factory = nullptr;
++  if (direct || !proxy.empty()) {
++    // No bypass list, second proxy, direct fallback or cached proxy auth.
++    auto params = manager->CreateDefaultNetworkContextParams();
++    params->http_cache_enabled = false;
++    net::ProxyConfig proxy_config;
++    if (!direct) {
++      proxy_config.proxy_rules().type = net::ProxyConfig::ProxyRules::Type::PROXY_LIST;
++      proxy_config.proxy_rules().single_proxies.AddProxyChain(std::move(chain));
++    }
++    params->initial_proxy_config = net::ProxyConfigWithAnnotation(proxy_config, annotation);
++    content::GetNetworkService()->CreateNetworkContext(
++        context.BindNewPipeAndPassReceiver(), std::move(params));
++    auto factory_params = network::mojom::URLLoaderFactoryParams::New();
++    factory_params->process_id = network::OriginatingProcessId::browser();
++    factory_params->is_orb_enabled = false;
++    factory_params->is_trusted = true;
++    context->CreateURLLoaderFactory(factory.BindNewPipeAndPassReceiver(),
++                                    std::move(factory_params));
++    selected_factory = factory.get();
++  } else {
++    // Without an explicit route, use the browser's actual system proxy config.
++    selected_factory = manager->GetURLLoaderFactory();
++  }
++  auto request = std::make_unique<network::ResourceRequest>();
++  request->url = GURL("https://api.ipify.org");
++  request->credentials_mode = network::mojom::CredentialsMode::kOmit;
++  request->redirect_mode = network::mojom::RedirectMode::kError;
++  request->load_flags = net::LOAD_DISABLE_CACHE;
++  auto loader = network::SimpleURLLoader::Create(std::move(request), annotation);
++  loader->SetTimeoutDuration(base::Seconds(10));
++  base::RunLoop loop;
++  std::string resolved;
++  loader->DownloadToString(selected_factory, base::BindOnce(
++      [](base::RunLoop* loop, std::string* result, std::optional<std::string> body) {
++        net::IPAddress address;
++        if (body) {
++          std::string text;
++          base::TrimWhitespaceASCII(*body, base::TRIM_ALL, &text);
++          if (address.AssignFromIPLiteral(text) && !address.IsZero())
++            *result = address.ToString();
++        }
++        loop->Quit();
++      }, &loop, &resolved), 256);
++  loop.Run();
++  if (resolved.empty()) {
++    LOG(ERROR) << "WebRTC auto IP lookup failed; no alternate/direct retry.";
++    return false;
++  }
++  // A nested startup task must not have frozen a renderer persona while
++  // the lookup was in flight. Never publish a second launch identity.
++  if (base::UxrConfig::GetInstance().IsInitialized()) {
++    LOG(ERROR) << "WebRTC auto persona initialized during IP lookup.";
++    return false;
++  }
++  command_line->AppendSwitchASCII("uxr-webrtc-ip", resolved);
++  return true;
++}
++
++
+ #if BUILDFLAG(IS_ANDROID) || BUILDFLAG(IS_CHROMEOS) || BUILDFLAG(IS_LINUX) || \
+     BUILDFLAG(IS_MAC) || BUILDFLAG(IS_WIN)
+ constexpr base::FilePath::CharType kMediaHistoryDatabaseName[] =
+@@ -1765,6 +1896,9 @@
+   // running.
+   browser_process_->PreMainMessageLoopRun();
+ 
++  if (!ResolveFingerprintWebRtcAuto())
++    return CHROME_RESULT_CODE_INVALID_CMDLINE_URL;
++
+ #if BUILDFLAG(IS_WIN)
+   // If the command line specifies 'uninstall' then we need to work here
+   // unless we detect another chrome browser running.

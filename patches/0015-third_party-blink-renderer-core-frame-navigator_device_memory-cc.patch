@@ -2,7 +2,7 @@ diff --git a/third_party/blink/renderer/core/frame/navigator_device_memory.cc b/
 index 05fa33e456..666154ddaa 100644
 --- a/third_party/blink/renderer/core/frame/navigator_device_memory.cc
 +++ b/third_party/blink/renderer/core/frame/navigator_device_memory.cc
-@@ -9,9 +9,39 @@
+@@ -9,9 +9,36 @@
  #include "third_party/blink/renderer/core/dom/document.h"
  #include "third_party/blink/renderer/core/frame/local_dom_window.h"
  
@@ -15,16 +15,13 @@ index 05fa33e456..666154ddaa 100644
  namespace blink {
  
  float NavigatorDeviceMemory::deviceMemory() const {
-+  // Getter overrides do not change the allocator or native memory bucket.
-+  if (base::UxrConfig::GetInstance().Get("uxr-synthetic-device-tests") != "true")
-+    return ApproximatedDeviceMemory::GetApproximatedDeviceMemory();
-+  // UXR Layer 2: persona-driven via renderer cmdline switch.
++  // Public overrides report a memory bucket, not an allocator/heap limit.
 +  double v = 0.0;
-+  // UXR P1-A: StringToDouble + snap to the web-exposed buckets {0.25..8}.
++  // Snap to Chromium's supported web-exposed memory buckets.
 +  if (base::StringToDouble(
 +          base::UxrConfig::GetInstance().Get("uxr-device-memory"), &v) &&
-+      v > 0.0) {
-+    const double kB[] = {0.25, 0.5, 1.0, 2.0, 4.0, 8.0};
++      std::isfinite(v) && v > 0.0) {
++    const double kB[] = {0.25, 0.5, 1.0, 2.0, 4.0, 8.0, 16.0, 32.0};
 +    double best = kB[0];
 +    for (double b : kB) {
 +      if (std::abs(b - v) < std::abs(best - v))

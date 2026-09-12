@@ -2,7 +2,15 @@ diff --git a/content/browser/renderer_host/render_process_host_impl.cc b/content
 index b15a2e90b1..79c9568633 100644
 --- a/content/browser/renderer_host/render_process_host_impl.cc
 +++ b/content/browser/renderer_host/render_process_host_impl.cc
-@@ -2013,6 +2013,20 @@
+@@ -22,6 +22,7 @@
+ #include "base/clang_profiling_buildflags.h"
+ #include "base/command_line.h"
+ #include "base/containers/adapters.h"
+ #include "base/containers/flat_map.h"
++#include "base/uxr_config.h"
+ #include "base/containers/map_util.h"
+ #include "base/debug/alias.h"
+@@ -2013,6 +2014,24 @@
    uint64_t trace_id = base::Token::CreateRandom().high();
    TRACE_EVENT("navigation", "RenderProcessHostImpl::Init",
                perfetto::Flow::Global(trace_id));
@@ -16,9 +24,13 @@ index b15a2e90b1..79c9568633 100644
 +            base::CommandLine::ForCurrentProcess()->GetSwitchValueASCII(sw.first);
 +      }
 +    }
-+    if (!uxr_cfg.empty()) {
-+      GetRendererInterface()->SetUxrConfig(std::move(uxr_cfg));
-+    }
++    // Snapshot construction is browser-owned and launch-scoped. Even an empty
++    // native snapshot must arrive before WebKit/isolate initialization.
++    auto& snapshot = base::UxrConfig::GetInstance();
++    CHECK(snapshot.SetAll(uxr_cfg)) << snapshot.ValidationError();
++    uxr_cfg = snapshot.Snapshot();
++    GetRendererInterface()->SetUxrConfig(
++        std::move(uxr_cfg), base::UxrConfig::kSchemaVersion);
 +  }
    GetRendererInterface()->InitializeRenderer(
        GetContentClient()->browser()->GetUserAgent(),

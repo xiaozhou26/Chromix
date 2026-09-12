@@ -1,0 +1,15 @@
+diff --git a/third_party/blink/renderer/platform/runtime_enabled_features.json5 b/third_party/blink/renderer/platform/runtime_enabled_features.json5
+--- a/third_party/blink/renderer/platform/runtime_enabled_features.json5
++++ b/third_party/blink/renderer/platform/runtime_enabled_features.json5
+@@ -2817,6 +2817,11 @@
+       status: "experimental",
+     },
+     {
++      // Explicit debugging opt-in only; never expose UA-internal roots.
++      name: "FakeShadowRoot",
++      base_feature: "none",
++    },
++    {
+       name: "FastPositionIterator",
+       // Not enabled due to a RTL issue. crbug.com/1421016.
+     },

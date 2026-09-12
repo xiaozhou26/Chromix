@@ -141,7 +141,7 @@ def test_heap_limit_keeps_native_v8_value(tmp_path):
     ('0014','NavigatorConcurrentHardware','hardwareConcurrency',32),
     ('0015','NavigatorDeviceMemory','deviceMemory',16),
 ])
-def test_explicit_cpu_memory_overrides_need_test_opt_in(tmp_path, number, klass, method, native):
+def test_explicit_cpu_memory_overrides_do_not_need_test_opt_in(tmp_path, number, klass, method, native):
     compiler = os.environ.get('CXX') or shutil.which('c++') or shutil.which('g++')
     if not compiler:
         pytest.skip('C++ compiler unavailable')
@@ -156,22 +156,25 @@ def test_explicit_cpu_memory_overrides_need_test_opt_in(tmp_path, number, klass,
 namespace base {
 struct UxrConfig {
   bool synthetic=false;
+  bool explicit_value=true;
   static UxrConfig& GetInstance(){static UxrConfig c;return c;}
   std::string Get(const std::string& key) const {
-    return key=="uxr-synthetic-device-tests" ? (synthetic?"true":"false") : "4";
+    return key=="uxr-synthetic-device-tests" ? (synthetic?"true":"false") : (explicit_value?"4":"");
   }
-  bool Has(const char*) const {return true;}
-  int GetSeededHwConcurrency() const {return 2;}
-  float GetSeededDeviceMemory() const {return 2;}
+  bool Has(const char*) const {return explicit_value;}
+  int GetSeededHwConcurrency() const {return synthetic?2:0;}
+  float GetSeededDeviceMemory() const {return synthetic?2:0;}
 };
 struct SysInfo {static int NumberOfProcessors(){return 32;}};
 bool StringToInt(const std::string& s,int* out){*out=std::stoi(s);return true;}
-bool StringToDouble(const std::string& s,double* out){*out=std::stod(s);return true;}
+bool StringToDouble(const std::string& s,double* out){if(s.empty())return false;*out=std::stod(s);return true;}
 }
 struct ApproximatedDeviceMemory {static float GetApproximatedDeviceMemory(){return 16;}};
 '''
     source += f'struct {klass} {{{returns} {method}() const {{\n{body}\nreturn {fallback};\n}}}};\n'
-    source += f'int main(){{{klass} n;assert(n.{method}()=={native});base::UxrConfig::GetInstance().synthetic=true;assert(n.{method}()==4);}}'
+    source += f'''int main(){{{klass} n; auto& config=base::UxrConfig::GetInstance();
+assert(n.{method}()==4); config.explicit_value=false; assert(n.{method}()=={native});
+config.synthetic=true; assert(n.{method}()==2); config.explicit_value=true; assert(n.{method}()==4);}}'''
     cpp = tmp_path / 'native.cc'
     cpp.write_text(source)
     binary = tmp_path / 'native-test'

@@ -1,0 +1,18 @@
+diff --git a/third_party/blink/renderer/platform/fonts/skia/skia_text_metrics.h b/third_party/blink/renderer/platform/fonts/skia/skia_text_metrics.h
+--- a/third_party/blink/renderer/platform/fonts/skia/skia_text_metrics.h
++++ b/third_party/blink/renderer/platform/fonts/skia/skia_text_metrics.h
+@@ -14,9 +14,14 @@
+ #include "third_party/skia/include/core/SkRect.h"
+ 
+ class SkFont;
++struct SkFontMetrics;
+ class SkStrikeRef;
+ 
+ namespace blink {
++
++// Linux-only opt-in. Returns false without modifying metrics unless the actual
++// selected typeface is a Windows family with valid OpenType metric tables.
++PLATFORM_EXPORT bool SkFontApplyWindowsMetrics(const SkFont&, SkFontMetrics*);
+ 
+ // TODO: Width functions are affected by issue
+ // https://bugs.chromium.org/p/skia/issues/detail?id=10123 in Skia, which

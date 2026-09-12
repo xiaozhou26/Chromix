@@ -419,14 +419,14 @@ def test_seed_alone_does_not_select_synthetic_gpu(identity_binary):
     assert_native_adapter(result, "hardware")
 
 
-def test_explicit_gpu_identity_needs_synthetic_opt_in(identity_binary):
+def test_explicit_gpu_identity_works_without_synthetic_opt_in(identity_binary):
     result = run_identity(identity_binary, {
         'uxr-webgl-vendor':'fake', 'uxr-webgl-renderer':'fake renderer',
         'uxr-webgpu-vendor':'fake', 'uxr-webgpu-architecture':'fake arch',
         'uxr-webgl-max-texture-size':'1', 'uxr-webgl-fingerprint':'true',
     }, synthetic=False)
-    assert_real_native(result)
-    assert result['persona.webgl_identity_explicit'] == '0'
+    assert_synthetic_adapter(result, 'fake', 'fake arch')
+    assert result['persona.webgl_identity_explicit'] == '1'
 
 
 GPU_TUPLES = {
@@ -476,6 +476,41 @@ def assert_template(result, vendor):
     assert_synthetic_adapter(result, vendor, architecture)
 
 
+
+def assert_platform_template(result, identity_binary, platform=None, architecture=None):
+    """Independent expected platform families; seed recurrence is pinned above."""
+    machine = identity_binary[1]
+    platform = (platform or ('windows' if machine.startswith('windows') else
+                            'macos' if machine.startswith('mac') else 'linux')).lower()
+    bucket = int(result['engine_first']) % 100
+    if platform in ('windows', 'win32'):
+        vendor = 'intel' if bucket < 50 else 'nvidia' if bucket < 85 else 'amd'
+        assert_template(result, vendor)
+        return
+    if platform == 'linux':
+        vendor = 'intel' if bucket < 50 else 'nvidia' if bucket < 85 else 'amd'
+        architecture_expected = {'intel':'gen-12-lp', 'nvidia':'ampere', 'amd':'rdna-2'}[vendor]
+        model = {'intel':'UHD Graphics 770', 'nvidia':'RTX 3060', 'amd':'RX 6600'}[vendor]
+        backend = 'OpenGL'
+    else:
+        arm = architecture == 'arm' or (architecture is None and machine.endswith('arm64'))
+        if arm:
+            generation = 1 if bucket < 35 else 2 if bucket < 70 else 3
+            vendor, architecture_expected, model = 'apple', f'apple-{generation+6}', f'Apple M{generation}'
+        else:
+            vendor = 'intel' if bucket < 65 else 'amd'
+            architecture_expected = 'gen-9' if vendor == 'intel' else 'rdna-1'
+            model = 'Iris(TM) Plus Graphics 655' if vendor == 'intel' else 'Radeon Pro 5500M'
+        backend = 'Metal'
+    assert result['persona.webgl_real'] == '0'
+    assert result['persona.webgl_identity_explicit'] == '0'
+    assert result['persona.webgpu_vendor'] == vendor
+    assert result['persona.webgpu_architecture'] == architecture_expected
+    assert model in result['persona.webgl_renderer'] and backend in result['persona.webgl_renderer']
+    assert vendor in result['persona.webgl_vendor'].lower()
+    assert_synthetic_adapter(result, vendor, architecture_expected)
+
+
 def assert_real_native(result):
     assert result["persona.webgl_real"] == "1"
     assert result["persona.webgpu_vendor"] == ""
@@ -490,10 +525,7 @@ def test_identity_golden_seed_and_noise_independence(identity_binary, seed, engi
     baseline = run_identity(identity_binary, config)
     assert baseline["persona.seed"] == str(seed)
     assert baseline["engine_first"] == str(engine_output)
-    if has_windows_pool(identity_binary):
-        assert_template(baseline, vendor)
-    else:
-        assert_real_native(baseline)
+    assert_platform_template(baseline, identity_binary)
     for noise in ({"uxr-canvas-seed": str(seed)}, {"uxr-canvas-seed": "0"},
                   {"uxr-canvas-seed": str(seed ^ 0x1234)},
                   {"uxr-disable-fingerprint-noise": "", "uxr-webgl-fingerprint": "false"}):
@@ -517,16 +549,16 @@ def test_identity_canvas_seed_fallback_and_fingerprint_precedence(identity_binar
         config["uxr-fingerprint-seed"] = raw
     result = run_identity(identity_binary, config)
     assert result["persona.seed"] == str(seed)
-    if seed and has_windows_pool(identity_binary):
-        assert_template(result, "nvidia")
+    if seed:
+        assert_platform_template(result, identity_binary)
     else:
         assert_real_native(result)
 
 
 @pytest.mark.parametrize("platform,architecture,eligible", [
     (None, None, True), ("windows", "x86", True), ("Windows", "x86", True),
-    ("win32", "x86", True), ("linux", "x86", False), ("macOS", "x86", False),
-    ("android", "arm", False), ("windows", "arm", False), ("windows", "arm64", False),
+    ("win32", "x86", True), ("linux", "x86", True), ("macOS", "x86", True),
+    ("android", "arm", False), ("windows", "arm", True), ("windows", "arm64", True),
 ])
 def test_identity_platform_and_architecture_gate(identity_binary, platform, architecture, eligible):
     config = {"uxr-fingerprint-seed": "4"}
@@ -535,8 +567,8 @@ def test_identity_platform_and_architecture_gate(identity_binary, platform, arch
     if architecture is not None:
         config["uxr-ua-arch"] = architecture
     result = run_identity(identity_binary, config)
-    if eligible and has_windows_pool(identity_binary):
-        assert_template(result, "amd")
+    if eligible:
+        assert_platform_template(result, identity_binary, platform, architecture)
     else:
         assert_real_native(result)
 
@@ -549,18 +581,21 @@ def test_identity_real_switch_truth_table(identity_binary, key, value, enabled):
     if value is not None:
         config[key] = value
     result = run_identity(identity_binary, config)
-    if not enabled and has_windows_pool(identity_binary):
-        assert_template(result, "nvidia")
+    if not enabled:
+        assert_platform_template(result, identity_binary)
     else:
         assert_real_native(result)
     # A complete explicit WebGL identity makes false observable on every platform.
     config.update({"uxr-webgl-vendor": "explicit-vendor", "uxr-webgl-renderer": "explicit-renderer"})
     result = run_identity(identity_binary, config)
     assert result["persona.webgl_real"] == str(int(enabled))
-    assert result["persona.webgl_identity_explicit"] == "1"
-    assert result["persona.webgl_vendor"] == "explicit-vendor"
-    assert result["persona.webgl_renderer"] == "explicit-renderer"
-    assert_native_adapter(result)
+    assert result["persona.webgl_identity_explicit"] == str(int(not enabled))
+    if enabled:
+        assert_real_native(result)
+    else:
+        assert result["persona.webgl_vendor"] == "explicit-vendor"
+        assert result["persona.webgl_renderer"] == "explicit-renderer"
+        assert_synthetic_adapter(result, "", "")
 
 
 @pytest.mark.parametrize("real,disabled", [("false", "true"), ("true", "false"), ("0", "1")])
@@ -584,22 +619,29 @@ def test_complete_webgl_identity_does_not_guess_webgpu_architecture(identity_bin
     assert result["persona.webgl_renderer"] == "custom-renderer"
     assert result["persona.webgpu_vendor"] == ""
     assert result["persona.webgpu_architecture"] == ""
-    assert_native_adapter(result)
+    assert_synthetic_adapter(result, "", "")
 
 
 @pytest.mark.parametrize("vendor,renderer", [("explicit-vendor", None), (None, "explicit-renderer"),
                                            ("explicit-vendor", ""), ("", "explicit-renderer"),
                                            ("", ""), ("", None), (None, "")])
 @pytest.mark.parametrize("seed", [None, "4"])
-def test_partial_webgl_identity_preserves_native(identity_binary, vendor, renderer, seed):
+def test_partial_webgl_identity_does_not_invent_unknown_counterparts(identity_binary, vendor, renderer, seed):
     config = {}
     for key, value in (("uxr-webgl-vendor", vendor), ("uxr-webgl-renderer", renderer),
                        ("uxr-fingerprint-seed", seed)):
         if value is not None:
             config[key] = value
     result = run_identity(identity_binary, config)
-    assert result["persona.webgl_identity_explicit"] == "0"
-    assert_real_native(result)
+    if vendor or renderer:
+        assert result["persona.webgl_identity_explicit"] == "1"
+        assert result["persona.webgl_vendor"] == (vendor or "")
+        assert result["persona.webgl_renderer"] == (renderer or "")
+        assert_synthetic_adapter(result, "", "")
+    elif seed:
+        assert_platform_template(result, identity_binary)
+    else:
+        assert_real_native(result)
 
 
 @pytest.mark.parametrize("overrides", [
@@ -636,8 +678,10 @@ def test_partial_webgpu_identity_never_mixes_native_and_synthetic(identity_binar
     if architecture is not None:
         config["uxr-webgpu-architecture"] = architecture
     result = run_identity(identity_binary, config)
-    if context == "seeded" and has_windows_pool(identity_binary):
-        assert_template(result, "amd")
+    if context == "seeded":
+        assert_platform_template(result, identity_binary)
+    elif context == "explicit-webgl":
+        assert_synthetic_adapter(result, "", "")
     else:
         assert_native_adapter(result)
 
@@ -646,8 +690,8 @@ def test_partial_webgpu_identity_never_mixes_native_and_synthetic(identity_binar
 def test_description_alone_cannot_replace_native_or_template_identity(identity_binary, seed):
     result = run_identity(identity_binary, {"uxr-fingerprint-seed": seed,
                                          "uxr-webgpu-description": "must-not-leak"})
-    if seed == "4" and has_windows_pool(identity_binary):
-        assert_template(result, "amd")
+    if seed == "4":
+        assert_platform_template(result, identity_binary)
     else:
         assert_native_adapter(result)
 

@@ -147,14 +147,20 @@ The launch contract is deliberately restrictive:
   rejected candidates. Runtime verification covers this startup, not all future
   permission, display, driver or browser-context changes.
 
-Default SDK launches no longer select synthetic geometry. Independent C++
-CPU/RAM/display and GPU templates require `--uxr-synthetic-device-tests=true`;
-they remain test fixtures, not measured samples. Legacy explicit CPU/RAM and GPU
-identity/GL limit overrides, font whitelist/substitution and persona fallback
-also require that opt-in, including outside measured mode. WebGPU feature filters
-still intersect real support; Dawn owns the actual limits. The heap getter always retains the native V8
-limit instead of deriving a value from UA bitness. These C++ changes require a
-rebuild from the updated patch series, not reuse of an older binary.
+Measured mode remains native (`--fingerprint=off`) and rejects per-field
+overrides. Outside measured mode, public fingerprint launches now supply fixed
+CPU/RAM and platform screen/taskbar/quota defaults, plus platform GPU identity
+templates; explicit public CPU/RAM/GPU identity flags do not require synthetic
+opt-in. These defaults are **not measured device records**. See the
+[public flag contract](fingerprint-flags.md).
+
+The older independent seeded CPU/RAM/display and GL-capability templates still
+require `--uxr-synthetic-device-tests=true`, as do legacy font whitelist/
+substitution and persona fallback. SDK default page viewport is native unless
+explicitly configured. Public GPU identity flags preserve actual GL capabilities;
+WebGPU feature filters intersect real support and Dawn owns actual limits. The
+heap getter retains V8's native limit rather than deriving it from UA bitness.
+These changes require a rebuilt browser, not reuse of an older binary.
 
 ## P0 Capability Audit
 
@@ -218,6 +224,57 @@ WebRTC traffic did not bypass the configured route.
 
 ## Remaining Work
 
+### Corpus review tooling (2026-09-12)
+
+New collections include `browser_versions` for all three launches and the exact
+device-probe SHA-256 in browser evidence; the record provenance repeats the full
+browser version and probe hash. Older bundles remain readable by the v1 selector,
+but must be recollected for corpus review. This does not change the selector's
+exact-native matching or its existing 24-hour live-preflight age default.
+
+`tools/fingerprint_corpus_review.py` checks an explicitly prepared review manifest:
+
+```powershell
+python -X utf8 tools/fingerprint_corpus_review.py corpus/review.json --output C:/diagnostics/corpus-new.json
+```
+
+Manifest template (placeholders are not executable evidence or a bundled dataset):
+
+```json
+{
+  "schema_version": 1,
+  "browser_version": "152.0.7977.82",
+  "probe_sha256": "<SHA-256 of sdk/python/chromix/device_probe.js>",
+  "max_age_days": 30,
+  "cohorts": [{"id": "windows-amd64", "os": "Windows", "architecture": "AMD64", "min_devices": 2}],
+  "samples": [{
+    "path": "machine-a/record.json",
+    "record_id": "<measured record_id>",
+    "record_sha256": "<SHA-256 of that record.json>",
+    "device_id": "<internal pseudonymous device tag>",
+    "cohort_id": "windows-amd64",
+    "reviewer": "<internal reviewer tag>",
+    "reviewed_at": "<ISO-8601 timestamp with timezone>",
+    "expires_at": "<ISO-8601 timestamp with timezone>",
+    "sample_kind": "physical"
+  }]
+}
+```
+
+The template deliberately needs real records and enough distinct devices before
+it can pass. Review checks bundle checksums, all five contexts, native inventory,
+full browser/probe version, collection age, review/expiry ordering, OS/architecture
+cohort membership, duplicate records and repeated device tags. `virtual`, `control`
+and `fixture` samples are retained as excluded diagnostics, never counted toward
+physical-device cohort minima. The tool does not modify records or selector state,
+manufacture reviewer approvals, or turn sample counts into population weights.
+
+`passed` means these integrity/metadata checks passed. Reviewer/device tags are
+supplied metadata, not authenticated proof. Physical backend equivalence, external
+routes and font-file-to-glyph binding remain false in the output. Native font-file
+inventory hashes and CDP family/PostScript/glyph counts are still separate evidence;
+a matching name alone cannot prove the exact file that rasterized a glyph.
+
 Canvas now has a separate [chain audit](canvas-chain.md) for pixels, codecs,
 color spaces, alpha, ImageBitmap and five-context/restart comparisons. The local
 stock-browser run fails; it is not a pool qualification or matching-build pass.
@@ -255,7 +312,7 @@ capture was validated in this run. Python sync/async context launch and async
 persistent restart, plus Node context and persistent restart, passed live startup
 verification using that stock executable. These are SDK workflow tests only.
 
-Latest P0 targeted regression: 1102 Python tests passed, 23 skipped, and 302
+Historical P0 targeted regression (before the 2026-09-12 changes): 1102 Python tests passed, 23 skipped, and 302
 font subtests passed; Node SDK: 142 passed, 2 skipped. Skips cover platform or
 unconfigured source/browser prerequisites. The 124-patch linter and JS syntax
 check passed. Standalone C++ probes cover explicit-override gating and native

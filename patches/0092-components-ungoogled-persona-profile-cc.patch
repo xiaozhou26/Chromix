@@ -2,7 +2,7 @@ diff --git a/components/ungoogled/persona_profile.cc b/components/ungoogled/pers
 new file mode 100644
 --- /dev/null
 +++ b/components/ungoogled/persona_profile.cc
-@@ -0,0 +1,234 @@
+@@ -0,0 +1,338 @@
 +// Copyright 2026.
 +#include "components/ungoogled/persona_profile.h"
 +
@@ -28,7 +28,8 @@ new file mode 100644
 +  unsigned weight;
 +};
 +
-+// Synthetic Windows templates, not measured devices or market-share weights.
++// Platform-compatible identity templates, not measured complete devices or
++// market-share weights. Explicit strings override the chosen tuple below.
 +// Architecture tokens follow Dawn's gpu_info.json for these model families.
 +constexpr std::array<WebGLGPU, 3> kWebGLGPUs = {{
 +    {"Google Inc. (Intel)",
@@ -45,18 +46,58 @@ new file mode 100644
 +     "amd", "gcn-5", 15},
 +}};
 +
-+bool SupportsSeededWebGLPool(const base::UxrConfig& config) {
-+  if (config.Get("uxr-synthetic-device-tests") != "true")
-+    return false;
-+#if BUILDFLAG(IS_WIN) && (defined(ARCH_CPU_X86_64) || defined(ARCH_CPU_X86))
-+  const std::string platform = base::ToLowerASCII(config.Get("uxr-platform"));
-+  const std::string architecture = config.Get("uxr-ua-arch");
-+  return (platform.empty() || platform == "windows" || platform == "win32") &&
-+         (architecture.empty() || architecture == "x86");
++constexpr std::array<WebGLGPU, 3> kLinuxWebGLGPUs = {{
++    {"Google Inc. (Intel)",
++     "ANGLE (Intel, Mesa Intel(R) UHD Graphics 770 (ADL-S GT1), OpenGL 4.6)",
++     "intel", "gen-12-lp", 50},
++    {"Google Inc. (NVIDIA Corporation)",
++     "ANGLE (NVIDIA Corporation, NVIDIA GeForce RTX 3060/PCIe/SSE2, "
++     "OpenGL 4.6.0 NVIDIA 570.133.07)", "nvidia", "ampere", 35},
++    {"Google Inc. (AMD)",
++     "ANGLE (AMD, AMD Radeon RX 6600 (radeonsi, navi23, LLVM 19.1.7, "
++     "DRM 3.61, 6.14.0), OpenGL 4.6)", "amd", "rdna-2", 15},
++}};
++constexpr std::array<WebGLGPU, 3> kMacArmWebGLGPUs = {{
++    {"Google Inc. (Apple)",
++     "ANGLE (Apple, ANGLE Metal Renderer: Apple M1, Unspecified Version)",
++     "apple", "apple-7", 35},
++    {"Google Inc. (Apple)",
++     "ANGLE (Apple, ANGLE Metal Renderer: Apple M2, Unspecified Version)",
++     "apple", "apple-8", 35},
++    {"Google Inc. (Apple)",
++     "ANGLE (Apple, ANGLE Metal Renderer: Apple M3, Unspecified Version)",
++     "apple", "apple-9", 30},
++}};
++constexpr std::array<WebGLGPU, 2> kMacIntelWebGLGPUs = {{
++    {"Google Inc. (Intel)",
++     "ANGLE (Intel, ANGLE Metal Renderer: Intel(R) Iris(TM) Plus Graphics 655, "
++     "Unspecified Version)", "intel", "gen-9", 65},
++    {"Google Inc. (AMD)",
++     "ANGLE (AMD, ANGLE Metal Renderer: AMD Radeon Pro 5500M, "
++     "Unspecified Version)", "amd", "rdna-1", 35},
++}};
++
++std::string GpuPlatform(const base::UxrConfig& config) {
++  std::string platform = base::ToLowerASCII(config.Get("uxr-ua-platform"));
++  if (platform.empty())
++    platform = base::ToLowerASCII(config.Get("uxr-platform"));
++  if (platform.empty()) {
++#if BUILDFLAG(IS_WIN)
++    platform = "windows";
++#elif BUILDFLAG(IS_MAC)
++    platform = "macos";
 +#else
-+  (void)config;
-+  return false;
++    platform = "linux";
 +#endif
++  }
++  return platform;
++}
++
++bool SupportsSeededWebGLPool(const base::UxrConfig& config) {
++  const std::string platform = GpuPlatform(config);
++  return platform == "windows" || platform == "win32" ||
++         platform == "macos" || platform == "macintel" ||
++         platform == "linux" || platform == "linux x86_64";
 +}
 +
 +uint64_t SeedFromConfig(const base::UxrConfig& config) {
@@ -69,34 +110,74 @@ new file mode 100644
 +  return seed;
 +}
 +
-+const WebGLGPU& SelectSeededWebGLGPU(const base::UxrConfig& config) {
-+  const uint64_t seed = SeedFromConfig(config);
-+  if (seed == 0)
-+    return kWebGLGPUs[0];
++std::string GpuVendorToken(const std::string& name) {
++  const std::string value = base::ToLowerASCII(name);
++  if (value.find("nvidia") != std::string::npos) return "nvidia";
++  if (value.find("intel") != std::string::npos) return "intel";
++  if (value.find("amd") != std::string::npos ||
++      value.find("ati technologies") != std::string::npos) return "amd";
++  if (value.find("apple") != std::string::npos) return "apple";
++  return "";
++}
 +
-+  std::mt19937_64 rng(seed);
++template <size_t N>
++const WebGLGPU* PickWebGLGPU(const std::array<WebGLGPU, N>& pool,
++                            uint64_t seed,
++                            const std::string& vendor_hint,
++                            const std::string& renderer_hint) {
++  for (const auto& gpu : pool)
++    if (renderer_hint == gpu.renderer)
++      return &gpu;
 +  unsigned total_weight = 0;
-+  for (const auto& gpu : kWebGLGPUs)
-+    total_weight += gpu.weight;
++  for (const auto& gpu : pool)
++    if (vendor_hint.empty() || vendor_hint == gpu.webgpu_vendor)
++      total_weight += gpu.weight;
++  if (!total_weight)
++    return nullptr;  // No compatible counterpart on this platform.
++  std::mt19937_64 rng(seed);
 +  // Engine output and integer mapping are stable across standard libraries.
 +  unsigned bucket = static_cast<unsigned>(rng() % total_weight);
-+  for (const auto& gpu : kWebGLGPUs) {
++  for (const auto& gpu : pool) {
++    if (!vendor_hint.empty() && vendor_hint != gpu.webgpu_vendor)
++      continue;
 +    if (bucket < gpu.weight)
-+      return gpu;
++      return &gpu;
 +    bucket -= gpu.weight;
 +  }
-+  return kWebGLGPUs.back();
++  return nullptr;
++}
++
++const WebGLGPU* SelectSeededWebGLGPU(const base::UxrConfig& config) {
++  const uint64_t seed = SeedFromConfig(config);
++  const std::string platform = GpuPlatform(config);
++  const std::string renderer = config.Get("uxr-webgl-renderer");
++  std::string hint = GpuVendorToken(renderer);
++  if (hint.empty())
++    hint = GpuVendorToken(config.Get("uxr-webgl-vendor"));
++  if (platform == "linux" || platform == "linux x86_64")
++    return PickWebGLGPU(kLinuxWebGLGPUs, seed, hint, renderer);
++  if (platform == "macos" || platform == "macintel") {
++    const std::string architecture = config.Get("uxr-ua-arch");
++    bool arm = architecture == "arm";
++#if defined(ARCH_CPU_ARM64) || defined(ARCH_CPU_ARMEL)
++    if (architecture.empty())
++      arm = true;
++#endif
++    return arm ? PickWebGLGPU(kMacArmWebGLGPUs, seed, hint, renderer)
++               : PickWebGLGPU(kMacIntelWebGLGPUs, seed, hint, renderer);
++  }
++  return PickWebGLGPU(kWebGLGPUs, seed, hint, renderer);
 +}
 +
 +void OverrideWebGLGPU(PersonaProfile* profile,
 +                      const base::UxrConfig& config) {
 +  if (profile->webgl_real || profile->webgl_identity_explicit)
 +    return;
-+  const WebGLGPU& gpu = SelectSeededWebGLGPU(config);
-+  profile->webgl_vendor = gpu.vendor;
-+  profile->webgl_renderer = gpu.renderer;
-+  profile->webgpu_vendor = gpu.webgpu_vendor;
-+  profile->webgpu_architecture = gpu.webgpu_architecture;
++  const WebGLGPU* gpu = SelectSeededWebGLGPU(config);
++  profile->webgl_vendor = gpu ? gpu->vendor : "";
++  profile->webgl_renderer = gpu ? gpu->renderer : "";
++  profile->webgpu_vendor = gpu ? gpu->webgpu_vendor : "";
++  profile->webgpu_architecture = gpu ? gpu->webgpu_architecture : "";
 +}
 +
 +void OverrideInt(const base::UxrConfig& config, const char* key, int* value) {
@@ -138,31 +219,54 @@ new file mode 100644
 +PersonaProfile BuildPersona() {
 +  PersonaProfile p;
 +  const base::UxrConfig& config = base::UxrConfig::GetInstance();
-+  // No identity/limit template may replace the physical backend by default.
-+  if (config.Get("uxr-synthetic-device-tests") != "true") {
++  const bool explicit_identity = !config.Get("uxr-webgl-vendor").empty() ||
++                                 !config.Get("uxr-webgl-renderer").empty();
++  // No flags means native. Public fingerprint mode and explicit GPU switches
++  // work without the independent synthetic hardware-test opt-in.
++  if (ConfigSwitchEnabled(config, "uxr-fingerprint-off") ||
++      (!ConfigSwitchEnabled(config, "uxr-fingerprint-enabled") &&
++       !ConfigSwitchEnabled(config, "uxr-synthetic-device-tests") &&
++       !explicit_identity)) {
 +    p.webgl_real = true;
 +    return p;
 +  }
++  p.webgl_native_capabilities =
++      !ConfigSwitchEnabled(config, "uxr-synthetic-device-tests");
 +  const std::string vendor = config.Get("uxr-webgl-vendor");
 +  const std::string renderer = config.Get("uxr-webgl-renderer");
-+  if (!vendor.empty() && !renderer.empty()) {
-+    p.webgl_vendor = vendor;
-+    p.webgl_renderer = renderer;
-+    p.webgl_identity_explicit = true;
-+  }
 +  p.webgl_fingerprint = ConfigSwitchEnabled(config, "uxr-webgl-fingerprint");
 +  p.webgl_real = ConfigSwitchEnabled(config, "uxr-webgl-real") ||
 +                 ConfigSwitchEnabled(config, "uxr-disable-gpu-fingerprint");
-+  // A partial identity is unusable; do not silently substitute another GPU.
-+  const bool partial_identity =
-+      (config.Has("uxr-webgl-vendor") || config.Has("uxr-webgl-renderer")) &&
-+      !p.webgl_identity_explicit;
-+  if (partial_identity ||
-+      (!p.webgl_identity_explicit &&
-+       (!SupportsSeededWebGLPool(config) || SeedFromConfig(config) == 0))) {
++  if (!explicit_identity &&
++      (!SupportsSeededWebGLPool(config) || SeedFromConfig(config) == 0)) {
 +    p.webgl_real = true;
 +  }
 +  OverrideWebGLGPU(&p, config);
++  if (!p.webgl_real && explicit_identity) {
++    // Select a counterpart from the same vendor before applying either flag.
++    // Unknown one-sided identities stay incomplete rather than acquire an
++    // unrelated seeded vendor/renderer. Complete caller tuples remain exact.
++    const std::string selected_renderer = p.webgl_renderer;
++    if (!vendor.empty()) {
++      p.webgl_vendor = vendor;
++      if (renderer.empty() && GpuVendorToken(vendor).empty())
++        p.webgl_renderer.clear();
++    }
++    if (!renderer.empty()) {
++      p.webgl_renderer = renderer;
++      if (vendor.empty() && GpuVendorToken(renderer).empty())
++        p.webgl_vendor.clear();
++    }
++    p.webgl_identity_explicit = true;
++    const std::string renderer_vendor = GpuVendorToken(p.webgl_renderer);
++    const bool coherent = !renderer_vendor.empty() &&
++        renderer_vendor == GpuVendorToken(p.webgl_vendor);
++    p.webgpu_vendor = coherent ? renderer_vendor : "";
++    // Only an exact known renderer can certify a Dawn architecture token.
++    if (!coherent || p.webgl_renderer != selected_renderer)
++      p.webgpu_architecture.clear();
++  }
++
 +  const std::string platform = config.Get("uxr-platform");
 +  p.mobile = platform == "android" || platform == "Android";
 +

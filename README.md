@@ -15,7 +15,7 @@ pinned `ungoogled-chromium` sources and the matching Windows/Linux/macOS platfor
 layer, then adds a reviewed Chromium 152 patch series and lightweight Python and
 Node SDKs. Five independent workflows build Windows x64, Linux x64/arm64,
 and macOS x64/arm64. Each platform publishes independently after its build,
-checksum, extraction, version, and headless smoke checks succeed. Successful
+checksum, extraction, version, headless smoke and fingerprint regression gates succeed. Successful
 platforms append to the same Chromium-version release tag; they need not share
 a source commit or wait for other platforms.
 
@@ -37,7 +37,8 @@ a source commit or wait for other platforms.
   Node scripts can usually migrate by changing the import.
 - **Proxy-aware setup:** optional GeoIP resolution aligns locale and timezone
   using the effective proxy. Proxied launches default to Chromium's native
-  non-proxied-UDP restriction; ICE addresses remain native.
+  non-proxied-UDP restriction; explicit/GeoIP-derived WebRTC IP presentation
+  overrides leave actual ICE routing to the native backend.
 - **Portable packages:** Windows, Linux, and macOS bundles are ZIP archives with
   runtime files, locales, fonts, and Chromium/Chromix license files. macOS
   bundles are unsigned and not notarized.
@@ -55,12 +56,18 @@ For a locally built or independently verified existing executable, run
 The runner requires Python Playwright, serves its own loopback test pages, and
 never downloads a browser. A passing tooling test is not a passing browser smoke.
 
-The GPU pool currently contains synthetic Windows test templates, not a measured
+The new [fingerprint regression gate](docs/fingerprint-acceptance.md) checks source
+freshness before compilation and runs seven bounded suites against the exact
+extracted executable. Display configuration now uses a launch-time emulation
+backend instead of separate getters. These changes still need a matching native
+Chromix build; installed Chrome control results are not release acceptance.
+
+The GPU pool contains Windows/Linux/macOS identity templates, not a measured
 full-device dataset. Screen/layout, font provenance, CPU/memory capabilities,
 media backends and wire-level networking still have open consistency work.
-Storage quotas and Network Information now retain native backend/notifier values
-instead of isolated getter-only substitutions. See the status document for
-retired switches and remaining priorities.
+Storage quota overrides now use the browser quota backend; Network Information
+retains native notifier values. See the [public flag reference](docs/fingerprint-flags.md)
+for defaults, implemented boundaries and the requirement to rebuild this stack.
 
 ## Downloads
 
@@ -293,6 +300,14 @@ Explicit caller settings take priority over GeoIP-derived values. Keep one
 stable seed and profile directory when a test needs a persistent identity;
 generate a new seed only when a new persona is intended.
 
+The complete [public fingerprint flag table](docs/fingerprint-flags.md) covers
+GPU, CPU/RAM, screen/taskbar, brand/version, quota, Windows font metrics, WebRTC
+IP/auto, noise/off, third-party cookies, Windows voices and `FakeShadowRoot`.
+Public fingerprint mode defaults to CPU/RAM 8/8 and platform-specific screen
+geometry; these are declared defaults, not measured device records. The SDK's
+page viewport stays native unless explicitly configured. Previously released
+executables do not gain these features by updating the SDK alone.
+
 ## Advanced opt-in features
 
 The following ports are compiled in but **disabled by default** because they can
@@ -305,10 +320,12 @@ break automation assumptions or weaken browser isolation:
   configured endpoint and removes the sandbox from participating renderer
   processes.
 
-The retired `--fingerprint-webrtc-ip`, `--fingerprint-webrtc-fake-srflx`
-and `--fingerprint-webrtc-fake-srflx-allow-udp` options (and their `uxr`
-counterparts) are rejected by the SDKs. Use a real proxy and the native
-WebRTC IP handling policy; changing candidate text does not route traffic.
+`--fingerprint-webrtc-ip=<IP|auto>` is supported as a local presentation override.
+The SDK can resolve it through HTTP/HTTPS/SOCKS metadata transport before launch;
+bare-browser auto uses a bounded startup network request. The retired
+`--fingerprint-webrtc-fake-srflx` and `--fingerprint-webrtc-fake-srflx-allow-udp`
+options (and their `uxr` counterparts) remain rejected. Changing candidate text
+does not route traffic; see the [resolution contract](docs/fingerprint-flags.md#webrtc-ip-and-proxy-resolution).
 
 Use these only in controlled environments. More implementation detail is in
 [`patches/README.md`](patches/README.md).
@@ -324,7 +341,7 @@ Chromix packages Windows x64, Linux x64/arm64, and macOS x64/arm64. The pinned l
 | ungoogled-chromium-windows | `152.0.7977.82-1.1` |
 | ungoogled-chromium-portablelinux | `152.0.7977.82-1` |
 | ungoogled-chromium-macos | `152.0.7977.82-1.1` |
-| Chromix | 124 patches listed in `patches/series` |
+| Chromix | 146 patches listed in `patches/series` |
 
 Requirements include Visual Studio 2022 with Desktop development with C++, the
 Windows 11 SDK 10.0.26100 Debugging Tools, Python 3, Git, PowerShell 7, 7-Zip,

@@ -1,0 +1,108 @@
+diff --git a/third_party/blink/renderer/core/frame/web_frame_widget_impl.cc b/third_party/blink/renderer/core/frame/web_frame_widget_impl.cc
+--- a/third_party/blink/renderer/core/frame/web_frame_widget_impl.cc
++++ b/third_party/blink/renderer/core/frame/web_frame_widget_impl.cc
+@@ -29,6 +29,8 @@
+  */
+ 
+ #include "third_party/blink/renderer/core/frame/web_frame_widget_impl.h"
++
++#include "base/uxr_config.h"
+ 
+ #include <algorithm>
+ #include <memory>
+@@ -2072,6 +2074,34 @@
+       }
+     }
+   }
++  // Configure the existing emulation backend once, after native widget sizing.
++  // Subsequent resize/zoom events flow through its normal visual-properties
++  // path. Fixed view_size intentionally stays fixed until a CDP update.
++  // Remember initialization even when CDP owns the emulator, so clearing CDP
++  // emulation cannot cause the launch defaults to be reapplied on the next resize.
++  if (ForTopMostMainFrame() && !uxr_display_initialized_) {
++    uxr_display_initialized_ = true;
++    const auto display = base::UxrConfig::GetInstance().Display();
++    if (display.enabled() && !AutoResizeMode() && !DeviceEmulator()) {
++      DeviceEmulationParams params;
++      params.screen_size = gfx::Size(display.width, display.height);
++      params.view_size = gfx::Size(display.viewport_width, display.viewport_height);
++      params.device_scale_factor = static_cast<float>(display.device_scale_factor);
++      if (display.has_position)
++        params.view_position = gfx::Point(display.window_x, display.window_y);
++      using Orientation = display::mojom::ScreenOrientation;
++      if (display.orientation == "landscape-primary")
++        params.screen_orientation_type = Orientation::kLandscapePrimary;
++      else if (display.orientation == "landscape-secondary")
++        params.screen_orientation_type = Orientation::kLandscapeSecondary;
++      else if (display.orientation == "portrait-primary")
++        params.screen_orientation_type = Orientation::kPortraitPrimary;
++      else if (display.orientation == "portrait-secondary")
++        params.screen_orientation_type = Orientation::kPortraitSecondary;
++      params.screen_orientation_angle = display.orientation_angle;
++      EnableDeviceEmulation(params, mojom::blink::DeviceEmulationCacheBehavior::kClearCache);
++    }
++  }
+ }
+ 
+ void WebFrameWidgetImpl::ApplyVisualPropertiesSizing(
+@@ -5439,16 +5469,24 @@
+     View()->CancelPagePopup();
+   }
+ 
++  // DOM screen state and OOPIF visual properties must follow the same effective
++  // backend, including emulation. Keep the original compositor screen above
++  // for native popup/scale handling, not for web-exposed display lists/events.
++  const display::ScreenInfos web_screen_infos = GetScreenInfos();
++  const display::ScreenInfos previous_web_screen_infos =
++      last_web_exposed_screen_infos_.value_or(previous_original_screen_infos);
++  last_web_exposed_screen_infos_ = web_screen_infos;
++
+   const bool window_screen_has_changed =
+       !Screen::AreWebExposedScreenPropertiesEqual(
+-          previous_original_screen_infos.current(),
+-          original_screen_infos.current());
++          previous_web_screen_infos.current(),
++          web_screen_infos.current());
+ 
+   const bool color_gamut_changed =
+       color_space_utilities::GetColorSpaceGamut(
+-          previous_original_screen_infos.current()) !=
++          previous_web_screen_infos.current()) !=
+       color_space_utilities::GetColorSpaceGamut(
+-          original_screen_infos.current());
++          web_screen_infos.current());
+ 
+   // Update Screens interface data before firing any events. The API is designed
+   // to offer synchronous access to the most up-to-date cached screen
+@@ -5457,12 +5495,12 @@
+   // window.screen events are fired as well.
+   ForEachLocalFrameControlledByWidget(
+       LocalRootImpl()->GetFrame(),
+-      [&original_screen_infos, window_screen_has_changed,
++      [&web_screen_infos, window_screen_has_changed,
+        color_gamut_changed](WebLocalFrameImpl* local_frame) {
+         auto* screen = local_frame->GetFrame()->DomWindow()->screen();
+-        screen->UpdateDisplayId(original_screen_infos.current().display_id);
++        screen->UpdateDisplayId(web_screen_infos.current().display_id);
+         CoreInitializer::GetInstance().DidUpdateScreens(
+-            *local_frame->GetFrame(), original_screen_infos);
++            *local_frame->GetFrame(), web_screen_infos);
+         if (window_screen_has_changed)
+           screen->DispatchEvent(*Event::Create(event_type_names::kChange));
+         if (color_gamut_changed) {
+@@ -5472,12 +5510,12 @@
+         }
+       });
+ 
+-  if (previous_original_screen_infos != original_screen_infos) {
++  if (previous_web_screen_infos != web_screen_infos) {
+     // Propagate changes down to child local root RenderWidgets and
+     // BrowserPlugins in other frame trees/processes.
+     ForEachRemoteFrameControlledByWidget(
+-        [&original_screen_infos](RemoteFrame* remote_frame) {
+-          remote_frame->DidChangeScreenInfos(original_screen_infos);
++        [&web_screen_infos](RemoteFrame* remote_frame) {
++          remote_frame->DidChangeScreenInfos(web_screen_infos);
+         });
+   }
+ }

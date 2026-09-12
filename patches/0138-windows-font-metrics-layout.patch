@@ -1,0 +1,13 @@
+diff --git a/third_party/blink/renderer/platform/fonts/simple_font_data.cc b/third_party/blink/renderer/platform/fonts/simple_font_data.cc
+--- a/third_party/blink/renderer/platform/fonts/simple_font_data.cc
++++ b/third_party/blink/renderer/platform/fonts/simple_font_data.cc
+@@ -124,6 +124,9 @@
+   SkFontMetrics metrics;
+ 
+   font_.getMetrics(&metrics);
++  // Apply the same table policy used by FontMetrics::AscentDescentWithHacks so
++  // line spacing, CSS font units and Canvas metrics use one metric family.
++  SkFontApplyWindowsMetrics(font_, &metrics);
+ 
+   float ascent;
+   float descent;

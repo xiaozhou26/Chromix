@@ -12,15 +12,17 @@ index 718f7d9a72..4bd48af514 100644
  #include "base/debug/crash_logging.h"
  #include "base/feature_list.h"
  #include "base/functional/bind.h"
-@@ -848,6 +851,13 @@ void RenderThreadImpl::InitializeWebKit(mojo::BinderMap* binders) {
+@@ -848,6 +851,15 @@ void RenderThreadImpl::InitializeWebKit(mojo::BinderMap* binders) {
        blink::WebImageGenerator::CreateAsSkImageGenerator);
  }
  
 +void RenderThreadImpl::SetUxrConfig(
-+    const base::flat_map<std::string, std::string>& config) {
++    const base::flat_map<std::string, std::string>& config,
++    uint32_t schema_version) {
 +  // Persona config arrives here over IPC (not the command line), so it never
 +  // appears in /proc/<renderer>/cmdline. Stored once in the process-global.
-+  base::UxrConfig::GetInstance().SetAll(config);
++  auto& snapshot = base::UxrConfig::GetInstance();
++  CHECK(snapshot.SetAll(config, schema_version)) << snapshot.ValidationError();
 +}
 +
  void RenderThreadImpl::InitializeRenderer(

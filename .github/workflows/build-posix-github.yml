@@ -356,8 +356,18 @@ jobs:
             ${{ runner.temp }}/chromix-build/upstream-cache-plan.log
             ${{ runner.temp }}/chromix-build/upstream-reuse/
             ${{ runner.temp }}/chromix-build/upstream-object-cache.json
+            ${{ runner.temp }}/chromix-build/fingerprint-diagnostics/
             ${{ runner.temp }}/chromix-upstream/result.json
           if-no-files-found: warn
+          retention-days: 14
+
+      - name: Upload fingerprint source receipt
+        if: steps.stage.outputs.finished == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ inputs.artifact }}-fingerprint-source
+          path: ${{ runner.temp }}/chromix-build/fingerprint-diagnostics/source-final.json
+          if-no-files-found: error
           retention-days: 14
 
   posix-2:
@@ -612,8 +622,18 @@ jobs:
             ${{ runner.temp }}/chromix-build/upstream-cache-plan.log
             ${{ runner.temp }}/chromix-build/upstream-reuse/
             ${{ runner.temp }}/chromix-build/upstream-object-cache.json
+            ${{ runner.temp }}/chromix-build/fingerprint-diagnostics/
             ${{ runner.temp }}/chromix-upstream/result.json
           if-no-files-found: warn
+          retention-days: 14
+
+      - name: Upload fingerprint source receipt
+        if: steps.stage.outputs.finished == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ inputs.artifact }}-fingerprint-source
+          path: ${{ runner.temp }}/chromix-build/fingerprint-diagnostics/source-final.json
+          if-no-files-found: error
           retention-days: 14
 
   posix-3:
@@ -868,8 +888,18 @@ jobs:
             ${{ runner.temp }}/chromix-build/upstream-cache-plan.log
             ${{ runner.temp }}/chromix-build/upstream-reuse/
             ${{ runner.temp }}/chromix-build/upstream-object-cache.json
+            ${{ runner.temp }}/chromix-build/fingerprint-diagnostics/
             ${{ runner.temp }}/chromix-upstream/result.json
           if-no-files-found: warn
+          retention-days: 14
+
+      - name: Upload fingerprint source receipt
+        if: steps.stage.outputs.finished == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ inputs.artifact }}-fingerprint-source
+          path: ${{ runner.temp }}/chromix-build/fingerprint-diagnostics/source-final.json
+          if-no-files-found: error
           retention-days: 14
 
   posix-4:
@@ -1124,8 +1154,18 @@ jobs:
             ${{ runner.temp }}/chromix-build/upstream-cache-plan.log
             ${{ runner.temp }}/chromix-build/upstream-reuse/
             ${{ runner.temp }}/chromix-build/upstream-object-cache.json
+            ${{ runner.temp }}/chromix-build/fingerprint-diagnostics/
             ${{ runner.temp }}/chromix-upstream/result.json
           if-no-files-found: warn
+          retention-days: 14
+
+      - name: Upload fingerprint source receipt
+        if: steps.stage.outputs.finished == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ inputs.artifact }}-fingerprint-source
+          path: ${{ runner.temp }}/chromix-build/fingerprint-diagnostics/source-final.json
+          if-no-files-found: error
           retention-days: 14
 
   posix-5:
@@ -1380,8 +1420,18 @@ jobs:
             ${{ runner.temp }}/chromix-build/upstream-cache-plan.log
             ${{ runner.temp }}/chromix-build/upstream-reuse/
             ${{ runner.temp }}/chromix-build/upstream-object-cache.json
+            ${{ runner.temp }}/chromix-build/fingerprint-diagnostics/
             ${{ runner.temp }}/chromix-upstream/result.json
           if-no-files-found: warn
+          retention-days: 14
+
+      - name: Upload fingerprint source receipt
+        if: steps.stage.outputs.finished == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ inputs.artifact }}-fingerprint-source
+          path: ${{ runner.temp }}/chromix-build/fingerprint-diagnostics/source-final.json
+          if-no-files-found: error
           retention-days: 14
 
   posix-6:
@@ -1636,8 +1686,18 @@ jobs:
             ${{ runner.temp }}/chromix-build/upstream-cache-plan.log
             ${{ runner.temp }}/chromix-build/upstream-reuse/
             ${{ runner.temp }}/chromix-build/upstream-object-cache.json
+            ${{ runner.temp }}/chromix-build/fingerprint-diagnostics/
             ${{ runner.temp }}/chromix-upstream/result.json
           if-no-files-found: warn
+          retention-days: 14
+
+      - name: Upload fingerprint source receipt
+        if: steps.stage.outputs.finished == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ inputs.artifact }}-fingerprint-source
+          path: ${{ runner.temp }}/chromix-build/fingerprint-diagnostics/source-final.json
+          if-no-files-found: error
           retention-days: 14
 
   posix-7:
@@ -1892,8 +1952,18 @@ jobs:
             ${{ runner.temp }}/chromix-build/upstream-cache-plan.log
             ${{ runner.temp }}/chromix-build/upstream-reuse/
             ${{ runner.temp }}/chromix-build/upstream-object-cache.json
+            ${{ runner.temp }}/chromix-build/fingerprint-diagnostics/
             ${{ runner.temp }}/chromix-upstream/result.json
           if-no-files-found: warn
+          retention-days: 14
+
+      - name: Upload fingerprint source receipt
+        if: steps.stage.outputs.finished == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ inputs.artifact }}-fingerprint-source
+          path: ${{ runner.temp }}/chromix-build/fingerprint-diagnostics/source-final.json
+          if-no-files-found: error
           retention-days: 14
 
   posix-8:
@@ -2148,8 +2218,18 @@ jobs:
             ${{ runner.temp }}/chromix-build/upstream-cache-plan.log
             ${{ runner.temp }}/chromix-build/upstream-reuse/
             ${{ runner.temp }}/chromix-build/upstream-object-cache.json
+            ${{ runner.temp }}/chromix-build/fingerprint-diagnostics/
             ${{ runner.temp }}/chromix-upstream/result.json
           if-no-files-found: warn
+          retention-days: 14
+
+      - name: Upload fingerprint source receipt
+        if: steps.stage.outputs.finished == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ inputs.artifact }}-fingerprint-source
+          path: ${{ runner.temp }}/chromix-build/fingerprint-diagnostics/source-final.json
+          if-no-files-found: error
           retention-days: 14
 
   verify-linux-arm64:
@@ -2159,7 +2239,7 @@ jobs:
       always() && inputs.platform == 'linux' && inputs.arch == 'arm64' &&
       !contains(needs.*.result, 'failure') && !contains(needs.*.result, 'cancelled')
     runs-on: ubuntu-24.04-arm
-    timeout-minutes: 20
+    timeout-minutes: 50
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -2200,11 +2280,29 @@ jobs:
           python3 "${GITHUB_WORKSPACE}/tools/verify_linux_bundle.py" \
             --bundle-dir "${RUNNER_TEMP}/chromix-native-smoke/chromix" --arch arm64 --runtime \
             2>&1 | tee "${RUNNER_TEMP}/chromix-linux-arm64-native-smoke.log"
+      - name: Download same-run source verification receipt
+        uses: actions/download-artifact@v4
+        with:
+          name: ${{ inputs.artifact }}-fingerprint-source
+          path: ${{ runner.temp }}/chromix-native-source
+      - name: Native ARM64 fingerprint regression gate
+        run: |
+          set -euo pipefail
+          timeout -k 15s 300s python3 -m pip install --disable-pip-version-check --timeout 30 --retries 1 \
+            -r tools/fingerprint-requirements.txt
+          BROWSER="${RUNNER_TEMP}/chromix-native-smoke/chromix/chrome"
+          HASH="$(sha256sum "$BROWSER" | cut -d ' ' -f 1)"
+          timeout -k 30s 2100s python3 tools/fingerprint_acceptance.py \
+            --browser "$BROWSER" --expected-sha256 "$HASH" \
+            --source-report "${RUNNER_TEMP}/chromix-native-source/source-final.json" \
+            --output-dir "${RUNNER_TEMP}/chromix-native-fingerprint"
       - name: Upload native verification diagnostics
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: ${{ inputs.artifact }}-native-smoke-attempt-${{ github.run_attempt }}
-          path: ${{ runner.temp }}/chromix-linux-arm64-native-smoke.log
+          path: |
+            ${{ runner.temp }}/chromix-linux-arm64-native-smoke.log
+            ${{ runner.temp }}/chromix-native-fingerprint/
           if-no-files-found: warn
           retention-days: 14

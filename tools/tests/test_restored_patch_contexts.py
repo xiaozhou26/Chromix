@@ -30,7 +30,8 @@ PATCHES = {
 }
 # Expected functional additions, excluding empty lines only; indentation is hashed.
 ADDITION_HASHES = {
-    "0018": "938125a87df94a17835e9efe3c344f813688ed5f6cdaf6657845a8953c105e1c",
+    # Geometry getter substitutions moved to the actual ScreenMetricsEmulator.
+    "0018": "58f8f2333f3c674126bccca5bdeb7eb0eafcc738554ce9e3f2d275b385ae0b8f",
     "0031": "f3e577877774fa2081480d96fb537a3cabf1e54e25045a140b58131ac47ae6f8",
     "0033": "61b5b3ae456468cdf8ee6a901a1014d77dfef2880c9d64588bdd1f0a59980fce",
     "0047": "b9492169a125898f839ab5b614ef0844a36a0953594bade93e660b58fa6a50c7",

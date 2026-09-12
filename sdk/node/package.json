@@ -6,7 +6,7 @@
   "main": "index.js",
   "exports": "./index.js",
   "bin": { "chromix": "cli.js" },
-  "files": ["index.js", "_binary.js", "_fonts.js", "_persona.js", "_network.js", "_device_pool.js", "cli.js", "README.md", "LICENSE"],
+  "files": ["index.js", "_binary.js", "_fonts.js", "_persona.js", "_fingerprint.js", "_network.js", "_device_pool.js", "cli.js", "README.md", "LICENSE"],
   "scripts": { "test": "node --test test/*.test.*" },
   "engines": { "node": ">=18" },
   "dependencies": { "yauzl": "^3.4.0" },

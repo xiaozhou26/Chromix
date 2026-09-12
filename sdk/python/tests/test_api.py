@@ -140,8 +140,6 @@ def test_geoip_flag_promotion(monkeypatch):
 
 
 @pytest.mark.parametrize("flag", [
-    "--fingerprint-webrtc-ip=auto", "--fingerprint-webrtc-ip=198.51.100.7",
-    "--uxr-webrtc-ip=198.51.100.7", "--uxr-webrtc-ip",
     "--fingerprint-webrtc-fake-srflx=198.51.100.7", "--uxr-webrtc-fake-srflx-allow-udp",
 ])
 def test_retired_webrtc_flags_fail_before_network(monkeypatch, flag):
@@ -149,7 +147,7 @@ def test_retired_webrtc_flags_fail_before_network(monkeypatch, flag):
         pytest.fail("Network or binary resolution attempted")
     monkeypatch.setattr(api, "_geoip_http", forbidden)
     monkeypatch.setattr(api, "ensure_binary", forbidden)
-    with pytest.raises(ValueError, match="retired.*real proxy.*force-webrtc-ip-handling-policy"):
+    with pytest.raises(ValueError, match="retired.*fingerprint-webrtc-ip"):
         api.build_args(False, [flag])
     with pytest.raises(ValueError, match="retired"):
         api._prepare(True, "http://p:1", [flag], False, None, None, True, None, False)
@@ -305,12 +303,12 @@ def test_persistent_sync_async_share_seed_and_preserve_args(tmp_path, monkeypatc
 def test_explicit_fingerprint_bypasses_profile_io(tmp_path, offline_launch, asynchronous, value):
     profile = tmp_path / "profile"
     args = ["--fingerprint=13", f"--fingerprint={value}"]
-    assert fingerprint(persistent(profile, asynchronous, args=args)) == value
+    assert fingerprint(persistent(profile, asynchronous, args=args)) == ("off" if value == "0" else value)
     assert not profile.exists()
     profile.mkdir()
     path = profile / SEED_FILE
     path.write_bytes(b"corrupt")
-    assert fingerprint(persistent(profile, asynchronous, args=args)) == value
+    assert fingerprint(persistent(profile, asynchronous, args=args)) == ("off" if value == "0" else value)
     assert path.read_bytes() == b"corrupt"
     assert args == ["--fingerprint=13", f"--fingerprint={value}"]
 
@@ -473,11 +471,12 @@ def test_split_context_kwargs_viewport_matches_persona_geometry():
                                     geometry=geometry)
     assert ctx["viewport"] == {"width": 1536, "height": 731}
     assert ctx["device_scale_factor"] == 1.25
-    # dpr=1.0 omits device_scale_factor (native default)
+    assert ctx['screen'] == {'width': 1536, 'height': 864}
+    # An explicit DPR=1 is not the host's potentially high-DPI default.
     geometry["dpr"] = 1.0
     ctx = api._split_context_kwargs(api._VIEWPORT_UNSET, None, None, None, {},
                                     geometry=geometry)
-    assert "device_scale_factor" not in ctx
+    assert ctx["device_scale_factor"] == 1.0
     # explicit viewport still wins
     ctx = api._split_context_kwargs({"width": 800, "height": 600}, None, None,
                                     None, {}, geometry=geometry)
@@ -777,7 +776,8 @@ def test_launch_network_policy_all_paths(tmp_path, offline_launch, local_network
     args = launch["args"]
     assert "--force-webrtc-ip-handling-policy=disable_non_proxied_udp" in args
     assert "--fingerprint-timezone=Asia/Tokyo" in args and "--lang=ja-JP" in args
-    assert not any("webrtc-ip=" in arg or "webrtc-fake" in arg for arg in args)
+    assert "--fingerprint-webrtc-ip=203.0.113.9" in args
+    assert not any("webrtc-fake" in arg for arg in args)
     assert fingerprint(args) == "42"
     assert options["args"] == ["--fingerprint=42"]
 
@@ -814,13 +814,10 @@ def test_geoip_invalid_response_fails_without_fallback(local_network, status, bo
     assert len(calls) == 1
 
 
-def test_socks_and_invalid_timeout_fail_before_connection(monkeypatch, local_network):
+def test_invalid_timeout_fails_before_connection(monkeypatch, local_network):
     def forbidden(*args, **kwargs):
         pytest.fail("Network attempted")
     monkeypatch.setattr(socket, "create_connection", forbidden)
-    for proxy in ("socks4://proxy:1080", "socks5://proxy:1080", "socks5h://proxy:1080"):
-        with pytest.raises(ValueError, match="not SOCKS.*No direct fallback"):
-            api.maybe_resolve_geoip(True, proxy, None, None)
     for value in ("0", "-1", "NaN", "Infinity", "61", ""):
         monkeypatch.setenv("CLOAKBROWSER_GEOIP_TIMEOUT_SECONDS", value)
         with pytest.raises(ValueError, match="TIMEOUT_SECONDS"):

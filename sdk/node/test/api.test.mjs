@@ -167,11 +167,11 @@ for (const value of ["42", "off", "0", ""]) {
   test(`explicit fingerprint skips all profile seed I/O: ${value}`, async (t) => {
     const root = offline(t), profile = join(root, "profile");
     const options = { args: ["--fingerprint=13", `--fingerprint=${value}`] };
-    assert.equal(fingerprint(await persistent(profile, options)), value);
+    assert.equal(fingerprint(await persistent(profile, options)), value === "0" ? "off" : value);
     assert.equal(existsSync(profile), false);
     mkdirSync(profile);
     writeFileSync(join(profile, SEED_FILE), "corrupt");
-    assert.equal(fingerprint(await persistent(profile, options)), value);
+    assert.equal(fingerprint(await persistent(profile, options)), value === "0" ? "off" : value);
     assert.equal(readFileSync(join(profile, SEED_FILE), "utf8"), "corrupt");
     assert.deepEqual(options.args, ["--fingerprint=13", `--fingerprint=${value}`]);
   });
@@ -468,6 +468,7 @@ test("browser newPage and newContext inherit geometry but allow explicit overrid
     const native = await browser[method]({ viewport: null });
     assert.equal(native.contextOptions.viewport, null);
     assert.equal(native.contextOptions.deviceScaleFactor, undefined);
+    assert.equal(native.contextOptions.screen, undefined);
   }
   await browser.close();
   const reused = {};
@@ -550,13 +551,12 @@ function loopbackOnly(t) {
   }
 }
 
-for (const flag of ["--fingerprint-webrtc-ip=auto", "--fingerprint-webrtc-ip=198.51.100.7",
-  "--uxr-webrtc-ip=198.51.100.7", "--uxr-webrtc-ip", "--fingerprint-webrtc-fake-srflx=198.51.100.7",
+for (const flag of ["--fingerprint-webrtc-fake-srflx=198.51.100.7",
   "--uxr-webrtc-fake-srflx-allow-udp"]) {
   test(`retired ICE flag rejects before network: ${flag}`, async (t) => {
     offline(t);
     t.mock.method(http, "request", () => assert.fail("network attempted"));
-    assert.throws(() => buildArgs({ extraArgs: [flag] }), /retired.*real proxy.*force-webrtc-ip-handling-policy/);
+    assert.throws(() => buildArgs({ extraArgs: [flag] }), /retired.*fingerprint-webrtc-ip/);
     await assert.rejects(fixtureApi.buildLaunchOptions({ geoip: true, stealthArgs: false,
       launchOptions: { args: [flag] } }), /retired/);
     assert.equal(calls.length, 0);
@@ -576,7 +576,7 @@ test("proxy credentials normalize once and preserve empty passwords, IPv6 and by
     assert.throws(() => splitProxy(bad), /Invalid proxy/);
 });
 
-test("GeoIP uses the final launchOptions proxy and does not generate ICE IP flags", async (t) => {
+test("GeoIP uses the final launchOptions proxy and injects the same exit IP", async (t) => {
   offline(t); loopbackOnly(t);
   const requests = [], wrong = [];
   const server = await localServer(t, (req, res) => { requests.push({ path: req.url, headers: req.headers }); res.end(JSON.stringify(geoData)); });
@@ -595,7 +595,8 @@ test("GeoIP uses the final launchOptions proxy and does not generate ICE IP flag
   assert.ok(launch.args.includes("--fingerprint-timezone=Asia/Tokyo"));
   assert.ok(launch.args.includes("--lang=ja-JP"));
   assert.ok(launch.args.includes("--force-webrtc-ip-handling-policy=disable_non_proxied_udp"));
-  assert.ok(!launch.args.some((arg) => /^--(?:fingerprint|uxr)-webrtc-(ip|fake)/.test(arg)));
+  assert.ok(launch.args.includes("--fingerprint-webrtc-ip=203.0.113.9"));
+  assert.ok(!launch.args.some((arg) => /webrtc-fake/.test(arg)));
   assert.equal(fingerprint(launch.args), "42");
   assert.deepEqual(options, snapshot);
 });
@@ -698,11 +699,9 @@ for (const [name, status, body, headers] of [
   });
 }
 
-test("SOCKS GeoIP and invalid timeout fail before any connection", async (t) => {
+test("invalid timeout fails before any connection", async (t) => {
   offline(t);
   t.mock.method(http, "request", () => assert.fail("network attempted"));
-  for (const proxy of ["socks4://proxy:1080", "socks5://proxy:1080", "socks5h://proxy:1080"])
-    await assert.rejects(fixtureApi.maybeResolveGeoip(true, proxy), /not SOCKS.*No direct fallback/);
   envFor(t, "CLOAKBROWSER_GEOIP_TIMEOUT_SECONDS", undefined);
   for (const value of ["0", "-1", "NaN", "Infinity", "61", ""]) {
     process.env.CLOAKBROWSER_GEOIP_TIMEOUT_SECONDS = value;

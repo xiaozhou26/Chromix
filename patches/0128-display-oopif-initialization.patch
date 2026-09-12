@@ -1,0 +1,13 @@
+diff --git a/third_party/blink/renderer/core/frame/web_remote_frame_impl.cc b/third_party/blink/renderer/core/frame/web_remote_frame_impl.cc
+--- a/third_party/blink/renderer/core/frame/web_remote_frame_impl.cc
++++ b/third_party/blink/renderer/core/frame/web_remote_frame_impl.cc
+@@ -361,7 +361,8 @@
+   visual_properties.page_scale_factor = ancestor_widget->PageScaleInMainFrame();
+   visual_properties.is_pinch_gesture_active =
+       ancestor_widget->PinchGestureActiveInMainFrame();
+-  visual_properties.screen_infos = ancestor_widget->GetOriginalScreenInfos();
++  // New OOPIF widgets start with the same effective screen as their parent.
++  visual_properties.screen_infos = ancestor_widget->GetScreenInfos();
+   visual_properties.visible_viewport_size =
+       ancestor_widget->VisibleViewportSize();
+   const std::vector<gfx::Rect>& viewport_segments =

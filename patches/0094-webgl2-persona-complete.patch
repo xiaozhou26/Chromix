@@ -56,11 +56,12 @@ index bb56bec111..2de48e0cba 100644
  }
  
  // TODO(kainino): Change outByteLength to GLuint and change the associated
-@@ -672,6 +685,25 @@ ScriptValue WebGL2RenderingContextBase::getInternalformatParameter(
+@@ -672,6 +685,26 @@ ScriptValue WebGL2RenderingContextBase::getInternalformatParameter(
        auto values = base::HeapArray<GLint>::WithSize(length);
        ContextGL()->GetInternalformativ(target, internalformat, GL_SAMPLES,
                                         length, values.data());
-+      if (!ungoogled::CurrentPersona().webgl_real) {
++      if (!ungoogled::CurrentPersona().webgl_real &&
++          !ungoogled::CurrentPersona().webgl_native_capabilities) {
 +        const GLint max_samples = ClampPersonaLimit(
 +            ContextGL(), GL_MAX_SAMPLES,
 +            ungoogled::CurrentPersona().webgl_max_samples);
@@ -82,12 +83,18 @@ index bb56bec111..2de48e0cba 100644
        return WebGLAny(script_state, DOMInt32Array::Create(values));
      }
      default:
-@@ -4853,6 +4885,29 @@ ScriptValue WebGL2RenderingContextBase::getParameter(ScriptState* script_state,
+@@ -4853,6 +4886,35 @@ ScriptValue WebGL2RenderingContextBase::getParameter(ScriptState* script_state,
                                                       GLenum pname) {
    if (isContextLost())
      return ScriptValue::CreateNull(script_state->GetIsolate());
-+  if (ungoogled::CurrentPersona().webgl_real) {
++  if (ungoogled::CurrentPersona().webgl_real ||
++      ungoogled::CurrentPersona().webgl_native_capabilities) {
 +    switch (pname) {
++      case GL_MAX_COMBINED_FRAGMENT_UNIFORM_COMPONENTS:
++      case GL_MAX_COMBINED_VERTEX_UNIFORM_COMPONENTS:
++      case GL_MAX_UNIFORM_BLOCK_SIZE:
++        return GetInt64Parameter(script_state, pname);
++      case GL_MAX_TRANSFORM_FEEDBACK_INTERLEAVED_COMPONENTS:
 +      case GL_MAX_3D_TEXTURE_SIZE:
 +      case GL_MAX_ARRAY_TEXTURE_LAYERS:
 +      case GL_MAX_COLOR_ATTACHMENTS:
@@ -112,7 +119,7 @@ index bb56bec111..2de48e0cba 100644
    switch (pname) {
      case GL_SHADING_LANGUAGE_VERSION:
        return WebGLAny(
-@@ -4871,26 +4926,37 @@ ScriptValue WebGL2RenderingContextBase::getParameter(ScriptState* script_state,
+@@ -4871,26 +4933,37 @@ ScriptValue WebGL2RenderingContextBase::getParameter(ScriptState* script_state,
      case GL_FRAGMENT_SHADER_DERIVATIVE_HINT:
        return GetUnsignedIntParameter(script_state, pname);
      case GL_MAX_3D_TEXTURE_SIZE:
@@ -162,7 +169,7 @@ index bb56bec111..2de48e0cba 100644
      case GL_MAX_ELEMENT_INDEX:
        return GetInt64Parameter(script_state, pname);
      case GL_MAX_ELEMENTS_INDICES:
-@@ -4899,43 +4965,55 @@ ScriptValue WebGL2RenderingContextBase::getParameter(ScriptState* script_state,
+@@ -4899,43 +4972,55 @@ ScriptValue WebGL2RenderingContextBase::getParameter(ScriptState* script_state,
        return GetIntParameter(script_state, pname);
      case GL_MAX_FRAGMENT_INPUT_COMPONENTS:
        return WebGLAny(script_state,

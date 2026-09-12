@@ -113,7 +113,7 @@ def test_includes_and_bounded_scope(patched_sources):
     assert patched_sources["0031"].count("UxrCopyAndNoiseEncodeBuffer(pixmap_, retained_image_)") == 2
     series = [line.strip() for line in (ROOT / "patches/series").read_text().splitlines()
               if line.strip() and not line.lstrip().startswith("#")]
-    assert [Path(line).name[:4] for line in series] == [f"{i:04d}" for i in range(1, 125)]
+    assert [Path(line).name[:4] for line in series] == [f"{i:04d}" for i in range(1, 127)]
     for number in ("0020", "0031"):
         assert series[int(number) - 1] == patch_path(number).relative_to(ROOT).as_posix()
 

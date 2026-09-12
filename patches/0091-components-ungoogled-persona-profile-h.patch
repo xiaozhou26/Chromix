@@ -2,7 +2,7 @@ diff --git a/components/ungoogled/persona_profile.h b/components/ungoogled/perso
 new file mode 100644
 --- /dev/null
 +++ b/components/ungoogled/persona_profile.h
-@@ -0,0 +1,76 @@
+@@ -0,0 +1,78 @@
 +// Copyright 2026.
 +#ifndef COMPONENTS_UNGOOGLED_PERSONA_PROFILE_H_
 +#define COMPONENTS_UNGOOGLED_PERSONA_PROFILE_H_
@@ -25,6 +25,8 @@ new file mode 100644
 +  bool webgl_identity_explicit = false;
 +  bool webgl_fingerprint = false;
 +  bool webgl_real = false;
++  // Public identity flags do not declare capabilities the driver lacks.
++  bool webgl_native_capabilities = true;
 +  bool mobile = false;
 +
 +  int webgl_max_texture_size = 16384;

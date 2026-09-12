@@ -45,7 +45,8 @@ function fmtDpr(dpr) {
 }
 
 function seededRandom(seed) {
-  let state = (seed ^ 0x7363726e) >>> 0;
+  const folded = (seed & 0xFFFFFFFFn) ^ (((seed >> 32n) * 0x9E3779B1n) & 0xFFFFFFFFn);
+  let state = (Number(folded) ^ 0x7363726e) >>> 0;
   return () => {
     state = (state + 0x6D2B79F5) >>> 0;
     let value = Math.imul(state ^ (state >>> 15), 1 | state);
@@ -61,32 +62,57 @@ export function ensurePersonaGeometry(args, rand) {
   const existing = new Map();
   for (const a of args || []) {
     const eq = a.indexOf("=");
-    if (eq > 0) existing.set(a.slice(2, eq), a.slice(eq + 1));
+    if (a.startsWith("--") && eq > 2) existing.set(a.slice(2, eq), a.slice(eq + 1));
   }
-  for (const dim of ["width", "height"]) {
-    const alias = `fingerprint-screen-${dim}`, key = `uxr-screen-${dim}`;
+  for (const [alias, key] of [
+    ...["width", "height"].map(dim => [`fingerprint-screen-${dim}`, `uxr-screen-${dim}`]),
+    ["fingerprint-taskbar-height", "uxr-taskbar-height"],
+  ]) {
+    if (existing.has(key) && existing.has(alias) && existing.get(key) !== existing.get(alias))
+      throw new Error(`conflicting display aliases: ${alias} and ${key}`);
     if (!existing.has(key) && existing.has(alias)) existing.set(key, existing.get(alias));
   }
+  const raw = existing.get("fingerprint") || "";
+  if (raw && (!/^[0-9]{1,20}$/.test(raw) || BigInt(raw) <= 0n || BigInt(raw) > 0xFFFFFFFFFFFFFFFFn))
+    throw new Error("synthetic geometry seed must be a nonzero decimal uint64");
   if (!rand) {
-    const seed = Number(existing.get("fingerprint"));
-    rand = Number.isInteger(seed) && seed > 0 && seed <= 0xFFFFFFFF
-      ? seededRandom(seed) : Math.random;
+    rand = raw ? seededRandom(BigInt(raw)) : Math.random;
   }
-  const numberAt = (key, zero = false) => {
-    if (!existing.has(key) || existing.get(key) === "") return null;
+  const numberAt = (key, zero = false, integral = true, maximum = 32768) => {
+    if (!existing.has(key)) return null;
+    const syntax = integral ? /^[0-9]+$/ : /^(?:[0-9]+(?:\.[0-9]*)?|\.[0-9]+)(?:[eE][+-]?[0-9]+)?$/;
+    if (!syntax.test(existing.get(key))) throw new Error(`invalid display value: ${key}`);
     const value = Number(existing.get(key));
-    return Number.isFinite(value) && (zero ? value >= 0 : value > 0) ? value : null;
+    if (existing.get(key).trim() && Number.isFinite(value) &&
+        (zero ? value >= 0 : value > 0) && value <= maximum && (!integral || Number.isInteger(value)))
+      return value;
+    throw new Error(`invalid display value: ${key}`);
   };
   const pick = pickPersonaScreen(rand);
   const w = numberAt("uxr-screen-width") ?? pick.width;
   const h = numberAt("uxr-screen-height") ?? pick.height;
-  const dpr = numberAt("uxr-device-pixel-ratio") ?? pick.dpr;
-  const available = numberAt("uxr-screen-avail-height");
+  const dpr = numberAt("uxr-device-pixel-ratio", false, false, 8) ?? pick.dpr;
+  if (dpr < 0.25) throw new Error("device pixel ratio must be in [0.25, 8]");
+  const availableWidth = numberAt("uxr-screen-avail-width", true);
+  const available = numberAt("uxr-screen-avail-height", true);
+  if ((availableWidth !== null && availableWidth > w) || (available !== null && available > h))
+    throw new Error("available bounds exceed the screen");
   const tb = numberAt("uxr-taskbar-height", true) ?? (available === null ? pick.taskbar : h - available);
+  if (tb > h || (available !== null && available !== h - tb))
+    throw new Error("taskbar and available height disagree");
   const windowSize = (existing.get("window-size") || "").split(",").map(Number);
-  const validSize = windowSize.length === 2 && windowSize.every((v) => Number.isFinite(v) && v > 0);
+  const validSize = windowSize.length === 2 && windowSize.every((v) => Number.isInteger(v) && v > 0 && v <= 32768);
+  if (existing.has("window-size") && (!validSize || !/^[0-9]+,[0-9]+$/.test(existing.get("window-size"))))
+    throw new Error("invalid native window-size");
   const outerWidth = numberAt("uxr-outer-width") ?? (validSize ? windowSize[0] : w);
   const outerHeight = numberAt("uxr-outer-height") ?? (validSize ? windowSize[1] : h - tb);
+  if (outerHeight <= CHROME_UI_STRIP)
+    throw new Error("synthetic window is smaller than its configured UI strip");
+  if (validSize && (outerWidth !== windowSize[0] || outerHeight !== windowSize[1]))
+    throw new Error("native and persona window sizes disagree");
+  const viewportWidth = numberAt("uxr-viewport-width"), viewportHeight = numberAt("uxr-viewport-height");
+  if ((viewportWidth === null) !== (viewportHeight === null))
+    throw new Error("viewport dimensions must be supplied together");
   const switches = [];
   const put = (key, val) => { if (!existing.has(key)) switches.push(`--${key}=${val}`); };
   put("uxr-screen-width", w);
@@ -96,7 +122,9 @@ export function ensurePersonaGeometry(args, rand) {
   put("uxr-outer-width", outerWidth);
   put("uxr-outer-height", outerHeight);
   const geometry = { width: w, height: h, dpr, taskbar: tb,
-                     availHeight: h - tb, outerWidth, outerHeight,
+                     availHeight: h - tb, availWidth: availableWidth ?? w, outerWidth, outerHeight,
+                     viewportWidth: viewportWidth ?? outerWidth,
+                     viewportHeight: viewportHeight ?? outerHeight - CHROME_UI_STRIP,
                      innerHeight: outerHeight - CHROME_UI_STRIP };
   return { args: [...switches, ...(args || [])], switches, geometry };
 }

@@ -2,12 +2,16 @@ diff --git a/content/browser/renderer_host/render_process_host_impl.cc b/content
 index 79c9568633..c10556d642 100644
 --- a/content/browser/renderer_host/render_process_host_impl.cc
 +++ b/content/browser/renderer_host/render_process_host_impl.cc
-@@ -3787,6 +3787,18 @@
+@@ -3787,6 +3787,22 @@
        *base::CommandLine::ForCurrentProcess();
    PropagateBrowserCommandLineToRenderer(browser_command_line, command_line);
  
 +  // Locale initialization precedes the renderer's persona IPC.
-+  static const char* const kUxrStartupSwitches[] = {"uxr-languages"};
++  static const char* const kUxrStartupSwitches[] = {
++      "uxr-languages", "uxr-fingerprint-off", "uxr-ua-brand",
++      "uxr-ua-brand-version", "uxr-ua-full-version", "uxr-ua-os",
++      "uxr-ua-platform", "uxr-ua-platform-version", "uxr-ua-arch",
++      "uxr-ua-bitness", "uxr-ua-model", "uxr-ua-wow64"};
 +  command_line->CopySwitchesFrom(browser_command_line, kUxrStartupSwitches);
 +
 +  // V8 cannot read the renderer's base::UxrConfig during flag initialization.

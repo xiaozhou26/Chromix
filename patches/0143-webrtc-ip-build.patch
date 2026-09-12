@@ -1,0 +1,11 @@
+diff --git a/third_party/blink/renderer/platform/BUILD.gn b/third_party/blink/renderer/platform/BUILD.gn
+--- a/third_party/blink/renderer/platform/BUILD.gn
++++ b/third_party/blink/renderer/platform/BUILD.gn
+@@ -1443,6 +1443,7 @@
+     "peerconnection/rtc_event_log_output_sink.h",
+     "peerconnection/rtc_event_log_output_sink_proxy.cc",
+     "peerconnection/rtc_event_log_output_sink_proxy.h",
++    "peerconnection/fingerprint_ip.h",
+     "peerconnection/rtc_ice_candidate_platform.cc",
+     "peerconnection/rtc_ice_candidate_platform.h",
+     "peerconnection/rtc_offer_options_platform.h",

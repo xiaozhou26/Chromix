@@ -1,0 +1,19 @@
+diff --git a/third_party/blink/renderer/modules/peerconnection/rtc_session_description_request_impl.cc b/third_party/blink/renderer/modules/peerconnection/rtc_session_description_request_impl.cc
+--- a/third_party/blink/renderer/modules/peerconnection/rtc_session_description_request_impl.cc
++++ b/third_party/blink/renderer/modules/peerconnection/rtc_session_description_request_impl.cc
+@@ -37,6 +37,7 @@
+ #include "third_party/blink/renderer/modules/peerconnection/rtc_peer_connection.h"
+ #include "third_party/blink/renderer/modules/peerconnection/rtc_session_description.h"
+ #include "third_party/blink/renderer/platform/peerconnection/rtc_session_description_platform.h"
++#include "third_party/blink/renderer/platform/peerconnection/fingerprint_ip.h"
+ 
+ namespace blink {
+ 
+@@ -80,6 +81,7 @@
+     description->setSdp(description_platform->Sdp());
+ 
+     requester_->NoteSdpCreated(*description);
++    description->setSdp(String::FromUtf8(RewriteFingerprintSdp(description_platform->Sdp().Utf8())));
+     success_callback_->InvokeAndReportException(nullptr, description);
+   }
+   Clear();

@@ -3,11 +3,12 @@ new file mode 100644
 index 0000000000..cac1a6896b
 --- /dev/null
 +++ b/base/uxr_config.cc
-@@ -0,0 +1,159 @@
+@@ -0,0 +1,308 @@
 +// Copyright 2026.
 +#include "base/uxr_config.h"
 +
 +#include <array>
++#include <cmath>
 +#include <cstdint>
 +#include <random>
 +
@@ -15,6 +16,84 @@ index 0000000000..cac1a6896b
 +#include "base/strings/string_number_conversions.h"
 +
 +namespace base {
++
++namespace {
++bool ReadDimension(const flat_map<std::string, std::string>& cfg,
++                   const char* key, int* out, int min = 1, int max = 32768) {
++  auto it = cfg.find(key);
++  if (it == cfg.end())
++    return true;
++  int value = 0;
++  if (!StringToInt(it->second, &value) || value < min || value > max)
++    return false;
++  *out = value;
++  return true;
++}
++
++bool ParseDisplay(const flat_map<std::string, std::string>& cfg,
++                  UxrDisplayConfig* d) {
++  if (!ReadDimension(cfg, "uxr-screen-width", &d->width) ||
++      !ReadDimension(cfg, "uxr-screen-height", &d->height) ||
++      (d->width == 0) != (d->height == 0) ||
++      !ReadDimension(cfg, "uxr-viewport-width", &d->viewport_width) ||
++      !ReadDimension(cfg, "uxr-viewport-height", &d->viewport_height) ||
++      (d->viewport_width == 0) != (d->viewport_height == 0) ||
++      !ReadDimension(cfg, "uxr-outer-width", &d->outer_width) ||
++      !ReadDimension(cfg, "uxr-outer-height", &d->outer_height) ||
++      (d->outer_width == 0) != (d->outer_height == 0) ||
++      !ReadDimension(cfg, "uxr-window-x", &d->window_x, -1000000, 1000000) ||
++      !ReadDimension(cfg, "uxr-window-y", &d->window_y, -1000000, 1000000))
++    return false;
++  d->has_position = cfg.contains("uxr-window-x") || cfg.contains("uxr-window-y");
++  d->available_width = d->width;
++  d->available_height = d->height;
++  if (!d->width && (cfg.contains("uxr-screen-avail-width") ||
++                    cfg.contains("uxr-screen-avail-height")))
++    return false;
++  if (!ReadDimension(cfg, "uxr-screen-avail-width", &d->available_width, 0) ||
++      !ReadDimension(cfg, "uxr-screen-avail-height", &d->available_height, 0) ||
++      d->available_width > d->width || d->available_height > d->height)
++    return false;
++  if (cfg.contains("uxr-taskbar-height")) {
++    int taskbar = 0;
++    if (!d->height || !ReadDimension(cfg, "uxr-taskbar-height", &taskbar, 0) ||
++        taskbar > d->height)
++      return false;
++    if (cfg.contains("uxr-screen-avail-height") &&
++        d->available_height != d->height - taskbar)
++      return false;
++    d->available_height = d->height - taskbar;
++  }
++  if (auto it = cfg.find("uxr-device-pixel-ratio"); it != cfg.end()) {
++    if (!StringToDouble(it->second, &d->device_scale_factor) ||
++        !std::isfinite(d->device_scale_factor) ||
++        d->device_scale_factor < 0.25 || d->device_scale_factor > 8)
++      return false;
++  }
++  if (auto it = cfg.find("uxr-screen-orientation"); it != cfg.end()) {
++    d->orientation = it->second;
++    if (d->orientation != "landscape-primary" &&
++        d->orientation != "landscape-secondary" &&
++        d->orientation != "portrait-primary" &&
++        d->orientation != "portrait-secondary")
++      return false;
++    d->orientation_angle = d->orientation.ends_with("secondary") ? 180 : 0;
++  }
++  if (cfg.contains("uxr-screen-orientation-angle")) {
++    if (d->orientation.empty() ||
++        !ReadDimension(cfg, "uxr-screen-orientation-angle", &d->orientation_angle, 0, 270) ||
++        d->orientation_angle % 90 != 0)
++      return false;
++  }
++  // This backend configures one emulated screen, not extra physical monitors.
++  if (auto it = cfg.find("uxr-screen-extended"); it != cfg.end()) {
++    if (it->second != "false" && it->second != "0")
++      return false;
++  }
++  // Color depth is a backend capability, never a getter-only declaration.
++  return !cfg.contains("uxr-screen-color-depth");
++}
++}  // namespace
 +
 +UxrConfig::UxrConfig() = default;
 +UxrConfig::~UxrConfig() = default;
@@ -25,9 +104,63 @@ index 0000000000..cac1a6896b
 +  return *instance;
 +}
 +
-+void UxrConfig::SetAll(const flat_map<std::string, std::string>& cfg) {
++bool UxrConfig::SetAll(const flat_map<std::string, std::string>& cfg,
++                       uint32_t schema_version) {
 +  AutoLock locker(lock_);
++  if (schema_version != kSchemaVersion) {
++    validation_error_ = "unsupported persona schema";
++    return false;
++  }
++  if (initialized_) {
++    if (map_ == cfg)
++      return true;
++    validation_error_ = "persona snapshot is immutable";
++    return false;
++  }
++  size_t bytes = 0;
++  for (const auto& [key, value] : cfg) {
++    bytes += key.size() + value.size();
++    if (key.empty() || key.size() > 128 || value.size() > 16384 ||
++        key.find_first_not_of("abcdefghijklmnopqrstuvwxyz0123456789-") !=
++            std::string::npos || value.find('\0') != std::string::npos) {
++      validation_error_ = "invalid persona field";
++      return false;
++    }
++  }
++  if (cfg.size() > 256 || bytes > 65536) {
++    validation_error_ = "persona snapshot exceeds bounds";
++    return false;
++  }
++  UxrDisplayConfig display;
++  if (!ParseDisplay(cfg, &display)) {
++    validation_error_ = "invalid or inconsistent display geometry";
++    return false;
++  }
 +  map_ = cfg;
++  display_ = display;
++  initialized_ = true;
++  validation_error_.clear();
++  return true;
++}
++
++bool UxrConfig::IsInitialized() const {
++  AutoLock locker(lock_);
++  return initialized_;
++}
++
++flat_map<std::string, std::string> UxrConfig::Snapshot() const {
++  AutoLock locker(lock_);
++  return map_;
++}
++
++UxrDisplayConfig UxrConfig::Display() const {
++  AutoLock locker(lock_);
++  return display_;
++}
++
++std::string UxrConfig::ValidationError() const {
++  AutoLock locker(lock_);
++  return validation_error_;
 +}
 +
 +bool UxrConfig::Has(const std::string& key) const {
@@ -47,19 +180,34 @@ index 0000000000..cac1a6896b
 +  if (it == map_.end()) {
 +    return false;
 +  }
-+  return StringToInt(it->second, out);
++  int value = 0;
++  if (!out || !StringToInt(it->second, &value))
++    return false;
++  *out = value;
++  return true;
 +}
 +
 +bool UxrConfig::GetDouble(const std::string& key, double* out) const {
 +  AutoLock locker(lock_);
 +  auto it = map_.find(key);
-+  return it != map_.end() && StringToDouble(it->second, out);
++  double value = 0;
++  if (!out || it == map_.end() || !StringToDouble(it->second, &value) ||
++      !std::isfinite(value))
++    return false;
++  *out = value;
++  return true;
 +}
 +
 +bool UxrConfig::GetUint64(const std::string& key, uint64_t* out) const {
 +  AutoLock locker(lock_);
 +  auto it = map_.find(key);
-+  return it != map_.end() && StringToUint64(it->second, out);
++  uint64_t value = 0;
++  if (!out || it == map_.end() || it->second.empty() ||
++      it->second.find_first_not_of("0123456789") != std::string::npos ||
++      !StringToUint64(it->second, &value))
++    return false;
++  *out = value;
++  return true;
 +}
 +
 +namespace {
@@ -69,7 +217,8 @@ index 0000000000..cac1a6896b
 +  if (cfg.Get("uxr-synthetic-device-tests") != "true")
 +    return 0u;
 +  uint64_t seed = 0;
-+  const std::string raw = cfg.Get("uxr-canvas-seed");
++  const std::string primary = cfg.Get("uxr-fingerprint-seed");
++  const std::string raw = primary.empty() ? cfg.Get("uxr-canvas-seed") : primary;
 +  if (raw.empty() || !base::StringToUint64(raw, &seed))
 +    return 0u;
 +  return seed;

@@ -87,6 +87,8 @@ def main(argv=None):
             browser = pw.chromium.launch(executable_path=str(args.browser.resolve()),
                 headless=not args.headed, args=launch.NATIVE_ARGS, chromium_sandbox=True)
             try:
+                report['browser_version'] = browser.version
+                report['probe_sha256'] = launch.pool.file_hash(launch.PROBE)
                 for isolated in (False, True):
                     context = browser.new_context(no_viewport=True)
                     try:

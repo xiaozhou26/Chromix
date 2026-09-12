@@ -1,0 +1,13 @@
+diff --git a/third_party/blink/renderer/modules/peerconnection/rtc_peer_connection.h b/third_party/blink/renderer/modules/peerconnection/rtc_peer_connection.h
+--- a/third_party/blink/renderer/modules/peerconnection/rtc_peer_connection.h
++++ b/third_party/blink/renderer/modules/peerconnection/rtc_peer_connection.h
+@@ -558,6 +558,9 @@
+   // Internal state [[LastOffer]] and [[LastAnswer]]
+   String last_offer_;
+   String last_answer_;
++  String fingerprint_pending_local_sdp_;
++  String fingerprint_current_local_sdp_;
++  String RestoreFingerprintLocalSdp(const String&) const;
+   int pending_create_offer_count_ = 0;
+   int pending_create_answer_count_ = 0;
+ 

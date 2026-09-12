@@ -21,7 +21,7 @@ import pytest
 ROOT = Path(__file__).resolve().parents[2]
 NUMBERS = (24, 43, 44, 85, 86, 87, 88)
 PATCH_BIN = shutil.which("gpatch") or shutil.which("patch")
-CXX = shutil.which("clang++") or shutil.which("g++")
+CXX = os.environ.get("CXX") or shutil.which("clang++") or shutil.which("g++")
 
 
 def patch_path(number):
@@ -66,7 +66,7 @@ def write_inputs(directory):
             continue
         path = directory / target_path(number)
         path.parent.mkdir(parents=True, exist_ok=True)
-        path.write_text(fixture_source(number))
+        path.write_text(fixture_source(number), encoding="utf-8", newline="\n")
 
 
 @pytest.fixture(scope="module")
@@ -151,12 +151,12 @@ def test_offset_and_wrong_direction_are_not_silently_accepted(tmp_path, patched_
     path = tmp_path / target_path(number)
     path.parent.mkdir(parents=True, exist_ok=True)
     before = patched_sources[24] if number == 85 else fixture_source(number)
-    path.write_text("\n" + before)
+    path.write_text("\n" + before, encoding="utf-8", newline="\n")
     result = apply_patch(tmp_path, number, dry_run=True)
     assert result.returncode == 0
     with pytest.raises(AssertionError, match="offset"):
         assert_strict(result)
-    path.write_text(patched_sources[number])
+    path.write_text(patched_sources[number], encoding="utf-8", newline="\n")
     assert apply_patch(tmp_path, number, dry_run=True).returncode != 0
 
 
@@ -200,6 +200,8 @@ def runtime_binary(tmp_path_factory, patched_sources):
                      '  std::unique_ptr<webrtc::NetworkManager> network_manager;')
     source += '\nvoid ApplyPolicy(Config& port_config, bool& allow_mdns_obfuscation) {\n' + policy + '}\n'
     guard = excerpt(patched_sources[44], '  const auto& uxr_config =', '\n  return web_configuration;\n}')
+    # Address parsing itself is executed against InetPton in the backend-feature tests.
+    source += '''\nstd::string FingerprintWebRtcIp() {\n  auto ip = base::UxrConfig::GetInstance().Get("uxr-webrtc-ip");\n  return ip == "198.51.100.1" || ip == "2001:db8::1" ? ip : "";\n}\n'''
     source += '\nint Validate(ExceptionState* exception_state) {\n  int web_configuration = 7;\n' + guard
     source += '\n  return web_configuration;\n}\n'
     source += excerpt(patched_sources[87], 'bool Port::IsValidStunMappedAddress(', 'void Port::AddAddress(')
@@ -219,7 +221,7 @@ def runtime_binary(tmp_path_factory, patched_sources):
     source += CPP_TESTS
     directory = tmp_path_factory.mktemp("webrtc-runtime")
     cpp, binary = directory / "webrtc.cc", directory / "webrtc"
-    cpp.write_text(source)
+    cpp.write_text(source, encoding="utf-8", newline="\n")
     result = subprocess.run([CXX, '-std=c++20', '-O0', '-Wall', '-Wextra', '-Werror',
                              str(cpp), '-o', str(binary)], capture_output=True, text=True, timeout=60)
     assert result.returncode == 0, result.stdout + result.stderr
@@ -601,11 +603,17 @@ int main(int argc, char** argv) {
     assert(RelayProtocol("relay", std::nullopt, "turn:example.test")==-1);
   } else if(test=="config") {
     ExceptionState native; assert(Validate(&native)==7 && native.errors==0);
-    for(auto key:{"uxr-webrtc-ip","uxr-webrtc-fake-srflx","uxr-webrtc-fake-srflx-allow-udp"}) {
+    for(auto key:{"uxr-webrtc-fake-srflx","uxr-webrtc-fake-srflx-allow-udp"}) {
       for(auto value:{"", "auto", "false", "198.51.100.1", "2001:db8::1"}) {
         cfg.values={{key,value}}; ExceptionState e; Validate(&e);
         assert(e.errors==1 && e.message.find("retired")!=std::string::npos);
       }
+    }
+    for(auto value:{"198.51.100.1", "2001:db8::1"}) {
+      cfg.values={{"uxr-webrtc-ip",value}}; ExceptionState e; Validate(&e); assert(!e.errors);
+    }
+    for(auto value:{"", "auto", "false"}) {
+      cfg.values={{"uxr-webrtc-ip",value}}; ExceptionState e; Validate(&e); assert(e.errors==1);
     }
     for(auto value:{"default","obfuscate","disable_non_proxied_udp",
                     "default_public_interface_only","default_public_and_private_interfaces"}) {
@@ -1774,3 +1782,17 @@ void BasicPortAllocatorSession::OnPortError(Port* port) {
 '''
 
 ALLOCATOR_CALLBACKS = ALLOCATOR_ON_CANDIDATE + ALLOCATOR_ON_COMPLETE_ERROR
+
+
+# Extended native Chromium 152 excerpts; whole-file provenance remains SOURCE_HASHES[44].
+SECTIONS[44] = [
+    (33, '#include <algorithm>\n#include <memory>\n#include <optional>\n#include <string>\n#include <utility>\n\n#include "base/compiler_specific.h"\n#include "base/containers/to_vector.h"\n#include "base/feature_list.h"\n#include "base/lazy_instance.h"\n#include "base/memory/ptr_util.h"\n#include "base/metrics/histogram_functions.h"\n#include "base/metrics/histogram_macros.h"\n#include "base/notreached.h"\n#include "base/numerics/safe_conversions.h"\n#include "base/task/single_thread_task_runner.h"\n#include "base/task/thread_pool.h"\n#include "build/build_config.h"\n#include "build/buildflag.h"\n#include "services/metrics/public/cpp/ukm_builders.h"\n#include "services/network/public/cpp/connection_allowlist.h"\n#include "third_party/blink/public/common/features.h"\n'),
+    (306, 'webrtc::PeerConnectionInterface::RTCConfiguration ParseConfiguration(\n    ExecutionContext* context,\n    const RTCConfiguration* configuration,\n    ExceptionState* exception_state) {\n  DCHECK(context);\n\n  webrtc::PeerConnectionInterface::RTCConfiguration web_configuration;\n\n  if (configuration->hasIceTransportPolicy()) {\n    UseCounter::Count(context, WebFeature::kRTCConfigurationIceTransportPolicy);\n    web_configuration.type = IceTransportPolicyFromEnum(\n        configuration->iceTransportPolicy().AsEnum());\n  } else if (configuration->hasIceTransports()) {\n    UseCounter::Count(context, WebFeature::kRTCConfigurationIceTransports);\n    web_configuration.type =\n        IceTransportPolicyFromEnum(configuration->iceTransports().AsEnum());\n  }\n\n  switch (configuration->bundlePolicy().AsEnum()) {\n    case V8RTCBundlePolicy::Enum::kMaxCompat:\n      web_configuration.bundle_policy =\n          webrtc::PeerConnectionInterface::kBundlePolicyMaxCompat;\n      break;\n    case V8RTCBundlePolicy::Enum::kMaxBundle:\n      web_configuration.bundle_policy =\n          webrtc::PeerConnectionInterface::kBundlePolicyMaxBundle;\n      break;\n    case V8RTCBundlePolicy::Enum::kBalanced:\n      break;\n  }\n\n  switch (configuration->rtcpMuxPolicy().AsEnum()) {\n    case V8RTCRtcpMuxPolicy::Enum::kNegotiate:\n      web_configuration.rtcp_mux_policy =\n          webrtc::PeerConnectionInterface::kRtcpMuxPolicyNegotiate;\n      Deprecation::CountDeprecation(context,\n                                    WebFeature::kRtcpMuxPolicyNegotiate);\n      break;\n    case V8RTCRtcpMuxPolicy::Enum::kRequire:\n      break;\n  }\n\n  if (RuntimeEnabledFeatures::RtcRtpHeaderEncryptionPolicyEnabled()) {\n    switch (configuration->rtpHeaderEncryptionPolicy().AsEnum()) {\n      case V8RTCRtpHeaderEncryptionPolicy::Enum::kNegotiate:\n        web_configuration.crypto_options.srtp.cryptex_policy =\n            webrtc::CryptoOptions::Srtp::CryptexPolicy::kNegotiate;\n        break;\n      case V8RTCRtpHeaderEncryptionPolicy::Enum::kRequire:\n        web_configuration.crypto_options.srtp.cryptex_policy =\n            webrtc::CryptoOptions::Srtp::CryptexPolicy::kRequire;\n        break;\n    }\n  }\n\n  // If RTC connections are blocked globally, communication with all ICE servers\n  // should be also blocked. The simplest way to accomplish this is to filter\n  // them all out before they reach the native layer.\n  if (!AreIceCandidatesAdministrativelyProhibited(context)) {\n    std::vector<webrtc::PeerConnectionInterface::IceServer>& ice_servers =\n        web_configuration.servers;\n    for (const RTCIceServer* ice_server : configuration->iceServers()) {\n      Vector<String> url_strings;\n      std::vector<std::string> converted_urls;\n      if (ice_server->hasUrls()) {\n        UseCounter::Count(context, WebFeature::kRTCIceServerURLs);\n        switch (ice_server->urls()->GetContentType()) {\n          case V8UnionStringOrStringSequence::ContentType::kString:\n            url_strings.push_back(ice_server->urls()->GetAsString());\n            break;\n          case V8UnionStringOrStringSequence::ContentType::kStringSequence:\n            url_strings = ice_server->urls()->GetAsStringSequence();\n            break;\n        }\n      } else if (ice_server->hasUrl()) {\n        UseCounter::Count(context, WebFeature::kRTCIceServerURL);\n        url_strings.push_back(ice_server->url());\n      } else {\n        exception_state->ThrowTypeError("Malformed RTCIceServer");\n        return {};\n      }\n\n      for (const String& url_string : url_strings) {\n        KURL url(NullUrl(), url_string);\n        if (!url.IsValid()) {\n          exception_state->ThrowDOMException(\n              DOMExceptionCode::kSyntaxError,\n              StrCat({"\'", url_string, "\' is not a valid URL."}));\n          return {};\n        }\n        bool is_valid_turn = IsValidTurnURL(url);\n        if (!is_valid_turn && !IsValidStunURL(url)) {\n          exception_state->ThrowDOMException(\n              DOMExceptionCode::kSyntaxError,\n              StrCat({"\'", url_string, "\' is not a valid stun or turn URL."}));\n          return {};\n        }\n        if (is_valid_turn &&\n            (!ice_server->hasUsername() || !ice_server->hasCredential())) {\n          exception_state->ThrowDOMException(\n              DOMExceptionCode::kInvalidAccessError,\n              "Both username and credential are "\n              "required when the URL scheme is "\n              "\\"turn\\" or \\"turns\\".");\n        }\n\n        converted_urls.push_back(String(url).Utf8());\n      }\n\n      auto converted_ice_server = webrtc::PeerConnectionInterface::IceServer();\n      converted_ice_server.urls = std::move(converted_urls);\n      if (ice_server->hasUsername()) {\n        converted_ice_server.username = ice_server->username().Utf8();\n      }\n      if (ice_server->hasCredential()) {\n        converted_ice_server.password = ice_server->credential().Utf8();\n      }\n      ice_servers.emplace_back(std::move(converted_ice_server));\n    }\n  }\n\n  web_configuration.certificates = base::ToVector(\n      configuration->certificates(),\n      [](const auto& certificate) { return certificate->Certificate(); });\n\n  web_configuration.ice_candidate_pool_size =\n      configuration->iceCandidatePoolSize();\n\n  if (configuration->hasRtcAudioJitterBufferMaxPackets()) {\n    UseCounter::Count(context, WebFeature::kRTCMaxAudioBufferSize);\n    web_configuration.audio_jitter_buffer_max_packets =\n        static_cast<int>(configuration->rtcAudioJitterBufferMaxPackets());\n  }\n\n  if (configuration->hasRtcAudioJitterBufferFastAccelerate()) {\n    UseCounter::Count(context, WebFeature::kRTCMaxAudioBufferSize);\n    web_configuration.audio_jitter_buffer_fast_accelerate =\n        configuration->hasRtcAudioJitterBufferFastAccelerate();\n  }\n\n  if (configuration->hasRtcAudioJitterBufferMinDelayMs()) {\n    UseCounter::Count(context, WebFeature::kRTCMaxAudioBufferSize);\n    web_configuration.audio_jitter_buffer_min_delay_ms =\n        static_cast<int>(configuration->rtcAudioJitterBufferMinDelayMs());\n  }\n\n  if (configuration->hasAlwaysNegotiateDataChannels()) {\n    web_configuration.always_negotiate_data_channels =\n        configuration->alwaysNegotiateDataChannels();\n  }\n\n  return web_configuration;\n}\n\n'),
+    (1136, '    }\n  }\n\n  ExecutionContext* context = ExecutionContext::From(script_state);\n  ParsedSessionDescription parsed_sdp = ParsedSessionDescription::Parse(\n      session_description_init->type().AsString(), sdp);\n'),
+    (1232, '    }\n  }\n\n  ParsedSessionDescription parsed_sdp = ParsedSessionDescription::Parse(\n      session_description_init->hasType()\n          ? session_description_init->type().AsString()\n'),
+    (1256, 'RTCSessionDescription* RTCPeerConnection::localDescription() const {\n  return pending_local_description_ ? pending_local_description_\n                                    : current_local_description_;\n}\n\nRTCSessionDescription* RTCPeerConnection::currentLocalDescription() const {\n  return current_local_description_.Get();\n}\n\nRTCSessionDescription* RTCPeerConnection::pendingLocalDescription() const {\n  return pending_local_description_.Get();\n}\n\nScriptPromise<IDLUndefined> RTCPeerConnection::setRemoteDescription(\n'),
+    (2524, '  tracks_.insert(track->Component(), track);\n}\n\nvoid RTCPeerConnection::NoteSdpCreated(const RTCSessionDescriptionInit& desc) {\n  if (desc.type() == V8RTCSdpType::Enum::kOffer) {\n    last_offer_ = desc.sdp();\n'),
+    (2573, '  DCHECK(!closed_);\n  DCHECK(GetExecutionContext()->IsContextThread());\n  DCHECK(platform_candidate);\n  RTCIceCandidate* ice_candidate = RTCIceCandidate::Create(platform_candidate);\n  MaybeDispatchEvent(RTCPeerConnectionIceEvent::Create(ice_candidate));\n}\n'),
+    (2585, '                                            const String& error_text) {\n  DCHECK(!closed_);\n  DCHECK(GetExecutionContext()->IsContextThread());\n  MaybeDispatchEvent(RTCPeerConnectionIceErrorEvent::Create(\n      address, port, host_candidate, url, error_code, error_text));\n}\n\nvoid RTCPeerConnection::DidChangeSessionDescriptions(\n'),
+    (2596, '    RTCSessionDescriptionPlatform* current_remote_description) {\n  DCHECK(!closed_);\n  DCHECK(GetExecutionContext()->IsContextThread());\n  pending_local_description_ =\n      pending_local_description\n          ? RTCSessionDescription::Create(pending_local_description)\n          : nullptr;\n  current_local_description_ =\n      current_local_description\n          ? RTCSessionDescription::Create(current_local_description)\n          : nullptr;\n  pending_remote_description_ =\n      pending_remote_description\n          ? RTCSessionDescription::Create(pending_remote_description)\n'),
+]

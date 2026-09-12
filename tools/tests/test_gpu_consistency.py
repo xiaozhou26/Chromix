@@ -221,7 +221,23 @@ std::string NumberToString(uint64_t value) { return std::to_string(value); }
 }
 """.replace("HASH_BODY", hash_body)
     seed = "\n".join(line for line in seed_sources["0105"].splitlines() if not line.startswith("#include"))
-    return compile_cpp(directory, support + seed + SEED_TESTS, "-pthread", "-fsanitize=undefined")
+    flags = ["-pthread", "-fsanitize=undefined", "-fno-sanitize-recover=all"]
+    if os.name == "nt":
+        flags.append("-fms-runtime-lib=static")
+        # MSVC's library search precedes Clang's resource directory on Windows.
+        # Its identically named UBSan library belongs to a different toolchain
+        # and can reference unavailable ASan COE symbols. Bind this compiler's
+        # own runtimes explicitly; keep UBSan enabled rather than skipping it.
+        resource = subprocess.run([gpu.CXX, "-print-resource-dir"],
+                                  capture_output=True, text=True, timeout=10)
+        assert resource.returncode == 0, resource.stderr
+        runtime = Path(resource.stdout.strip()) / "lib" / "windows"
+        for name in ("clang_rt.ubsan_standalone-x86_64.lib",
+                     "clang_rt.ubsan_standalone_cxx-x86_64.lib"):
+            library = runtime / name
+            assert library.is_file(), f"missing compiler-matched UBSan runtime: {library}"
+            flags.append(str(library))
+    return compile_cpp(directory, support + seed + SEED_TESTS, *flags)
 
 
 @pytest.mark.parametrize("case", ["bits", "legacy", "invalid", "precedence", "lifecycle", "threads"])

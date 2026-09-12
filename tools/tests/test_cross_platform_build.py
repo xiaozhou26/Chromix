@@ -170,7 +170,7 @@ class CrossPlatformBuildRegressionTest(unittest.TestCase):
             for job in jobs:
                 with self.subTest(workflow=filename, job=job):
                     diagnostics = [step for step in workflow["jobs"][job]["steps"]
-                                   if "diagnostics" in step.get("name", "")]
+                                   if step.get("name") in ('Upload build diagnostics', 'Upload upstream cache diagnostics')]
                     self.assertEqual(len(diagnostics), 1)
                     options = diagnostics[0]["with"]
                     self.assertTrue(options["include-hidden-files"])

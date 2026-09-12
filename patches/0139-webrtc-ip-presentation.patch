@@ -1,0 +1,145 @@
+diff --git a/third_party/blink/renderer/platform/peerconnection/fingerprint_ip.h b/third_party/blink/renderer/platform/peerconnection/fingerprint_ip.h
+new file mode 100644
+--- /dev/null
++++ b/third_party/blink/renderer/platform/peerconnection/fingerprint_ip.h
+@@ -0,0 +1,140 @@
++// Copyright 2026.
++#ifndef THIRD_PARTY_BLINK_RENDERER_PLATFORM_PEERCONNECTION_FINGERPRINT_IP_H_
++#define THIRD_PARTY_BLINK_RENDERER_PLATFORM_PEERCONNECTION_FINGERPRINT_IP_H_
++
++#include <set>
++#include <string>
++#include <string_view>
++#include <utility>
++#include <vector>
++
++#include "base/uxr_config.h"
++#include "net/base/ip_address.h"
++
++namespace blink {
++
++inline std::string FingerprintWebRtcIp() {
++  const auto& config = base::UxrConfig::GetInstance();
++  if (config.Get("uxr-fingerprint-off") == "true")
++    return "";
++  net::IPAddress address;
++  return address.AssignFromIPLiteral(config.Get("uxr-webrtc-ip"))
++             ? address.ToString() : "";
++}
++
++inline std::string RewriteFingerprintAddress(std::string_view value,
++                                            const std::string& replacement) {
++  if (replacement.empty() || value.empty() || value == "0.0.0.0" || value == "::")
++    return std::string(value);
++  net::IPAddress target;
++  if (!target.AssignFromIPLiteral(replacement))
++    return std::string(value);
++  net::IPAddress original;
++  const bool literal = original.AssignFromIPLiteral(value);
++  if (literal && original.IsZero())
++    return std::string(value);
++  if (literal || value.ends_with(".local"))
++    return replacement;
++  return std::string(value);
++}
++
++inline std::vector<std::pair<size_t, size_t>> FingerprintCandidateTokens(
++    const std::string& candidate) {
++  if (candidate.size() > 65536 ||
++      !(candidate.starts_with("candidate:") || candidate.starts_with("a=candidate:")))
++    return {};
++  std::vector<std::pair<size_t, size_t>> tokens;
++  for (size_t at = 0; at < candidate.size();) {
++    const size_t start = candidate.find_first_not_of(" \t", at);
++    if (start == std::string::npos) break;
++    const size_t end = candidate.find_first_of(" \t", start);
++    tokens.emplace_back(start, end == std::string::npos ? candidate.size() - start : end - start);
++    if (end == std::string::npos) break;
++    at = end;
++  }
++  const auto value = [&](size_t index) {
++    return std::string_view(candidate).substr(tokens[index].first, tokens[index].second);
++  };
++  if (tokens.size() < 8 || value(6) != "typ" ||
++      (value(7) != "host" && value(7) != "srflx" && value(7) != "prflx" && value(7) != "relay"))
++    return {};
++  return tokens;
++}
++
++// Rewrite presentation copies only: never manufacture ICE candidates or alter
++// libwebrtc's socket/STUN state. TURN allocation addresses are infrastructure,
++// not the host address; preserve them so relay candidates stay usable.
++inline std::string RewriteFingerprintCandidate(
++    const std::string& candidate, const std::string& replacement) {
++  if (replacement.empty()) return candidate;
++  const auto tokens = FingerprintCandidateTokens(candidate);
++  if (tokens.empty()) return candidate;
++  const auto value = [&](size_t index) {
++    return std::string_view(candidate).substr(tokens[index].first, tokens[index].second);
++  };
++  std::vector<size_t> addresses;
++  if (value(7) != "relay") addresses.push_back(4);
++  for (size_t i = 8; i + 1 < tokens.size(); i += 2)
++    if (value(i) == "raddr") addresses.push_back(i + 1);
++  std::string result = candidate;
++  for (auto it = addresses.rbegin(); it != addresses.rend(); ++it) {
++    const auto [start, count] = tokens[*it];
++    result.replace(start, count, RewriteFingerprintAddress(value(*it), replacement));
++  }
++  return result;
++}
++
++inline std::string RewriteFingerprintSdp(
++    const std::string& sdp, const std::string& replacement = FingerprintWebRtcIp()) {
++  if (replacement.empty())
++    return sdp;
++  // A default c= address may be the TURN allocation. Do not rewrite it while
++  // preserving the corresponding relay candidate (including expanded IPv6).
++  std::set<std::string> relay_addresses;
++  for (size_t start = 0; start < sdp.size();) {
++    const size_t lf = sdp.find('\n', start);
++    const size_t end = lf == std::string::npos ? sdp.size() : lf;
++    std::string line = sdp.substr(start, end - start);
++    if (!line.empty() && line.back() == '\r') line.pop_back();
++    const auto tokens = FingerprintCandidateTokens(line);
++    if (!tokens.empty()) {
++      const auto value = [&](size_t index) {
++        return std::string_view(line).substr(tokens[index].first, tokens[index].second);
++      };
++      net::IPAddress address;
++      if (value(7) == "relay" && address.AssignFromIPLiteral(value(4)))
++        relay_addresses.insert(address.ToString());
++    }
++    if (lf == std::string::npos) break;
++    start = lf + 1;
++  }
++  std::string result;
++  result.reserve(sdp.size());
++  for (size_t start = 0; start < sdp.size();) {
++    const size_t lf = sdp.find('\n', start);
++    const size_t end = lf == std::string::npos ? sdp.size() : lf;
++    const bool cr = end > start && sdp[end - 1] == '\r';
++    std::string line = sdp.substr(start, end - start - (cr ? 1 : 0));
++    if (line.starts_with("a=candidate:")) {
++      line = RewriteFingerprintCandidate(line, replacement);
++    } else if (line.starts_with("c=IN IP4 ") || line.starts_with("c=IN IP6 ")) {
++      net::IPAddress original;
++      const bool relay = original.AssignFromIPLiteral(line.substr(9)) &&
++          relay_addresses.contains(original.ToString());
++      const std::string address = relay ? line.substr(9) :
++          RewriteFingerprintAddress(line.substr(9), replacement);
++      if (address != line.substr(9))
++        line = std::string(replacement.find(':') == std::string::npos ? "c=IN IP4 " : "c=IN IP6 ") + address;
++    }
++    result += line;
++    if (cr) result += '\r';
++    if (lf != std::string::npos) result += '\n';
++    if (lf == std::string::npos) break;
++    start = lf + 1;
++  }
++  return result;
++}
++
++}  // namespace blink
++
++#endif  // THIRD_PARTY_BLINK_RENDERER_PLATFORM_PEERCONNECTION_FINGERPRINT_IP_H_

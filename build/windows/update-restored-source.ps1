@@ -6,6 +6,34 @@ param(
 $ErrorActionPreference = "Stop"
 $Repo = (Resolve-Path (Join-Path $PSScriptRoot "..\..")).Path
 
+function Update-WebGpuAlignmentValidation {
+  # Old completed snapshots can contain patch 0042 before StrictNumeric was
+  # explicitly unwrapped. Source-layer stamps do not attest this expression.
+  $relative = "third_party\blink\renderer\modules\webgpu\gpu_supported_limits.cc"
+  $path = Join-Path $Src $relative
+  if (-not (Test-Path -LiteralPath $path -PathType Leaf)) {
+    throw "resume source file is missing: $relative"
+  }
+  $content = [IO.File]::ReadAllText($path)
+  $old = 'std::has_single_bit\(\s*value\.ValueOrDie\(\)\s*\)'
+  $current = 'std::has_single_bit(static_cast<T>(value.ValueOrDie()))'
+  $oldCount = [regex]::Matches($content, $old).Count
+  $currentCount = [regex]::Matches($content, [regex]::Escape($current)).Count
+  if ($oldCount -eq 0 -and $currentCount -eq 1) {
+    Write-Host "==> WebGPU alignment validation already current"
+    return
+  }
+  if ($oldCount -ne 1 -or $currentCount -ne 0 -or
+      -not $content.Contains('minUniformBufferOffsetAlignment') -or
+      -not $content.Contains('minStorageBufferOffsetAlignment') -or
+      -not $content.Contains('base::CheckedNumeric<T>')) {
+    throw "unsupported restored WebGPU alignment validation; refusing an unchecked migration: $relative"
+  }
+  $updated = [regex]::Replace($content, $old, $current)
+  [IO.File]::WriteAllText($path, $updated, (New-Object Text.UTF8Encoding($false)))
+  Write-Host "==> migrated restored WebGPU StrictNumeric alignment validation"
+}
+
 function Set-SourceReplacement {
   param(
     [Parameter(Mandatory)] [string]$RelativePath,
@@ -188,6 +216,10 @@ function Replace-RegexOnce {
     $Content.Substring($match.Index + $match.Length)
 }
 
+
+# Fail before compiling an obsolete StrictNumeric expression, including when
+# preparation stamps and the rest of the snapshot are already current.
+Update-WebGpuAlignmentValidation
 
 # The stage-3 cache may predate the latest UA rewrite in patches 0004/0005.
 # Migrate the already-patched browser source before ninja so the cache remains incremental.

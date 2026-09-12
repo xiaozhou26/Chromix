@@ -12,7 +12,7 @@ index 9d155705c1..b8f0e0b8f0 100644
  #include "third_party/blink/renderer/modules/webgpu/gpu_memory_heap_info.h"
  #include "third_party/blink/renderer/modules/webgpu/gpu_subgroup_matrix_config.h"
  
-@@ -34,7 +37,43 @@ GPUAdapterInfo::GPUAdapterInfo(const String& vendor,
+@@ -34,7 +37,47 @@ GPUAdapterInfo::GPUAdapterInfo(const String& vendor,
        type_(type),
        d3d_shader_model_(d3d_shader_model),
        vk_driver_version_(vk_driver_version),
@@ -22,7 +22,10 @@ index 9d155705c1..b8f0e0b8f0 100644
 +  if (is_fallback_adapter_)
 +    return;
 +  const auto& config = base::UxrConfig::GetInstance();
-+  if (config.Get("uxr-synthetic-device-tests") != "true")
++  if (config.Get("uxr-fingerprint-off") == "true" ||
++      (config.Get("uxr-synthetic-device-tests") != "true" &&
++       config.Get("uxr-fingerprint-enabled") != "true" &&
++       !config.Has("uxr-webgl-vendor") && !config.Has("uxr-webgl-renderer")))
 +    return;
 +  const auto& persona = ungoogled::CurrentPersona();
 +  const bool explicit_vendor = config.Has("uxr-webgpu-vendor") &&
@@ -32,13 +35,14 @@ index 9d155705c1..b8f0e0b8f0 100644
 +      !config.Get("uxr-webgpu-architecture").empty();
 +  const bool explicit_identity = explicit_vendor && explicit_architecture;
 +  const bool use_template = !persona.webgl_real &&
-+      !persona.webgl_identity_explicit && !persona.webgpu_vendor.empty() &&
++      !persona.webgpu_vendor.empty() &&
 +      !persona.webgpu_architecture.empty();
-+  if (!explicit_identity && !use_template)
++  const bool use_custom = !persona.webgl_real && persona.webgl_identity_explicit;
++  if (!explicit_identity && !use_template && !use_custom)
 +    return;
 +
-+  // A complete tuple is required; never mix a synthetic vendor with native
-+  // architecture/device/driver values. Description is optional metadata.
++  // Custom model names cannot certify architecture/device/driver values.
++  // Use empty fields instead of combining them with native identity metadata.
 +  vendor_ = explicit_identity
 +      ? String(config.Get("uxr-webgpu-vendor").c_str())
 +      : String(persona.webgpu_vendor.c_str());

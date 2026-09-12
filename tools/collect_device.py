@@ -122,6 +122,7 @@ from chromix._device_host import host_inventory
 def collect_browser(args):
     binary = smoke.binary_identity(args.browser)
     result = {'binary':binary, 'observations':[], 'external_requests':[],
+              'browser_versions':[], 'probe_sha256':pool.file_hash(ASSET),
               'profile_isolation':False, 'headless':not args.headed,
               'engine_provenance':'User supplied executable; hash is not authentication',
               'limitations':['No wire capture or physical backend equivalence proof',
@@ -134,16 +135,13 @@ def collect_browser(args):
             storage = []
             for index, profile in enumerate(('profile-a', 'profile-a', 'profile-b')):
                 switches = smoke.browser_args({'mode':'native'}, server.origin, False)
-                # Keep Chromium's native loopback bypass. On Windows the
-                # trailing <-loopback> rule can send this origin to the proxy.
-                switches = [arg for arg in switches if not arg.startswith('--proxy-bypass-list=')]
-                switches.append('--proxy-bypass-list=127.0.0.1')
                 result['launch_args'] = switches
                 context = playwright.chromium.launch_persistent_context(
                     str(Path(temp) / profile), executable_path=binary['path'],
                     args=switches, headless=not args.headed, chromium_sandbox=True,
                     no_viewport=True, service_workers='allow', timeout=args.timeout_ms)
                 try:
+                    result['browser_versions'].append(context.browser.version)
                     context.set_default_timeout(args.timeout_ms)
                     def guard(route):
                         if smoke.allowed_url(route.request.url, server.origin):
@@ -177,6 +175,10 @@ def collect_browser(args):
             result['profile_isolation'] = storage == [None, token, None]
     if pool.file_hash(binary['path']) != binary['sha256']:
         raise ValueError('browser executable changed during collection')
+    if len(result['browser_versions']) != 3 or len(set(result['browser_versions'])) != 1:
+        raise ValueError('browser version changed or was not observed in every launch')
+    if pool.file_hash(ASSET) != result['probe_sha256']:
+        raise ValueError('device probe changed during collection')
     return result
 
 
@@ -205,6 +207,8 @@ def main(argv=None):
             'collector':'chromix-collect-device-v1',
             'collected_at':datetime.now(timezone.utc).isoformat(),
             'browser_sha256':browser['binary']['sha256'],
+            'browser_version':browser['browser_versions'][0],
+            'probe_sha256':browser['probe_sha256'],
         }, 'device':{'host':host, 'surfaces':pool.stable_observation(browser['observations'][0])},
             'evidence':{name:{'path':name + '.json', 'sha256':pool.file_hash(args.output / (name + '.json'))}
                         for name in ('host', 'browser')},

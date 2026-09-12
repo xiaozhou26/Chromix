@@ -6,8 +6,8 @@ index 57e3c329c2..c51b9d78bb 100644
        blink::mojom::OriginTrialsSettingsPtr origin_trial_settings,
        blink::mojom::PerformanceTier cpu_performance_tier,
        uint64_t trace_id) override;
-+  void SetUxrConfig(const base::flat_map<std::string, std::string>& config)
-+      override;
++  void SetUxrConfig(const base::flat_map<std::string, std::string>& config,
++                    uint32_t schema_version) override;
  #if BUILDFLAG(IS_MAC)
    void UpdateScrollbarTheme(
        mojom::UpdateScrollbarThemeParamsPtr params) override;

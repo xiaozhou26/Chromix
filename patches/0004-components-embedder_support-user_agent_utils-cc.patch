@@ -1,5 +1,4 @@
 diff --git a/components/embedder_support/user_agent_utils.cc b/components/embedder_support/user_agent_utils.cc
-index c6320fcb6d..b1458349fd 100644
 --- a/components/embedder_support/user_agent_utils.cc
 +++ b/components/embedder_support/user_agent_utils.cc
 @@ -8,6 +8,7 @@
@@ -10,7 +9,7 @@ index c6320fcb6d..b1458349fd 100644
  #include <optional>
  #include <string>
  #include <vector>
-@@ -154,6 +155,56 @@
+@@ -154,6 +155,73 @@
  }
  #endif  // BUILDFLAG(IS_WIN)
  
@@ -30,12 +29,29 @@ index c6320fcb6d..b1458349fd 100644
 +    int major_version = 0;
 +    if (parsed_version.IsValid() &&
 +        base::StringToInt(base::NumberToString(parsed_version.components()[0]),
-+                          &major_version)) {
++                          &major_version) && major_version > 0) {
 +      return override_version;
 +    }
 +    return std::string(version_info::GetVersionNumber());
 +  }());
 +  return *version;
++}
++
++std::string GetEffectiveBrowserBrandFullVersion() {
++  const std::string version = base::CommandLine::ForCurrentProcess()->
++      GetSwitchValueASCII("uxr-ua-brand-version");
++  const base::Version parsed(version);
++  int major = 0;
++  return parsed.IsValid() &&
++         base::StringToInt(base::NumberToString(parsed.components()[0]), &major) && major > 0
++             ? version : GetEffectiveUserAgentFullVersion();
++}
++
++std::string BrowserBrandProductToken(const std::string& brand) {
++  if (brand == "Microsoft Edge") return "Edg";
++  if (brand == "Opera") return "OPR";
++  if (brand == "Vivaldi") return "Vivaldi";
++  return "";
 +}
 +
 +const std::string& GetEffectiveUserAgentMajorVersion() {
@@ -67,7 +83,7 @@ index c6320fcb6d..b1458349fd 100644
  const blink::UserAgentBrandList GetUserAgentBrandList(
      const std::string& major_version,
      const std::string& full_version,
-@@ -167,6 +218,17 @@
+@@ -167,14 +235,38 @@
    brand = version_info::GetProductName();
  #endif
  
@@ -78,14 +94,38 @@ index c6320fcb6d..b1458349fd 100644
 +    if (brand->empty() || *brand == "Chromium")
 +      brand.reset();
 +  } else if (!brand &&
-+             command_line->GetSwitchValueASCII("fingerprint") != "off") {
++             command_line->GetSwitchValueASCII("uxr-fingerprint-off") != "true") {
 +    brand = "Google Chrome";
 +  }
 +
    std::string brand_version =
        output_version_type == blink::UserAgentBrandVersionType::kFullVersion
            ? full_version
-@@ -183,10 +245,10 @@
+           : major_version;
+ 
+-  return GenerateBrandVersionList(major_version_number, brand, brand_version,
+-                                  output_version_type,
+-                                  additional_brand_version);
++  auto brands = GenerateBrandVersionList(major_version_number, brand, brand_version,
++                                         output_version_type,
++                                         additional_brand_version);
++  // Preserve the engine's Chromium version and GREASE ordering. Only the
++  // primary browser brand uses its independent marketing version.
++  if (brand && command_line->HasSwitch("uxr-ua-brand-version")) {
++    const std::string full = GetEffectiveBrowserBrandFullVersion();
++    const std::string version =
++        output_version_type == blink::UserAgentBrandVersionType::kFullVersion
++            ? full : base::NumberToString(base::Version(full).components()[0]);
++    for (auto& entry : brands) {
++      if (entry.brand == *brand)
++        entry.version = version;
++    }
++  }
++  return brands;
+ }
+ 
+ // Return UserAgentBrandList with the major version populated in the brand
+@@ -183,10 +275,10 @@
  // GetVersionNumber()
  const blink::UserAgentBrandList GetUserAgentBrandMajorVersionListInternal(
      std::optional<blink::UserAgentBrandVersion> additional_brand_version) {
@@ -100,7 +140,7 @@ index c6320fcb6d..b1458349fd 100644
  }
  
  // For desktop and android:
-@@ -207,19 +269,29 @@
+@@ -207,17 +299,27 @@
  // GetVersionNumber()
  const blink::UserAgentBrandList GetUserAgentBrandFullVersionListInternal(
      std::optional<blink::UserAgentBrandVersion> additional_brand_version) {
@@ -119,8 +159,6 @@ index c6320fcb6d..b1458349fd 100644
  std::string GetUserAgentInternal() {
    std::string product = GetProductAndVersion();
 -  if (base::CommandLine::ForCurrentProcess()->HasSwitch(kHeadless)) {
--    product.insert(0, "Headless");
--  }
 +  const std::string& full_version = GetEffectiveUserAgentFullVersion();
 +  const std::string& major_version = GetEffectiveUserAgentMajorVersion();
 +  const std::string user_agent_version =
@@ -130,14 +168,30 @@ index c6320fcb6d..b1458349fd 100644
 +  product = ReplaceProductVersion(product, user_agent_version);
 +  const base::CommandLine* command_line =
 +      base::CommandLine::ForCurrentProcess();
-+  if (command_line->GetSwitchValueASCII("fingerprint") == "off" &&
++  if (command_line->GetSwitchValueASCII("uxr-fingerprint-off") == "true" &&
 +      command_line->HasSwitch(kHeadless)) {
-+    product.insert(0, "Headless");
-+  }
+     product.insert(0, "Headless");
+   }
  
- #if BUILDFLAG(IS_ANDROID) || BUILDFLAG(IS_IOS)
-   if (base::CommandLine::ForCurrentProcess()->HasSwitch(kUseMobileUserAgent)) {
-@@ -301,6 +373,18 @@
+@@ -227,9 +329,14 @@
+   }
+ #endif
+ 
+-  return ShouldSendUserAgentUnifiedPlatform()
+-             ? BuildUnifiedPlatformUserAgentFromProduct(product)
+-             : BuildUserAgentFromProduct(product);
++  std::string user_agent = ShouldSendUserAgentUnifiedPlatform()
++                               ? BuildUnifiedPlatformUserAgentFromProduct(product)
++                               : BuildUserAgentFromProduct(product);
++  const std::string token = BrowserBrandProductToken(
++      command_line->GetSwitchValueASCII("uxr-ua-brand"));
++  if (!token.empty())
++    user_agent += " " + token + "/" + GetEffectiveBrowserBrandFullVersion();
++  return user_agent;
+ }
+ 
+ // Generate random order list based on the input size and seed.
+@@ -301,6 +408,18 @@
  }
  
  std::string GetUnifiedPlatform() {
@@ -156,7 +210,7 @@ index c6320fcb6d..b1458349fd 100644
  #if BUILDFLAG(IS_ANDROID) || BUILDFLAG(IS_CHROMEOS)
    // This constant is only used on Android (desktop) and Linux.
    constexpr char kUnifiedPlatformChromeOSX64[] = "X11; CrOS x86_64 14541.0.0";
-@@ -616,6 +700,12 @@
+@@ -616,6 +735,12 @@
  }
  
  std::string GetPlatformForUAMetadata() {
@@ -169,14 +223,14 @@ index c6320fcb6d..b1458349fd 100644
  #if BUILDFLAG(IS_ANDROID)
    if (base::android::device_info::is_desktop() ||
        base::android::device_info::is_xr()) {
-@@ -678,13 +768,26 @@
+@@ -678,13 +803,26 @@
    // High entropy client hints.
    metadata.brand_full_version_list =
        GetUserAgentBrandFullVersionListInternal(std::nullopt);
 -  metadata.full_version = std::string(version_info::GetVersionNumber());
 -  metadata.architecture = GetCpuArchitecture();
 -  metadata.model = BuildModelInfo();
-+  metadata.full_version = GetEffectiveUserAgentFullVersion();
++  metadata.full_version = GetEffectiveBrowserBrandFullVersion();
 +  const base::CommandLine* command_line =
 +      base::CommandLine::ForCurrentProcess();
 +  metadata.architecture = command_line->HasSwitch("uxr-ua-arch")
@@ -202,7 +256,7 @@ index c6320fcb6d..b1458349fd 100644
    return metadata;
  }
  
-@@ -846,6 +949,11 @@
+@@ -846,6 +984,11 @@
  }
  
  std::string BuildUserAgentFromProduct(const std::string& product) {

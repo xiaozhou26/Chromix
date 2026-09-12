@@ -71,7 +71,7 @@ def test_async_patches_are_in_series_and_well_formed(tmp_path):
 
     series = [line.strip() for line in (ROOT / "patches/series").read_text().splitlines()
               if line.strip() and not line.lstrip().startswith("#")]
-    assert len(series) == 124
+    assert len(series) == 128
     for number in ("0121", "0122", "0123", "0124"):
         patch = patch_path(number)
         assert series[int(number) - 1] == patch.relative_to(ROOT).as_posix()

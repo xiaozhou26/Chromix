@@ -75,8 +75,45 @@ published atomically for concurrent first launches. An explicit
 wins without creating or rewriting the file; `stealthArgs: false` also skips
 seed I/O. Defaults claim the native persona: `linux`, `windows`, or `macos`.
 
-Default viewport geometry is native. Seeded synthetic geometry requires explicit
-`args: ['--uxr-synthetic-device-tests=true']` and is only a test template.
+Default page viewport geometry is native. Public fingerprint mode supplies
+CPU/RAM 8/8, platform-specific screen/taskbar defaults and a 102400 MiB quota.
+The older seeded synthetic viewport/hardware pools require explicit
+`args: ['--uxr-synthetic-device-tests=true']` and remain separate test templates.
+
+Explicit synthetic seeds accept nonzero decimal uint64 strings without rounding
+through JavaScript `Number`; Python and Node derive identical geometry. Malformed
+seeds, conflicting screen/taskbar aliases, invalid work areas and incomplete
+viewport pairs fail. `--uxr-viewport-width`/`--uxr-viewport-height` override the
+UI-strip template. A configured viewport sends screen and DPR together, including
+DPR 1; `viewport: null` removes inherited screen/DPR defaults. The
+[launch display backend](../../docs/persona-cross-process-design.md) needs a
+browser rebuilt from the current patch stack.
+
+### Public fingerprint flags
+
+GPU vendor/renderer, CPU/RAM, screen/taskbar, brand/version/platform version,
+timezone/locale, quota, Windows font metrics, WebRTC IP/auto, noise/off,
+third-party cookies, Windows voice tables and `FakeShadowRoot` are available
+through `args`. See the [complete flag contract](../../docs/fingerprint-flags.md)
+for defaults and limitations. Updating this SDK does not add native features
+to an old executable; use a browser rebuilt from the matching patch stack.
+
+```javascript
+const browser = await launch({ args: [
+  '--fingerprint=42',
+  '--fingerprint-brand=Edge',
+  '--fingerprint-brand-version=152.0.0.0',
+  '--fingerprint-noise=false',
+  '--fingerprint-allow-3p-cookies',
+  '--enable-blink-features=FakeShadowRoot',
+] });
+```
+
+`--fingerprint=off` accepts `false/0/disable/disabled` and strips the injected
+platform. Explicit timezone/locale and `geoip: true` still apply regional
+settings; omit them for a native-persona comparison. `noise=false` keeps seeds
+while disabling existing perturbations; it does not install four independent
+Canvas/WebGL/audio/client-rect noise implementations.
 
 ## Measured device launch
 
@@ -122,25 +159,36 @@ operations to the configured endpoint.
 ### Proxy and GeoIP behavior
 
 GeoIP is metadata, not a routing mechanism. The lookup uses the effective
-HTTP/HTTPS proxy, including `launchOptions.proxy` overrides, and does not
+HTTP/HTTPS/SOCKS proxy, including `launchOptions.proxy` overrides, and does not
 inherit environment proxies or `NO_PROXY` bypasses. Failed lookups do not
-fall back to the host connection. SOCKS remains a browser proxy option;
-for SOCKS use `geoip: false` and explicit `timezone` / `locale`.
+fall back to the host connection. Metadata transport supports SOCKS4/4a/5/5h
+and SOCKS5 credentials. This does not add SOCKS authentication or every URL
+alias to Chromium/Playwright's browser proxy backend. SOCKS5/4a use remote
+destination DNS; SOCKS4 uses local IPv4 DNS. Lookup accepts one raw
+`--proxy-server` route, not PAC/auto-detect, route lists, empty raw proxies,
+raw proxy credentials or a proxy conflicting with `--no-proxy-server`.
+Simultaneous raw/Playwright proxy endpoints must match; omitted default ports
+and equivalent IPv6 spellings are normalized. Supply credentials in the high-level option.
 
 With a proxy, the SDK defaults to the native
 `--force-webrtc-ip-handling-policy=disable_non_proxied_udp` unless an explicit
 native policy was supplied. This is a WebRTC policy, not a guarantee about
 all DNS, HTTP, QUIC or operating-system traffic.
 
-The SDK rejects `--fingerprint-webrtc-ip`, `--fingerprint-webrtc-fake-srflx`
-and `--fingerprint-webrtc-fake-srflx-allow-udp` (including `uxr` equivalents).
-GeoIP no longer appends an ICE address override. Its HTTP metadata service
-is unauthenticated and must not be treated as proof of an exit route.
+`--fingerprint-webrtc-ip=<IPv4|IPv6|auto>` is supported. Auto resolves before
+launch through the effective proxy. `geoip: true` reuses its one lookup to inject
+the exit IP unless an explicit IP wins; off mode skips IP injection. The browser
+rewrites local candidate/SDP/stats presentation, not sockets or STUN success.
+Remote addresses, zero placeholders and relay allocations remain native.
+`webrtc-fake-srflx` and `webrtc-fake-srflx-allow-udp` (including `uxr` equivalents)
+remain rejected. The HTTP metadata service is not independent proof of an exit
+route. Bare-browser auto has a separate bounded HTTPS startup resolver; see
+the [full resolution contract](../../docs/fingerprint-flags.md#webrtc-ip-and-proxy-resolution).
 
 GeoIP lookup failures now reject with `Error`. The timeout defaults to 10
 seconds and accepts values greater than zero and at most 60. Creating a
 later context with another proxy does not recompute browser-level locale
-or timezone.
+or timezone/IP.
 
 ## CLI
 

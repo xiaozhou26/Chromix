@@ -389,12 +389,18 @@ def browser_args(scenario: dict, origin: str, no_sandbox: bool) -> list[str]:
             "--disable-component-update", "--disable-domain-reliability", "--disable-sync",
             "--disable-quic", "--disable-breakpad", "--no-pings", "--enable-automation",
             "--disable-features=MediaRouter,OptimizationHints,AutofillServerCommunication",
-            f"--proxy-server={origin}", f"--proxy-bypass-list=127.0.0.1:{urlsplit(origin).port};<-loopback>",
+            # Rules are ordered: remove implicit loopback bypass first, then
+            # restore only our endpoint. Reversing them proxies the fixture too.
+            f"--proxy-server={origin}", f"--proxy-bypass-list=<-loopback>;127.0.0.1:{urlsplit(origin).port}",
             "--host-resolver-rules=MAP * ~NOTFOUND, EXCLUDE 127.0.0.1",
             "--disable-extensions", "--disable-client-side-phishing-detection",
             "--force-webrtc-ip-handling-policy=disable_non_proxied_udp"]
     if scenario["mode"] == "native":
         args.append("--fingerprint=off")
+    elif scenario["mode"] == "off":
+        # Off deliberately retains explicit locale/timezone overrides. This
+        # cell compares with the native baseline, so it must not supply either.
+        args += ["--fingerprint=off", f"--fingerprint-platform={PLATFORMS[scenario['platform']]['platform']}"]
     else:
         seed = scenario["seed"] if scenario["mode"] == "on" else "off"
         args += ["--uxr-synthetic-device-tests=true",

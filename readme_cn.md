@@ -20,7 +20,7 @@ Chromix 是基于 Chromium 的浏览器项目，面向浏览器自动化、兼�
 - **可配置的浏览器身份**：支持 UA、平台、语言、时区等设置，并维护 Canvas、WebGL、WebGPU、媒体、字体等相关补丁；各项能力以状态记录中的限制为准。
 - **持久化配置种子**：SDK 的持久化用户目录复用同一个指纹种子；非持久化启动默认生成随机 32 位种子，命令行也支持显式种子。
 - **Playwright 集成**：Python 返回 `Browser` / `BrowserContext`，Node.js 提供对应的 camelCase API，并保持 CloakBrowser 风格的常用接口。
-- **代理感知配置**：可选 GeoIP 查询通过实际使用的代理获取语言、时区信息；代理启动默认使用 Chromium 原生的非代理 UDP 限制策略，保留真实 WebRTC 地址处理。
+- **代理感知配置**：可选 GeoIP 查询通过实际使用的代理获取语言、时区和出口 IP；代理启动默认限制非代理 UDP。WebRTC IP 参数修改本地地址的展示副本，实际 ICE 路由仍由原生后端负责。
 - **五平台独立构建**：Windows x64、Linux x64/ARM64、macOS Intel/Apple Silicon 各自构建和验证，不因其他平台尚未完成而阻塞已验证平台。
 - **固定源码与完整性检查**：源码版本和平台层固定，发布包附带 `SHA256SUMS`；SDK 在校验清单可用时先校验归档，再进行安全解压。
 
@@ -252,15 +252,19 @@ Node.js 顶层 `executablePath` 也不是该包装层的下载绕过选项；`la
 
 显式调用参数优先于 GeoIP 推导结果。需要长期稳定身份的测试，应复用同一个种子和用户目录；只有需要新身份时才更换种子。平台配置是声明的测试身份，不会把 Linux 主机变成真实的 Windows 或 macOS 设备。
 
-当前实现保留多项原生能力作为默认行为：
+完整参数表见 [指纹参数说明](docs/fingerprint-flags.md)：GPU、CPU/内存、屏幕/任务栏、品牌/版本、配额、Windows 字体度量、WebRTC IP/auto、noise/off、第三方 Cookie、Windows 声音表和 `FakeShadowRoot` 均已接入当前源码。**需要重编译；只更新 SDK 不会让旧二进制自动具备这些功能。**
 
-- 存储容量由浏览器真实后端管理，Network Information 与原生通知器保持一致。
-- WebRTC 保留真实候选地址与原生路由策略；修改候选字符串不等于改变流量路径。
-- GPU 池中的 Windows 记录是**合成测试模板**，不是经过测量的完整设备数据库。
-- 旧 CPU、内存、GPU 身份覆盖、字体替换以及旧 Canvas 读回/导出噪声等实验行为，需要显式启用 `--uxr-synthetic-device-tests=true`；默认原生行为不等于完成跨设备模拟。
+当前实现的默认值和边界：
+
+- 启用 `--fingerprint` 后默认 CPU/内存为 8/8，屏幕为 Windows/Linux 1920×1080、macOS 1440×900；任务栏高度分别为 48/0/95。页面 viewport 与 screen 是不同设置，SDK 不会因此自动套用旧的随机 viewport 模板。
+- 存储配额接入浏览器后端，默认 102400 MiB；真实使用量、磁盘耗尽和桶限制仍保留。Network Information 与原生通知器保持一致。
+- WebRTC 支持显式 IP 和 `auto`，GeoIP 可复用同次查询的出口 IP；不生成虚假候选或 STUN 成功，保留远端和 TURN relay 地址。修改候选字符串不等于改变流量路径。
+- GPU 池包含 Windows/Linux/macOS **身份模板**，不是经过测量的完整设备数据库；公开身份参数保留真实 GL/Dawn 能力。
+- 旧的独立 CPU/内存/屏幕随机池、GL 能力模板、字体替换和 Canvas 读回/导出噪声仍需 `--uxr-synthetic-device-tests=true`。`noise=false` 保留种子并关闭已有扰动，但不代表四套 Canvas/WebGL/audio/client-rect 噪声引擎已经实现。
+- Windows 字体参数是有条件的字体度量对齐，不是完整 DirectWrite 模拟；跨系统声音表不安装 SAPI 合成引擎。第三方 Cookie 和 closed shadow DOM 访问均为显式选项。
 - 屏幕与实际布局、字体来源、媒体后端、图形渲染以及 TLS/HTTP 等网络层的一致性，仍有未完成或未通过匹配浏览器验收的项目。
 
-实现细节与验收边界以 [指纹状态记录](FINGERPRINT_STATUS.md)、[真实设备池说明](docs/device-pool.md) 和 [Canvas 链路说明](docs/canvas-chain.md) 为准。单元测试通过、补丁可应用或一个构建步骤成功，都不能替代真实浏览器验证。
+实现细节与验收边界以 [指纹状态记录](FINGERPRINT_STATUS.md)、[真实设备池说明](docs/device-pool.md) 和 [Canvas 链路说明](docs/canvas-chain.md) 为准。新增的 [指纹回归门禁](docs/fingerprint-acceptance.md) 在编译前核验实际补丁内容，解包后固定二进制 hash/版本运行七项测试，失败诊断单独保留。单元测试通过、补丁可应用或一个构建步骤成功，都不能替代匹配版本的真实浏览器验证。
 
 ### 高级实验选项
 
@@ -269,7 +273,7 @@ Node.js 顶层 `executablePath` 也不是该包装层的下载绕过选项；`la
 - `--fingerprint-devtools-runtime-suppression`：抑制部分 V8 Runtime 可观测行为，可能影响控制台消息和自动化绑定。
 - `--fingerprint-canvas-bridge=<host:port|ws://...>` 配合 `--fingerprint-canvas-bridge-unsafe`：实验性远端 Canvas Bridge；参与的渲染进程会失去 sandbox。当前 Canvas 路径还需要合成测试开关，且不代表完整的 WebGL 远端替换已经实现。
 
-SDK 已拒绝 `--fingerprint-webrtc-ip`、`--fingerprint-webrtc-fake-srflx`、`--fingerprint-webrtc-fake-srflx-allow-udp` 及对应的 `uxr` 参数。使用真实代理、TURN 或 Chromium 原生 IP 处理策略，不要依赖已经退役的地址伪造配置。更多信息见 [补丁说明](patches/README.md)。
+`--fingerprint-webrtc-ip` 已恢复为本地展示层参数，并增加启动前 `auto` 解析；`--fingerprint-webrtc-fake-srflx`、`--fingerprint-webrtc-fake-srflx-allow-udp` 及对应 `uxr` 参数仍然退役。解析失败不会回退直连，SDK 的 SOCKS 元数据查询能力也不等于 Chromium 新增了 SOCKS 认证支持。更多信息见 [参数说明](docs/fingerprint-flags.md) 和 [补丁说明](patches/README.md)。
 
 ## 从源码构建
 
@@ -282,7 +286,7 @@ SDK 已拒绝 `--fingerprint-webrtc-ip`、`--fingerprint-webrtc-fake-srflx`、`-
 | ungoogled-chromium-windows | `152.0.7977.82-1.1` |
 | ungoogled-chromium-portablelinux | `152.0.7977.82-1` |
 | ungoogled-chromium-macos | `152.0.7977.82-1.1` |
-| Chromix | [patches/series](patches/series) 中的 124 个补丁 |
+| Chromix | [patches/series](patches/series) 中的 146 个补丁 |
 
 完整提交固定值见 [build/ungoogled-revisions.psd1](build/ungoogled-revisions.psd1)。
 

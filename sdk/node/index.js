@@ -26,14 +26,16 @@ import {
 } from "./_binary.js";
 import { fontLaunchEnv, fontDirWhitelistArg } from "./_fonts.js";
 import { ensurePersonaGeometry } from "./_persona.js";
-import { extractProxyUrl, geoipHttp, networkArgs, splitProxy } from "./_network.js";
+import { normalizeFingerprintArgs } from "./_fingerprint.js";
+import { extractProxyUrl, geoipHttp, networkArgs, splitProxy, lookupProxy as proxyForLookup,
+  resolveWebrtcArgs } from "./_network.js";
 import { launchMeasured, measuredOptions } from "./_device_pool.js";
 
 // One geometry pick per options object, shared by buildLaunchOptions and
 // buildContextOptions (launchPersistentContext calls them separately).
 const _personaGeoCache = new WeakMap();
 function personaGeometryFor(options) {
-  const args = options.launchOptions?.args ?? options.args ?? [];
+  const args = normalizeFingerprintArgs(options.launchOptions?.args ?? options.args ?? []);
   const key = JSON.stringify([args, options.stealthArgs]);
   let entry = _personaGeoCache.get(options);
   if (!entry || entry.key !== key) {
@@ -175,7 +177,7 @@ export function buildArgs({ stealthArgs = true, extraArgs = [], timezone, locale
   const keys = [...seen.keys()];
   if (startMaximized && !["--start-maximized", "--window-size", "--window-position"].some((k) => keys.includes(k)))
     put("--start-maximized");
-  return [...seen.values()];
+  return normalizeFingerprintArgs([...seen.values()]);
 }
 
 function resolveAbs(p) {
@@ -183,7 +185,7 @@ function resolveAbs(p) {
 }
 
 // ---------------------------------------------------------------------------
-// GeoIP metadata (never used to synthesize WebRTC candidates)
+// GeoIP metadata and WebRTC presentation-address resolution
 // ---------------------------------------------------------------------------
 
 // Explicit proxy always wins over environment/bypass settings; no proxy means direct.
@@ -274,12 +276,11 @@ export function buildContextOptions(options = {}) {
   const { locale, timezoneId, ...ctx } = options.contextOptions || {};
   if (locale !== undefined || timezoneId !== undefined)
     console.warn("[chromix] contextOptions.locale/timezoneId ignored — use top-level locale/timezone (binary flag)");
-  // Viewport must match the persona screen: inner = screen - taskbar - Chrome
-  // UI strip, and deviceScaleFactor keeps canvas backing stores consistent
-  // with the spoofed devicePixelRatio.
+  // Explicit synthetic viewport wins over the UI-strip template. Keep screen
+  // and DPR together so Playwright does not replace screen with viewport size.
   const persona = personaGeometryFor(options).geometry;
   const personaViewport = persona
-    ? { width: persona.outerWidth, height: persona.innerHeight } : null;
+    ? { width: persona.viewportWidth, height: persona.viewportHeight } : null;
   const viewport = options.viewport !== undefined
     ? options.viewport
     : ctx.viewport !== undefined ? ctx.viewport : headless ? personaViewport : null;
@@ -288,8 +289,10 @@ export function buildContextOptions(options = {}) {
     ...(ctx.proxy ? { proxy: splitProxy(ctx.proxy) } : {}),
     ...(options.userAgent ? { userAgent: options.userAgent } : {}),
     viewport,
-    ...(viewport && persona && persona.dpr !== 1 && ctx.deviceScaleFactor === undefined
-      ? { deviceScaleFactor: persona.dpr } : {}),
+    ...(viewport && persona ? {
+      screen: ctx.screen ?? { width: persona.width, height: persona.height },
+      deviceScaleFactor: ctx.deviceScaleFactor ?? persona.dpr,
+    } : {}),
     ...(options.colorScheme ? { colorScheme: options.colorScheme } : {}),
   };
 }
@@ -299,11 +302,13 @@ export async function buildLaunchOptions(options = {}) {
     throw new Error("devicePool requires launchContext or launchPersistentContext for runtime verification");
   const headless = effectiveHeadless(options);
   const proxy = splitProxy(launchProxy(options));
-  const lookupProxy = splitProxy(geoipProxy(options));
   const persona = personaGeometryFor(options);
+  const lookupProxy = splitProxy(options.geoip
+    ? proxyForLookup(persona.args, geoipProxy(options)) : geoipProxy(options));
   let args = networkArgs(persona.args, proxy || lookupProxy);
-  const { timezone, locale } = await maybeResolveGeoip(
+  const { timezone, locale, exitIp } = await maybeResolveGeoip(
     options.geoip, lookupProxy, options.timezone ?? options.timezoneId, options.locale, args);
+  args = await resolveWebrtcArgs(args, lookupProxy, { exitIp, geoip: options.geoip, lookup: geoipHttp });
   const binary = await ensureBinary(options);
   // Widevine / DRM: auto-enable when a CDM is present; CLOAKBROWSER_WIDEVINE=0 opts out.
   if (process.env.CLOAKBROWSER_WIDEVINE !== "0" && !(args || []).some((a) => a.startsWith("--uxr-widevine-cdm"))) {
@@ -510,7 +515,10 @@ export async function launch(options = {}) {
     const original = browser[method].bind(browser);
     browser[method] = (contextOptions = {}) => {
       const defaults = buildContextOptions(options);
-      if (contextOptions.viewport === null) delete defaults.deviceScaleFactor;
+      if (contextOptions.viewport === null) {
+        delete defaults.deviceScaleFactor;
+        delete defaults.screen;
+      }
       return original({ ...defaults, ...contextOptions });
     };
   }
