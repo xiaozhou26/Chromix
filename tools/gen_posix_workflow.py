@@ -228,7 +228,8 @@ def run_step(stage: int) -> str:
         id: stage
         env:
           CHROMIX_BUILD_PROFILE: ${{ inputs.build_profile }}
-          CHROMIX_RESERVE_MINUTES: ${{ inputs['max-stages'] == 1 && '15' || '45' }}
+          # Mac runtime gates need 45m in addition to packaging/checkpoint reserve.
+          CHROMIX_RESERVE_MINUTES: ${{ inputs.platform == 'macos' && '90' || inputs['max-stages'] == 1 && '15' || '45' }}
           CHROMIX_USE_UPSTREAM_CACHE: ${{ inputs.use_upstream_cache && '1' || '0' }}
           GH_TOKEN: ${{ secrets.UPSTREAM_ACTIONS_TOKEN || github.token }}
         run: |
@@ -267,10 +268,12 @@ RESUME_STEPS = """      - name: Validate selected POSIX checkpoint
           SNAPSHOT_ARTIFACT_IDS: ${{ inputs.resume_artifact_ids }}
           BUILD_PLATFORM: ${{ inputs.platform }}
           CACHE_REQUIRED: ${{ inputs.use_upstream_cache }}
+          RECOVERY_BRANCH: ${{ github.ref_name }}
         run: |
           set -euo pipefail
           test "$CACHE_REQUIRED" = true
           python3 tools/validate_posix_snapshot.py --platform "$BUILD_PLATFORM" --arch '${{ inputs.arch }}' \\
+            --recovery-branch "$RECOVERY_BRANCH" \\
             --report "${RUNNER_TEMP}/chromix-logs/snapshot-origin.json"
       - name: Check out checkpoint patch definitions
         if: inputs.resume_run_id != ''
@@ -302,9 +305,35 @@ RESUME_STEPS = """      - name: Validate selected POSIX checkpoint
             2>&1 | tee "${RUNNER_TEMP}/chromix-logs/snapshot-migration.log"
 """
 
+RUNTIME_FAILURE = """      - name: Upload failed macOS runtime bundle
+        if: ${{ !cancelled() && inputs.platform == 'macos' && steps.stage.outcome == 'failure' && steps.stage.outputs.package_ready == 'true' && steps.stage.outputs.runtime_failed == 'true' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ inputs.artifact }}-failed-runtime-s%(stage)d-attempt-${{ github.run_attempt }}
+          path: |
+            ${{ runner.temp }}/chromix-build/dist/${{ inputs.artifact }}.zip
+            ${{ runner.temp }}/chromix-build/dist/SHA256SUMS
+            ${{ runner.temp }}/chromix-build/runtime-smoke-stage-%(stage)d/
+            ${{ runner.temp }}/chromix-build/fingerprint-diagnostics/
+            ${{ runner.temp }}/chromix-logs/stage-%(stage)d.log
+          if-no-files-found: error
+          retention-days: 14
+          compression-level: 0
+
+      - name: Preserve failed macOS runtime checkpoint
+        id: runtime_checkpoint
+        if: ${{ !cancelled() && inputs.platform == 'macos' && steps.stage.outcome == 'failure' && steps.stage.outputs.package_ready == 'true' && steps.stage.outputs.runtime_failed == 'true' }}
+        run: |
+          set -euo pipefail
+          WORK="${RUNNER_TEMP}/chromix-build"
+          bash build/posix/ci-parts.sh "$WORK" "$WORK/.snapshot-stage-%(stage)d"
+          echo "upload_snapshot=true" >> "$GITHUB_OUTPUT"
+
+"""
+
 SNAPSHOT_ENSURE = """      - name: Verify handoff snapshot
         id: checkpoint
-        if: ${{ !cancelled() && steps.stage.outputs.upload_snapshot == 'true' }}
+        if: ${{ !cancelled() && (steps.stage.outputs.upload_snapshot == 'true' || steps.runtime_checkpoint.outputs.upload_snapshot == 'true') }}
         run: |
           set -euo pipefail
           SNAP="${RUNNER_TEMP}/chromix-build/.snapshot-stage-%(stage)d"
@@ -314,7 +343,7 @@ SNAPSHOT_ENSURE = """      - name: Verify handoff snapshot
 """
 
 UPLOAD_PARTS = """      - name: Upload tree part 1
-        if: ${{ !cancelled() && steps.stage.outputs.upload_snapshot == 'true' && steps.checkpoint.outcome == 'success' }}
+        if: ${{ !cancelled() && (steps.stage.outputs.upload_snapshot == 'true' || steps.runtime_checkpoint.outputs.upload_snapshot == 'true') && steps.checkpoint.outcome == 'success' }}
         uses: actions/upload-artifact@v4
         with:
           name: ${{ inputs.artifact }}-tree-s%(stage)d-attempt-${{ github.run_attempt }}-part1
@@ -323,7 +352,7 @@ UPLOAD_PARTS = """      - name: Upload tree part 1
           retention-days: 3
           compression-level: 0
       - name: Upload tree part 2
-        if: ${{ !cancelled() && steps.stage.outputs.upload_snapshot == 'true' && steps.checkpoint.outcome == 'success' }}
+        if: ${{ !cancelled() && (steps.stage.outputs.upload_snapshot == 'true' || steps.runtime_checkpoint.outputs.upload_snapshot == 'true') && steps.checkpoint.outcome == 'success' }}
         uses: actions/upload-artifact@v4
         with:
           name: ${{ inputs.artifact }}-tree-s%(stage)d-attempt-${{ github.run_attempt }}-part2
@@ -332,7 +361,7 @@ UPLOAD_PARTS = """      - name: Upload tree part 1
           retention-days: 3
           compression-level: 0
       - name: Upload tree part 3
-        if: ${{ !cancelled() && steps.stage.outputs.upload_snapshot == 'true' && steps.checkpoint.outcome == 'success' }}
+        if: ${{ !cancelled() && (steps.stage.outputs.upload_snapshot == 'true' || steps.runtime_checkpoint.outputs.upload_snapshot == 'true') && steps.checkpoint.outcome == 'success' }}
         uses: actions/upload-artifact@v4
         with:
           name: ${{ inputs.artifact }}-tree-s%(stage)d-attempt-${{ github.run_attempt }}-part3
@@ -341,7 +370,7 @@ UPLOAD_PARTS = """      - name: Upload tree part 1
           retention-days: 3
           compression-level: 0
       - name: Upload tree part 4
-        if: ${{ !cancelled() && steps.stage.outputs.upload_snapshot == 'true' && steps.checkpoint.outcome == 'success' }}
+        if: ${{ !cancelled() && (steps.stage.outputs.upload_snapshot == 'true' || steps.runtime_checkpoint.outputs.upload_snapshot == 'true') && steps.checkpoint.outcome == 'success' }}
         uses: actions/upload-artifact@v4
         with:
           name: ${{ inputs.artifact }}-tree-s%(stage)d-attempt-${{ github.run_attempt }}-part4
@@ -371,6 +400,7 @@ FINAL_UPLOADS = """      - name: Upload final bundle
           include-hidden-files: true
           path: |
             ${{ runner.temp }}/chromix-logs/
+            ${{ runner.temp }}/chromix-build/runtime-smoke-stage-%(stage)d/
             ${{ runner.temp }}/chromix-build/src/out/Chromix/args.gn
             ${{ runner.temp }}/chromix-build/src/out/Default/args.gn
             ${{ runner.temp }}/chromix-build/src/.chromix-upstream-restored.json
@@ -455,6 +485,7 @@ def job(stage: int) -> str:
     parts.append("      - name: Select compile parallelism\n"
                  "        run: python3 tools/build_resources.py --github-env\n\n")
     parts.append(run_step(stage))
+    parts.append(RUNTIME_FAILURE % {"stage": stage})
     parts.append(SNAPSHOT_ENSURE % {"stage": stage})
     parts.append("\n")
     parts.append(UPLOAD_PARTS % {"stage": stage})

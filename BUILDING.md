@@ -176,6 +176,30 @@ GitHub skips push-triggered workflows for `[skip ci]`, but still permits manual
 dispatch. `build-posix-github.yml` is callable only through a platform entrypoint;
 its platform and architecture must be supplied explicitly.
 
+### macOS runtime failure recovery
+
+Mac stages reserve 90 minutes before their stage deadline for packaging,
+runtime checks and checkpoint handling, in both `staged` and `single` modes.
+This includes the bounded version/headless checks, fingerprint dependency
+installation and fingerprint acceptance gate. Linux reserves are unchanged;
+runner disk speed, upload speed and job cancellation can still prevent recovery.
+
+Once a Mac ZIP passes checksum verification, extraction, launcher, smoke and
+fingerprint failures keep the job failed. Before packing a recovery checkpoint,
+Actions uploads a separate `<artifact>-failed-runtime-sN-attempt-M` diagnostic
+artifact containing the ZIP, `SHA256SUMS`, available runtime/fingerprint reports
+and the stage log. It is not a verified release bundle. The smoke helper records
+stdout, stderr, exit status and timeouts; on macOS timeouts it also attempts
+bounded process and stack sampling. Successful completion still requires the
+fingerprint gate.
+
+Recovery snapshots retain the compiled tree but exclude root-level `dist`,
+`smoke` and `runtime-smoke-stage-*` directories, so restored runs cannot reuse
+stale smoke evidence. Select all checkpoint artifact IDs and their exact producer
+attempt when resuming. Donors must come from `main`, or from a manual run on the
+same explicitly selected recovery branch. Existing runs keep their original
+workflow revision and patch set.
+
 ### Five-platform parallelism and incremental builds
 
 All five Actions entrypoints accept `compile_jobs=auto|N`. The default `auto`

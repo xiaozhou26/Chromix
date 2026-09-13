@@ -246,6 +246,9 @@ class PosixSnapshotRoundTripTest(unittest.TestCase):
             "src/tool": "#!/bin/sh\necho ok\n",
             "tooling/depot_tools/gclient": "tooling fixture\n",
             "src/download_cache/keep": "not the root cache\n",
+            "src/dist/keep": "not the root package\n",
+            "src/smoke/keep": "not the root smoke profile\n",
+            "src/runtime-smoke-stage-1/keep": "not the root smoke evidence\n",
             "tooling/handoff/custom parts/keep": "not the parts directory\n",
             "tooling/handoff/custom [1]*?\\tail/keep": "literal nested path\n",
             ".root-marker": "hidden root marker\n",
@@ -537,6 +540,9 @@ class PosixSnapshotRoundTripTest(unittest.TestCase):
             ".snapshot-stage-99/stage/tree.tar.zst",
             "src/.snapshot-stage-old/stale-volume",
             "download_cache/chromium.tar.xz",
+            "dist/chromix-mac-arm64.zip",
+            "smoke/profile/SingletonLock",
+            "runtime-smoke-stage-1/report.json",
         )
         for name in excluded_files:
             path = self.work / name
@@ -574,6 +580,8 @@ class PosixSnapshotRoundTripTest(unittest.TestCase):
                 self.assertFalse(any(
                     any(part.startswith(".snapshot-stage-") for part in Path(name).parts)
                     or name == "download_cache" or name.startswith("download_cache/")
+                    or name in ("dist", "smoke") or name.startswith(("dist/", "smoke/"))
+                    or name.startswith("runtime-smoke-stage-")
                     or name == relative or name.startswith(relative + "/")
                     or Path(name).name.startswith("tree.tar.zst")
                     for name in names), names)
@@ -967,7 +975,8 @@ class GenPosixWorkflowTest(unittest.TestCase):
             snapshot_steps.append(next(s for s in steps if s.get("name") == "Verify handoff snapshot"))
             self.assertEqual(len(snapshot_steps), 5)
             for step in snapshot_steps:
-                expected = "!cancelled() && steps.stage.outputs.upload_snapshot == 'true'"
+                expected = ("!cancelled() && (steps.stage.outputs.upload_snapshot == 'true' || "
+                            "steps.runtime_checkpoint.outputs.upload_snapshot == 'true')")
                 if step.get("name", "").startswith("Upload tree part"):
                     expected += " && steps.checkpoint.outcome == 'success'"
                 self.assertEqual(step["if"], "${{ " + expected + " }}")

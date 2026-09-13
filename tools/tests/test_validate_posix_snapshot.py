@@ -83,6 +83,22 @@ class SnapshotValidationTest(unittest.TestCase):
                 with self.assertRaises(ValueError):
                     self.validate(client)
 
+    def test_same_recovery_branch_manual_donor_must_be_explicit(self):
+        client = Client()
+        client.run['head_branch'] = 'repair/macos-arm64-old-patches-20260913'
+        with self.assertRaisesRegex(ValueError, 'identity'):
+            self.validate(client)
+        report = snapshot.validate(client, REPO, 123, 7, 1, 'arm64', [101, 102],
+                                   recovery_branch=client.run['head_branch'])
+        self.assertEqual(report['head_sha'], SHA)
+        with self.assertRaisesRegex(ValueError, 'identity'):
+            snapshot.validate(client, REPO, 123, 7, 1, 'arm64', [101, 102],
+                              recovery_branch='repair/other')
+        client.run['event'] = 'push'
+        with self.assertRaisesRegex(ValueError, 'identity'):
+            snapshot.validate(client, REPO, 123, 7, 1, 'arm64', [101, 102],
+                              recovery_branch=client.run['head_branch'])
+
     def test_missing_expired_duplicate_noncontiguous_parts_rejected(self):
         cases = [[], [Client().artifacts[1]], [Client().artifacts[0]], [Client().artifacts[0]] * 2]
         for field, value in [('expired', True), ('size_in_bytes', 0),

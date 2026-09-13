@@ -52,7 +52,7 @@ class FastWorkflowTest(unittest.TestCase):
                 stage = next(step for step in job["steps"] if step.get("id") == "stage")
                 self.assertEqual(stage["env"]["CHROMIX_BUILD_PROFILE"], "${{ inputs.build_profile }}")
                 self.assertEqual(stage["env"]["CHROMIX_RESERVE_MINUTES"],
-                                 "${{ inputs['max-stages'] == 1 && '15' || '45' }}")
+                                 "${{ inputs.platform == 'macos' && '90' || inputs['max-stages'] == 1 && '15' || '45' }}")
                 self.assertEqual(job["timeout-minutes"], 355)
                 self.assertNotIn("continue-on-error", stage)
                 self.assertNotIn("continue-on-error", job)
