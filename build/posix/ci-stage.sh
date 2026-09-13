@@ -241,23 +241,35 @@ if [ "$PLATFORM" = linux ] && [ "$HOST_ARCH" != "$ARCH" ]; then
   exit 0
 fi
 
-if [ "$PLATFORM" = linux ]; then
-  bash "$REPO/build/linux/prepare-ci-sandbox.sh" "$SMOKE_DIR/chromix/chrome"
-fi
-VERSION_OUTPUT="$("$TIMEOUT" 30s "$LAUNCHER" --version)" ||
-  die "extracted launcher --version check failed"
-echo "$VERSION_OUTPUT"
 CHROMIUM_VERSION_PIN="$(tr -d '\n' < "$REPO/CHROMIUM_VERSION")"
-grep -qF "$CHROMIUM_VERSION_PIN" <<<"$VERSION_OUTPUT" ||
-  die "extracted browser version does not match the pinned Chromium version"
+if [ "$PLATFORM" = macos ]; then
+  emit package_ready true
+  emit runtime_verified false
+  if python3 "$REPO/tools/macos_browser_smoke.py" --launcher "$LAUNCHER" \
+      --output "$WORK/runtime-smoke-stage-$STAGE_INDEX" --profile "$SMOKE_DIR/profile" \
+      --chromium-version "$CHROMIUM_VERSION_PIN"; then
+    :
+  else
+    rm -rf "$SMOKE_DIR"
+    emit runtime_failed true
+    die "extracted macOS runtime smoke test failed; see runtime-smoke-stage-$STAGE_INDEX"
+  fi
+else
+  bash "$REPO/build/linux/prepare-ci-sandbox.sh" "$SMOKE_DIR/chromix/chrome"
+  VERSION_OUTPUT="$("$TIMEOUT" 30s "$LAUNCHER" --version)" ||
+    die "extracted launcher --version check failed"
+  echo "$VERSION_OUTPUT"
+  grep -qF "$CHROMIUM_VERSION_PIN" <<<"$VERSION_OUTPUT" ||
+    die "extracted browser version does not match the pinned Chromium version"
 
-DOM_OUTPUT="$("$TIMEOUT" 60s "$LAUNCHER" --headless --disable-gpu --no-first-run \
-  --no-default-browser-check "--user-data-dir=$SMOKE_DIR/profile" \
-  --dump-dom 'data:text/html,<p>chromix-smoke-ok</p>')" ||
-  die "extracted headless smoke test failed"
-echo "$DOM_OUTPUT"
-grep -qF '<p>chromix-smoke-ok</p>' <<<"$DOM_OUTPUT" ||
-  die "smoke page marker missing from dumped DOM"
+  DOM_OUTPUT="$("$TIMEOUT" 60s "$LAUNCHER" --headless --disable-gpu --no-first-run \
+    --no-default-browser-check "--user-data-dir=$SMOKE_DIR/profile" \
+    --dump-dom 'data:text/html,<p>chromix-smoke-ok</p>')" ||
+    die "extracted headless smoke test failed"
+  echo "$DOM_OUTPUT"
+  grep -qF '<p>chromix-smoke-ok</p>' <<<"$DOM_OUTPUT" ||
+    die "smoke page marker missing from dumped DOM"
+fi
 
 rm -rf "$SMOKE_DIR"
 emit runtime_verified true

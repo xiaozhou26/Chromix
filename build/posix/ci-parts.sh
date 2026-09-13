@@ -44,7 +44,8 @@ if command -v gsplit >/dev/null 2>&1; then SPLIT=gsplit; else SPLIT=split; fi
 
 # BSD tar exclusions are unanchored: ./download_cache also drops the required
 # tooling/download_cache symlink. find -path matches the full relative path.
-find_excludes=(-name '.snapshot-stage-*' -o -path './download_cache')
+find_excludes=(-name '.snapshot-stage-*' -o -path './download_cache' -o -path './dist' -o -path './smoke'
+               -o -path './runtime-smoke-stage-*')
 case "$PARTS_DIR" in
   "${ROOT%/}/"*)
     parts_relative="${PARTS_DIR#"${ROOT%/}/"}"

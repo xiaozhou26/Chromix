@@ -70,7 +70,8 @@ class Client:
 
 
 def validate(client, repository: str, run_id: int, stage: int, attempt: int, arch: str,
-             expected_artifact_ids: list[int], platform: str = "macos") -> dict:
+             expected_artifact_ids: list[int], platform: str = "macos", *,
+             recovery_branch: str | None = None) -> dict:
     if (not 1 <= len(expected_artifact_ids) <= 4
             or len(set(expected_artifact_ids)) != len(expected_artifact_ids)
             or any(type(value) is not int or value <= 0 for value in expected_artifact_ids)):
@@ -81,8 +82,9 @@ def validate(client, repository: str, run_id: int, stage: int, attempt: int, arc
     run = client.get(f"/actions/runs/{run_id}")
     if (run.get("id") != run_id or run.get("name") != workflow
             or run.get("path") != f".github/workflows/{workflow}.yml"
-            or run.get("head_branch") != "main"
+            or run.get("head_branch") not in ("main", recovery_branch or "main")
             or run.get("event") not in ("push", "workflow_dispatch")
+            or (run.get("head_branch") != "main" and run.get("event") != "workflow_dispatch")
             or run.get("repository", {}).get("full_name") != repository
             or run.get("head_repository", {}).get("full_name") != repository
             or run.get("status") != "completed"
@@ -145,13 +147,14 @@ def main() -> int:
     parser.add_argument("--artifact-ids", default=os.environ.get("SNAPSHOT_ARTIFACT_IDS", ""))
     parser.add_argument("--platform", choices=("linux", "macos"), default=os.environ.get("BUILD_PLATFORM", "macos"))
     parser.add_argument("--arch", choices=("x64", "arm64"), required=True)
+    parser.add_argument("--recovery-branch", help="Also accept a manual donor from this exact recovery branch")
     parser.add_argument("--report", type=Path, required=True)
     args = parser.parse_args()
     client = Client(args.repository, os.environ.get("GH_TOKEN", ""))
     report = validate(client, args.repository, positive(args.run_id, "run ID"),
                       positive(args.stage, "stage"), positive(args.attempt, "attempt"), args.arch,
                       [positive(value.strip(), "artifact ID") for value in args.artifact_ids.split(",")],
-                      platform=args.platform)
+                      platform=args.platform, recovery_branch=args.recovery_branch)
     args.report.parent.mkdir(parents=True, exist_ok=True)
     args.report.write_text(json.dumps(report, indent=2, sort_keys=True) + "\n")
     if os.environ.get("GITHUB_OUTPUT"):

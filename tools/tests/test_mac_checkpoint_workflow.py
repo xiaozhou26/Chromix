@@ -84,6 +84,47 @@ class PosixCheckpointWorkflowTest(unittest.TestCase):
             final = next(step for step in steps if step.get('name') == 'Upload final bundle')
             self.assertEqual(final['if'], "steps.stage.outputs.finished == 'true'")
 
+    def test_failed_mac_runtime_bundle_is_diagnostic_only(self):
+        for number in range(1, 9):
+            steps = workflow('build-posix-github.yml')['jobs'][f'posix-{number}']['steps']
+            failed = next(step for step in steps if step.get('name') == 'Upload failed macOS runtime bundle')
+            for guard in ('!cancelled()', "inputs.platform == 'macos'",
+                          "steps.stage.outputs.package_ready == 'true'",
+                          "steps.stage.outcome == 'failure'",
+                          "steps.stage.outputs.runtime_failed == 'true'"):
+                self.assertIn(guard, failed['if'])
+            self.assertIn(f'-failed-runtime-s{number}-attempt-', failed['with']['name'])
+            self.assertEqual(failed['with']['if-no-files-found'], 'error')
+            snapshot = next(step for step in steps if step.get('id') == 'runtime_checkpoint')
+            self.assertEqual(snapshot['if'], failed['if'])
+            self.assertLess(steps.index(failed), steps.index(snapshot))
+            verify = next(step for step in steps if step.get('id') == 'checkpoint')
+            self.assertLess(steps.index(snapshot), steps.index(verify))
+            for step in [verify, *[item for item in steps if item.get('name', '').startswith('Upload tree part')]]:
+                self.assertIn("steps.runtime_checkpoint.outputs.upload_snapshot == 'true'", step['if'])
+            logs = next(step for step in steps if step.get('name') == 'Upload build diagnostics')
+            self.assertEqual(logs['if'], 'always()')
+            self.assertIn(f'/runtime-smoke-stage-{number}/', logs['with']['path'])
+            final = next(step for step in steps if step.get('name') == 'Upload final bundle')
+            self.assertEqual(final['if'], "steps.stage.outputs.finished == 'true'")
+
+    def test_failed_runtime_snapshot_emits_only_after_success(self):
+        steps = workflow('build-posix-github.yml')['jobs']['posix-1']['steps']
+        script = next(step['run'] for step in steps if step.get('id') == 'runtime_checkpoint')
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            helper = root / 'build/posix/ci-parts.sh'
+            helper.parent.mkdir(parents=True)
+            for code in (0, 23):
+                helper.write_text(f'#!/bin/sh\nexit {code}\n')
+                output = root / 'output'
+                output.write_text('')
+                result = subprocess.run(['bash', '-c', script], cwd=root, capture_output=True,
+                                        text=True, env=dict(os.environ, RUNNER_TEMP=temp,
+                                                           GITHUB_OUTPUT=str(output)), timeout=5)
+                self.assertEqual(result.returncode, code)
+                self.assertEqual(output.read_text(), '' if code else 'upload_snapshot=true\n')
+
     def test_sdk_preflight_precedes_large_downloads_on_every_mac_stage(self):
         for number in range(1, 9):
             steps = workflow('build-posix-github.yml')['jobs'][f'posix-{number}']['steps']
