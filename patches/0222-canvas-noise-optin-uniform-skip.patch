@@ -1,0 +1,140 @@
+# 0222: canvas per-seed noise without synthetic fixtures.
+# - uxr-canvas-noise=true (public --fingerprint-canvas-noise) opts into the
+#   seeded LSB readback/export noise (GpuBackendPolicy.canvas_pixel_noise).
+# - Uniform neighborhoods stay native: solid fills read back byte-exact,
+#   only edge/texture pixels that differ from a neighbor carry seeded noise.
+diff --git a/base/uxr_config.cc b/base/uxr_config.cc
+index cb7b313..cf19966 100644
+--- a/base/uxr_config.cc
++++ b/base/uxr_config.cc
+@@ -104,7 +104,15 @@ bool ParseGpuBackend(const flat_map<std::string, std::string>& cfg,
+   }
+   const bool allow_synthetic = !policy->native && synthetic_tests;
+   const bool noise_disabled = cfg.contains("uxr-disable-fingerprint-noise");
+-  policy->canvas_pixel_noise = allow_synthetic && !noise_disabled;
++  // 0222: uxr-canvas-noise=true opts into seeded LSB canvas readback/export
++  // noise without the synthetic test fixtures. Ordinary seeded launches keep
++  // native geometry/capability fixtures; only the per-seed pixel noise path
++  // activates (blink skips uniform regions, so plain fills stay exact).
++  const auto canvas_noise = cfg.find("uxr-canvas-noise");
++  const bool canvas_noise_opt =
++      canvas_noise != cfg.end() && canvas_noise->second == "true";
++  policy->canvas_pixel_noise =
++      (allow_synthetic || canvas_noise_opt) && !noise_disabled;
+   policy->canvas_text_noise = !policy->native && !noise_disabled;
+   policy->canvas_bridge = allow_synthetic;
+   policy->capability_overrides = !policy->native;
+diff --git a/chrome/app/chrome_main.cc b/chrome/app/chrome_main.cc
+index 01e9225..a21fd8c 100644
+--- a/chrome/app/chrome_main.cc
++++ b/chrome/app/chrome_main.cc
+@@ -268,6 +268,7 @@ int ChromeMain(int argc, const char** argv) {
+                                              "uxr-devtools-runtime-suppression"},
+       {"fingerprint-canvas-bridge",        "uxr-canvas-bridge"},
+       {"fingerprint-canvas-bridge-unsafe", "uxr-canvas-bridge-unsafe"},
++      {"fingerprint-canvas-noise",         "uxr-canvas-noise"},
+     };
+     for (const auto& a : kAliases) {
+       if (command_line->HasSwitch(a.fp) &&
+diff --git a/third_party/blink/renderer/modules/canvas/canvas2d/base_rendering_context_2d.cc b/third_party/blink/renderer/modules/canvas/canvas2d/base_rendering_context_2d.cc
+index 26b63d5..3bf0e3f 100644
+--- a/third_party/blink/renderer/modules/canvas/canvas2d/base_rendering_context_2d.cc
++++ b/third_party/blink/renderer/modules/canvas/canvas2d/base_rendering_context_2d.cc
+@@ -785,14 +785,44 @@ ImageData* BaseRenderingContext2D::getImageDataInternal(
+                          ph_ct == kBGRA_8888_SkColorType)) {
+       auto ph_pixels = gfx::SkPixmapToWritableSpan(ph_pm);
+       if (!ph_pixels.empty()) {
+-        for (int ph_y = 0; ph_y < ph_pm.height(); ++ph_y) {
+-          auto ph_row = ph_pixels.subspan(
+-              static_cast<size_t>(ph_y) * ph_pm.rowBytes(),
+-              ph_pm.info().minRowBytes());
+-          for (int ph_x = 0; ph_x < ph_pm.width(); ++ph_x) {
+-            auto ph_pixel = ph_row.subspan(static_cast<size_t>(ph_x) * 4, size_t{4});
++        // 0222: near-flat neighborhoods stay native. Plain solid fills read
++        // back byte-exact (solid-fill exactness is a tampering probe on its
++        // own); only pixels that differ from a neighbor by 2+ in any channel
++        // (text cores, strokes, hard edges) carry the seeded LSB noise. The
++        // 1-unit tolerance keeps the verdict invariant under LSB forcing:
++        // forced noise only rewrites bit 0, so a 2+ difference stays 2+ and a
++        // 0/1 difference stays 0/1 - putImageData round trips are therefore
++        // byte-stable (skip decisions never flip between reads).
++        const int ph_w = ph_pm.width();
++        const int ph_h = ph_pm.height();
++        const size_t ph_stride = ph_pm.rowBytes();
++        const auto ph_near_rgb = [](const uint8_t* a, const uint8_t* b) {
++          const int d0 = a[0] > b[0] ? a[0] - b[0] : b[0] - a[0];
++          const int d1 = a[1] > b[1] ? a[1] - b[1] : b[1] - a[1];
++          const int d2 = a[2] > b[2] ? a[2] - b[2] : b[2] - a[2];
++          return d0 <= 1 && d1 <= 1 && d2 <= 1;
++        };
++        for (int ph_y = 0; ph_y < ph_h; ++ph_y) {
++          uint8_t* const ph_row =
++              ph_pixels.data() + static_cast<size_t>(ph_y) * ph_stride;
++          for (int ph_x = 0; ph_x < ph_w; ++ph_x) {
++            uint8_t* const ph_pixel = ph_row + static_cast<size_t>(ph_x) * 4;
+             if (ph_pixel[3] == 0)
+               continue;
++            bool ph_flat = true;
++            if (ph_x > 0 && !ph_near_rgb(ph_pixel, ph_pixel - 4))
++              ph_flat = false;
++            if (ph_flat && ph_x + 1 < ph_w &&
++                !ph_near_rgb(ph_pixel, ph_pixel + 4))
++              ph_flat = false;
++            if (ph_flat && ph_y > 0 &&
++                !ph_near_rgb(ph_pixel, ph_pixel - ph_stride))
++              ph_flat = false;
++            if (ph_flat && ph_y + 1 < ph_h &&
++                !ph_near_rgb(ph_pixel, ph_pixel + ph_stride))
++              ph_flat = false;
++            if (ph_flat)
++              continue;
+             const uint32_t ax =
+                 static_cast<uint32_t>(sx) + static_cast<uint32_t>(ph_x);
+             const uint32_t ay =
+diff --git a/third_party/blink/renderer/platform/graphics/image_data_buffer.cc b/third_party/blink/renderer/platform/graphics/image_data_buffer.cc
+index 2cd2d59..89bb301 100644
+--- a/third_party/blink/renderer/platform/graphics/image_data_buffer.cc
++++ b/third_party/blink/renderer/platform/graphics/image_data_buffer.cc
+@@ -85,13 +85,37 @@ bool UxrCopyAndNoiseEncodeBuffer(SkPixmap& pm, sk_sp<SkImage>& retained_image) {
+     return false;
+   }
+   auto pixels = gfx::SkPixmapToWritableSpan(copy);
+-  for (int y = 0; apply_noise && y < copy.height(); ++y) {
+-    auto row = pixels.subspan(static_cast<size_t>(y) * copy.rowBytes(),
+-                              copy.info().minRowBytes());
+-    for (int x = 0; x < copy.width(); ++x) {
+-      auto pixel = row.subspan(static_cast<size_t>(x) * 4, size_t{4});
++  // 0222: near-flat neighborhoods stay native. Solid fills export byte-exact
++  // (solid-fill exactness is a tampering probe on its own); only pixels that
++  // differ from a neighbor by 2+ in any channel carry the seeded LSB noise.
++  // The 1-unit tolerance keeps the verdict invariant under LSB forcing (bit 0
++  // is the only rewritten bit), so round trips stay byte-stable.
++  const int cw = copy.width();
++  const int chh = copy.height();
++  const size_t cstride = copy.rowBytes();
++  const auto near_rgb = [](const uint8_t* a, const uint8_t* b) {
++    const int d0 = a[0] > b[0] ? a[0] - b[0] : b[0] - a[0];
++    const int d1 = a[1] > b[1] ? a[1] - b[1] : b[1] - a[1];
++    const int d2 = a[2] > b[2] ? a[2] - b[2] : b[2] - a[2];
++    return d0 <= 1 && d1 <= 1 && d2 <= 1;
++  };
++  for (int y = 0; apply_noise && y < chh; ++y) {
++    uint8_t* const row = pixels.data() + static_cast<size_t>(y) * cstride;
++    for (int x = 0; x < cw; ++x) {
++      uint8_t* const pixel = row + static_cast<size_t>(x) * 4;
+       if (pixel[3] == 0)
+         continue;
++      bool flat = true;
++      if (x > 0 && !near_rgb(pixel, pixel - 4))
++        flat = false;
++      if (flat && x + 1 < cw && !near_rgb(pixel, pixel + 4))
++        flat = false;
++      if (flat && y > 0 && !near_rgb(pixel, pixel - cstride))
++        flat = false;
++      if (flat && y + 1 < chh && !near_rgb(pixel, pixel + cstride))
++        flat = false;
++      if (flat)
++        continue;
+       for (uint32_t ch = 0; ch < 3; ++ch) {
+         const size_t index = ct == kBGRA_8888_SkColorType ? 2 - ch : ch;
+         const uint32_t v = pixel[index];

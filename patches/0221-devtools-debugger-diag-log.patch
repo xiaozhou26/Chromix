@@ -1,0 +1,224 @@
+diff --git a/content/browser/devtools/devtools_agent_host_impl.cc b/content/browser/devtools/devtools_agent_host_impl.cc
+--- a/content/browser/devtools/devtools_agent_host_impl.cc
++++ b/content/browser/devtools/devtools_agent_host_impl.cc
+@@ -9,6 +9,7 @@
+ 
+ #include "base/command_line.h"
+ #include "base/functional/bind.h"
++#include "base/logging.h"
+ #include "base/memory/ref_counted_memory.h"
+ #include "base/no_destructor.h"
+ #include "base/notreached.h"
+@@ -352,14 +353,24 @@ bool DevToolsAgentHostImpl::AttachInternal(
+ bool DevToolsAgentHostImpl::AttachClient(DevToolsAgentHostClient* client) {
+   if (SessionByClient(client))
+     return false;
+-  return AttachInternal(
++  const bool attached = AttachInternal(
+       std::make_unique<DevToolsSession>(client, GetSessionMode()));
++  // YMH-DT-DIAG: diagnostics-only logging on attach events.
++  LOG(WARNING) << "YMH-DT-DIAG AttachClient client="
++               << static_cast<const void*>(client) << " type=" << GetType()
++               << " target_id=" << GetId() << " url=" << GetURL().spec()
++               << " result=" << attached;
++  return attached;
+ }
+ 
+ bool DevToolsAgentHostImpl::DetachClient(DevToolsAgentHostClient* client) {
+   DevToolsSession* session = SessionByClient(client);
+   if (!session)
+     return false;
++  // YMH-DT-DIAG: log before DetachInternal as it may destroy |this|.
++  LOG(WARNING) << "YMH-DT-DIAG DetachClient client="
++               << static_cast<const void*>(client) << " type=" << GetType()
++               << " target_id=" << GetId() << " url=" << GetURL().spec();
+   scoped_refptr<DevToolsAgentHostImpl> protect(this);
+   DetachInternal(session);
+   return true;
+diff --git a/content/browser/devtools/devtools_http_handler.cc b/content/browser/devtools/devtools_http_handler.cc
+--- a/content/browser/devtools/devtools_http_handler.cc
++++ b/content/browser/devtools/devtools_http_handler.cc
+@@ -460,6 +460,11 @@ static std::string_view GetMimeType(std::string_view filename) {
+ 
+ void ServerWrapper::OnHttpRequest(int connection_id,
+                                   const net::HttpServerRequestInfo& info) {
++  // YMH-DT-DIAG: log every plain HTTP request hitting the DevTools port
++  // (method/path/peer) so probing of the exposed endpoint is visible.
++  LOG(WARNING) << "YMH-DT-DIAG HttpRequest conn=" << connection_id
++               << " peer=" << info.peer.ToString() << " method=" << info.method
++               << " path=" << info.path;
+   if (!RequestIsSafeToServe(info)) {
+     Send500(connection_id,
+             "Host header is specified and is not an IP address or localhost.");
+@@ -816,6 +821,17 @@ void DevToolsHttpHandler::OnWebSocketRequest(
+   if (!thread_)
+     return;
+ 
++  // YMH-DT-DIAG: log every WebSocket upgrade attempt with peer address and
++  // request path (/devtools/browser/... vs /devtools/page/<id>).
++  {
++    const std::string ws_origin = request.headers.count("origin")
++                                      ? request.headers.at("origin")
++                                      : std::string();
++    LOG(WARNING) << "YMH-DT-DIAG WebSocketRequest conn=" << connection_id
++                 << " peer=" << request.peer.ToString()
++                 << " path=" << request.path << " origin=" << ws_origin;
++  }
++
+   if (request.headers.count("origin") &&
+       !remote_allow_origins_.count(request.headers.at("origin")) &&
+       !remote_allow_origins_.count("*")) {
+@@ -891,6 +907,8 @@ void DevToolsHttpHandler::OnWebSocketMessage(int connection_id,
+ }
+ 
+ void DevToolsHttpHandler::OnClose(int connection_id) {
++  // YMH-DT-DIAG: connection teardown visibility for connection forensics.
++  LOG(WARNING) << "YMH-DT-DIAG ConnectionClosed conn=" << connection_id;
+   auto removed_count = connection_to_client_.erase(connection_id);
+   if (delegate_ && removed_count > 0 &&
+       mode_ ==
+@@ -1021,6 +1039,10 @@ void DevToolsHttpHandler::AcceptWebSocket(
+     const net::HttpServerRequestInfo& request) {
+   if (!thread_)
+     return;
++  // YMH-DT-DIAG: marks the point where the WebSocket is actually accepted.
++  LOG(WARNING) << "YMH-DT-DIAG WebSocketAccept conn=" << connection_id
++               << " peer=" << request.peer.ToString()
++               << " path=" << request.path;
+   if (mode_ ==
+       DevToolsAgentHost::RemoteDebuggingServerMode::kWithApprovalOnly) {
+     delegate_->SetActiveWebSocketConnections(connection_to_client_.size());
+diff --git a/content/browser/devtools/devtools_session.cc b/content/browser/devtools/devtools_session.cc
+--- a/content/browser/devtools/devtools_session.cc
++++ b/content/browser/devtools/devtools_session.cc
+@@ -9,6 +9,7 @@
+ 
+ #include "base/containers/flat_set.h"
+ #include "base/functional/bind.h"
++#include "base/logging.h"
+ #include "base/trace_event/trace_event.h"
+ #include "content/browser/bad_message.h"
+ #include "content/browser/devtools/devtools_manager.h"
+@@ -95,6 +96,31 @@ bool TerminateOnCrossProcessNavigation(crdtp::span<uint8_t> method) {
+ const char kResumeMethod[] = "Runtime.runIfWaitingForDebugger";
+ const char kSessionId[] = "sessionId";
+ 
++// YMH-DT-DIAG: diagnostics-only logging for DevTools debugger traffic.
++// The V8-side inspector agent (v8/src/inspector) has no access to Chromium
++// logging, so Debugger-domain commands and pause/resume notifications are
++// logged here: this session is the browser-side choke point every client
++// command and every renderer-originating notification passes through.
++// The application's own automation client never sends Debugger-domain
++// commands, so any such line indicates foreign CDP traffic. Logging only,
++// no behavior change.
++const char kYmhDiagPrefix[] = "YMH-DT-DIAG";
++
++bool YmhShouldLogCommand(const std::string& method) {
++  return method.rfind("Debugger.", 0) == 0 ||
++         method == "Runtime.runIfWaitingForDebugger" ||
++         method == "Target.attachToTarget" ||
++         method == "Target.detachFromTarget";
++}
++
++std::string YmhTruncated(const std::string& text) {
++  const size_t kLimit = 300;
++  if (text.size() <= kLimit) {
++    return text;
++  }
++  return text.substr(0, kLimit) + "...";
++}
++
+ // Clients match against this error message verbatim (http://crbug.com/1001678).
+ const char kTargetClosedMessage[] = "Inspected target navigated or closed";
+ const char kTargetCrashedMessage[] = "Target crashed";
+@@ -379,6 +405,28 @@ void DevToolsSession::DispatchProtocolMessage(
+ void DevToolsSession::DispatchProtocolMessageInternal(
+     crdtp::Dispatchable dispatchable,
+     base::span<const uint8_t> message) {
++  // YMH-DT-DIAG: log Debugger-domain commands (enable/disable, breakpoint
++  // set/remove, instrumentation breakpoints, pause/resume) with a truncated
++  // JSON payload covering breakpointId/url/condition. See kYmhDiagPrefix.
++  {
++    const std::string ymh_method(dispatchable.Method().begin(),
++                                 dispatchable.Method().end());
++    if (YmhShouldLogCommand(ymh_method)) {
++      std::vector<uint8_t> ymh_json;
++      const bool ymh_converted =
++          crdtp::json::ConvertCBORToJSON(crdtp::SpanFrom(message), &ymh_json)
++              .ok();
++      LOG(WARNING) << kYmhDiagPrefix << " Cmd method=" << ymh_method
++                   << " call_id=" << dispatchable.CallId() << " session="
++                   << (session_id_.empty() ? std::string("root") : session_id_)
++                   << " target=" << agent_host_->GetId() << "/"
++                   << agent_host_->GetType() << " payload="
++                   << YmhTruncated(ymh_converted
++                                       ? std::string(ymh_json.begin(),
++                                                     ymh_json.end())
++                                       : std::string());
++    }
++  }
+   if ((browser_only_ || runtime_resume_) &&
+       crdtp::SpanEquals(crdtp::SpanFrom(kResumeMethod),
+                         dispatchable.Method())) {
+@@ -600,6 +648,21 @@ void DevToolsSession::DispatchProtocolResponseOrNotification(
+     }
+     return;
+   }
++
++  // YMH-DT-DIAG: log renderer-originating pause/resume notifications. The
++  // payload carries the pause reason and top call frames. A raw substring
++  // match covers both JSON and CBOR frame encodings.
++  if (is_notification) {
++    const std::string ymh_raw(message_span.begin(), message_span.end());
++    if (ymh_raw.find("Debugger.paused") != std::string::npos ||
++        ymh_raw.find("Debugger.resumed") != std::string::npos) {
++      LOG(WARNING) << kYmhDiagPrefix << " Event target=" << agent_host->GetId()
++                   << "/" << agent_host->GetType() << " session="
++                   << (session_id.empty() ? std::string("root") : session_id)
++                   << " payload=" << YmhTruncated(ymh_raw);
++    }
++  }
++
+   client->DispatchProtocolMessage(agent_host, message->data);
+ }
+ 
+diff --git a/content/browser/devtools/render_frame_devtools_agent_host.cc b/content/browser/devtools/render_frame_devtools_agent_host.cc
+--- a/content/browser/devtools/render_frame_devtools_agent_host.cc
++++ b/content/browser/devtools/render_frame_devtools_agent_host.cc
+@@ -11,6 +11,7 @@
+ 
+ #include "base/functional/bind.h"
+ #include "base/json/json_reader.h"
++#include "base/logging.h"
+ #include "base/memory/ptr_util.h"
+ #include "base/memory/raw_ptr.h"
+ #include "base/metrics/histogram_functions.h"
+@@ -1080,6 +1081,15 @@ RenderProcessHost* RenderFrameDevToolsAgentHost::GetProcessHost() {
+ void RenderFrameDevToolsAgentHost::MainThreadDebuggerPaused() {
+   is_debugger_paused_ = true;
+ 
++  // YMH-DT-DIAG: browser-side signal that this target's main thread is
++  // paused in the debugger (debugger statement, breakpoint or
++  // instrumentation pause), independent of which client caused it.
++  LOG(WARNING) << "YMH-DT-DIAG MainThreadDebuggerPaused target=" << GetId()
++               << " url="
++               << (GetWebContents()
++                       ? GetWebContents()->GetLastCommittedURL().spec()
++                       : std::string());
++
+   if (!GetWebContents() || is_debugger_pause_situation_recorded_) {
+     return;
+   }
+@@ -1120,6 +1130,11 @@ void RenderFrameDevToolsAgentHost::MainThreadDebuggerPaused() {
+ 
+ void RenderFrameDevToolsAgentHost::MainThreadDebuggerResumed() {
+   is_debugger_paused_ = false;
++  LOG(WARNING) << "YMH-DT-DIAG MainThreadDebuggerResumed target=" << GetId()
++               << " url="
++               << (GetWebContents()
++                       ? GetWebContents()->GetLastCommittedURL().spec()
++                       : std::string());
+ }
+ 
+ bool RenderFrameDevToolsAgentHost::IsChildFrame() {
+

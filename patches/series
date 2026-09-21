@@ -215,3 +215,9 @@ patches/0213-display-emulator-reentry.patch
 patches/0214-animation-clock-quantization.patch
 patches/0215-document-timeline-clock-origin.patch
 patches/0216-display-native-emulated-regressions.patch
+patches/0217-content-browser-client-hints-device-memory-uxr.patch
+patches/0218-canvas-lsb-idempotent-noise.patch
+patches/0219-webgl-hide-unmasked-macos.patch
+patches/0220-webgpu-explicit-identity-uxr.patch
+patches/0221-devtools-debugger-diag-log.patch
+patches/0222-canvas-noise-optin-uniform-skip.patch

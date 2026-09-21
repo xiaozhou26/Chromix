@@ -1,0 +1,30 @@
+diff --git a/third_party/blink/renderer/modules/webgl/webgl_rendering_context_base.cc b/third_party/blink/renderer/modules/webgl/webgl_rendering_context_base.cc
+--- a/third_party/blink/renderer/modules/webgl/webgl_rendering_context_base.cc
++++ b/third_party/blink/renderer/modules/webgl/webgl_rendering_context_base.cc
+@@ -4114,6 +4114,26 @@ bool WebGLRenderingContextBase::ExtensionSupportedAndAllowed(
+     return false;
+   if (disabled_extensions_.Contains(String(tracker->ExtensionName())))
+     return false;
++  // 0219: real Mac Chrome (113+) removed WEBGL_debug_renderer_info entirely.
++  // getExtension returns null and UNMASKED_VENDOR/RENDERER_WEBGL (0x9245/0x9246)
++  // raise INVALID_ENUM. Exposing unmasked GPU strings under a macOS persona is
++  // a "WebGL vendor mismatch" signal on detection sites, so hide the extension
++  // for spoofed Mac personas. Enumeration, getExtension and the getParameter
++  // gates (ExtensionEnabled) all route through this single filter.
++  if (!ungoogled::CurrentPersona().webgl_real &&
++      tracker->MatchesName(String("WEBGL_debug_renderer_info"))) {
++    const auto& uxr_cfg = base::UxrConfig::GetInstance();
++    const String uxr_platform = String::FromUtf8(uxr_cfg.Get("uxr-platform"));
++    const String uxr_ua_platform =
++        String::FromUtf8(uxr_cfg.Get("uxr-ua-platform"));
++    const bool mac_platform =
++        DeprecatedEqualIgnoringCase(uxr_platform, String("MacIntel")) ||
++        DeprecatedEqualIgnoringCase(uxr_platform, String("macos")) ||
++        DeprecatedEqualIgnoringCase(uxr_ua_platform, String("macos")) ||
++        DeprecatedEqualIgnoringCase(uxr_ua_platform, String("MacIntel"));
++    if (mac_platform)
++      return false;
++  }
+   // Enumeration and getExtension must use the same native-capability filter.
+   if (!ungoogled::CurrentPersona().webgl_real &&
+       base::UxrConfig::GetInstance().Has("uxr-webgl-extensions")) {

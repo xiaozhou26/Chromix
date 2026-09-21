@@ -1,6 +1,6 @@
 # Public fingerprint flags
 
-This is the contract of the **current Chromium 152.0.7977.82 source stack**, not
+This is the contract of the **current Chromium 153.0.8010.47 source stack**, not
 a claim about previously released binaries. Rebuild the browser and use the
 matching Python/Node SDK checkout. Upstream descriptions saying “148+” or “150+”
 do not prove that an older Chromix executable contains these changes.
@@ -37,6 +37,7 @@ all injected. `--fingerprint=off` disables persona overrides as described below.
 | `--fingerprint-windows-font-metrics` | Opt-in Linux → Windows font metric alignment. Requires a Windows persona and actual matching Windows font files; otherwise no-op. See the font boundary below. |
 | `--fingerprint-font-policy` / `--fingerprint-font-whitelist` | `native` / `restricted`. Restricted requires 1–256 installed family names and checks resolved native fonts, fallback and Local Font Access. Downloaded author fonts remain usable. |
 | `--fingerprint-audio-render` / `--fingerprint-audio-seed` | `native` (default) / `isolated`. Isolation processes the actual audio output bus; requires a nonzero decimal uint64 audio seed or fingerprint seed. Sample rates/devices remain native. |
+| `--fingerprint-canvas-noise` | `true` opts into seeded canvas LSB readback/export noise without the synthetic fixtures (patch 0222). Near-flat neighborhoods (per-channel neighbor delta <= 1) stay native: solid fills read back byte-exact and putImageData round trips stay byte-stable; only pixels differing by 2+ in any channel carry the seed noise. Requires a nonzero fingerprint seed. |
 | `--fingerprint-timer-resolution` | Decimal integer **milliseconds**, 0–1000. Zero/unset keeps native precision; positive values quantize V8 wall clocks and Blink public timestamps. |
 | `--fingerprint-codec-h264/vp8/vp9/av1/hevc` | Set each family separately to `native` / `disabled`; an explicit empty value also disables it. Shared capability and operation restrictions never add codec support. See the backend boundary below. |
 | `--fingerprint-max-touch-points` / `--fingerprint-pointer` / `--fingerprint-hover` | 0–16 / `fine,coarse,none` / `hover,none`. Configure WebPreferences; fine plus positive touch points enables mixed input. Invalid combinations fail before snapshot publication. |
@@ -90,8 +91,7 @@ SIMD/Wasm support or allocation limits.
 
 The older independently seeded hardware/display and GL-capability test paths
 and GPU identity templates require `--uxr-synthetic-device-tests=true`. They are separate from the
-public fixed defaults above. Legacy font substitutions and Canvas readback/
-export noise also remain synthetic-test opt-ins. WebGL/audio/client-rect
+public fixed defaults above. Legacy font substitutions and Canvas readback/export noise also remain synthetic-test opt-ins, except the standalone `--fingerprint-canvas-noise=true` opt-in (patch 0222) which activates only the seeded LSB pixel noise path. WebGL/audio/client-rect
 getter-only perturbations have **not** been restored by this compatibility work.
 
 [Measured device mode](device-pool.md) selects evidence-backed whole native

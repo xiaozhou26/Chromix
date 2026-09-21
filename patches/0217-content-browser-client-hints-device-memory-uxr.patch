@@ -1,0 +1,57 @@
+diff -u a/content/browser/client_hints/client_hints.cc b/content/browser/client_hints/client_hints.cc
+--- a/content/browser/client_hints/client_hints.cc
++++ b/content/browser/client_hints/client_hints.cc
++++ "b/C:\\chromix-build\\src\\content\\browser\\client_hints\\client_hints.cc"
+@@ -5,6 +5,7 @@
+ #include "content/browser/client_hints/client_hints.h"
+ 
+ #include <algorithm>
++#include <cmath>  // UXR
+ #include <optional>
+ #include <string>
+ 
+@@ -19,6 +20,7 @@
+ #include "base/strings/string_number_conversions.h"
+ #include "base/strings/string_util.h"
+ #include "base/time/time.h"
++#include "base/uxr_config.h"
+ #include "build/build_config.h"
+ #include "content/browser/devtools/devtools_instrumentation.h"
+ #include "content/browser/preloading/prerender/prerender_host.h"
+@@ -238,9 +240,33 @@ void RemoveClientHintHeader(WebClientHintsType client_hint_type,
+ void AddDeviceMemoryHeader(net::HttpRequestHeaders* headers,
+                            bool use_deprecated_version = false) {
+   DCHECK(headers);
+-  blink::ApproximatedDeviceMemory::Initialize();
+-  const float device_memory =
+-      blink::ApproximatedDeviceMemory::GetApproximatedDeviceMemory();
++  // UXR: mirror navigator.deviceMemory (blink navigator_device_memory.cc) so
++  // the Device-Memory client hint always equals the JS surface. Public
++  // overrides report a memory bucket, not an allocator/heap limit.
++  double v = 0.0;
++  float device_memory = 0.0f;
++  if (base::StringToDouble(
++          base::UxrConfig::GetInstance().Get("uxr-device-memory"), &v) &&
++      std::isfinite(v) && v > 0.0) {
++    const double kB[] = {0.25, 0.5, 1.0, 2.0, 4.0, 8.0, 16.0, 32.0};
++    double best = kB[0];
++    for (double b : kB) {
++      if (std::abs(b - v) < std::abs(best - v))
++        best = b;
++    }
++    device_memory = static_cast<float>(best);
++  } else {
++    // Synthetic memory buckets; an absent seed preserves the host value.
++    const float ph_pool =
++        base::UxrConfig::GetInstance().GetSeededDeviceMemory();
++    if (ph_pool > 0.0f) {
++      device_memory = ph_pool;
++    } else {
++      blink::ApproximatedDeviceMemory::Initialize();
++      device_memory =
++          blink::ApproximatedDeviceMemory::GetApproximatedDeviceMemory();
++    }
++  }
+   DCHECK_LT(0.0, device_memory);
+   SetHeaderToDouble(headers,
+                     use_deprecated_version

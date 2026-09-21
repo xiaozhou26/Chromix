@@ -1,0 +1,52 @@
+diff --git a/third_party/blink/renderer/modules/webgpu/gpu_adapter_info.cc b/third_party/blink/renderer/modules/webgpu/gpu_adapter_info.cc
+--- a/third_party/blink/renderer/modules/webgpu/gpu_adapter_info.cc
++++ b/third_party/blink/renderer/modules/webgpu/gpu_adapter_info.cc
+@@ -47,18 +47,21 @@ GPUAdapterInfo::GPUAdapterInfo(const String& vendor,
+        config.Get("uxr-fingerprint-enabled") != "true" &&
+        !config.Has("uxr-webgl-vendor") && !config.Has("uxr-webgl-renderer")))
+     return;
+-  const auto& persona = ungoogled::CurrentPersona();
+-  // WebGL names cannot certify this adapter: hybrid systems may select a
+-  // different GPU. Public mode keeps the complete native Dawn identity.
+-  // Seed/template/explicit WebGPU overrides are synthetic-test-only.
+-  if (persona.webgl_native_capabilities)
+-    return;
+   const bool explicit_vendor = config.Has("uxr-webgpu-vendor") &&
+       !config.Get("uxr-webgpu-vendor").empty();
+   const bool explicit_architecture =
+       config.Has("uxr-webgpu-architecture") &&
+       !config.Get("uxr-webgpu-architecture").empty();
+   const bool explicit_identity = explicit_vendor && explicit_architecture;
++  const auto& persona = ungoogled::CurrentPersona();
++  // WebGL names cannot certify this adapter: hybrid systems may select a
++  // different GPU. The explicit uxr-webgpu-vendor/-architecture pair is a
++  // public-launch identity override (aligned with the explicit-wins
++  // semantics of the font policy switches), not a synthetic-test-only
++  // input; without both keys public mode keeps the complete native Dawn
++  // identity.
++  if (persona.webgl_native_capabilities && !explicit_identity)
++    return;
+   const bool use_template = !persona.webgl_real &&
+       !persona.webgpu_vendor.empty() &&
+       !persona.webgpu_architecture.empty();
+diff --git a/components/ungoogled/persona_profile.cc b/components/ungoogled/persona_profile.cc
+--- a/components/ungoogled/persona_profile.cc
++++ b/components/ungoogled/persona_profile.cc
+@@ -30,7 +30,7 @@ constexpr std::array<WebGLGPU, 3> kWebGLGPUs = {{
+     {"Google Inc. (Intel)",
+      "ANGLE (Intel, Intel(R) UHD Graphics 770 (0x0000A780) Direct3D11 "
+      "vs_5_0 ps_5_0, D3D11)",
+-     "intel", "gen-12-lp", 50},
++     "intel", "gen-12lp", 50},
+     {"Google Inc. (NVIDIA)",
+      "ANGLE (NVIDIA, NVIDIA GeForce RTX 3060 Direct3D11 vs_5_0 ps_5_0, "
+      "D3D11)",
+@@ -44,7 +44,7 @@ constexpr std::array<WebGLGPU, 3> kWebGLGPUs = {{
+ constexpr std::array<WebGLGPU, 3> kLinuxWebGLGPUs = {{
+     {"Google Inc. (Intel)",
+      "ANGLE (Intel, Mesa Intel(R) UHD Graphics 770 (ADL-S GT1), OpenGL 4.6)",
+-     "intel", "gen-12-lp", 50},
++     "intel", "gen-12lp", 50},
+     {"Google Inc. (NVIDIA Corporation)",
+      "ANGLE (NVIDIA Corporation, NVIDIA GeForce RTX 3060/PCIe/SSE2, "
+      "OpenGL 4.6.0 NVIDIA 570.133.07)", "nvidia", "ampere", 35},
