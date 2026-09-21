@@ -216,10 +216,16 @@ build/windows/package-win.ps1 -Arch arm64 -Out C:\chromix-arm64\src\out\Chromix 
 
 The independent `build-win-arm64-github.yml` workflow cross-compiles on
 `windows-2022`, preserving the twelve-stage snapshot handoff and process cleanup
-gates. Its first run prepares pinned sources without the x64 upstream object
-cache. Same-run snapshots use an ARM64-specific artifact prefix and exact
-producer attempt; cross-run snapshot inputs are not exposed for this new platform.
-The existing Windows x64 workflow and cache policy remain separate.
+gates. By default it prepares pinned sources. Set `use_upstream_cache=true` and
+`upstream_run_id=35059013950` to require the pinned ARM64 checkpoint
+`10573131525` for Chromium `153.0.8010.47`. The manifest binds its digest to
+attempt 5 and the successful `build / build-11` producer, independently of later
+upstream stages. The restored GN target must be ARM64; x64-target caches are rejected.
+Restored ARM64 builds preserve the donor's `chrome_pgo_phase` so the cold-build
+overlay does not disable profile-guided optimization and invalidate cached objects.
+Same-run snapshots use an ARM64-specific artifact prefix and exact producer
+attempt; cross-run snapshot inputs are not exposed. The Windows x64 cache pin
+remains separate.
 
 `chromix-win-arm64.zip` is checked for its SHA256, bundle layout and ARM64 PE
 headers, then downloaded by a required `windows-11-arm` job from the same run.
@@ -247,10 +253,11 @@ entrypoint cancels an active build.
 | `build-win-x64-github.yml` | `windows-2022` | Windows x64 | `chromix-win-x64.zip` |
 | `build-win-arm64-github.yml` | `windows-2022` build; `windows-11-arm` verification | Windows arm64 | `chromix-win-arm64.zip` |
 
-The existing five entrypoints support manual dispatch with
-`use_upstream_cache=true` by default. Windows ARM64 instead starts from pinned
-sources and accepts `build_profile` and `compile_jobs`. Filtered pushes start the
-affected platform workflows; shared build changes can start all six. To push a repair without duplicating platforms
+All six entrypoints support manual dispatch with `use_upstream_cache` and
+`upstream_run_id`; Windows ARM64 keeps cache use opt-in and also accepts
+`build_profile` and `compile_jobs`. An explicit cache request fails rather than
+falling back to a cold build when its exact pinned cache is unavailable.
+Filtered pushes start the affected platform workflows; shared build changes can start all six. To push a repair without duplicating platforms
 already running, include `[skip ci]` in the commit message, then dispatch only
 the repaired platform. Confirm the source SHA and workflow before dispatching
 and reuse an existing run rather than dispatching the same pair twice:

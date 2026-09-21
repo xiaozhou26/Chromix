@@ -166,6 +166,31 @@ class RestoreNinjaTest(unittest.TestCase):
         self.assertEqual(self.select(), host)
         self.assertEqual(self.probed, [host])
 
+    def test_windows_arm64_uses_only_x64_host_ninja_for_each_log_format(self):
+        for log_format, version in ((5, "1.11.1"), (6, "1.12.1.chromium.4"), (7, "1.13.2")):
+            with self.subTest(log=log_format):
+                self.log.write_bytes(f"# ninja log v{log_format}\r\n".encode())
+                bundle = self.put_binary("windows", "arm64", version, bundled=True)
+                host = self.put_binary("windows", "x64", version)
+                self.probed.clear()
+                self.assertEqual(self.select("windows", "arm64", host=("windows", "x64")), host)
+                self.assertEqual(self.probed, [host])
+                report = self.report()
+                self.assertEqual(report["arch"], "arm64")
+                self.assertEqual(report["host"], ["windows", "x64"])
+                self.assertEqual(report["candidates"][0]["architectures"], ["arm64"])
+                self.assertEqual(report["selected"]["architectures"], ["x64"])
+                host.unlink()
+                self.probed.clear()
+                with self.assertRaisesRegex(ValueError, "no compatible native Ninja"):
+                    self.select("windows", "arm64", host=("windows", "x64"))
+                self.assertEqual(self.probed, [])
+                self.put_binary("windows", "x64", version, bundled=True)
+                self.assertEqual(self.select("windows", "arm64", host=("windows", "x64")), bundle)
+                self.versions[bundle] = "1.14.0"
+                with self.assertRaisesRegex(ValueError, "no compatible native Ninja"):
+                    self.select("windows", "arm64", host=("windows", "x64"))
+
     def test_windows_prefers_bundle_then_falls_back_to_host(self):
         host = self.put_binary("windows")
         bundle = self.put_binary("windows", bundled=True)
@@ -235,10 +260,11 @@ class RestoreNinjaTest(unittest.TestCase):
             self.versions[host] = error
             self.assertEqual(self.select(), bundle)
 
-    def test_only_native_and_linux_x64_to_arm64_host_target_pairs_are_allowed(self):
-        for target in TARGETS:
+    def test_only_native_posix_linux_cross_and_x64_hosted_windows_pairs_are_allowed(self):
+        for target in (*TARGETS, ("windows", "arm64")):
             for host in (*TARGETS, ("windows", "arm64"), ("linux", "unknown")):
-                if host == target or (target, host) == (("linux", "arm64"), ("linux", "x64")):
+                allowed = ((target[0], "x64") if target[0] == "windows" else target)
+                if host == allowed or (target, host) == (("linux", "arm64"), ("linux", "x64")):
                     continue
                 with self.subTest(target=target, host=host):
                     with self.assertRaisesRegex(ValueError, "native .* runner is required"):
@@ -247,7 +273,7 @@ class RestoreNinjaTest(unittest.TestCase):
                     self.assertEqual(self.report()["host"], list(host))
                     self.assertEqual(self.report()["candidates"], [])
         with self.assertRaisesRegex(ValueError, "unsupported restored build target"):
-            self.select("windows", "arm64")
+            self.select("windows", "x86")
 
     def test_bundle_cannot_link_outside_source(self):
         external = self.put_binary(version="1.13.2")
@@ -553,7 +579,9 @@ class DirectWindowsRestoredBuildTest(unittest.TestCase):
         put(out / ".ninja_deps", "retained deps")
         put(out / "changed-compiler.obj", "upstream object")
         if restored:
-            put(src / ".chromix-upstream-restored.json", "{}")
+            put(src / ".chromix-upstream-restored.json", json.dumps({
+                "platform": "windows", "arch": "x64",
+                "identity": {"platform": "windows", "arch": "x64"}}))
         baseline = work / 'upstream-reuse/baseline.json'
         if resume:
             put(src / '.chromix-source-ready', 'ready')

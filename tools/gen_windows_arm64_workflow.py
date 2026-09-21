@@ -30,19 +30,19 @@ def workflow():
     result = {'name': result.pop('name'), 'on': events, **result}
     for event in ('workflow_call', 'workflow_dispatch'):
         events[event]['inputs'] = {name: value for name, value in events[event]['inputs'].items()
-                                   if name in ('build_profile', 'compile_jobs')}
-    events['workflow_call'].pop('secrets', None)
+                                   if name in ('build_profile', 'compile_jobs', 'use_upstream_cache', 'upstream_run_id')}
+        events[event]['inputs']['use_upstream_cache']['default'] = False
     events['push']['paths'] += [
         '.github/workflows/build-win-x64-github.yml',
         'tools/gen_windows_arm64_workflow.py',
         'tools/verify_windows_bundle.py',
         'tools/tests/test_windows_arm64_workflow.py',
         'tools/tests/test_windows_arm64_build.py',
+        'tools/tests/test_windows_upstream_cache.py',
         'tools/tests/test_verify_windows_bundle.py',
     ]
     result['env'].pop('CHROMIX_WINDOWS_MIGRATION_PROFILE', None)
-    result['env'].update(CHROMIX_TARGET_ARCH='arm64', CHROMIX_USE_UPSTREAM_CACHE='0',
-                         CHROMIX_PREFER_UPSTREAM_CACHE='0')
+    result['env'].update(CHROMIX_TARGET_ARCH='arm64', CHROMIX_PREFER_UPSTREAM_CACHE='0')
     for index in range(1, 13):
         job = result['jobs'][f'build-{index}']
         if index == 1:
@@ -53,8 +53,7 @@ def workflow():
                          + previous + ".outputs.finished != 'true' }}")
         steps = []
         for step in job['steps']:
-            if step.get('name') in ('Download tree from previous run', 'Upload upstream cache diagnostics',
-                                     'Upload restored reuse evidence', 'Check explicit snapshot migration inputs',
+            if step.get('name') in ('Download tree from previous run', 'Check explicit snapshot migration inputs',
                                      'Restore exact source-migration snapshot'):
                 continue
             if (step.get('name') == 'Ensure build tree snapshot'
@@ -62,10 +61,8 @@ def workflow():
                 step['if'] = step['if'].replace(' }}', " && steps.stage.outputs.finished != 'true' }}")
             if step.get('name') == 'Download tree from previous stage':
                 step.pop('if', None)
-            if step.get('id') == 'stage':
-                step.pop('env', None)
-                step['run'] = (f'build\\windows\\ci-stage.ps1 -StageIndex {index} -MaxStages 12'
-                               + (' -FromArtifact' if index > 1 else ''))
+            if step.get('id') == 'stage' and index > 1:
+                step['run'] = f'build\\windows\\ci-stage.ps1 -StageIndex {index} -MaxStages 12 -FromArtifact'
             steps.append(step)
             if step.get('name') == 'Verify native process-tree cleanup':
                 steps.append({

@@ -268,7 +268,9 @@ class FetchUpstreamCacheTest(unittest.TestCase):
         self.assertEqual(manifest["chromium_version"], "153.0.8010.36")
         self.assertEqual(manifest["ungoogled_commit"], "dd8fb9b5c837982faf41ba58cd30a5664e77c329")
         source = manifest["sources"]["windows"]
-        self.assertEqual(source, {
+        x64_source = copy.deepcopy(source)
+        x64_source["artifacts"].pop("arm64")
+        self.assertEqual(x64_source, {
             "chromium_version": "153.0.8010.47",
             "ungoogled_commit": "31e6f2dd3bb2f113800d25ae359f024684addb51",
             "repository": "ungoogled-software/ungoogled-chromium-windows",
@@ -293,7 +295,8 @@ class FetchUpstreamCacheTest(unittest.TestCase):
             "artifact_digest": source["artifacts"]["x64"]["digest"],
         })
         self.assert_metadata_provenance(pin, datetime(2026, 9, 19, tzinfo=timezone.utc))
-        for arch, run_id, reason in (("arm64", None, "unsupported_target"),
+        for arch, run_id, reason in (("arm64", 35059013905, "run_id_mismatch"),
+                                     ("x64", 35059013950, "run_id_mismatch"),
                                      ("x64", 34806882978, "run_id_mismatch"),
                                      ("x64", 33898278106, "run_id_mismatch")):
             with self.subTest(arch=arch, run_id=run_id):

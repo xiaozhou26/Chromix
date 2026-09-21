@@ -31,7 +31,7 @@ def binary_architectures(path: Path, system: str) -> set[str]:
     """Bound header reads before any restored executable is run."""
     cpus = {"linux": {62: "x64", 183: "arm64"},
             "macos": {0x1000007: "x64", 0x100000C: "arm64"},
-            "windows": {0x8664: "x64"}}[system]
+            "windows": {0x8664: "x64", 0xAA64: "arm64"}}[system]
     with path.open("rb") as stream:
         header = stream.read(64)
         if len(header) != 64:
@@ -128,11 +128,13 @@ def select_ninja(work: Path, system: str, arch: str) -> Path:
               "host": list(host_identity()), "candidates": []}
     try:
         if (system, arch) not in (("linux", "x64"), ("linux", "arm64"),
-                                 ("macos", "x64"), ("macos", "arm64"), ("windows", "x64")):
+                                 ("macos", "x64"), ("macos", "arm64"),
+                                 ("windows", "x64"), ("windows", "arm64")):
             raise ValueError("unsupported restored build target")
-        if (report["host"] != [system, arch]
+        native_arch = "x64" if system == "windows" else arch
+        if (report["host"] != [system, native_arch]
                 and (system, arch, *report["host"]) != ("linux", "arm64", "linux", "x64")):
-            raise ValueError(f"a native {system} {arch} runner is required (Linux ARM64 also supports Linux x64 hosts)")
+            raise ValueError(f"a native {system} {native_arch} runner is required (Linux ARM64 also supports Linux x64 hosts)")
         host_arch = report["host"][1]
         if not (src / ".chromix-upstream-restored.json").is_file():
             raise ValueError("restored source receipt is required")

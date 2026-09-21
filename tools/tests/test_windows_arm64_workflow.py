@@ -1,4 +1,8 @@
 """Windows ARM64 stages remain isolated and require native acceptance."""
+import re
+import shutil
+import subprocess
+import tempfile
 from pathlib import Path
 import sys
 import unittest
@@ -24,14 +28,20 @@ class WindowsArm64WorkflowTest(unittest.TestCase):
         self.assertEqual(workflow['concurrency']['group'], 'build-win-arm64-github-${{ github.ref }}')
         self.assertFalse(workflow['concurrency']['cancel-in-progress'])
         for event in ('workflow_dispatch', 'workflow_call'):
-            self.assertEqual(set(workflow['on'][event]['inputs']), {'build_profile', 'compile_jobs'})
+            self.assertEqual(set(workflow['on'][event]['inputs']),
+                             {'build_profile', 'compile_jobs', 'use_upstream_cache', 'upstream_run_id'})
+            self.assertIs(workflow['on'][event]['inputs']['use_upstream_cache']['default'], False)
         self.assertEqual(workflow['on']['push']['branches'], ['main'])
-        for name in ('CHROMIX_USE_UPSTREAM_CACHE', 'CHROMIX_PREFER_UPSTREAM_CACHE'):
-            self.assertEqual(workflow['env'][name], '0')
+        self.assertEqual(workflow['env']['CHROMIX_USE_UPSTREAM_CACHE'],
+                         "${{ (inputs.use_upstream_cache || inputs.upstream_run_id != '') && '1' || '0' }}")
+        self.assertEqual(workflow['env']['CHROMIX_PREFER_UPSTREAM_CACHE'], '0')
         self.assertEqual(workflow['env']['CHROMIX_TARGET_ARCH'], 'arm64')
         self.assertNotIn('resume_run_id', generator.render())
         self.assertNotIn('CHROMIX_WINDOWS_MIGRATION_PROFILE', workflow['env'])
-        self.assertNotIn('UPSTREAM_ACTIONS_TOKEN', generator.render())
+        self.assertEqual(workflow['on']['workflow_call']['secrets'],
+                         {'UPSTREAM_ACTIONS_TOKEN': {'required': False}})
+        references = set(re.findall(r'inputs\.([a-z_]+)', generator.render()))
+        self.assertEqual(references, set(workflow['on']['workflow_dispatch']['inputs']))
 
     def test_twelve_stages_keep_snapshot_safety_and_target_names(self):
         for index in range(1, 13):
@@ -41,7 +51,20 @@ class WindowsArm64WorkflowTest(unittest.TestCase):
                 self.assertEqual(job['timeout-minutes'], 355)
                 steps = job['steps']
                 stage = next(step for step in steps if step.get('id') == 'stage')
-                self.assertIn(f'-StageIndex {index} -MaxStages 12', stage['run'])
+                if index == 1:
+                    self.assertIn('StageIndex = 1', stage['run'])
+                    self.assertIn('MaxStages = 12', stage['run'])
+                    self.assertIn("UseUpstreamCache = ($env:USE_UPSTREAM_CACHE -eq 'true')", stage['run'])
+                    self.assertIn('$stageArgs.UpstreamRunId = $env:UPSTREAM_RUN_ID', stage['run'])
+                    self.assertEqual(stage['env'], {
+                        'USE_UPSTREAM_CACHE': '${{ inputs.use_upstream_cache }}',
+                        'UPSTREAM_RUN_ID': '${{ inputs.upstream_run_id }}',
+                        'GH_TOKEN': '${{ secrets.UPSTREAM_ACTIONS_TOKEN || github.token }}',
+                    })
+                else:
+                    self.assertIn(f'-StageIndex {index} -MaxStages 12', stage['run'])
+                    self.assertNotIn('env', stage)
+                self.assertNotIn('${{', stage['run'])
                 self.assertNotIn('continue-on-error', stage)
                 selection = next(step for step in steps if step.get('name') == 'Select compile parallelism')
                 self.assertLess(steps.index(selection), steps.index(stage))
@@ -70,6 +93,40 @@ class WindowsArm64WorkflowTest(unittest.TestCase):
                 self.assertEqual(receipt['if'], final['if'])
                 self.assertEqual(receipt['with']['path'], 'C:\\c\\dist\\source-verification.json')
                 self.assertEqual(receipt['with']['if-no-files-found'], 'error')
+
+    def test_cache_diagnostics_survive_failures_and_use_target_artifact_names(self):
+        for index in range(1, 13):
+            steps = self.workflow['jobs'][f'build-{index}']['steps']
+            name = 'Upload upstream cache diagnostics' if index == 1 else 'Upload restored reuse evidence'
+            upload = next(step for step in steps if step.get('name') == name)
+            self.assertEqual(upload['if'], '${{ always() }}')
+            self.assertEqual(upload['with']['if-no-files-found'], 'ignore')
+            self.assertIn('win-arm64', upload['with']['name'])
+            self.assertIn('${{ github.run_attempt }}', upload['with']['name'])
+            for path in ('upstream-reuse\\baseline.json', 'upstream-reuse\\result.json'):
+                self.assertIn(path, upload['with']['path'])
+            if index == 1:
+                self.assertTrue(upload['with']['include-hidden-files'])
+                for path in ('C:\\u\\result.json', '.chromix-upstream-restored.json',
+                             'upstream-cache-restore.json', 'upstream-cache-preparation.json'):
+                    self.assertIn(path, upload['with']['path'])
+
+    def test_workflow_powershell_commands_parse(self):
+        powershell = shutil.which('pwsh') or '/opt/pwsh/pwsh'
+        if not Path(powershell).is_file():
+            self.skipTest('PowerShell is unavailable')
+        commands = [step['run'] for job in self.workflow['jobs'].values() for step in job['steps']
+                    if step.get('shell') in ('powershell', 'pwsh') and 'run' in step]
+        with tempfile.TemporaryDirectory() as temp:
+            for index, command in enumerate(commands):
+                Path(temp, f'{index}.ps1').write_text(command)
+            result = subprocess.run([powershell, '-NoLogo', '-NoProfile', '-NonInteractive', '-Command',
+                '$ErrorActionPreference = "Stop"; Get-ChildItem -LiteralPath "' + temp + '" | ForEach-Object { '
+                '$tokens = $null; $errors = $null; '
+                '[Management.Automation.Language.Parser]::ParseFile($_.FullName, [ref]$tokens, [ref]$errors) | Out-Null; '
+                'if ($errors.Count) { throw ($errors | Out-String) } }'],
+                capture_output=True, text=True, timeout=30)
+            self.assertEqual(result.returncode, 0, result.stderr)
 
     def test_release_and_sdk_names_match_the_native_job(self):
         import release_browser

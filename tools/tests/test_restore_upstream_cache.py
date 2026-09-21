@@ -24,6 +24,13 @@ from tools import restore_upstream_cache as restore
 from tools.tests.test_fetch_upstream_cache import synthetic_windows_source
 
 
+def windows_source(repo):
+    source = synthetic_windows_source(repo)
+    source["artifacts"]["arm64"] = dict(source["artifacts"]["x64"], id=104, run_id=103,
+        name="build-artifact-arm", workflow_path=".github/workflows/build-arm.yml")
+    return source
+
+
 def archive_bytes(entries, zipped=False):
     output = io.BytesIO()
     if zipped:
@@ -93,7 +100,7 @@ class RestoreUpstreamCacheTest(unittest.TestCase):
         if platform == "windows":
             path = self.repo / "build/upstream-cache.json"
             manifest = json.loads(path.read_text())
-            manifest["sources"]["windows"] = synthetic_windows_source(self.repo)
+            manifest["sources"]["windows"] = windows_source(self.repo)
             self.write(path, json.dumps(manifest))
         if self.cache.exists():
             shutil.rmtree(self.cache)
@@ -373,9 +380,42 @@ class RestoreUpstreamCacheTest(unittest.TestCase):
         self.assertFalse((self.cache / ".lock").exists())
         self.assertEqual(self.invoke()["status"], "hit")
 
-    def test_all_five_manifest_targets_restore(self):
+    def test_windows_arm64_restore_keeps_source_objects_and_selected_pin_identity(self):
+        self.make_cache("windows", "arm64")
+        before = self.donor_snapshot()
+        entry = self.invoke()
+        self.assertEqual(entry["status"], "hit", entry)
+        receipt = restore.verify_restored(self.work, "windows", "arm64", self.repo)
+        self.assertEqual(receipt["identity"]["chromium_version"], "153.0.8010.47")
+        self.assertEqual(receipt["identity"]["run_id"], 103)
+        self.assertEqual(receipt["identity"]["artifact_id"], 104)
+        self.assertEqual(receipt["identity"]["workflow_path"], ".github/workflows/build-arm.yml")
+        for relative, expected in before.items():
+            path = self.work / "src" / relative
+            self.assertEqual((path.read_bytes(), path.stat().st_mtime_ns), expected)
+        with self.assertRaisesRegex(restore.Miss, "receipt does not match"):
+            restore.verify_restored(self.work, "windows", "x64", self.repo)
+
+    def test_windows_arm64_wrong_version_target_or_host_args_fail_closed(self):
+        for name, value in (("target_cpu", "x64"), ("v8_target_cpu", "x64"),
+                            ("host_cpu", "arm64"), ("target_os", "linux")):
+            with self.subTest(name=name):
+                self.make_cache("windows", "arm64")
+                self.write(self.donor / "out/Default/args.gn",
+                           f'target_cpu = "arm64"\n{name} = "{value}"\n')
+                entry = self.invoke()
+                self.assertEqual(entry["status"], "miss", entry)
+                self.assertIn(f"GN {name} does not match", entry["reasons"][0])
+                self.assertFalse((self.work / "src").exists())
+        self.make_cache("windows", "arm64")
+        self.write(self.donor / "chrome/VERSION", "MAJOR=153\nMINOR=0\nBUILD=8010\nPATCH=36\n")
+        self.assertEqual(self.invoke()["status"], "miss")
+        self.assertFalse((self.work / "src").exists())
+
+    def test_all_six_manifest_targets_restore(self):
         for platform, arch in (("linux", "x64"), ("linux", "arm64"),
-                               ("macos", "x64"), ("macos", "arm64"), ("windows", "x64")):
+                               ("macos", "x64"), ("macos", "arm64"),
+                               ("windows", "x64"), ("windows", "arm64")):
             for version in (5, 6, 7):
                 with self.subTest(platform=platform, arch=arch, version=version):
                     self.make_cache(platform, arch)
@@ -838,7 +878,7 @@ class RestoreUpstreamCacheTest(unittest.TestCase):
             with self.subTest(cache=cache), self.assertRaises(restore.LocalError):
                 restore.restore(self.work, "linux", "x64", cache, self.repo)
         with self.assertRaises(restore.LocalError):
-            restore.restore(self.work, "windows", "arm64", self.cache, self.repo)
+            restore.restore(self.work, "windows", "x86", self.cache, self.repo)
         outside = Path(self.tmp.name) / "outside"
         outside.mkdir()
         self.work.mkdir(exist_ok=True)

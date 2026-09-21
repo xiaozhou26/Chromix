@@ -26,7 +26,8 @@ $UngoogledTooling = Join-Path $WorkDir "tooling\ungoogled-chromium"
 $WindowsTooling = Join-Path $WorkDir "tooling\ungoogled-chromium-windows"
 
 Write-Host "==> Chromix Windows $Arch build | Chromium $($Revisions.ChromiumVersion) | $WorkDir"
-& "$PSScriptRoot\assert-target-arch.ps1" -WorkDir $WorkDir -Arch $Arch -Initialize:($Arch -eq "arm64")
+& "$PSScriptRoot\assert-target-arch.ps1" -WorkDir $WorkDir -Arch $Arch -Initialize:($Arch -eq "arm64") `
+  -RequireMarker:($Resume -and $Arch -eq "arm64")
 if ($Arch -eq "arm64") {
   & "$PSScriptRoot\assert-arm64-toolchain.ps1" -ChromiumVersion $Revisions.ChromiumVersion
 } else {
@@ -48,7 +49,7 @@ $Ninja = Join-Path $Src "third_party\ninja\ninja.exe"
 & "$PSScriptRoot\configure-node.ps1" -NodePath (Join-Path $Src 'third_party\node\win\node.exe')
 if (Test-Path (Join-Path $Src ".chromix-upstream-restored.json")) {
   $Out = Join-Path $Src "out\Default"
-  $Ninja = & python (Join-Path $Repo "tools\restore_ninja.py") --workdir $WorkDir --platform windows --arch x64
+  $Ninja = & python (Join-Path $Repo "tools\restore_ninja.py") --workdir $WorkDir --platform windows --arch $Arch
   if ($LASTEXITCODE -ne 0 -or -not $Ninja) { throw "restored Ninja compatibility check failed" }
   $env:NINJA = $Ninja
 }
@@ -62,6 +63,9 @@ $mergeArgs += @(
   (Join-Path $Repo "build\args.windows.gn")
 )
 if ($Arch -eq "arm64") { $mergeArgs += (Join-Path $Repo "build\args.windows.arm64.gn") }
+if ($Arch -eq "arm64" -and (Test-Path (Join-Path $Src ".chromix-upstream-restored.json"))) {
+  $mergeArgs += @("--preserve-pgo-from", $mergedArgs)
+}
 python @mergeArgs
 if ($LASTEXITCODE -ne 0) { throw "GN argument merge failed" }
 if ($Arch -eq "arm64") {
@@ -97,7 +101,7 @@ for relative, keys in RESTORED.items():
   }
   if (Test-Path (Join-Path $Src ".chromix-upstream-restored.json")) {
     python (Join-Path $Repo "tools\prepare_restored_build.py") --phase finish `
-      --platform windows --arch x64 --workdir $WorkDir
+      --platform windows --arch $Arch --workdir $WorkDir
     if ($LASTEXITCODE -ne 0) { throw "restored build preparation failed (exit $LASTEXITCODE)" }
   }
   $gn = Join-Path $Out "gn.exe"
@@ -126,7 +130,7 @@ for relative, keys in RESTORED.items():
     if ($LASTEXITCODE -ne 0) { throw "restored upstream build-plan check failed" }
     # The collector preserves the initial baseline across resumed builds.
     & python (Join-Path $Repo "tools\restored_reuse_evidence.py") --phase before `
-      --workdir $WorkDir --platform windows --arch x64 --ninja $Ninja --target chrome
+      --workdir $WorkDir --platform windows --arch $Arch --ninja $Ninja --target chrome
     if ($LASTEXITCODE -ne 0) { throw "restored reuse evidence collection failed before Ninja (exit $LASTEXITCODE)" }
   }
   & $Ninja -C $Out -j $Jobs chrome
@@ -134,7 +138,7 @@ for relative, keys in RESTORED.items():
   if (Test-Path (Join-Path $Src ".chromix-upstream-restored.json")) {
     try {
       & python (Join-Path $Repo "tools\restored_reuse_evidence.py") --phase after `
-        --workdir $WorkDir --platform windows --arch x64 --ninja $Ninja --target chrome --exit-code $ninjaRc
+        --workdir $WorkDir --platform windows --arch $Arch --ninja $Ninja --target chrome --exit-code $ninjaRc
       if ($LASTEXITCODE -ne 0) { throw "restored reuse evidence collection failed after Ninja (exit $LASTEXITCODE)" }
     } catch {
       if ($ninjaRc -ne 0) { throw "ninja failed (exit $ninjaRc); $($_.Exception.Message)" }

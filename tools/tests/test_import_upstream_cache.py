@@ -11,7 +11,8 @@ from pathlib import Path
 from unittest import mock
 
 from tools import import_upstream_cache as importer
-from tools.tests.test_fetch_upstream_cache import synthetic_windows_source, unavailable_source, windows153_source
+from tools.tests.test_restore_upstream_cache import windows_source
+from tools.tests.test_fetch_upstream_cache import unavailable_source, windows153_source
 
 
 class ImportUpstreamCacheTest(unittest.TestCase):
@@ -34,7 +35,7 @@ class ImportUpstreamCacheTest(unittest.TestCase):
                 shutil.copyfile(importer.REPO / relative, destination)
         path = self.repo / "build/upstream-cache.json"
         manifest = importer.read_json(path)
-        manifest["sources"]["windows"] = synthetic_windows_source(self.repo)
+        manifest["sources"]["windows"] = windows_source(self.repo)
         self.write(path, json.dumps(manifest))
         self.prepare()
 
@@ -104,8 +105,9 @@ class ImportUpstreamCacheTest(unittest.TestCase):
             "macos": ["clang", "clang++", "llvm-ar", "llvm-readobj", "llvm-objcopy", "ld64.lld"],
             "windows": ["clang-cl", "lld-link", "llvm-ml"],
         }[self.platform]
+        host_arch = "x64" if self.platform == "windows" else self.arch
         for name in binaries:
-            self.binary(clang / "bin" / (name + suffix))
+            self.binary(clang / "bin" / (name + suffix), arch=host_arch)
         self.write(clang / "cr_build_revision", self.versions["clang"])
         resource = clang / "lib/clang" / self.versions["clang_release"]
         for name in ("stddef.h", "stdarg.h"):
@@ -116,10 +118,11 @@ class ImportUpstreamCacheTest(unittest.TestCase):
                                "windows": f"lib/windows/clang_rt.builtins-{runtime_arch}.lib"}[self.platform], b"!<arch>\nfixture")
         self.write(rust / "VERSION", f"rustc 1.96.0 deadbeef ({self.versions['rust']} chromium)\n")
         for name in ("rustc", "cargo", "rustfmt", "bindgen"):
-            self.binary(rust / "bin" / (name + suffix))
-        rustlib = rust / "lib/rustlib" / importer.TRIPLES[self.platform, self.arch] / "lib"
-        for name in ("std", "core", "alloc", "compiler_builtins"):
-            self.write(rustlib / f"lib{name}-abc123.rlib", b"!<arch>\nfixture")
+            self.binary(rust / "bin" / (name + suffix), arch=host_arch)
+        for cpu in {self.arch, host_arch}:
+            rustlib = rust / "lib/rustlib" / importer.TRIPLES[self.platform, cpu] / "lib"
+            for name in ("std", "core", "alloc", "compiler_builtins"):
+                self.write(rustlib / f"lib{name}-abc123.rlib", b"!<arch>\nfixture")
         self.write(rust / ("bin/rustc_driver-abc.dll" if self.platform == "windows" else "lib/librustc_driver-abc.so"), b"shared runtime")
         self.write(rust / {"linux": "lib/libclang.so.23", "macos": "lib/libclang.dylib",
                            "windows": "bin/libclang.dll"}[self.platform], b"bindgen runtime")
@@ -360,6 +363,53 @@ class ImportUpstreamCacheTest(unittest.TestCase):
         self.prepare(arch="arm64")
         self.assertEqual(self.run_phase()["status"], "hit")
         self.assertTrue((self.src / importer.RUST / "lib/rustlib/aarch64-unknown-linux-gnu/lib").is_dir())
+
+    def test_windows_arm64_identity_and_bindgen_use_selected_pin_and_x64_executables(self):
+        self.prepare("windows", "arm64")
+        self.assertEqual(self.identity["chromium_version"], "153.0.8010.47")
+        self.assertEqual(self.identity["run_id"], 103)
+        self.assertEqual(self.identity["workflow_path"], ".github/workflows/build-arm.yml")
+        self.assertEqual(self.identity["artifact_id"], 104)
+        before = importer.inventory(self.src / importer.CLANG)
+        source = (self.src / "chrome/canonical.cc").read_bytes()
+        with mock.patch.object(importer, "require_binary", wraps=importer.require_binary) as check:
+            entry = self.run_phase()
+        self.assertEqual(entry["status"], "hit", entry)
+        self.assertTrue(all(call.args[1:] == ("windows", "x64") for call in check.call_args_list))
+        self.assertEqual(entry["reused"], {"clang": False, "rust": False, "bindgen": True})
+        self.assertEqual(entry["counts"]["objects_copied"], 0)
+        self.assertEqual(importer.inventory(self.src / importer.CLANG), before)
+        self.assertEqual((self.src / "chrome/canonical.cc").read_bytes(), source)
+        self.assertFalse((self.src / importer.MARKER).exists())
+
+    def test_windows_arm64_import_rejects_wrong_host_binaries_target_libraries_and_x64_receipt(self):
+        for relative in (importer.CLANG / "bin/clang-cl.exe", importer.RUST / "bin/rustc.exe",
+                         importer.RUST / "bin/bindgen.exe"):
+            with self.subTest(binary=relative):
+                self.prepare("windows", "arm64")
+                self.binary(self.donor / relative, arch="arm64")
+                self.assert_miss(self.run_phase(), "host architecture")
+                self.assertFalse((self.src / importer.RUST / "bin/bindgen.exe").exists())
+        for cpu in ("x64", "arm64"):
+            with self.subTest(libraries=cpu):
+                self.prepare("windows", "arm64")
+                shutil.rmtree(self.donor / importer.RUST / "lib/rustlib" / importer.TRIPLES["windows", cpu])
+                self.assert_miss(self.run_phase(), "required toolchain libraries")
+        self.prepare("windows", "arm64")
+        self.result["manifest"]["run_id"] = 101
+        self.save_receipt()
+        self.assert_miss(self.run_phase(), "pinned identity mismatch: run_id")
+        self.prepare("windows", "arm64")
+        (self.donor / importer.CLANG / "lib/clang/23/lib/windows/clang_rt.builtins-aarch64.lib").unlink()
+        self.assert_miss(self.run_phase(), "required toolchain libraries")
+
+    def test_windows_arm64_does_not_enable_relocated_object_import(self):
+        self.prepare("windows", "arm64")
+        self.assertEqual(self.run_phase()["status"], "hit")
+        self.object_args('target_cpu = "arm64"\nhost_cpu = "x64"\n')
+        entry = self.run_phase("objects")
+        self.assert_miss(entry, "external SDK identity and environment are unavailable")
+        self.assertFalse((self.src / "out/Chromix/obj/object.o").exists())
 
     def test_current_clang_target_triple_runtime_layout_hits(self):
         resource = self.donor / importer.CLANG / "lib/clang/23"

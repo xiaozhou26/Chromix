@@ -8,10 +8,12 @@ import re
 from pathlib import Path
 
 ASSIGNMENT = re.compile(r"^\s*([A-Za-z_][A-Za-z0-9_]*)\s*=")
+PGO_KEY = "chrome_pgo_phase"
+PGO_ASSIGNMENT = re.compile(r"chrome_pgo_phase\s*=\s*[012]\s*(?:#.*)?")
 GENERATED_HEADER = "# Generated. Later input files override earlier assignments."
 
 
-def parse(path: Path) -> tuple[list[str], dict[str, str]]:
+def parse(path: Path, *, require_pgo: bool = False) -> tuple[list[str], dict[str, str]]:
     order: list[str] = []
     values: dict[str, str] = {}
     pending_comments: list[str] = []
@@ -29,11 +31,15 @@ def parse(path: Path) -> tuple[list[str], dict[str, str]]:
         if not match:
             raise ValueError(f"{path}: unsupported GN line: {raw}")
         key = match.group(1)
+        if require_pgo and key == PGO_KEY and not PGO_ASSIGNMENT.fullmatch(line):
+            raise ValueError(f"{path}: chrome_pgo_phase must be a literal 0, 1 or 2")
         if key not in values:
             order.append(key)
         comments = "\n".join(pending_comments)
         values[key] = f"{comments}\n{line}" if comments else line
         pending_comments.clear()
+    if require_pgo and PGO_KEY not in values:
+        raise ValueError(f"{path}: required chrome_pgo_phase assignment is missing")
     return order, values
 
 
@@ -41,9 +47,19 @@ def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--build-profile", choices=("fast", "release"),
                         help="override ThinLTO optimization for a build")
+    parser.add_argument("--preserve-pgo-from", type=Path,
+                        help="preserve required literal chrome_pgo_phase from previously verified restored args")
     parser.add_argument("output", type=Path)
     parser.add_argument("inputs", nargs="+", type=Path)
     args = parser.parse_args()
+
+    preserved_pgo = None
+    if args.preserve_pgo_from:
+        try:
+            _, values = parse(args.preserve_pgo_from, require_pgo=True)
+        except (OSError, ValueError) as error:
+            parser.error(str(error))
+        preserved_pgo = values[PGO_KEY]
 
     order: list[str] = []
     merged: dict[str, str] = {}
@@ -53,6 +69,11 @@ def main() -> int:
             if key not in merged:
                 order.append(key)
             merged[key] = values[key]
+
+    if preserved_pgo is not None:
+        if PGO_KEY not in merged:
+            order.append(PGO_KEY)
+        merged[PGO_KEY] = preserved_pgo
 
     if args.build_profile:
         key = "thin_lto_enable_optimizations"

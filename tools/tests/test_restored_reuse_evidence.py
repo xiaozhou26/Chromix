@@ -131,6 +131,30 @@ class RestoredReuseEvidenceTest(unittest.TestCase):
                 self.assertLess(len(json.dumps(report)), 16 * 1024)
                 self.verify.assert_called_with(self.work, "linux", "x64", repo=evidence.REPO)
 
+    def test_windows_arm64_retention_keeps_baseline_and_does_not_claim_elf_target_evidence(self):
+        self.architecture_fixture({"obj/target.obj": b"\x64\xaa" + b"coff-target" * 8,
+                                   "clang_x64/obj/host.obj": b"\x64\x86" + b"coff-host" * 8},
+                                  platform="windows", arch="arm64")
+        baseline = self.before()
+        path = self.work / "upstream-reuse/baseline.json"
+        raw = path.read_bytes()
+        self.assertFalse(self.after(124)["retention_proven"])
+        self.assertEqual(self.before(), baseline)
+        report = self.after()
+        self.assertTrue(report["retention_proven"])
+        self.assertEqual(report["retained_count"], 2)
+        self.assertFalse(report["architecture_evidence"]["target_retention_proven"])
+        self.assertEqual(report["architecture_evidence"]["retained_by_arch"],
+                         {"x64": 0, "arm64": 0, "unknown": 2})
+        self.assertEqual(path.read_bytes(), raw)
+        self.before()
+        with self.log.open("a") as stream:
+            stream.write(self.records[0])
+        report = self.after()
+        self.assertEqual(report["retained_count"], 1)
+        self.assertEqual(report["disqualified"], {"obj/target.obj": "appended_record_repeated"})
+        self.assertEqual(path.read_bytes(), raw)
+
     def test_mixed_elf_architectures_ignore_paths_and_preserve_baseline_schema(self):
         self.architecture_fixture({"clang_x64/obj/target.o": elf_object(),
                                    "obj/arm64/host.o": elf_object(62),

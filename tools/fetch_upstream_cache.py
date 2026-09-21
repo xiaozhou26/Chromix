@@ -16,6 +16,8 @@ GH_TOKEN authenticates GitHub API requests only. Availability/validation failure
 write a miss and exit zero; invalid arguments or destination paths exit nonzero.
 Schema 1 sources default to available; ``available: false`` requires explicit
 platform identity and forbids run/artifact fields. All sources remain validated.
+Windows ARM64 may pin a distinct run/workflow and a successful producer checkpoint;
+only that checkpoint permits an in-progress attempt, with verified creation times.
 Linux/macOS require a host zstd executable. The destination must be dedicated to
 this tool; result.json records ownership and the absolute source path on a hit.
 """
@@ -79,6 +81,9 @@ UNAVAILABLE_SOURCE_FIELDS = {
     "available", "chromium_version", "ungoogled_commit", "repository", "repository_id",
     "head_sha", "head_branch", "event", "workflow_path", "source_roots",
 }
+ARTIFACT_FIELDS = {"id", "name", "size_in_bytes", "digest", "expires_at", "inner_archive"}
+ARTIFACT_OVERRIDES = {"run_id", "workflow_path"}
+CHECKPOINT_FIELDS = {"run_attempt", "producer_job_id", "producer_job_name"}
 ORIGINAL_SOURCE_ROOTS = {
     "linux": "/repo/build/src",
     "macos": "/Users/runner/work/ungoogled-chromium-macos/ungoogled-chromium-macos/build/src",
@@ -111,13 +116,13 @@ def sha256(path):
     return "sha256:" + result.hexdigest()
 
 
-def timestamp(value):
+def timestamp(value, reason="invalid_expiry"):
     try:
         parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
-        require(parsed.tzinfo is not None, "invalid_expiry")
+        require(parsed.tzinfo is not None, reason)
         return parsed
     except (AttributeError, TypeError, ValueError) as exc:
-        raise CacheMiss("invalid_expiry") from exc
+        raise CacheMiss(reason) from exc
 
 
 def load_manifest(platform, arch, run_id=None, root=ROOT):
@@ -156,10 +161,29 @@ def load_manifest(platform, arch, run_id=None, root=ROOT):
             require(type(source["repository_id"]) is int and source["repository_id"] > 0, "manifest_id")
             if not available:
                 continue
+            require(not CHECKPOINT_FIELDS.intersection(source), "manifest_checkpoint")
             require(type(source["run_id"]) is int and source["run_id"] > 0, "manifest_id")
-            require(set(source["artifacts"]) == ({"x64"} if target == "windows"
-                                                else {"x64", "arm64"}), "manifest_targets")
-            for artifact in source["artifacts"].values():
+            targets = set(source["artifacts"])
+            require(targets in ({"x64"}, {"x64", "arm64"}) if target == "windows"
+                    else targets == {"x64", "arm64"}, "manifest_targets")
+            for artifact_arch, artifact in source["artifacts"].items():
+                fields = ARTIFACT_FIELDS
+                if target == "windows" and artifact_arch == "arm64":
+                    fields = fields | ARTIFACT_OVERRIDES
+                    checkpoint = CHECKPOINT_FIELDS.intersection(artifact)
+                    require(not checkpoint or checkpoint == CHECKPOINT_FIELDS, "manifest_checkpoint")
+                    if checkpoint:
+                        fields = fields | CHECKPOINT_FIELDS
+                        require(all(type(artifact[key]) is int and artifact[key] > 0
+                                    for key in ("run_attempt", "producer_job_id"))
+                                and isinstance(artifact["producer_job_name"], str)
+                                and re.fullmatch(r"build / build-[1-9][0-9]*", artifact["producer_job_name"]),
+                                "manifest_checkpoint")
+                    require(type(artifact["run_id"]) is int and artifact["run_id"] > 0
+                            and artifact["run_id"] != source["run_id"], "manifest_id")
+                    require(artifact["workflow_path"] == ".github/workflows/build-arm.yml"
+                            and artifact["name"] == "build-artifact-arm", "untrusted_manifest_artifact")
+                require(set(artifact) == fields, "manifest_artifact_fields")
                 require(type(artifact["id"]) is int and artifact["id"] > 0
                         and type(artifact["size_in_bytes"]) is int
                         and 0 < artifact["size_in_bytes"] <= MAX_EXTRACTED, "manifest_artifact")
@@ -181,10 +205,14 @@ def load_manifest(platform, arch, run_id=None, root=ROOT):
             identity.update(available=False, ungoogled_commit=source["ungoogled_commit"])
             raise CacheMiss("source_unavailable", details={"manifest": identity})
         require(arch in source["artifacts"], "unsupported_target")
-        require(run_id is None or run_id == source["run_id"], "run_id_mismatch")
         pin = {key: value for key, value in source.items() if key != "artifacts"}
         pin["artifact"] = source["artifacts"][arch]
+        overrides = {key: value for key, value in pin["artifact"].items()
+                     if key in ARTIFACT_OVERRIDES | CHECKPOINT_FIELDS}
+        pin.update(overrides)
+        require(run_id is None or run_id == pin["run_id"], "run_id_mismatch")
         pin["chromium_version"] = version
+        identity.update(overrides)
         identity.update(run_id=pin["run_id"], artifact_id=pin["artifact"]["id"],
                         artifact_digest=pin["artifact"]["digest"])
         return pin, identity
@@ -194,15 +222,21 @@ def load_manifest(platform, arch, run_id=None, root=ROOT):
         raise CacheMiss("invalid_manifest_or_pins") from exc
 
 
-def validate_metadata(pin, run, artifact, now=None):
+def validate_metadata(pin, run, artifact, now=None, producer=None):
     now = now or datetime.now(timezone.utc)
     expected = pin["artifact"]
     require(isinstance(run, dict) and isinstance(artifact, dict), "invalid_api_metadata")
+    checkpoint = CHECKPOINT_FIELDS.intersection(pin)
+    require(not checkpoint or (checkpoint == CHECKPOINT_FIELDS
+            and pin["repository"] == "ungoogled-software/ungoogled-chromium-windows"
+            and pin["workflow_path"] == ".github/workflows/build-arm.yml"
+            and expected["name"] == "build-artifact-arm"), "untrusted_checkpoint")
+    successful = run.get("status") == "completed" and run.get("conclusion") == "success"
+    in_progress = run.get("status") == "in_progress" and run.get("conclusion") is None
     require(all(run.get(key) == pin[key] for key in ("head_sha", "head_branch", "event"))
             and run.get("id") == pin["run_id"]
             and run.get("path") == pin["workflow_path"]
-            and run.get("status") == "completed" and run.get("conclusion") == "success",
-            "untrusted_run")
+            and (successful or (checkpoint and in_progress)), "untrusted_run")
     for key in ("repository", "head_repository"):
         repo = run.get(key) or {}
         require(isinstance(repo, dict) and repo.get("full_name") == pin["repository"]
@@ -218,6 +252,33 @@ def validate_metadata(pin, run, artifact, now=None):
             and workflow.get("head_repository_id") == pin["repository_id"], "artifact_provenance")
     require(artifact.get("expired") is False
             and timestamp(artifact.get("expires_at")) > now, "artifact_expired")
+    if checkpoint:
+        require(type(run.get("run_attempt")) is int
+                and run["run_attempt"] == pin["run_attempt"], "untrusted_run_attempt")
+        require(isinstance(producer, dict)
+                and type(producer.get("id")) is int and producer["id"] == pin["producer_job_id"]
+                and producer.get("name") == pin["producer_job_name"]
+                and type(producer.get("run_id")) is int and producer["run_id"] == pin["run_id"]
+                and type(producer.get("run_attempt")) is int
+                and producer["run_attempt"] == pin["run_attempt"]
+                and producer.get("head_sha") == pin["head_sha"]
+                and producer.get("head_branch") == pin["head_branch"]
+                and producer.get("workflow_name") == "build-arm"
+                and producer.get("status") == "completed"
+                and producer.get("conclusion") == "success", "untrusted_producer")
+        steps = producer.get("steps")
+        require(isinstance(steps, list) and all(isinstance(step, dict) for step in steps),
+                "untrusted_producer_steps")
+        stages = [step for step in steps if step.get("name") == "Run Stage"]
+        require(len(stages) == 1 and stages[0].get("status") == "completed"
+                and stages[0].get("conclusion") == "success", "untrusted_producer_steps")
+        reason = "artifact_creation_window"
+        require(timestamp(run.get("run_started_at"), reason)
+                <= timestamp(producer.get("started_at"), reason)
+                <= timestamp(stages[0].get("started_at"), reason)
+                <= timestamp(artifact.get("created_at"), reason)
+                <= timestamp(stages[0].get("completed_at"), reason)
+                <= timestamp(producer.get("completed_at"), reason) <= now, reason)
 
 
 class NoRedirect(urllib.request.HTTPRedirectHandler):
@@ -1159,9 +1220,14 @@ def fetch(platform, arch, destination, run_id=None, root=ROOT, client=None):
             client = client or GitHub()
             progress.phase("metadata")
             base = f"/repos/{pin['repository']}/actions"
-            run = client.json(f"{base}/runs/{pin['run_id']}")
+            run_path = f"{base}/runs/{pin['run_id']}"
+            if "run_attempt" in pin:
+                run_path += f"/attempts/{pin['run_attempt']}"
+            run = client.json(run_path)
             artifact = client.json(f"{base}/artifacts/{pin['artifact']['id']}")
-            validate_metadata(pin, run, artifact)
+            producer = (client.json(f"{base}/jobs/{pin['producer_job_id']}")
+                        if "producer_job_id" in pin else None)
+            validate_metadata(pin, run, artifact, producer=producer)
             require_space(destination, 2 * pin["artifact"]["size_in_bytes"])
             outer, inner = destination / ".download.zip", destination / ".inner"
             # Download verifies the pinned outer ZIP digest before opening either archive.

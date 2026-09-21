@@ -365,7 +365,7 @@ if ((Test-Path (Join-Path $Src ".chromix-patch-in-progress")) -and
 if ($RestoredUpstream) {
   Invoke-Checked $Python @(
     (Join-Path $Repo "tools\restore_upstream_cache.py"), "--phase", "verify",
-    "--platform", "windows", "--arch", "x64", "--workdir", $Root
+    "--platform", "windows", "--arch", $Arch, "--workdir", $Root
   )
 }
 if ((Test-Path $readyMarker) -and -not (Test-Marker ".chromix-source-ready" $versionKey)) {
@@ -457,9 +457,10 @@ if ($actualWindowsVersion -ne $Revisions.UngoogledWindowsVersion) {
 if ($RestoredUpstream) {
   Invoke-Checked $Python @(
     (Join-Path $Repo "tools\prepare_restored_build.py"), "--phase", "inspect",
-    "--platform", "windows", "--arch", "x64", "--workdir", $Root
+    "--platform", "windows", "--arch", $Arch, "--workdir", $Root
   )
   Assert-RestoredToolchain
+  Assert-Arm64RustToolchain
   $RestoredPatchExe = Resolve-HostPatch
   Write-Host "==> verified upstream core/Windows overlay/prune/domain layers; appending Chromix patches"
   $applyArgs = @(

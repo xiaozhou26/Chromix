@@ -582,9 +582,9 @@ class UpstreamObjectCacheTest(unittest.TestCase):
 
     def test_malformed_metadata_and_unsupported_platform_disable_old_cache(self):
         self.ready()
-        for platform in ("macos", "windows"):
-            with self.subTest(platform=platform):
-                self.assert_miss(cache.prepare(self.src, self.donor, platform, "x64", self.work),
+        for platform, arch in (("macos", "x64"), ("windows", "x64"), ("windows", "arm64")):
+            with self.subTest(platform=platform, arch=arch):
+                self.assert_miss(cache.prepare(self.src, self.donor, platform, arch, self.work),
                                  "unsupported platform")
                 self.assertEqual(json.loads((self.work / cache.CACHE / "manifest.json").read_text())["status"], "miss")
         path = self.old / ".ninja_deps"

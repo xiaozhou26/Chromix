@@ -194,7 +194,7 @@ def repository_identity(repo: Path, platform: str, arch: str) -> tuple[dict, dic
     artifact = pin["artifact"]
     identity = dict(expected, platform=platform, arch=arch)
     for key in ("repository", "repository_id", "head_branch", "event", "workflow_path", "run_id"):
-        identity[key] = source[key]
+        identity[key] = pin[key]
     for key in ("id", "name", "digest", "size_in_bytes"):
         identity[f"artifact_{key}"] = artifact[key]
     return identity, source
@@ -284,8 +284,24 @@ def require_glob(root: Path, pattern: str) -> None:
         require_file(path)
 
 
+def validate_rust_libraries(src: Path, platform: str, arch: str) -> dict:
+    arches = sorted({arch, "x64"}) if platform == "windows" else [arch]
+    libraries = {}
+    for cpu in arches:
+        relative = RUST / "lib/rustlib" / TRIPLES[platform, cpu] / "lib"
+        root = safe_path(src, relative)
+        for pattern in ("libstd-*.rlib", "libcore-*.rlib", "liballoc-*.rlib", "libcompiler_builtins-*.rlib"):
+            require_glob(root, pattern)
+            for path in sorted(root.glob(pattern)):
+                if path.is_file():
+                    safe_path(src, path.relative_to(src))
+                    libraries[path.relative_to(src).as_posix()] = digest_file(path)
+    return libraries
+
+
 def validate_toolchains(src: Path, versions: dict, platform: str, arch: str,
                         bindgen: bool = True) -> dict:
+    host_arch = "x64" if platform == "windows" else arch
     clang = safe_path(src, CLANG)
     rust = safe_path(src, RUST)
     trees = {"clang": inventory(clang), "rust": inventory(rust)}
@@ -303,7 +319,7 @@ def validate_toolchains(src: Path, versions: dict, platform: str, arch: str,
         "windows": ["clang-cl", "lld-link", "llvm-ml"],
     }[platform]
     for name in binaries:
-        require_binary(clang / "bin" / (name + suffix), platform, arch)
+        require_binary(clang / "bin" / (name + suffix), platform, host_arch)
     resource = clang / "lib/clang" / versions["clang_release"]
     require_file(resource / "include/stddef.h")
     require_file(resource / "include/stdarg.h")
@@ -317,10 +333,13 @@ def validate_toolchains(src: Path, versions: dict, platform: str, arch: str,
         require_glob(resource, {"macos": "lib/darwin/libclang_rt.osx.a",
                                 "windows": f"lib/windows/clang_rt.builtins-{runtime_arch}.lib"}[platform])
     for name in ["rustc", "cargo", "rustfmt"] + (["bindgen"] if bindgen else []):
-        require_binary(rust / "bin" / (name + suffix), platform, arch)
-    rustlib = rust / "lib/rustlib" / TRIPLES[platform, arch] / "lib"
-    for pattern in ("libstd-*.rlib", "libcore-*.rlib", "liballoc-*.rlib", "libcompiler_builtins-*.rlib"):
-        require_glob(rustlib, pattern)
+        require_binary(rust / "bin" / (name + suffix), platform, host_arch)
+    if (platform, arch) == ("windows", "arm64"):
+        validate_rust_libraries(src, platform, arch)
+    else:
+        rustlib = rust / "lib/rustlib" / TRIPLES[platform, arch] / "lib"
+        for pattern in ("libstd-*.rlib", "libcore-*.rlib", "liballoc-*.rlib", "libcompiler_builtins-*.rlib"):
+            require_glob(rustlib, pattern)
     require_glob(rust, "bin/rustc_driver*.dll" if platform == "windows" else "lib/librustc_driver*.*")
     if bindgen:
         require_glob(rust, {"linux": "lib/libclang.so*", "macos": "lib/libclang.dylib",
@@ -483,6 +502,16 @@ def preserve_external_tool_lookups(cache: Path, donor: Path, result: dict) -> No
         path.write_text("#error unverified external build tool\n", encoding="utf-8")
 
 
+def validate_gn_target(values: dict, platform: str, arch: str) -> None:
+    for name in ("target_cpu", "v8_target_cpu"):
+        if (name == "target_cpu" or name in values) and values.get(name) != json.dumps(arch):
+            raise Miss(f"GN {name} does not match requested architecture")
+    if platform == "windows":
+        for name, expected in (("host_cpu", "x64"), ("target_os", "win")):
+            if name in values and values[name] != json.dumps(expected):
+                raise Miss(f"GN {name} does not match Windows x64-host build")
+
+
 def check_objects(src: Path, donor: Path, arch: str, platform: str) -> None:
     if not (src / ".chromix-domain-substituted").is_file():
         raise Miss("final canonical domain substitution is not recorded")
@@ -493,6 +522,7 @@ def check_objects(src: Path, donor: Path, arch: str, platform: str) -> None:
             raise Miss("mandatory GN target_cpu does not match requested architecture")
         if "v8_target_cpu" in values and values["v8_target_cpu"] != json.dumps(arch):
             raise Miss("GN v8_target_cpu does not match requested architecture")
+        validate_gn_target(values, platform, arch)
     differences = sorted(key for key in canonical.keys() | cached.keys() if canonical.get(key) != cached.get(key))
     if differences:
         raise Miss("GN assignments differ: " + ", ".join(differences[:12]))

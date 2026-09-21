@@ -46,6 +46,7 @@ name: build-win-arm64-github
     - tools/verify_windows_bundle.py
     - tools/tests/test_windows_arm64_workflow.py
     - tools/tests/test_windows_arm64_build.py
+    - tools/tests/test_windows_upstream_cache.py
     - tools/tests/test_verify_windows_bundle.py
   workflow_call:
     inputs:
@@ -57,6 +58,17 @@ name: build-win-arm64-github
         required: false
         type: string
         default: auto
+      use_upstream_cache:
+        required: false
+        type: boolean
+        default: false
+      upstream_run_id:
+        required: false
+        type: string
+        default: ''
+    secrets:
+      UPSTREAM_ACTIONS_TOKEN:
+        required: false
   workflow_dispatch:
     inputs:
       build_profile:
@@ -71,6 +83,16 @@ name: build-win-arm64-github
         description: 'Ninja jobs: auto uses CPU/memory limits, or a positive integer'
         type: string
         default: auto
+      use_upstream_cache:
+        description: Require pinned full upstream source + out/Default reuse; false permits cold builds
+        required: false
+        default: false
+        type: boolean
+      upstream_run_id:
+        description: Optional upstream run ID; must match the pinned cache manifest
+        required: false
+        default: ''
+        type: string
 permissions:
   contents: read
   actions: read
@@ -80,7 +102,7 @@ concurrency:
 env:
   CHROMIX_BUILD_PROFILE: ${{ inputs.build_profile || 'native' }}
   CHROMIX_JOBS: ${{ inputs.compile_jobs || 'auto' }}
-  CHROMIX_USE_UPSTREAM_CACHE: '0'
+  CHROMIX_USE_UPSTREAM_CACHE: ${{ (inputs.use_upstream_cache || inputs.upstream_run_id != '') && '1' || '0' }}
   CHROMIX_PREFER_UPSTREAM_CACHE: '0'
   DEPOT_TOOLS_WIN_TOOLCHAIN: '0'
   DEPOT_TOOLS_METRICS: '0'
@@ -125,7 +147,43 @@ jobs:
     - name: Run stage 1
       id: stage
       shell: powershell
-      run: build\windows\ci-stage.ps1 -StageIndex 1 -MaxStages 12
+      env:
+        GH_TOKEN: ${{ secrets.UPSTREAM_ACTIONS_TOKEN || github.token }}
+        USE_UPSTREAM_CACHE: ${{ inputs.use_upstream_cache }}
+        UPSTREAM_RUN_ID: ${{ inputs.upstream_run_id }}
+      run: "$stageArgs = @{\n  StageIndex = 1\n  MaxStages = 12\n  UseUpstreamCache = ($env:USE_UPSTREAM_CACHE -eq 'true')\n\
+        }\nif ($env:UPSTREAM_RUN_ID) { $stageArgs.UpstreamRunId = $env:UPSTREAM_RUN_ID }\n& build\\windows\\ci-stage.ps1 @stageArgs\n"
+    - name: Upload upstream cache diagnostics
+      if: ${{ always() }}
+      uses: actions/upload-artifact@v4
+      with:
+        name: upstream-cache-win-arm64-s1-attempt-${{ github.run_attempt }}
+        include-hidden-files: true
+        path: 'C:\u\result.json
+
+          C:\c\chromix\upstream-cache-restore.json
+
+          C:\c\chromix\upstream-cache-ninja.json
+
+          C:\c\chromix\upstream-cache-preparation.json
+
+          C:\c\chromix\src\.chromix-upstream-restored.json
+
+          C:\c\chromix\src\.chromix-restored-patches.json
+
+          C:\c\chromix\src\out\Default\args.gn
+
+          C:\c\chromix\upstream-cache-import.json
+
+          C:\c\chromix\upstream-cache-plan.log
+
+          C:\c\chromix\upstream-reuse\baseline.json
+
+          C:\c\chromix\upstream-reuse\result.json
+
+          '
+        if-no-files-found: ignore
+        retention-days: 3
     - name: Ensure build tree snapshot
       if: ${{ always() && steps.stage.outputs.snapshot_safe == 'true' && steps.stage.outputs.upload_parts != 'true' && steps.stage.outputs.finished
         != 'true' }}
@@ -228,6 +286,18 @@ jobs:
       id: stage
       shell: powershell
       run: build\windows\ci-stage.ps1 -StageIndex 2 -MaxStages 12 -FromArtifact
+    - name: Upload restored reuse evidence
+      if: ${{ always() }}
+      uses: actions/upload-artifact@v4
+      with:
+        name: upstream-reuse-win-arm64-${{ github.job }}-attempt-${{ github.run_attempt }}
+        path: 'C:\c\chromix\upstream-reuse\baseline.json
+
+          C:\c\chromix\upstream-reuse\result.json
+
+          '
+        if-no-files-found: ignore
+        retention-days: 3
     - name: Ensure build tree snapshot
       if: ${{ always() && steps.stage.outputs.snapshot_safe == 'true' && steps.stage.outputs.upload_parts != 'true' && steps.stage.outputs.finished
         != 'true' }}
@@ -330,6 +400,18 @@ jobs:
       id: stage
       shell: powershell
       run: build\windows\ci-stage.ps1 -StageIndex 3 -MaxStages 12 -FromArtifact
+    - name: Upload restored reuse evidence
+      if: ${{ always() }}
+      uses: actions/upload-artifact@v4
+      with:
+        name: upstream-reuse-win-arm64-${{ github.job }}-attempt-${{ github.run_attempt }}
+        path: 'C:\c\chromix\upstream-reuse\baseline.json
+
+          C:\c\chromix\upstream-reuse\result.json
+
+          '
+        if-no-files-found: ignore
+        retention-days: 3
     - name: Ensure build tree snapshot
       if: ${{ always() && steps.stage.outputs.snapshot_safe == 'true' && steps.stage.outputs.upload_parts != 'true' && steps.stage.outputs.finished
         != 'true' }}
@@ -432,6 +514,18 @@ jobs:
       id: stage
       shell: powershell
       run: build\windows\ci-stage.ps1 -StageIndex 4 -MaxStages 12 -FromArtifact
+    - name: Upload restored reuse evidence
+      if: ${{ always() }}
+      uses: actions/upload-artifact@v4
+      with:
+        name: upstream-reuse-win-arm64-${{ github.job }}-attempt-${{ github.run_attempt }}
+        path: 'C:\c\chromix\upstream-reuse\baseline.json
+
+          C:\c\chromix\upstream-reuse\result.json
+
+          '
+        if-no-files-found: ignore
+        retention-days: 3
     - name: Ensure build tree snapshot
       if: ${{ always() && steps.stage.outputs.snapshot_safe == 'true' && steps.stage.outputs.upload_parts != 'true' && steps.stage.outputs.finished
         != 'true' }}
@@ -534,6 +628,18 @@ jobs:
       id: stage
       shell: powershell
       run: build\windows\ci-stage.ps1 -StageIndex 5 -MaxStages 12 -FromArtifact
+    - name: Upload restored reuse evidence
+      if: ${{ always() }}
+      uses: actions/upload-artifact@v4
+      with:
+        name: upstream-reuse-win-arm64-${{ github.job }}-attempt-${{ github.run_attempt }}
+        path: 'C:\c\chromix\upstream-reuse\baseline.json
+
+          C:\c\chromix\upstream-reuse\result.json
+
+          '
+        if-no-files-found: ignore
+        retention-days: 3
     - name: Ensure build tree snapshot
       if: ${{ always() && steps.stage.outputs.snapshot_safe == 'true' && steps.stage.outputs.upload_parts != 'true' && steps.stage.outputs.finished
         != 'true' }}
@@ -636,6 +742,18 @@ jobs:
       id: stage
       shell: powershell
       run: build\windows\ci-stage.ps1 -StageIndex 6 -MaxStages 12 -FromArtifact
+    - name: Upload restored reuse evidence
+      if: ${{ always() }}
+      uses: actions/upload-artifact@v4
+      with:
+        name: upstream-reuse-win-arm64-${{ github.job }}-attempt-${{ github.run_attempt }}
+        path: 'C:\c\chromix\upstream-reuse\baseline.json
+
+          C:\c\chromix\upstream-reuse\result.json
+
+          '
+        if-no-files-found: ignore
+        retention-days: 3
     - name: Ensure build tree snapshot
       if: ${{ always() && steps.stage.outputs.snapshot_safe == 'true' && steps.stage.outputs.upload_parts != 'true' && steps.stage.outputs.finished
         != 'true' }}
@@ -738,6 +856,18 @@ jobs:
       id: stage
       shell: powershell
       run: build\windows\ci-stage.ps1 -StageIndex 7 -MaxStages 12 -FromArtifact
+    - name: Upload restored reuse evidence
+      if: ${{ always() }}
+      uses: actions/upload-artifact@v4
+      with:
+        name: upstream-reuse-win-arm64-${{ github.job }}-attempt-${{ github.run_attempt }}
+        path: 'C:\c\chromix\upstream-reuse\baseline.json
+
+          C:\c\chromix\upstream-reuse\result.json
+
+          '
+        if-no-files-found: ignore
+        retention-days: 3
     - name: Ensure build tree snapshot
       if: ${{ always() && steps.stage.outputs.snapshot_safe == 'true' && steps.stage.outputs.upload_parts != 'true' && steps.stage.outputs.finished
         != 'true' }}
@@ -840,6 +970,18 @@ jobs:
       id: stage
       shell: powershell
       run: build\windows\ci-stage.ps1 -StageIndex 8 -MaxStages 12 -FromArtifact
+    - name: Upload restored reuse evidence
+      if: ${{ always() }}
+      uses: actions/upload-artifact@v4
+      with:
+        name: upstream-reuse-win-arm64-${{ github.job }}-attempt-${{ github.run_attempt }}
+        path: 'C:\c\chromix\upstream-reuse\baseline.json
+
+          C:\c\chromix\upstream-reuse\result.json
+
+          '
+        if-no-files-found: ignore
+        retention-days: 3
     - name: Ensure build tree snapshot
       if: ${{ always() && steps.stage.outputs.snapshot_safe == 'true' && steps.stage.outputs.upload_parts != 'true' && steps.stage.outputs.finished
         != 'true' }}
@@ -942,6 +1084,18 @@ jobs:
       id: stage
       shell: powershell
       run: build\windows\ci-stage.ps1 -StageIndex 9 -MaxStages 12 -FromArtifact
+    - name: Upload restored reuse evidence
+      if: ${{ always() }}
+      uses: actions/upload-artifact@v4
+      with:
+        name: upstream-reuse-win-arm64-${{ github.job }}-attempt-${{ github.run_attempt }}
+        path: 'C:\c\chromix\upstream-reuse\baseline.json
+
+          C:\c\chromix\upstream-reuse\result.json
+
+          '
+        if-no-files-found: ignore
+        retention-days: 3
     - name: Ensure build tree snapshot
       if: ${{ always() && steps.stage.outputs.snapshot_safe == 'true' && steps.stage.outputs.upload_parts != 'true' && steps.stage.outputs.finished
         != 'true' }}
@@ -1044,6 +1198,18 @@ jobs:
       id: stage
       shell: powershell
       run: build\windows\ci-stage.ps1 -StageIndex 10 -MaxStages 12 -FromArtifact
+    - name: Upload restored reuse evidence
+      if: ${{ always() }}
+      uses: actions/upload-artifact@v4
+      with:
+        name: upstream-reuse-win-arm64-${{ github.job }}-attempt-${{ github.run_attempt }}
+        path: 'C:\c\chromix\upstream-reuse\baseline.json
+
+          C:\c\chromix\upstream-reuse\result.json
+
+          '
+        if-no-files-found: ignore
+        retention-days: 3
     - name: Ensure build tree snapshot
       if: ${{ always() && steps.stage.outputs.snapshot_safe == 'true' && steps.stage.outputs.upload_parts != 'true' && steps.stage.outputs.finished
         != 'true' }}
@@ -1146,6 +1312,18 @@ jobs:
       id: stage
       shell: powershell
       run: build\windows\ci-stage.ps1 -StageIndex 11 -MaxStages 12 -FromArtifact
+    - name: Upload restored reuse evidence
+      if: ${{ always() }}
+      uses: actions/upload-artifact@v4
+      with:
+        name: upstream-reuse-win-arm64-${{ github.job }}-attempt-${{ github.run_attempt }}
+        path: 'C:\c\chromix\upstream-reuse\baseline.json
+
+          C:\c\chromix\upstream-reuse\result.json
+
+          '
+        if-no-files-found: ignore
+        retention-days: 3
     - name: Ensure build tree snapshot
       if: ${{ always() && steps.stage.outputs.snapshot_safe == 'true' && steps.stage.outputs.upload_parts != 'true' && steps.stage.outputs.finished
         != 'true' }}
@@ -1248,6 +1426,18 @@ jobs:
       id: stage
       shell: powershell
       run: build\windows\ci-stage.ps1 -StageIndex 12 -MaxStages 12 -FromArtifact
+    - name: Upload restored reuse evidence
+      if: ${{ always() }}
+      uses: actions/upload-artifact@v4
+      with:
+        name: upstream-reuse-win-arm64-${{ github.job }}-attempt-${{ github.run_attempt }}
+        path: 'C:\c\chromix\upstream-reuse\baseline.json
+
+          C:\c\chromix\upstream-reuse\result.json
+
+          '
+        if-no-files-found: ignore
+        retention-days: 3
     - name: Ensure build tree snapshot
       if: ${{ always() && steps.stage.outputs.snapshot_safe == 'true' && steps.stage.outputs.upload_parts != 'true' && steps.stage.outputs.finished
         != 'true' }}

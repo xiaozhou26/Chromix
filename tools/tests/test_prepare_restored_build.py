@@ -14,7 +14,7 @@ from unittest import mock
 
 from tools import prepare_restored_build as prepare
 from tools import restore_upstream_cache as restore
-from tools.tests.test_fetch_upstream_cache import synthetic_windows_source
+from tools.tests.test_restore_upstream_cache import windows_source
 
 
 class PrepareRestoredBuildTest(unittest.TestCase):
@@ -47,14 +47,16 @@ class PrepareRestoredBuildTest(unittest.TestCase):
         else:
             header[:2] = b"MZ"
             struct.pack_into("<I", header, 60, 64)
-            header.extend(b"PE\0\0" + struct.pack("<H", 0x8664))
+            header.extend(b"PE\0\0" + struct.pack("<H", {"x64": 0x8664, "arm64": 0xAA64}[arch]))
         self.write(path, header)
         path.chmod(0o755)
 
     def fixture(self, platform="macos", arch="arm64", donor_arch=None, *, host_arch=None):
         repo = prepare.ROOT
         if platform == "windows":
-            repo = self.work / "fixture-repo"
+            temporary = tempfile.TemporaryDirectory()
+            self.addCleanup(temporary.cleanup)
+            repo = Path(temporary.name)
             for relative in ("CHROMIUM_VERSION", "CHROMIUM_LINUX_VERSION", "CHROMIUM_MACOS_VERSION", "CHROMIUM_WINDOWS_VERSION",
                              "build/ungoogled-revisions.psd1", "build/upstream-cache.json"):
                 source = prepare.ROOT / relative
@@ -62,7 +64,7 @@ class PrepareRestoredBuildTest(unittest.TestCase):
                     self.write(repo / relative, source.read_bytes())
             path = repo / "build/upstream-cache.json"
             manifest = json.loads(path.read_text())
-            manifest["sources"]["windows"] = synthetic_windows_source(repo)
+            manifest["sources"]["windows"] = windows_source(repo)
             self.write(path, json.dumps(manifest))
         self.fixture_repo = repo
         identity, _, manifest = restore.identities(repo, platform, arch)
@@ -81,6 +83,11 @@ class PrepareRestoredBuildTest(unittest.TestCase):
         self.write(self.src / restore.MARKER, json.dumps(receipt))
         for relative in prepare.tool_paths(platform, arch, host_arch=host_arch).values():
             self.binary(self.src / relative, platform, donor_arch or host_arch or arch)
+        if (platform, arch) == ("windows", "arm64"):
+            for triple in ("x86_64-pc-windows-msvc", "aarch64-pc-windows-msvc"):
+                for name in ("std", "core", "alloc", "compiler_builtins"):
+                    self.write(self.src / prepare.RUST / "lib/rustlib" / triple / "lib" / f"lib{name}-test.rlib",
+                               b"!<arch>\nfixture")
         # Upstream macOS resources have nested nightly components and no Chromium stamps.
         if platform == "macos":
             rust = self.src / prepare.RUST
@@ -604,12 +611,13 @@ class PrepareRestoredBuildTest(unittest.TestCase):
         self.assertFalse(report["ready_for_gn"])
         self.assertFalse((self.src / prepare.INSPECTION).exists())
 
-    def test_only_native_and_linux_x64_to_arm64_host_target_pairs_are_allowed(self):
+    def test_only_native_posix_linux_cross_and_x64_hosted_windows_pairs_are_allowed(self):
         targets = (("linux", "x64"), ("linux", "arm64"), ("macos", "x64"),
-                   ("macos", "arm64"), ("windows", "x64"))
+                   ("macos", "arm64"), ("windows", "x64"), ("windows", "arm64"))
         for target in targets:
-            for host in (*targets, ("windows", "arm64"), ("linux", "unknown")):
-                if host == target or (target, host) == (("linux", "arm64"), ("linux", "x64")):
+            for host in (*targets, ("linux", "unknown")):
+                allowed = ((target[0], "x64") if target[0] == "windows" else target)
+                if host == allowed or (target, host) == (("linux", "arm64"), ("linux", "x64")):
                     continue
                 with self.subTest(target=target, host=host), \
                         mock.patch.object(prepare, "host_identity", return_value=host), \
@@ -617,9 +625,110 @@ class PrepareRestoredBuildTest(unittest.TestCase):
                     with self.assertRaisesRegex(ValueError, "native .* runner is required"):
                         prepare.validate_native_tools(self.src, *target)
                     run.assert_not_called()
-        with mock.patch.object(prepare, "host_identity", return_value=("windows", "arm64")):
-            with self.assertRaisesRegex(ValueError, "unsupported restored build target"):
-                prepare.validate_native_tools(self.src, "windows", "arm64")
+        with self.assertRaisesRegex(ValueError, "unsupported restored build target"):
+            prepare.validate_native_tools(self.src, "windows", "x86")
+
+    def test_windows_x64_host_prepares_arm64_without_rewriting_source_or_internal_objects(self):
+        receipt = self.fixture("windows", "arm64", host_arch="x64")
+        self.assertEqual(receipt["identity"]["chromium_version"], "153.0.8010.47")
+        self.assertEqual(receipt["identity"]["run_id"], 103)
+        self.assertEqual(receipt["identity"]["workflow_path"], ".github/workflows/build-arm.yml")
+        obj = self.object("target.obj")
+        self.object("sdk.obj")
+        self.deps({"obj/target.obj": ["../../include/a.h"],
+                   "obj/sdk.obj": ["C:/Windows Kits/Include/stddef.h"]})
+        self.binary(self.out / "chrome.exe", "windows", "arm64")
+        cache = self.work / "upstream-cache"
+        donor = cache / "tree/src"
+        donor.parent.mkdir(parents=True)
+        (self.src / restore.MARKER).unlink()
+        self.src.rename(donor)
+        self.write(cache / "result.json", json.dumps({
+            "owner": restore.fetcher.OWNER, "status": "hit", "source": str(donor),
+            "destination": str(cache), "platform": "windows", "arch": "arm64",
+            "manifest": receipt["manifest"], "extraction_scope": restore.fetcher.SOURCE_SCOPE,
+            "skipped_external_symlinks": 0, "external_symlink_paths": []}))
+        restored = restore.restore(self.work, "windows", "arm64", cache, repo=self.fixture_repo)
+        self.assertEqual(restored["status"], "hit", restored)
+        self.assertFalse(donor.exists())
+        protected = {path: (path.read_bytes(), path.stat().st_mtime_ns) for path in (
+            obj, self.src / "include/a.h", self.src / restore.MARKER,
+            *(self.out / name for name in prepare.METADATA))}
+        with self.native_context("windows", "x64"):
+            inspection = prepare.prepare(self.work, "windows", "arm64", phase="inspect", repo=self.fixture_repo)
+            result = prepare.prepare(self.work, "windows", "arm64", repo=self.fixture_repo)
+            resumed = prepare.prepare(self.work, "windows", "arm64", repo=self.fixture_repo)
+        for data in (inspection, result, resumed):
+            self.assertEqual(data["host"], {"platform": "windows", "arch": "x64"})
+            self.assertEqual(data["arch"], "arm64")
+            self.assertTrue(data["native_tools"])
+            self.assertFalse(data["needs_invalidation"])
+            self.assertEqual(len(data["rust_libraries"]), 8)
+            self.assertTrue(all(tool["architectures"] == ["x64"] for tool in data["tools"].values()))
+        self.assertTrue(result["ready_for_gn"])
+        self.assertEqual(result["counters"]["tool_swap_invalidations"], 0)
+        self.assertEqual(result["dependencies"]["external_dependency_outputs"], 1)
+        self.assertEqual(result["removed_final_products"], ["chrome.exe"])
+        self.assertFalse((self.out / "obj/sdk.obj").exists())
+        for path, expected in protected.items():
+            self.assertEqual((path.read_bytes(), path.stat().st_mtime_ns), expected)
+
+    def test_windows_arm64_rejects_target_binaries_as_host_tools_without_execution(self):
+        self.fixture("windows", "arm64", donor_arch="arm64", host_arch="x64")
+        obj = self.object("target.obj")
+        with self.native_context("windows", "x64"), mock.patch.object(prepare.subprocess, "run") as run:
+            inspection = prepare.prepare(self.work, "windows", "arm64", phase="inspect", repo=self.fixture_repo)
+            self.assertTrue(inspection["host_mismatch"])
+            self.assertTrue(inspection["needs_invalidation"])
+            with self.assertRaisesRegex(ValueError, "cannot execute on the native host"):
+                prepare.prepare(self.work, "windows", "arm64", repo=self.fixture_repo)
+            run.assert_not_called()
+        self.assertTrue(obj.exists())
+        self.assertFalse((self.src / prepare.MARKER).exists())
+
+    def test_windows_arm64_requires_host_and_target_rust_libraries(self):
+        self.fixture("windows", "arm64", host_arch="x64")
+        obj = self.object("target.obj")
+        for triple in ("x86_64-pc-windows-msvc", "aarch64-pc-windows-msvc"):
+            for library in ("std", "core", "alloc", "compiler_builtins"):
+                path = self.src / prepare.RUST / "lib/rustlib" / triple / "lib" / f"lib{library}-test.rlib"
+                original = path.read_bytes()
+                for empty in (False, True):
+                    with self.subTest(triple=triple, library=library, empty=empty):
+                        if empty:
+                            path.write_bytes(b"")
+                        else:
+                            path.unlink()
+                        with self.native_context("windows", "x64"):
+                            with self.assertRaisesRegex(ValueError, "required toolchain"):
+                                prepare.prepare(self.work, "windows", "arm64", repo=self.fixture_repo)
+                        self.assertTrue(obj.exists())
+                        self.assertFalse((self.src / prepare.MARKER).exists())
+                        report = json.loads((self.work / "upstream-cache-preparation.json").read_text())
+                        self.assertFalse(report["ready_for_gn"])
+                        path.write_bytes(original)
+
+    def test_windows_arm64_rust_replacement_after_inspect_invalidates_objects(self):
+        self.fixture("windows", "arm64", host_arch="x64")
+        obj = self.object("target.obj")
+        self.deps({"obj/target.obj": ["../../include/a.h"]})
+        with self.native_context("windows", "x64"):
+            prepare.prepare(self.work, "windows", "arm64", phase="inspect", repo=self.fixture_repo)
+            path = self.src / prepare.RUST / "lib/rustlib/aarch64-pc-windows-msvc/lib/libstd-test.rlib"
+            path.write_bytes(b"changed target library")
+            inspection = prepare.prepare(self.work, "windows", "arm64", phase="inspect", repo=self.fixture_repo)
+            self.assertTrue(inspection["needs_invalidation"])
+            result = prepare.prepare(self.work, "windows", "arm64", repo=self.fixture_repo)
+        self.assertEqual(result["counters"]["tool_swap_invalidations"], 1)
+        self.assertFalse(obj.exists())
+
+    def test_windows_arm64_wrong_gn_target_fails_before_any_tool_probe(self):
+        self.fixture("windows", "arm64", host_arch="x64")
+        self.write(self.out / "args.gn", 'target_cpu = "x64"\n')
+        with self.native_context("windows", "x64"), mock.patch.object(prepare.subprocess, "run") as run:
+            with self.assertRaisesRegex(ValueError, "target_cpu does not match"):
+                prepare.prepare(self.work, "windows", "arm64", repo=self.fixture_repo)
+            run.assert_not_called()
 
     def test_windows_native_probe_uses_only_mocked_version_commands(self):
         self.fixture("windows", "x64")

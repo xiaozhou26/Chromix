@@ -19,6 +19,15 @@ WORKFLOW = REPO / ".github/workflows/build-win-x64-github.yml"
 PREPARE = REPO / "build/windows/prepare-ungoogled.ps1"
 
 
+def windows_source_fixture(repo):
+    from tools.tests.test_fetch_upstream_cache import synthetic_windows_source
+
+    source = synthetic_windows_source(repo)
+    source['artifacts']['arm64'] = dict(source['artifacts']['x64'], id=104, name='build-artifact-arm',
+                                      run_id=103, workflow_path='.github/workflows/build-arm.yml')
+    return source
+
+
 def stage_budget_source() -> str:
     stage = STAGE.read_text()
     return stage[stage.index('$StageMinutes ='):stage.index('\nfunction Write-OutVar')]
@@ -68,8 +77,12 @@ class WindowsUpstreamCacheRegressionTest(unittest.TestCase):
         self.assertEqual(self.stage.count("--phase restore"), 1)
         self.assertLess(self.stage.index("\nFree-Disk\n"), self.stage.index(self.cache))
         self.assertLess(self.stage.index("--phase restore"), self.stage.index('& "$PSScriptRoot\\prepare-ungoogled.ps1"'))
-        self.assertIn('"--platform", "windows", "--arch", "x64", "--destination", $UpstreamCacheDir', self.cache)
-        self.assertIn('--platform windows --arch x64 --workdir $WorkDir --cache-dir $UpstreamCacheDir', self.cache)
+        self.assertIn('"--platform", "windows", "--arch", $Arch, "--destination", $UpstreamCacheDir', self.cache)
+        self.assertEqual(self.stage.count('"--arch", $Arch'), 1)
+        for path in (STAGE, PREPARE, REPO / 'build/windows/build.ps1'):
+            self.assertNotRegex(path.read_text(), r'--arch(?: x64|", "x64")')
+        self.assertIn('-arch=x64 -host_arch=x64', self.stage)
+        self.assertIn('--arch $Arch --workdir $WorkDir --cache-dir $UpstreamCacheDir', self.cache)
         for number in range(2, 13):
             job = workflow_job(self.workflow, f"build-{number}")
             self.assertIn(f"-StageIndex {number} -MaxStages 12 -FromArtifact", job)
@@ -196,7 +209,7 @@ class WindowsUpstreamCacheRegressionTest(unittest.TestCase):
         self.assertIn('$gn = Join-Path $OutDir "gn.exe"', self.stage)
         self.assertIn('if (-not (Test-Path $gn)) {', self.stage)
         selected = self.stage.index('$Ninja = & python (Join-Path $Repo "tools\\restore_ninja.py")')
-        self.assertIn('--workdir $WorkDir --platform windows --arch x64', self.stage[selected:])
+        self.assertIn('--workdir $WorkDir --platform windows --arch $Arch', self.stage[selected:])
         self.assertIn('if ($LASTEXITCODE -ne 0 -or -not $Ninja) { throw "restored Ninja compatibility check failed" }',
                       self.stage)
         self.assertIn('$env:NINJA = $Ninja', self.stage)
@@ -254,7 +267,7 @@ class WindowsUpstreamCacheRegressionTest(unittest.TestCase):
 
     def test_inspect_precedes_tools_and_finish_precedes_gn_without_placeholder_report(self):
         self.assertIn('"--phase", "inspect"', self.restored_prep)
-        self.assertIn('"--platform", "windows", "--arch", "x64", "--workdir", $Root', self.restored_prep)
+        self.assertIn('"--platform", "windows", "--arch", $Arch, "--workdir", $Root', self.restored_prep)
         self.assertLess(self.restored_prep.index('prepare_restored_build.py'),
                         self.restored_prep.index('Assert-RestoredToolchain'))
         self.assertLess(self.stage.index('& "$PSScriptRoot\\prepare-ungoogled.ps1"'),
@@ -426,8 +439,6 @@ class WindowsRequiredCacheTest(unittest.TestCase):
         self.powershell = shutil.which("pwsh") or "/opt/pwsh/pwsh"
         if not Path(self.powershell).is_file():
             self.skipTest("pwsh is unavailable")
-        from tools.tests.test_fetch_upstream_cache import synthetic_windows_source
-
         self.fixture.pin_repo = self.fixture.repo
         for relative in ("CHROMIUM_VERSION", "CHROMIUM_LINUX_VERSION", "CHROMIUM_MACOS_VERSION",
                          "CHROMIUM_WINDOWS_VERSION", "build/ungoogled-revisions.psd1", "build/upstream-cache.json",
@@ -437,13 +448,15 @@ class WindowsRequiredCacheTest(unittest.TestCase):
             self.fixture.put(self.fixture.repo / "tools" / source.name, source.read_bytes())
         path = self.fixture.repo / "build/upstream-cache.json"
         manifest = json.loads(path.read_text())
-        manifest["sources"]["windows"] = synthetic_windows_source(self.fixture.repo)
+        manifest["sources"]["windows"] = windows_source_fixture(self.fixture.repo)
         path.write_text(json.dumps(manifest))
+        self.fixture.put(self.fixture.repo / 'build/windows/assert-target-arch.ps1',
+                         (REPO / 'build/windows/assert-target-arch.ps1').read_bytes())
         stage = STAGE.read_text()
         policy = next(line for line in stage.splitlines() if line.startswith("$RequireUpstreamCache ="))
-        start = stage.index('$domainProgress = Join-Path $Src')
+        start = stage.index('# Cache restores establish the marker')
         end = stage.index('\nif (-not (Test-Path (Join-Path $Src ".chromix-source-ready"))', start)
-        self.script = self.fixture.root / "stage.ps1"
+        self.script = self.fixture.repo / 'build/windows/stage.ps1'
         self.script.write_text(r'''
 $ErrorActionPreference = "Stop"
 $Repo = $env:TEST_REPO
@@ -454,6 +467,7 @@ $UpstreamCacheDir = $env:TEST_CACHE
 $Revisions = & (Join-Path $Repo "build/windows/read-platform-pins.ps1") -Repo $Repo
 $RestoredUpstream = $false
 $StageIndex = [int]$env:TEST_STAGE
+$Arch = $env:TEST_ARCH
 $FromArtifact = $env:TEST_RESUME -eq "1"
 $UseUpstreamCache = $env:TEST_SWITCH -eq "1"
 $UpstreamRunId = $env:TEST_RUN_ID
@@ -461,6 +475,10 @@ $ValidateOnly = $env:TEST_VALIDATE -eq "1"
 function Get-RemainingMin { return [int]$env:TEST_MINUTES }
 function Invoke-Tracked {
   param($File, $ArgList, $Cwd, $TimeoutSec)
+  if (-not $ArgList.Contains('"--arch" "' + $Arch + '"')) { throw "fetch target architecture missing" }
+  if ($UpstreamRunId -and -not $ArgList.Contains('"--run-id" "' + $UpstreamRunId + '"')) {
+    throw "explicit upstream run missing"
+  }
   Add-Content $env:CALL_LOG "fetch"
   if ($env:TEST_TRACKED_ERROR) { throw $env:TEST_TRACKED_ERROR }
   if ($TimeoutSec -gt 10800 -or $TimeoutSec -lt 60 -or
@@ -480,11 +498,11 @@ Add-Content $env:CALL_LOG ("ninja:" + $OutDir.Replace('\', '/'))
 ''')
 
     def run_stage(self, *, enabled=True, validate=False, resume=False, stage=1,
-                  minutes=300, fetch_rc=0, switch=False, run_id="", tracked_error="", prefer=False):
+                  minutes=300, fetch_rc=0, switch=False, run_id="", tracked_error="", prefer=False, arch="x64"):
         fixture = self.fixture
         env = {**fixture.env, "TEST_REPO": str(fixture.repo), "TEST_WORK": str(fixture.work),
                "TEST_CACHE": str(fixture.cache), "TEST_PYTHON": sys.executable,
-               "TEST_STAGE": str(stage), "TEST_RESUME": str(int(resume)),
+               "TEST_STAGE": str(stage), "TEST_RESUME": str(int(resume)), "TEST_ARCH": arch,
                "TEST_SWITCH": str(int(switch)), "TEST_RUN_ID": run_id,
                "TEST_VALIDATE": str(int(validate)), "TEST_MINUTES": str(minutes),
                "FETCH_RC": str(fetch_rc), "TEST_TRACKED_ERROR": tracked_error,
@@ -492,6 +510,59 @@ Add-Content $env:CALL_LOG ("ninja:" + $OutDir.Replace('\', '/'))
                "CHROMIX_PREFER_UPSTREAM_CACHE": str(int(prefer))}
         return subprocess.run([self.powershell, "-NoLogo", "-NoProfile", "-NonInteractive",
                                "-File", str(self.script)], env=env, capture_output=True, text=True, timeout=20)
+
+    def test_arm64_restore_initializes_verified_marker_and_resumes_same_target(self):
+        self.fixture.seed('windows', 'arm64')
+        result = self.run_stage(arch='arm64', run_id='103')
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertEqual((self.fixture.work / '.chromix-target-arch').read_text().strip(), 'arm64')
+        self.assertEqual(self.fixture.called()[:4], ['fetch', 'restore', 'verify', 'verify'])
+        receipt = json.loads((self.fixture.work / 'src/.chromix-upstream-restored.json').read_text())
+        self.assertEqual(receipt['identity']['arch'], 'arm64')
+        self.assertEqual(receipt['identity']['run_id'], 103)
+        self.fixture.calls.unlink()
+        resumed = self.run_stage(arch='arm64', stage=2, resume=True)
+        self.assertEqual(resumed.returncode, 0, resumed.stdout + resumed.stderr)
+        self.assertEqual(self.fixture.called(), ['verify', 'prepare',
+                         f'ninja:{self.fixture.work.as_posix()}/src/out/Default'])
+        (self.fixture.work / '.chromix-target-arch').unlink()
+        self.fixture.calls.unlink()
+        missing = self.run_stage(arch='arm64', stage=2, resume=True)
+        self.assertNotEqual(missing.returncode, 0)
+        self.assertIn('no target architecture marker', missing.stderr)
+        self.assertFalse((self.fixture.work / '.chromix-target-arch').exists())
+        self.assertEqual(self.fixture.called(), [])
+
+    def test_arm64_rejects_x64_cache_without_initializing_marker(self):
+        self.fixture.seed('windows', 'x64')
+        result = self.run_stage(arch='arm64')
+        self.assertNotEqual(result.returncode, 0)
+        self.assertFalse((self.fixture.work / '.chromix-target-arch').exists())
+        self.assertNotIn('prepare', self.fixture.called())
+
+    def test_arm64_rejects_x64_snapshot_even_with_arm64_marker(self):
+        self.fixture.seed('windows', 'x64')
+        restored = self.run_stage()
+        self.assertEqual(restored.returncode, 0, restored.stderr)
+        self.fixture.calls.unlink()
+        self.fixture.put(self.fixture.work / '.chromix-target-arch', 'arm64')
+        result = self.run_stage(arch='arm64', stage=2, resume=True)
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn('receipt platform/architecture mismatch', result.stderr)
+        self.assertEqual(self.fixture.called(), [])
+
+    def test_arm64_default_is_cold_and_explicit_miss_stops_before_marker_or_prepare(self):
+        self.fixture.seed('windows', 'arm64', reason='artifact_expired')
+        failed = self.run_stage(arch='arm64')
+        self.assertNotEqual(failed.returncode, 0)
+        self.assertFalse((self.fixture.work / '.chromix-target-arch').exists())
+        self.assertEqual(self.fixture.called(), ['fetch'])
+        self.fixture.calls.unlink()
+        cold = self.run_stage(arch='arm64', enabled=False)
+        self.assertEqual(cold.returncode, 0, cold.stderr)
+        self.assertEqual(self.fixture.called(), ['prepare',
+                         f'ninja:{self.fixture.work.as_posix()}/src/out/Chromix'])
+        self.assertEqual((self.fixture.work / '.chromix-target-arch').read_text().strip(), 'arm64')
 
     def test_only_metadata_expiry_can_fall_back_when_cache_is_optional(self):
         for enabled, phase, reason, success in (
@@ -640,7 +711,9 @@ Add-Content $env:CALL_LOG ("ninja:" + $OutDir.Replace('\', '/'))
                     self.fixture.put(src / ".chromix-upstream-restored.json", receipt)
                 result = self.run_stage(stage=2, resume=True)
                 self.assertNotEqual(result.returncode, 0)
-                self.assertEqual(self.fixture.called(), [] if receipt is None else ["verify"])
+                self.assertEqual(self.fixture.called(), [])
+                if receipt is not None:
+                    self.assertIn('receipt platform/architecture mismatch', result.stderr)
                 self.assertTrue((src / ".chromix-source-ready").is_file())
 
     def test_fresh_no_cache_is_normal_but_switch_or_run_id_requires_it(self):
@@ -658,6 +731,8 @@ Add-Content $env:CALL_LOG ("ninja:" + $OutDir.Replace('\', '/'))
 
 
 class WindowsRestoredPreparationFixture:
+    arch = "x64"
+
     def setUp(self):
         self.temp = tempfile.TemporaryDirectory(prefix="windows restored prep ")
         self.addCleanup(self.temp.cleanup)
@@ -668,8 +743,6 @@ class WindowsRestoredPreparationFixture:
         self.repo.mkdir()
         self.src.mkdir(parents=True)
         self.calls = self.root / "calls"
-        from tools.tests.test_fetch_upstream_cache import synthetic_windows_source
-
         for relative in ("CHROMIUM_VERSION", "CHROMIUM_LINUX_VERSION", "CHROMIUM_MACOS_VERSION",
                          "CHROMIUM_WINDOWS_VERSION", "build/ungoogled-revisions.psd1", "build/upstream-cache.json",
                          "build/windows/read-platform-pins.ps1"):
@@ -677,7 +750,7 @@ class WindowsRestoredPreparationFixture:
         self.pins = load_pins(self.repo, "windows")
         path = self.repo / "build/upstream-cache.json"
         manifest = json.loads(path.read_text())
-        manifest["sources"]["windows"] = synthetic_windows_source(self.repo)
+        manifest["sources"]["windows"] = windows_source_fixture(self.repo)
         self.put(path, json.dumps(manifest))
         self.put(self.repo / "patches/series", "patches/one.patch\n")
         self.put(self.repo / "patches/one.patch", "diff --git a/sample.cc b/sample.cc\n--- a/sample.cc\n+++ b/sample.cc\n"
@@ -691,7 +764,7 @@ class WindowsRestoredPreparationFixture:
 from pathlib import Path
 with open(os.environ['MOCK_CALLS'], 'a') as output:
     output.write('verify\\n')
-assert sys.argv[1:7] == ['--phase', 'verify', '--platform', 'windows', '--arch', 'x64']
+assert sys.argv[1:7] == ['--phase', 'verify', '--platform', 'windows', '--arch', os.environ['CHROMIX_TARGET_ARCH']]
 assert '--cache-dir' not in sys.argv
 src = Path(sys.argv[sys.argv.index('--workdir') + 1]) / 'src'
 assert json.loads((src / '.chromix-upstream-restored.json').read_text()).get('valid')
@@ -712,6 +785,13 @@ assert json.loads((src / '.chromix-upstream-restored.json').read_text()).get('va
         self.put(self.src / "third_party/rust-toolchain/bin/rustc_driver-fixture.dll", "driver")
         for relative in ("include/stddef.h", "include/stdarg.h", "lib/windows/clang_rt.builtins-x86_64.lib"):
             self.put(self.src / "third_party/llvm-build/Release+Asserts/lib/clang/22" / relative, "resource")
+        self.put(self.repo / 'build/windows/prep_rust_toolchain.py',
+                 (REPO / 'build/windows/prep_rust_toolchain.py').read_text())
+        self.put(self.root / 'assert-target-arch.ps1', (REPO / 'build/windows/assert-target-arch.ps1').read_text())
+        if self.arch == 'arm64':
+            self.put(self.work / '.chromix-target-arch', 'arm64')
+            for name in ('std', 'core', 'alloc', 'compiler_builtins'):
+                self.put(self.src / f'third_party/rust-toolchain/lib/rustlib/aarch64-pc-windows-msvc/lib/lib{name}-fixture.rlib', 'std')
         self.prepare_build_fixture()
         # Only host executable discovery differs on Linux; the preparation body is unchanged.
         source = source.replace('(Get-Command python.exe -ErrorAction Stop).Source', '$env:MOCK_PYTHON')
@@ -735,7 +815,8 @@ function git {
 }
 & $env:MOCK_SCRIPT -Root $env:MOCK_WORK -Repo $env:MOCK_REPO
 ''')
-        self.env = {**os.environ, "MOCK_CALLS": str(self.calls), "MOCK_PYTHON": sys.executable,
+        self.env = {**os.environ, 'CHROMIX_TARGET_ARCH': self.arch,
+                    "MOCK_CALLS": str(self.calls), "MOCK_PYTHON": sys.executable,
                     "MOCK_CORE": self.pins["UngoogledCommit"], "MOCK_WINDOWS": self.pins["UngoogledWindowsCommit"],
                     "MOCK_SCRIPT": str(self.script), "MOCK_WORK": str(self.work), "MOCK_REPO": str(self.repo)}
 
@@ -748,13 +829,14 @@ function git {
         from tools import prepare_restored_build as helper
         from tools import restore_upstream_cache as restore
 
-        identity, _, manifest = restore.identities(self.repo, "windows", "x64")
+        identity, _, manifest = restore.identities(self.repo, "windows", self.arch)
         version = "\n".join(f"{key}={value}" for key, value in zip(
             ("MAJOR", "MINOR", "BUILD", "PATCH"), identity["chromium_version"].split(".")))
         self.put(self.src / "chrome/VERSION", version)
         self.put(self.src / "BUILD.gn", "# fixture\n")
         self.out = self.src / "out/Default"
-        self.put(self.out / "args.gn", 'target_cpu = "x64"\nis_debug = true\n'
+        self.put(self.out / "args.gn", f'target_cpu = "{self.arch}"\nis_debug = true\n'
+                 'chrome_pgo_phase = 0\nchrome_pgo_phase = 2 # donor Windows override\n'
                  'extra_literal = ["upstream", "with spaces"]\ncommon_override = "donor"\n'
                  'windows_override = "donor"\n')
         self.put(self.out / "build.ninja", "# fixture\n")
@@ -775,13 +857,13 @@ function git {
         (self.out / ".ninja_deps").write_bytes(deps)
         receipt = {"schema_version": 1, "owner": restore.OWNER, "status": "restored", "valid": True,
                    "extraction_scope": restore.fetcher.SOURCE_SCOPE, "identity": identity, "manifest": manifest,
-                   "platform": "windows", "arch": "x64", "external_symlink_paths": [],
+                   "platform": "windows", "arch": self.arch, "external_symlink_paths": [],
                    "original_args": restore.source_args(self.src, identity)}
         self.put(self.src / restore.MARKER, json.dumps(receipt))
         self.put(self.out / "obj/sdk.obj", "external SDK object")
         for name in ("chrome.exe", "chrome.dll", "chrome_elf.dll"):
             self.put(self.out / name, "upstream final product")
-        for name, relative in helper.tool_paths("windows", "x64").items():
+        for name, relative in helper.tool_paths("windows", self.arch).items():
             if name == "bindgen":
                 continue
             path = self.src / relative
@@ -918,7 +1000,7 @@ sys.path.insert(0, {str(REPO)!r})
 from tools import restore_ninja as helper
 work = Path(os.environ['MOCK_WORK'])
 ninja = work / 'src/third_party/ninja/ninja.exe'
-assert sys.argv[1:] == ['--workdir', str(work), '--platform', 'windows', '--arch', 'x64']
+assert sys.argv[1:] == ['--workdir', str(work), '--platform', 'windows', '--arch', os.environ['CHROMIX_TARGET_ARCH']]
 run = subprocess.run
 def probe(command, **kwargs):
     assert command == [str(ninja), '--version'], command
@@ -935,6 +1017,7 @@ raise SystemExit(helper.main())
         self.put(self.work / "tooling/ungoogled-chromium-windows/flags.windows.gn",
                  'windows_override = "windows"\nis_debug = true\n')
         self.put(self.repo / "build/args.windows.gn", (REPO / "build/args.windows.gn").read_text())
+        self.put(self.repo / 'build/args.windows.arm64.gn', (REPO / 'build/args.windows.arm64.gn').read_text())
         from tools.upstream_script_identity import ENDPOINTS, RESTORED
         for relative, keys in RESTORED.items():
             self.put(self.src / relative, "\n".join(ENDPOINTS[key][0] for key in keys))
@@ -973,7 +1056,7 @@ parser = argparse.ArgumentParser()
 parser.add_argument('--phase', choices=('before', 'after'), required=True)
 parser.add_argument('--workdir', type=Path, required=True)
 parser.add_argument('--platform', choices=('windows',), required=True)
-parser.add_argument('--arch', choices=('x64',), required=True)
+parser.add_argument('--arch', choices=(os.environ['CHROMIX_TARGET_ARCH'],), required=True)
 parser.add_argument('--ninja', required=True)
 parser.add_argument('--target', choices=('chrome',), required=True)
 parser.add_argument('--exit-code', type=int)
@@ -1025,6 +1108,7 @@ $Src = Join-Path $WorkDir "src"
 $OutDir = Join-Path $Src "out/Chromix"
 $RestoredUpstream = $false
 $StageIndex = [int]$env:MOCK_STAGE
+$Arch = $env:CHROMIX_TARGET_ARCH
 $FromArtifact = $StageIndex -gt 1
 $ValidateOnly = $env:MOCK_VALIDATE -eq "1"
 $UseUpstreamCache = $true
@@ -1095,7 +1179,7 @@ function Invoke-FixtureNinja {
         baseline_time = baseline.stat().st_mtime_ns
         self.assertEqual(json.loads((evidence / "result.json").read_text()), {"exit_code": 0})
         report = self.report()
-        self.assertEqual((report["platform"], report["arch"], report["phase"]), ("windows", "x64", "finish"))
+        self.assertEqual((report["platform"], report["arch"], report["phase"]), ("windows", self.arch, "finish"))
         self.assertTrue(report["ready_for_gn"])
         self.assertGreater(report["counters"]["toolchain_invalidated_outputs"], 0)
         self.assertFalse((self.out / "obj/retained.obj").exists())
@@ -1111,6 +1195,9 @@ function Invoke-FixtureNinja {
         self.assertIn('windows_override = "windows"', args)
         self.assertEqual(args.count('is_debug ='), 1)
         self.assertIn('is_debug = false', args)
+        self.assertIn(f'target_cpu = "{self.arch}"', args)
+        self.assertIn('chrome_pgo_phase = ' + ('2 # donor Windows override' if self.arch == 'arm64' else '0'), args)
+        self.assertEqual(args.count('chrome_pgo_phase'), 1)
         self.assertFalse((self.src / "out/Chromix").exists())
         self.put(self.out / "obj/retained.obj", "new object")
         self.put(self.out / "chrome.exe", "Chromix product")
@@ -1229,6 +1316,122 @@ function Invoke-FixtureNinja {
                 self.assertTrue((self.src / ".chromix-restored-build-inspection.json").exists())
 
 
+class WindowsArm64PgoTestMixin:
+    def test_required_pgo_fails_before_gn_on_initial_build_and_resume(self):
+        fixture = getattr(self, 'fixture', self)
+        path = fixture.out / 'args.gn'
+        for resume in (False, True):
+            valid = path.read_text()
+            without_pgo = ''.join(line for line in valid.splitlines(keepends=True)
+                                  if not line.startswith('chrome_pgo_phase'))
+            for assignment in ('', 'chrome_pgo_phase = true\n', 'chrome_pgo_phase = 3\n',
+                               'chrome_pgo_phase = "2"\n'):
+                with self.subTest(resume=resume, assignment=assignment):
+                    path.write_text(without_pgo + assignment)
+                    before = path.read_bytes()
+                    fixture.calls.unlink(missing_ok=True)
+                    failed = fixture.run_prep()
+                    self.assertNotEqual(failed.returncode, 0)
+                    self.assertIn('chrome_pgo_phase', failed.stdout + failed.stderr)
+                    phases = fixture.phases()
+                    self.assertIn('verify', phases)
+                    self.assertIn('inspect', phases)
+                    self.assertNotIn('gn-gen', phases)
+                    self.assertNotIn('ninja', phases)
+                    self.assertEqual(path.read_bytes(), before)
+            path.write_text(valid)
+            fixture.calls.unlink(missing_ok=True)
+            passed = fixture.run_prep()
+            self.assertEqual(passed.returncode, 0, passed.stdout + passed.stderr)
+            fixture.env.update(MOCK_STAGE='2', MOCK_LOCAL_RESUME='1')
+
+    def test_receipt_verification_precedes_required_pgo_validation(self):
+        fixture = getattr(self, 'fixture', self)
+        receipt_path = fixture.src / '.chromix-upstream-restored.json'
+        receipt = json.loads(receipt_path.read_text())
+        receipt['valid'] = False
+        receipt_path.write_text(json.dumps(receipt))
+        path = fixture.out / 'args.gn'
+        path.write_text('target_cpu="arm64"\nchrome_pgo_phase = true\n')
+        before = path.read_bytes()
+        failed = fixture.run_prep()
+        self.assertNotEqual(failed.returncode, 0)
+        self.assertEqual(fixture.phases(), ['verify'])
+        self.assertNotIn('GN argument merge failed', failed.stderr)
+        self.assertEqual(path.read_bytes(), before)
+
+
+@unittest.skipUnless(shutil.which('pwsh') and shutil.which('patch'), 'PowerShell and GNU patch required')
+class WindowsArm64RestoredBuildStageTest(WindowsArm64PgoTestMixin, WindowsRestoredBuildStageTest):
+    arch = 'arm64'
+
+
+@unittest.skipUnless(shutil.which('pwsh') and shutil.which('patch'), 'PowerShell and GNU patch required')
+class WindowsArm64LocalBuildTest(WindowsArm64PgoTestMixin, unittest.TestCase):
+    def setUp(self):
+        fixture = WindowsRestoredBuildStageTest()
+        fixture.arch = 'arm64'
+        fixture.addCleanup = self.addCleanup
+        fixture.setUp()
+        self.fixture = fixture
+        fixture.env.update(MOCK_STAGE='2', MOCK_LOCAL_RESUME='0')
+        source = (REPO / 'build/windows/build.ps1').read_text()
+        # Native tool execution and final PE version metadata are covered separately.
+        source = source[:source.index('\n$chrome = Join-Path $Out')]
+        source = source.replace('$Repo = (Resolve-Path "$PSScriptRoot\\..\\..").Path', '$Repo = $env:MOCK_REPO')
+        source = source.replace('& $gn gen $Out --fail-on-unused-args',
+                                'Invoke-FixtureGn gen $Out --fail-on-unused-args')
+        source = source.replace('& $Ninja -C $Out -n chrome', 'Invoke-FixtureNinja $Ninja -C $Out -n chrome')
+        source = source.replace('& $Ninja -C $Out -j $Jobs chrome', 'Invoke-FixtureCompile -C $Out -j $Jobs chrome')
+        fixture.put(fixture.root / 'build.ps1', source)
+        fixture.put(fixture.root / 'assert-arm64-toolchain.ps1', 'param($ChromiumVersion)\n')
+        prelude = fixture.wrapper.read_text().split('$domainProgress = Join-Path $Src', 1)[0]
+        fixture.put(fixture.wrapper, prelude + r'''
+$OutDir = Join-Path $Src "out/Default"
+function Invoke-FixtureCompile {
+  if ($args.Count -ne 5 -or $args[0] -ne "-C" -or $args[1] -ne $OutDir -or
+      $args[2] -ne "-j" -or $args[3] -ne 8 -or $args[4] -ne "chrome") { throw "unexpected compile arguments" }
+  Add-Content -LiteralPath $env:MOCK_CALLS -Value "ninja"
+  $global:LASTEXITCODE = [int]$env:MOCK_NINJA_RC
+}
+& (Join-Path $PSScriptRoot "build.ps1") -WorkDir $WorkDir -Arch arm64 -Resume:($env:MOCK_LOCAL_RESUME -eq "1")
+''')
+
+    def test_local_pipeline_uses_arm64_receipts_and_x64_host_tools(self):
+        fixture = self.fixture
+        result = fixture.run_prep()
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertEqual(fixture.phases(), ['verify', 'inspect', 'ninja-guard', 'normalize', 'bindgen',
+                                          'finish', 'gn-bootstrap', 'gn-gen', 'ninja-plan',
+                                          'evidence-before', 'ninja', 'evidence-after'])
+        self.assertEqual(fixture.report()['arch'], 'arm64')
+        self.assertTrue(fixture.report()['ready_for_gn'])
+        args = (fixture.out / 'args.gn').read_text()
+        self.assertIn('target_cpu = "arm64"', args)
+        self.assertIn('chrome_pgo_phase = 2 # donor Windows override', args)
+        self.assertEqual(args.count('chrome_pgo_phase'), 1)
+        self.assertFalse((fixture.src / 'out/Chromix').exists())
+        self.assertEqual((fixture.work / '.chromix-target-arch').read_text().strip(), 'arm64')
+        fixture.calls.unlink()
+        fixture.env.update(MOCK_NINJA_RC='9', MOCK_LOCAL_RESUME='1')
+        failed = fixture.run_prep()
+        self.assertNotEqual(failed.returncode, 0)
+        self.assertIn('ninja failed (exit 9)', failed.stderr)
+        self.assertEqual(fixture.phases()[-3:], ['evidence-before', 'ninja', 'evidence-after'])
+        self.assertEqual((fixture.out / 'args.gn').read_text(), args)
+
+    def test_local_pipeline_rejects_x64_receipt_before_preparation(self):
+        fixture = self.fixture
+        path = fixture.src / '.chromix-upstream-restored.json'
+        receipt = json.loads(path.read_text())
+        receipt['arch'] = 'x64'
+        fixture.put(path, json.dumps(receipt))
+        failed = fixture.run_prep()
+        self.assertNotEqual(failed.returncode, 0)
+        self.assertIn('receipt platform/architecture mismatch', failed.stderr)
+        self.assertFalse(fixture.calls.exists())
+
+
 @unittest.skipUnless(shutil.which("pwsh"), "PowerShell required")
 class WindowsRestoreStageMockTest(unittest.TestCase):
     def setUp(self):
@@ -1259,6 +1462,7 @@ $Src = Join-Path $WorkDir "src"
 $OutDir = Join-Path $Src "out/Chromix"
 $RestoredUpstream = $false
 $StageIndex = [int]$env:MOCK_STAGE
+$Arch = "x64"
 $ValidateOnly = $env:MOCK_VALIDATE -eq "1"
 $FromArtifact = $env:MOCK_ARTIFACT -eq "1"
 $UseUpstreamCache = $env:MOCK_USE -eq "1"
@@ -1302,7 +1506,7 @@ function python {
 Set-Content -LiteralPath (Join-Path $Repo "out-dir") -Value $OutDir
 ''', encoding="utf-8")
         (self.root / "prepare-ungoogled.ps1").write_text(r'''
-param($Root, $Repo, $DeadlineEpoch, $ReserveMinutes)
+param($Root, $Repo, $DeadlineEpoch, $ReserveMinutes, $Arch = "x64")
 Add-Content -LiteralPath $env:MOCK_CALLS -Value "prepare"
 if ($ReserveMinutes -ne $PackReserveMin -or $DeadlineEpoch -ne [DateTimeOffset]::new($Deadline).ToUnixTimeSeconds()) {
   throw "preparation did not receive the stage budget"
@@ -1311,7 +1515,7 @@ if ($env:MOCK_PREPARE_EXHAUSTED -eq "1") { throw "PREPARE_BUDGET_EXHAUSTED: fixt
 $Src = Join-Path $Root "src"
 New-Item -ItemType Directory -Force -Path $Src | Out-Null
 if (Test-Path (Join-Path $Src ".chromix-upstream-restored.json")) {
-  python (Join-Path $Repo "tools/restore_upstream_cache.py") --phase verify --platform windows --arch x64 --workdir $Root
+  python (Join-Path $Repo "tools/restore_upstream_cache.py") --phase verify --platform windows --arch $Arch --workdir $Root
   if ($LASTEXITCODE -ne 0) { throw "mock prepare receipt verification failed" }
 }
 $ready = Join-Path $Src ".chromix-source-ready"

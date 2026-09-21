@@ -47,7 +47,7 @@ class Arm64BuildSourceTest(unittest.TestCase):
             self.assertNotRegex(source, r'host_cpu\s*=\s*"arm64"|Replace\("x64", "arm64"\)')
         stage = (WINDOWS / "ci-stage.ps1").read_text()
         self.assertIn('-arch=x64 -host_arch=x64', stage)
-        self.assertIn('--arch x64 --workdir $WorkDir --cache-dir $UpstreamCacheDir', stage)
+        self.assertIn('--arch $Arch --workdir $WorkDir --cache-dir $UpstreamCacheDir', stage)
 
     def test_real_gn_merge_preserves_x64_default_and_arm64_final_target(self):
         with tempfile.TemporaryDirectory() as temp:
@@ -70,6 +70,51 @@ class Arm64BuildSourceTest(unittest.TestCase):
                         self.assertEqual(re.findall(r'^target_cpu\s*=\s*"([^"\n]+)"', args, re.M), [arch])
                         self.assertIn('host_cpu="x64"', args)
                         self.assertIn('is_debug = false', args)
+
+    @unittest.skipUnless(PWSH, "PowerShell is unavailable")
+    def test_both_entrypoint_merges_preserve_pgo_only_for_restored_arm64(self):
+        with tempfile.TemporaryDirectory(prefix='windows PGO merge ') as temp:
+            root = Path(temp)
+            core, windows, out = (root / name for name in ('core', 'windows', 'out'))
+            for path in (core, windows, out):
+                path.mkdir()
+            (core / 'flags.gn').write_text('chrome_pgo_phase=0\nsymbol_level=2\n')
+            (windows / 'flags.windows.gn').write_text('chrome_pgo_phase=2\n')
+            for name, variable in (('build.ps1', '$mergedArgs'), ('ci-stage.ps1', '$gnArgs')):
+                source = (WINDOWS / name).read_text()
+                start = source.index(variable + ' = Join-Path')
+                end = source.index('if ($Arch -eq "arm64") {\n  & "$PSScriptRoot\\assert-target-arch.ps1"', start)
+                merge = source[start:end]
+                for arch in ('arm64', 'x64'):
+                    for restored in (False, True):
+                        for profile in ('native', 'fast', 'release'):
+                            with self.subTest(name=name, arch=arch, restored=restored, profile=profile):
+                                (out / 'args.gn').write_text('chrome_pgo_phase = 2 # donor\ntarget_cpu="arm64"\n')
+                                receipt = root / '.chromix-upstream-restored.json'
+                                receipt.unlink(missing_ok=True)
+                                if restored:
+                                    receipt.write_text('{}')
+                                result = run_ps(r'''
+$Repo = $env:TEST_REPO
+$Src = $env:TEST_ROOT
+$Out = $OutDir = Join-Path $Src "out"
+$UngoogledTooling = Join-Path $Src "core"
+$WindowsTooling = Join-Path $Src "windows"
+$Arch = $env:TEST_ARCH
+$RestoredUpstream = $env:TEST_RESTORED -eq "1"
+$BuildProfile = $env:TEST_PROFILE
+function python {
+  & $env:TEST_PYTHON @args
+  $global:LASTEXITCODE = $LASTEXITCODE
+}
+''' + merge, TEST_REPO=str(REPO), TEST_ROOT=str(root), TEST_ARCH=arch,
+                                    TEST_RESTORED=str(int(restored)), TEST_PROFILE=profile, TEST_PYTHON=sys.executable)
+                                self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+                                text = (out / 'args.gn').read_text()
+                                expected = '2 # donor' if arch == 'arm64' and restored else '0'
+                                self.assertIn('chrome_pgo_phase = ' + expected, text)
+                                self.assertEqual(text.count('chrome_pgo_phase'), 1)
+                                self.assertIn(f'target_cpu = "{arch}"', text)
 
     def test_snapshot_guard_precedes_source_migration_and_tool_downloads(self):
         stage = (WINDOWS / "ci-stage.ps1").read_text()
@@ -188,7 +233,40 @@ class Arm64SnapshotTest(unittest.TestCase):
         self.put('src/.chromix-upstream-restored.json', '{"arch":"x64"}')
         failed = self.guard()
         self.assertNotEqual(failed.returncode, 0)
-        self.assertIn('cannot reuse the x64 pinned upstream cache', failed.stderr)
+        self.assertIn('receipt platform/architecture mismatch', failed.stderr)
+
+    def test_existing_restore_requires_receipt_identity_before_initializing_marker(self):
+        self.put('src/out/Default/args.gn', 'target_cpu="arm64"\nhost_cpu="x64"\n')
+        good = {'platform': 'windows', 'arch': 'arm64',
+                'identity': {'platform': 'windows', 'arch': 'arm64'}}
+        for receipt in (None, [], [good, good], {}, {'arch': 'arm64'}, {**good, 'arch': 'x64'},
+                        {**good, 'platform': 'linux'}, {**good, 'identity': {'arch': 'x64'}}):
+            with self.subTest(receipt=receipt):
+                self.put('src/.chromix-upstream-restored.json', json.dumps(receipt))
+                failed = self.guard()
+                self.assertNotEqual(failed.returncode, 0)
+                self.assertIn('receipt platform/architecture mismatch', failed.stderr)
+                self.assertFalse((self.work / '.chromix-target-arch').exists())
+        self.put('src/.chromix-upstream-restored.json', json.dumps(good))
+        code = r'''
+function python {
+  if ($args[1] -ne "--phase" -or $args[2] -ne "verify" -or
+      $args[4] -ne "windows" -or $args[6] -ne "arm64") { throw "wrong restore verification interface" }
+  if (Test-Path (Join-Path $env:WORK ".chromix-target-arch")) { throw "marker initialized before receipt verification" }
+  $global:LASTEXITCODE = [int]$env:VERIFY_RC
+}
+& $env:GUARD -WorkDir $env:WORK -Arch arm64 -Initialize
+'''
+        for rc in ('1', '0'):
+            result = run_ps(code, GUARD=str(WINDOWS / 'assert-target-arch.ps1'),
+                            WORK=str(self.work), VERIFY_RC=rc)
+            self.assertEqual(result.returncode == 0, rc == '0', result.stderr)
+            self.assertEqual((self.work / '.chromix-target-arch').exists(), rc == '0')
+        (self.work / '.chromix-target-arch').unlink()
+        failed = self.guard(require=True)
+        self.assertNotEqual(failed.returncode, 0)
+        self.assertIn('no target architecture marker', failed.stderr)
+        self.assertFalse((self.work / '.chromix-target-arch').exists())
 
     def test_all_known_output_directories_are_checked_and_unknown_output_rejected(self):
         self.put('.chromix-target-arch', 'arm64')
@@ -203,7 +281,8 @@ class Arm64SnapshotTest(unittest.TestCase):
 
     def test_legacy_x64_snapshot_remains_compatible(self):
         self.put('src/.chromix-source-ready', 'legacy unchanged')
-        self.put('src/.chromix-upstream-restored.json', '{"arch":"x64"}')
+        self.put('src/.chromix-upstream-restored.json', json.dumps({
+            'platform': 'windows', 'arch': 'x64', 'identity': {'platform': 'windows', 'arch': 'x64'}}))
         self.put('src/out/Default/args.gn', 'target_cpu="x64"\ntarget_cpu = "x64"\n')
         passed = self.guard('x64')
         self.assertEqual(passed.returncode, 0, passed.stderr)
@@ -234,7 +313,7 @@ if ($env:EXPLICIT) { $options.Arch = $env:EXPLICIT }
                         self.assertEqual(result.returncode, 0, result.stderr)
                         self.assertEqual(result.stdout.strip(), expected)
 
-    def test_upstream_opt_in_fails_and_optional_preference_is_ignored_for_arm64(self):
+    def test_upstream_opt_in_is_target_independent(self):
         source = (WINDOWS / 'ci-stage.ps1').read_text()
         policy = source[source.index('$RequireUpstreamCache ='):source.index('$PartsDir =')]
         for arch in ('x64', 'arm64'):
@@ -248,12 +327,10 @@ $UpstreamRunId = if ($env:OPTION -eq "run") { "123" } else { "" }
 @{ required = [bool]$RequireUpstreamCache; prefer = $env:CHROMIX_PREFER_UPSTREAM_CACHE } | ConvertTo-Json -Compress
 ''', TEST_ARCH=arch, OPTION=option, CHROMIX_USE_UPSTREAM_CACHE='1' if option == 'env' else '0',
                                     CHROMIX_PREFER_UPSTREAM_CACHE='1')
-                    blocked = arch == 'arm64' and option != 'none'
-                    self.assertEqual(result.returncode != 0, blocked, result.stderr)
-                    if not blocked:
-                        data = json.loads(result.stdout)
-                        self.assertEqual(data['prefer'], '0' if arch == 'arm64' else '1')
-                        self.assertEqual(data['required'], option != 'none')
+                    self.assertEqual(result.returncode, 0, result.stderr)
+                    data = json.loads(result.stdout)
+                    self.assertEqual(data['prefer'], '1')
+                    self.assertEqual(data['required'], option != 'none')
 
 
 class Arm64RustToolchainTest(unittest.TestCase):

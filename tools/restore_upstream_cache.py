@@ -38,7 +38,7 @@ OWNER = "chromix-upstream-restore-v1"
 Miss = importer.Miss
 LocalError = fetcher.LocalError
 TARGETS = {("linux", "x64"), ("linux", "arm64"), ("macos", "x64"),
-           ("macos", "arm64"), ("windows", "x64")}
+           ("macos", "arm64"), ("windows", "x64"), ("windows", "arm64")}
 NANOSECOND = 1_000_000_000
 # Keep synchronized with importer.preserve_external_tool_lookups.
 HOST_LINKS = {"third_party/node/linux/node-linux-x64/bin/node",
@@ -143,9 +143,7 @@ def source_args(src: Path, identity: dict) -> dict:
         raise Miss("restored chrome/VERSION does not match repository pins")
     path = src / "out/Default/args.gn"
     values = gn_assignments_last_wins(path)
-    for name in ("target_cpu", "v8_target_cpu"):
-        if (name == "target_cpu" or name in values) and values.get(name) != json.dumps(identity["arch"]):
-            raise Miss(f"GN {name} does not match requested architecture")
+    importer.validate_gn_target(values, identity["platform"], identity["arch"])
     raw = path.read_bytes()
     return {"path": "out/Default/args.gn", "text": raw.decode("utf-8"),
             "bytes": len(raw), "sha256": hashlib.sha256(raw).hexdigest(), "assignments": values}
@@ -379,6 +377,7 @@ def verify_restored(workdir: Path, platform: str, arch: str, repo: Path = REPO) 
     for name in ("target_cpu", "v8_target_cpu"):
         if (name == "target_cpu" or name in original_values) and original_values.get(name) != json.dumps(arch):
             raise Miss("restored original GN args architecture is inconsistent")
+    importer.validate_gn_target(original_values, platform, arch)
     links = receipt.get("external_symlink_paths")
     if (not isinstance(links, list)
             or any(not isinstance(name, str) or not is_known_external_link(name, platform) for name in links)
