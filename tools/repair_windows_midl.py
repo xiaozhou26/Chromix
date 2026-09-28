@@ -53,6 +53,24 @@ WINDOWS154_RECORDS = (
         "before_sha256": WINDOWS154_ORIGINAL_SHA256,
         "after_sha256": WINDOWS154_REPAIRED_SHA256,
     }),
+    MappingProxyType({
+        "identity": MappingProxyType({
+            "chromium_version": "154.0.8037.57",
+            "ungoogled_commit": "800d0bb5078472e4442c1fd73373172754a60939",
+            "head_sha": "fc387c7527f875ca73c82ed4907fccaa86808c9a",
+            "platform": "windows", "arch": "arm64",
+            "repository": "ungoogled-software/ungoogled-chromium-windows",
+            "repository_id": 177210827,
+            "head_branch": "154.0.8037.57-1.1", "event": "push",
+            "workflow_path": ".github/workflows/build-arm.yml",
+            "run_id": 36093095856,
+            "artifact_id": 10939470078, "artifact_name": "build-artifact-arm",
+            "artifact_digest": "sha256:4f6e341e4a9dec0b2ffc5e7dab81d8bebc4074b91b55acfa78f6e9b443c25133",
+            "artifact_size_in_bytes": 16009896290,
+        }),
+        "before_sha256": WINDOWS154_ORIGINAL_SHA256,
+        "after_sha256": WINDOWS154_REPAIRED_SHA256,
+    }),
 )
 BEFORE = b"""            open(file_path, 'wb').close()
         shutil.copy(file_path, outdir)
