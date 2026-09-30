@@ -40,10 +40,19 @@ def snapshot_files():
             "status": "restored", "platform": "windows", "arch": "arm64",
             "identity": {"platform": "windows", "arch": "arm64"},
         }),
-        "src/.chromix-restored-patches.json": json.dumps({"patch_count": 216, "outputs": {"fixture": "hash"}}),
+        "src/.chromix-restored-patches.json": json.dumps({
+            "schema_version": 1,
+            "identity_sha256": "a" * 64,
+            "identity": {
+                "platform": "windows",
+                "selection": {"version": "154.0.8037.57"},
+                "series": {"patches": [{"path": "patches/0001.patch", "sha256": "b" * 64}]},
+            },
+            "outputs": {"fixture": "hash"},
+        }),
         "src/.chromix-source-ready": "154.0.8037.57|pinned|patches\n",
         "src/.chromix-source-unpacked": "154.0.8037.57\n",
-        "src/out/Default/args.gn": 'target_cpu = "arm64"\nhost_cpu = "x64"\ntarget_os = "win"\n',
+        "src/out/Default/args.gn": 'target_cpu = "arm64"\ntarget_os = "win"\n',
     }
 
 

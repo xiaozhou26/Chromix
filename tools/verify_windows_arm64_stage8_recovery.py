@@ -173,9 +173,25 @@ def validate_snapshot_files(files: dict[str, bytes]) -> dict:
              and receipt.get("arch") == "arm64" and receipt.get("identity", {}).get("arch") == "arm64",
              "snapshot upstream receipt is not verified for Windows ARM64")
     patches = json.loads(_read_marker(files, "src/.chromix-restored-patches.json"))
-    _require(isinstance(patches, dict) and isinstance(patches.get("patch_count"), int)
-             and patches["patch_count"] > 0 and isinstance(patches.get("outputs"), dict),
-             "snapshot restored-patches receipt is missing or invalid")
+    identity = patches.get("identity") if isinstance(patches, dict) else None
+    selection = identity.get("selection") if isinstance(identity, dict) else None
+    series = identity.get("series") if isinstance(identity, dict) else None
+    _require(
+        isinstance(patches, dict)
+        and patches.get("schema_version") == 1
+        and isinstance(patches.get("identity_sha256"), str)
+        and re.fullmatch(r"[0-9a-f]{64}", patches["identity_sha256"])
+        and isinstance(patches.get("outputs"), dict)
+        and bool(patches["outputs"])
+        and isinstance(identity, dict)
+        and identity.get("platform") == "windows"
+        and isinstance(selection, dict)
+        and selection.get("version") == CHROMIUM_VERSION
+        and isinstance(series, dict)
+        and isinstance(series.get("patches"), list)
+        and bool(series["patches"]),
+        "snapshot restored-patches receipt is missing or invalid",
+    )
     ready = _read_marker(files, "src/.chromix-source-ready")
     _require(ready.startswith(CHROMIUM_VERSION + "|"), "snapshot source-ready receipt has the wrong Chromium version")
     _require(_read_marker(files, "src/.chromix-source-unpacked") == CHROMIUM_VERSION,
@@ -183,11 +199,11 @@ def validate_snapshot_files(files: dict[str, bytes]) -> dict:
     args = _read_marker(files, "src/out/Default/args.gn")
     _require(len(re.findall(r"(?m)^\s*target_cpu\s*=", args)) == 1
              and re.search(r'(?m)^\s*target_cpu\s*=\s*"arm64"\s*(?:#.*)?$', args)
-             and re.search(r'(?m)^\s*host_cpu\s*=\s*"x64"\s*(?:#.*)?$', args)
              and re.search(r'(?m)^\s*target_os\s*=\s*"win"\s*(?:#.*)?$', args),
-             "snapshot GN arguments do not identify Windows ARM64 with x64 host tools")
+             "snapshot GN arguments do not identify Windows ARM64")
     return {"status": "verified", "architecture": "arm64", "platform": "windows",
-            "source_ready": True, "restored_patches": patches["patch_count"]}
+            "source_ready": True, "restored_patches": len(series["patches"]),
+            "restored_outputs": len(patches["outputs"])}
 
 
 def _seven_zip(path: str | None) -> str:
