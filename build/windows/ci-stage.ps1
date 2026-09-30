@@ -565,14 +565,21 @@ function Free-Disk {
 function Initialize-VisualStudio {
   $vswhere = "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe"
   if (-not (Test-Path $vswhere)) { throw "vswhere.exe is not available: $vswhere" }
-  $installation = (& $vswhere -latest -products * `
+  $installations = @(& $vswhere -latest -products * `
     -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 `
-    -property installationPath).Trim()
+    -property installationPath)
+  $discoveryExit = $LASTEXITCODE
+  if ($discoveryExit -ne 0) { throw "Visual Studio discovery failed (vswhere exit $discoveryExit)" }
+  $installation = $installations | Select-Object -First 1
   if (-not $installation) { throw "Visual Studio 2022 C++ tools are not installed" }
+  $installation = $installation.Trim()
   if ($Arch -eq "arm64") {
-    $installation = (& $vswhere -latest -products * -version '[17.0,18.0)' `
+    $installations = @(& $vswhere -latest -products * -version '[17.0,18.0)' `
       -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 Microsoft.VisualStudio.Component.VC.Tools.ARM64 `
-      -property installationPath | Select-Object -First 1)
+      -property installationPath)
+    $discoveryExit = $LASTEXITCODE
+    if ($discoveryExit -ne 0) { throw "VS2022 ARM64 discovery failed (vswhere exit $discoveryExit)" }
+    $installation = $installations | Select-Object -First 1
     if (-not $installation) {
       throw "VS2022 ARM64 tools are missing; add Microsoft.VisualStudio.Component.VC.Tools.ARM64 with the existing VS installer --add"
     }
@@ -766,7 +773,10 @@ Assert-CiScripts
 Free-Disk
 Initialize-VisualStudio
 Install-WindowsSdk
-if ($Arch -eq "arm64") { & "$PSScriptRoot\assert-arm64-toolchain.ps1" -ChromiumVersion $Revisions.ChromiumVersion }
+if ($Arch -eq "arm64") {
+  & "$PSScriptRoot\assert-arm64-toolchain.ps1" -Installation $env:GYP_MSVS_OVERRIDE_PATH `
+    -ChromiumVersion $Revisions.ChromiumVersion
+}
 git config --global core.longpaths true
 
 Remove-Item Env:PYTHONUTF8 -ErrorAction SilentlyContinue

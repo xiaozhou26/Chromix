@@ -7,10 +7,13 @@ $ErrorActionPreference = "Stop"
 if (-not $Installation) {
   $vswhere = "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe"
   if (-not (Test-Path -LiteralPath $vswhere)) { throw "vswhere.exe is not available: $vswhere" }
-  $Installation = (& $vswhere -latest -products * -version '[17.0,18.0)' `
+  $installations = @(& $vswhere -latest -products * -version '[17.0,18.0)' `
     -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 Microsoft.VisualStudio.Component.VC.Tools.ARM64 `
-    -property installationPath | Select-Object -First 1)
-  if ($LASTEXITCODE -ne 0 -or -not $Installation) {
+    -property installationPath)
+  $discoveryExit = $LASTEXITCODE
+  if ($discoveryExit -ne 0) { throw "VS2022 discovery failed (vswhere exit $discoveryExit)" }
+  $Installation = $installations | Select-Object -First 1
+  if (-not $Installation) {
     throw "Install VS2022 components Microsoft.VisualStudio.Component.VC.Tools.x86.x64 and Microsoft.VisualStudio.Component.VC.Tools.ARM64 using the existing VS installer --add"
   }
 }
