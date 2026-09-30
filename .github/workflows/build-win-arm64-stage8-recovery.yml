@@ -83,6 +83,8 @@ jobs:
         $installation = $installations | Select-Object -First 1
         if (-not $installation) { throw 'ARM64 Visual Studio tools are unavailable' }
         $pins = & build/windows/read-platform-pins.ps1 -Repo $env:GITHUB_WORKSPACE
+        & build/windows/ensure-windows-sdk.ps1 -Arch arm64 -ChromiumVersion $pins.ChromiumVersion -DownloadDir $env:RUNNER_TEMP -Install
+        if ($LASTEXITCODE -ne 0) { throw 'pinned Windows SDK installation failed' }
         & build/windows/assert-arm64-toolchain.ps1 -Installation $installation.Trim() -ChromiumVersion $pins.ChromiumVersion
         if ($LASTEXITCODE -ne 0) { throw 'ARM64 host prerequisite preflight failed' }
     - name: Upload recovery proof diagnostics
