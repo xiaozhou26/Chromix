@@ -38,6 +38,7 @@ ALLOWED_TARGET_CHANGES = frozenset({
     "build/windows/ci-stage.ps1",
     "tools/tests/test_windows_arm64_build.py",
     "tools/tests/test_windows_arm64_stage8_recovery.py",
+    "tools/tests/test_windows_arm64_stage8_recovery_workflow.py",
     "tools/verify_windows_arm64_stage8_recovery.py",
 })
 SOURCE_INPUT_PREFIXES = (
