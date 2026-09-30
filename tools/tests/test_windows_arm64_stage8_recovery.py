@@ -54,9 +54,39 @@ def test_snapshot_markers_prove_arm64_and_reject_x64_or_cold_output():
     with pytest.raises(ValueError, match="architecture"):
         recovery.validate_snapshot_files({key: value.encode() for key, value in bad.items()})
     bad = snapshot_files()
-    bad["src/out/Default/args.gn"] += "target_cpu = \"arm64\"\n"
+    bad["src/out/Default/args.gn"] += 'target_cpu = "arm64"\n'
     with pytest.raises(ValueError, match="GN arguments"):
         recovery.validate_snapshot_files({key: value.encode() for key, value in bad.items()})
+
+
+def test_snapshot_archive_rejects_only_exact_state_markers(monkeypatch, tmp_path):
+    required = {"chromix/" + name: value.encode() for name, value in snapshot_files().items()}
+
+    def run_with(listing):
+        def fake_run(command, *args, **kwargs):
+            if command[1] == "l":
+                return subprocess.CompletedProcess(command, 0, stdout=listing.encode(), stderr=b"")
+            member = command[3].removeprefix("chromix/")
+            return subprocess.CompletedProcess(command, 0, stdout=required[command[3]], stderr=b"")
+        return fake_run
+
+    forbidden = "\n".join([
+        *[f"Path = {name}" for name in required],
+        "Path = chromix/src/chrome/browser/web_applications/ash/migrations",
+        "Path = chromix/src/web/in-progress-example.txt",
+        "Path = chromix/src/.chromix-restored-patches-in-progress",
+    ])
+    monkeypatch.setattr(recovery.subprocess, "run", run_with(forbidden))
+    with pytest.raises(ValueError, match="migration or interrupted"):
+        recovery.verify_snapshot_archive(tmp_path / "tree.7z.001", "7z")
+
+    ordinary_names = "\n".join([
+        "Path = chromix/src/chrome/browser/web_applications/ash/migrations",
+        "Path = chromix/src/web/in-progress-example.txt",
+        *[f"Path = {name}" for name in required],
+    ])
+    monkeypatch.setattr(recovery.subprocess, "run", run_with(ordinary_names))
+    assert recovery.verify_snapshot_archive(tmp_path / "tree.7z.001", "7z")["status"] == "verified"
 
 
 def test_source_proof_allows_only_recovery_files_and_requires_donor_ancestor(tmp_path):
@@ -68,12 +98,10 @@ def test_source_proof_allows_only_recovery_files_and_requires_donor_ancestor(tmp
     put(donor, "patches/series", "patches/0001.patch\n")
     put(donor, "CHROMIUM_WINDOWS_VERSION", "154.0.8037.57\n")
     donor_sha = commit(donor)
-    # Make the fixture use the pinned donor identity while still exercising the real proof.
     old_donor_sha, old_allowed = recovery.DONOR_SHA, recovery.ALLOWED_TARGET_CHANGES
     recovery.DONOR_SHA = donor_sha
     recovery.ALLOWED_TARGET_CHANGES = frozenset({"tools/tests/test_windows_arm64_stage8_recovery.py"})
     try:
-        target.mkdir()
         subprocess.run(["git", "clone", "-q", str(donor), str(target)], check=True)
         put(target, "tools/tests/test_windows_arm64_stage8_recovery.py", "fixture\n")
         commit(target)

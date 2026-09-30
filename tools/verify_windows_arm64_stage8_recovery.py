@@ -207,7 +207,14 @@ def verify_snapshot_archive(archive: Path, seven_zip: str | None = None) -> dict
     _require(required <= members, "snapshot archive is missing required ARM64 markers")
     _require(not any(name.startswith("chromix/src/out/Chromix/") for name in members),
              "snapshot archive contains a silent cold-source migration output")
-    _require(not any(".chromix-windows-snapshot-migration" in name or "in-progress" in name for name in members),
+    forbidden_state_markers = {
+        "chromix/src/.chromix-windows-snapshot-migration.json",
+        "chromix/src/.chromix-domain-substitution-in-progress",
+        "chromix/src/.chromix-restored-patches-in-progress",
+        "chromix/src/.chromix-layer-in-progress",
+        "chromix/src/.chromix-patch-in-progress",
+    }
+    _require(not (forbidden_state_markers & members),
              "snapshot archive contains migration or interrupted-restore state")
     files = {}
     for name in SNAPSHOT_FILES:
