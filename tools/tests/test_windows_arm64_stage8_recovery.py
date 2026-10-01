@@ -118,7 +118,7 @@ def test_source_proof_allows_only_recovery_files_and_requires_donor_ancestor(tmp
         assert result["source_inputs_changed"] == []
         put(target, "patches/series", "changed\n")
         commit(target)
-        with pytest.raises(ValueError, match="outside the recovery allowlist|source, pin"):
+        with pytest.raises(ValueError, match="outside the recovery allowlist|source, pin|direct child"):
             recovery.verify_source_proof(donor, target, target_sha=git(target, "rev-parse", "HEAD").strip())
     finally:
         recovery.DONOR_SHA = old_donor_sha
@@ -133,8 +133,8 @@ def test_metadata_validator_requires_exact_artifacts():
         def get(self, path):
             self.calls.append(path)
             return {
-                "id": recovery.RUN_ID, "name": "warm profile=native jobs=auto cache=true upstream=36093095856",
-                "path": ".github/workflows/build-win-arm64-github.yml", "event": "workflow_dispatch",
+                "id": recovery.RUN_ID, "name": "build-win-arm64-stage8-recovery",
+                "path": ".github/workflows/build-win-arm64-stage8-recovery.yml", "event": "workflow_dispatch",
                 "head_branch": recovery.DONOR_BRANCH, "head_sha": recovery.DONOR_SHA,
                 "status": "completed", "conclusion": "failure", "run_attempt": recovery.ATTEMPT,
                 "repository": {"full_name": recovery.REPOSITORY},
@@ -143,10 +143,10 @@ def test_metadata_validator_requires_exact_artifacts():
 
         def items(self, path, key):
             if key == "jobs":
-                return [{"id": recovery.DONOR_JOB_ID, "name": "stage 7 (resume compile)", "status": "completed",
-                         "conclusion": "success", "head_sha": recovery.DONOR_SHA, "run_id": recovery.RUN_ID,
+                return [{"id": recovery.DONOR_JOB_ID, "name": "stage 12 (resume compile)", "status": "completed",
+                         "conclusion": "failure", "head_sha": recovery.DONOR_SHA, "run_id": recovery.RUN_ID,
                          "run_attempt": recovery.ATTEMPT, "steps": [
-                             {"name": "Run stage 7", "conclusion": "success"},
+                             {"name": "Run stage 12", "conclusion": "failure"},
                              *[{"name": f"Upload tree part {part}", "conclusion": "success"} for part in (1, 2, 3, 4)],
                          ]}]
             return [{**item, "workflow_run": {"id": recovery.RUN_ID, "head_sha": recovery.DONOR_SHA,

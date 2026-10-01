@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Verify the pinned Windows ARM64 stage-7 recovery inputs without running donor code."""
+"""Verify the pinned Windows ARM64 stage-12 recovery inputs without running donor code."""
 from __future__ import annotations
 
 import argparse
@@ -15,20 +15,20 @@ from typing import Callable
 from validate_posix_snapshot import Client
 
 REPOSITORY = "xiaozhou26/Chromix"
-WORKFLOW = "build-win-arm64-github"
-RUN_NAME = "warm profile=native jobs=auto cache=true upstream=36093095856"
-RUN_ID = 36457043833
+WORKFLOW = "build-win-arm64-stage8-recovery"
+RUN_NAME = "build-win-arm64-stage8-recovery"
+RUN_ID = 36677869521
 ATTEMPT = 1
-DONOR_SHA = "d5b4322122549256a227e7f5e221c5630832532c"
-DONOR_BRANCH = "build/windows154-arm64-midl-20260929"
-DONOR_JOB_ID = 109649628083
-DONOR_STAGE = 7
+DONOR_SHA = "91adf3cc3e2df651ad5af43f0fd72aba0f0f0e9a"
+DONOR_BRANCH = "build/windows154-arm64-stage8-sdk-20260930"
+DONOR_JOB_ID = 110184885191
+DONOR_STAGE = 12
 CHROMIUM_VERSION = "154.0.8037.57"
 ARTIFACTS = (
-    {"id": 11076655438, "name": "win-arm64-tree-s7-attempt-1-part1", "size_in_bytes": 9663676664,
-     "expired": False, "digest": "sha256:91a8622a71360ee9604e6514f97a94099dbb7d8cbba20e6bc31e68dbd098ef9d"},
-    {"id": 11076670152, "name": "win-arm64-tree-s7-attempt-1-part2", "size_in_bytes": 2263039430,
-     "expired": False, "digest": "sha256:614999d7e227cdbaf3c2258d373794f7b8549734a93fa777cb0f90a7c958ff6a"},
+    {"id": 11145248351, "name": "win-arm64-tree-s12-attempt-1-part1", "size_in_bytes": 9663676664,
+     "expired": False, "digest": "sha256:d015246fc348cde6f7d2555d8fe09263dd5f32ca6646ac6e18240c5310b50d36"},
+    {"id": 11144669229, "name": "win-arm64-tree-s12-attempt-1-part2", "size_in_bytes": 3030570342,
+     "expired": False, "digest": "sha256:a3253bc52ae0251a90e771df000d3eebf2d2f672f7886d4346e88400f60afe12"},
 )
 
 # Parent-owned host fixes are permitted; all source and build-input changes remain forbidden.
@@ -67,49 +67,49 @@ def _exact_artifacts(items) -> bool:
 def validate_metadata(client: Client) -> dict:
     run = client.get(f"/actions/runs/{RUN_ID}")
     _require(run.get("id") == RUN_ID and run.get("name") == RUN_NAME,
-             "stage7 run identity or profile mismatch")
+             "stage12 run identity or profile mismatch")
     _require(run.get("path") == f".github/workflows/{WORKFLOW}.yml" and run.get("event") == "workflow_dispatch",
-             "stage7 run workflow or event mismatch")
+             "stage12 run workflow or event mismatch")
     _require(run.get("head_branch") == DONOR_BRANCH and run.get("head_sha") == DONOR_SHA,
-             "stage7 run branch or SHA mismatch")
+             "stage12 run branch or SHA mismatch")
     _require(run.get("repository", {}).get("full_name") == REPOSITORY
              and run.get("head_repository", {}).get("full_name") == REPOSITORY,
-             "stage7 run repository mismatch")
+             "stage12 run repository mismatch")
     _require(run.get("status") == "completed" and run.get("conclusion") == "failure"
-             and run.get("run_attempt") == ATTEMPT, "stage7 run is not the completed attempt-1 failure")
+             and run.get("run_attempt") == ATTEMPT, "stage12 run is not the completed attempt-1 failure")
 
     jobs = client.items(f"/actions/runs/{RUN_ID}/attempts/{ATTEMPT}/jobs", "jobs")
     matches = [job for job in jobs if job.get("id") == DONOR_JOB_ID]
-    _require(len(matches) == 1, "exact stage7 job is missing or ambiguous")
+    _require(len(matches) == 1, "exact stage12 job is missing or ambiguous")
     job = matches[0]
-    _require(job.get("name") == "stage 7 (resume compile)" and job.get("status") == "completed"
-             and job.get("conclusion") == "success" and job.get("head_sha") == DONOR_SHA
+    _require(job.get("name") == "stage 12 (resume compile)" and job.get("status") == "completed"
+             and job.get("conclusion") == "failure" and job.get("head_sha") == DONOR_SHA
              and job.get("run_id") == RUN_ID and job.get("run_attempt") == ATTEMPT,
-             "stage7 job identity or completion mismatch")
+             "stage12 job identity or completion mismatch")
     steps = {step.get("name"): step.get("conclusion") for step in job.get("steps", [])}
-    _require(steps.get("Run stage 7") == "success" and all(
+    _require(steps.get("Run stage 12") == "failure" and all(
         steps.get(f"Upload tree part {part}") == "success" for part in (1, 2)),
-        "stage7 compile or checkpoint upload did not succeed")
+        "stage12 compile or checkpoint upload did not produce the exact checkpoint")
     _require(steps.get("Upload tree part 3") in ("success", "skipped")
              and steps.get("Upload tree part 4") in ("success", "skipped"),
-             "stage7 checkpoint upload metadata is incomplete")
+             "stage12 checkpoint upload metadata is incomplete")
 
     listed = client.items(f"/actions/runs/{RUN_ID}/artifacts", "artifacts")
-    prefix = "win-arm64-tree-s7-attempt-1-part"
+    prefix = "win-arm64-tree-s12-attempt-1-part"
     checkpoint = [item for item in listed if item.get("name", "").startswith(prefix)]
     _require(len(checkpoint) == len(ARTIFACTS) and _exact_artifacts(sorted(checkpoint, key=lambda item: item["name"])),
-             "stage7 artifact IDs, names, sizes, or digests differ from the pinned set")
+             "stage12 artifact IDs, names, sizes, or digests differ from the pinned set")
     selected = checkpoint
     for item in selected:
         origin = item.get("workflow_run", {})
         _require(origin.get("id") == RUN_ID and origin.get("head_sha") == DONOR_SHA
                  and origin.get("head_branch") == DONOR_BRANCH,
-                 "stage7 artifact provenance mismatch")
+                 "stage12 artifact provenance mismatch")
     return {
         "repository": REPOSITORY, "workflow": WORKFLOW, "run_name": RUN_NAME,
         "head_branch": DONOR_BRANCH, "head_sha": DONOR_SHA, "run_id": RUN_ID,
         "attempt": ATTEMPT, "stage": DONOR_STAGE, "job_id": DONOR_JOB_ID,
-        "pattern": "win-arm64-tree-s7-attempt-1-part*", "artifacts": list(ARTIFACTS),
+        "pattern": "win-arm64-tree-s12-attempt-1-part*", "artifacts": list(ARTIFACTS),
     }
 
 
@@ -146,6 +146,9 @@ def verify_source_proof(previous_repo: Path, repo: Path, *, target_sha: str) -> 
     _require(donor_object.returncode == 0, "target checkout cannot resolve the exact donor commit")
     ancestry = subprocess.run(["git", "-C", str(repo), "merge-base", "--is-ancestor", DONOR_SHA, target_sha])
     _require(ancestry.returncode == 0, "recovery target is not descended from the exact donor commit")
+    parents = _git(repo, "rev-list", "--parents", "-n", "1", target_sha).strip().split()
+    _require(len(parents) == 2 and parents[1] == DONOR_SHA,
+             "recovery target must be a direct child of the exact donor commit")
 
     old, new = _tree(repo, DONOR_SHA), _tree(repo, target_sha)
     changed = sorted(name for name in set(old) | set(new) if old.get(name) != new.get(name))
