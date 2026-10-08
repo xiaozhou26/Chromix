@@ -18,7 +18,7 @@ def test_recovery_starts_at_stage13_and_keeps_native_acceptance():
     assert "verify_windows_arm64_stage8_recovery.py --metadata-report" in text
     assert "download_windows_snapshot.py --manifest" in text
     assert "--source-proof" in text
-    assert "ref: 91adf3cc3e2df651ad5af43f0fd72aba0f0f0e9a" in WORKFLOW.read_text(encoding="utf-8")
+    assert "ref: 15a6425cfbd7a7ecd4a69ad206d0650778bf8253" in WORKFLOW.read_text(encoding="utf-8")
     assert "-StageIndex 13 -MaxStages 13 -FromArtifact" in text
     assert "--metadata-report" in text
     assert "--manifest" in text

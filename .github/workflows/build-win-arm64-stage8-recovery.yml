@@ -44,7 +44,7 @@ jobs:
       uses: actions/checkout@v4
       with:
         repository: xiaozhou26/Chromix
-        ref: 91adf3cc3e2df651ad5af43f0fd72aba0f0f0e9a
+        ref: 15a6425cfbd7a7ecd4a69ad206d0650778bf8253
         path: donor
         fetch-depth: 0
         persist-credentials: false

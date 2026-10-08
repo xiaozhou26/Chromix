@@ -45,13 +45,13 @@ def snapshot_files():
             "identity_sha256": "a" * 64,
             "identity": {
                 "platform": "windows",
-                "selection": {"version": "154.0.8037.57"},
+                "selection": {"version": "154.0.8037.97"},
                 "series": {"patches": [{"path": "patches/0001.patch", "sha256": "b" * 64}]},
             },
             "outputs": {"fixture": "hash"},
         }),
-        "src/.chromix-source-ready": "154.0.8037.57|pinned|patches\n",
-        "src/.chromix-source-unpacked": "154.0.8037.57\n",
+        "src/.chromix-source-ready": "154.0.8037.97|pinned|patches\n",
+        "src/.chromix-source-unpacked": "154.0.8037.97\n",
         "src/out/Default/args.gn": 'target_cpu = "arm64"\ntarget_os = "win"\n',
     }
 
@@ -105,7 +105,7 @@ def test_source_proof_allows_only_recovery_files_and_requires_donor_ancestor(tmp
     subprocess.run(["git", "init", "-q", str(donor)], check=True)
     put(donor, "build/args.windows.gn", "target_cpu = \"arm64\"\n")
     put(donor, "patches/series", "patches/0001.patch\n")
-    put(donor, "CHROMIUM_WINDOWS_VERSION", "154.0.8037.57\n")
+    put(donor, "CHROMIUM_WINDOWS_VERSION", "154.0.8037.97\n")
     donor_sha = commit(donor)
     old_donor_sha, old_allowed = recovery.DONOR_SHA, recovery.ALLOWED_TARGET_CHANGES
     recovery.DONOR_SHA = donor_sha
@@ -133,8 +133,8 @@ def test_metadata_validator_requires_exact_artifacts():
         def get(self, path):
             self.calls.append(path)
             return {
-                "id": recovery.RUN_ID, "name": "build-win-arm64-stage8-recovery",
-                "path": ".github/workflows/build-win-arm64-stage8-recovery.yml", "event": "workflow_dispatch",
+                "id": recovery.RUN_ID, "name": recovery.RUN_NAME,
+                "path": f".github/workflows/{recovery.WORKFLOW}.yml", "event": "workflow_dispatch",
                 "head_branch": recovery.DONOR_BRANCH, "head_sha": recovery.DONOR_SHA,
                 "status": "completed", "conclusion": "failure", "run_attempt": recovery.ATTEMPT,
                 "repository": {"full_name": recovery.REPOSITORY},

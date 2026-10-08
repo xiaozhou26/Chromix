@@ -15,20 +15,20 @@ from typing import Callable
 from validate_posix_snapshot import Client
 
 REPOSITORY = "xiaozhou26/Chromix"
-WORKFLOW = "build-win-arm64-stage8-recovery"
-RUN_NAME = "build-win-arm64-stage8-recovery"
-RUN_ID = 36677869521
+WORKFLOW = "build-win-arm64-github"
+RUN_NAME = "warm profile=native jobs=auto cache=true upstream=37100793757"
+RUN_ID = 37455471388
 ATTEMPT = 1
-DONOR_SHA = "91adf3cc3e2df651ad5af43f0fd72aba0f0f0e9a"
-DONOR_BRANCH = "build/windows154-arm64-stage8-sdk-20260930"
-DONOR_JOB_ID = 110184885191
+DONOR_SHA = "15a6425cfbd7a7ecd4a69ad206d0650778bf8253"
+DONOR_BRANCH = "main"
+DONOR_JOB_ID = 113438156537
 DONOR_STAGE = 12
-CHROMIUM_VERSION = "154.0.8037.57"
+CHROMIUM_VERSION = "154.0.8037.97"
 ARTIFACTS = (
-    {"id": 11145248351, "name": "win-arm64-tree-s12-attempt-1-part1", "size_in_bytes": 9663676664,
-     "expired": False, "digest": "sha256:d015246fc348cde6f7d2555d8fe09263dd5f32ca6646ac6e18240c5310b50d36"},
-    {"id": 11144669229, "name": "win-arm64-tree-s12-attempt-1-part2", "size_in_bytes": 3030570342,
-     "expired": False, "digest": "sha256:a3253bc52ae0251a90e771df000d3eebf2d2f672f7886d4346e88400f60afe12"},
+    {"id": 11582775420, "name": "win-arm64-tree-s12-attempt-1-part1", "size_in_bytes": 9663676664,
+     "expired": False, "digest": "sha256:eb4f963bf75a727b90f7c3bdb85d7ec8faf99112bcbe0b9e7187885bc2b629f4"},
+    {"id": 11582590872, "name": "win-arm64-tree-s12-attempt-1-part2", "size_in_bytes": 3270690206,
+     "expired": False, "digest": "sha256:2e10f4f5398ad2bb04fcd8257225d4a783177ad95767eb1e5c42a0e24adfb0ae"},
 )
 
 # Parent-owned host fixes are permitted; all source and build-input changes remain forbidden.
@@ -139,7 +139,7 @@ def verify_source_proof(previous_repo: Path, repo: Path, *, target_sha: str) -> 
              "donor and target checkouts must be separate directories")
     donor_head = _git(previous_repo, "rev-parse", "HEAD").strip()
     target_head = _git(repo, "rev-parse", "HEAD").strip()
-    _require(donor_head == DONOR_SHA, "donor checkout is not the exact stage7 source SHA")
+    _require(donor_head == DONOR_SHA, "donor checkout is not the exact stage12 source SHA")
     _require(target_head == target_sha and re.fullmatch(r"[0-9a-f]{40}", target_sha),
              "target checkout is not the current recovery commit")
     donor_object = subprocess.run(["git", "-C", str(repo), "cat-file", "-e", f"{DONOR_SHA}^{{commit}}"])
