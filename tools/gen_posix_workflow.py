@@ -163,7 +163,23 @@ MAC_STEPS = """      - name: Select compatible Xcode
 
       - name: Disable Spotlight indexing
         if: runner.os == 'macOS'
-        run: sudo mdutil -a -i off
+        run: |
+          set -euo pipefail
+          volume=/System/Volumes/Data
+          for attempt in 1 2 3; do
+            if sudo mdutil -i off "$volume"; then
+              echo "Requested indexing disable on $volume"
+            fi
+            if status=$(sudo mdutil -s "$volume"); then
+              printf '%s\\n' "$status"
+              if printf '%s\\n' "$status" | grep -Eq '^[[:space:]]*Indexing( and searching)? disabled\\.[[:space:]]*$'; then
+                exit 0
+              fi
+            fi
+            if [ "$attempt" -lt 3 ]; then sleep 3; fi
+          done
+          echo "::error::Unable to verify Spotlight indexing is disabled on $volume"
+          exit 1
 
       # Chromium supplies clang; Homebrew supplies the remaining build tools.
       - name: Install macOS build tools
