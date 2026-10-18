@@ -35,6 +35,10 @@ MAX_FILE = 1024 * 1024
 PINS = {
     "154.0.8037.97": None,
     CHROMIUM_VERSION: {"v8_revision": V8_REVISION, "target_cpus": ("x64", "arm64")},
+    "155.0.8059.79": {
+        "v8_revision": "d89479ac5446a374c55a35be19b5a23437558d99",
+        "target_cpus": ("x64", "arm64"),
+    },
 }
 AMD64 = 0x8664
 

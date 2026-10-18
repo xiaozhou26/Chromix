@@ -120,6 +120,49 @@ WINDOWS155_RECORDS = (
         "after_sha256": WINDOWS155_REPAIRED_SHA256,
     }),
 )
+# Reconstructed from tag 155.0.8059.79, a1e3123 Windows patch and 9f145d8
+# core domain rules; both architectures use the same source preparation.
+# These pins are source-reconstructed, not extracted artifact bytes.
+WINDOWS15579_ORIGINAL_SHA256 = "0c0062cc6b73e1d0874e2a3304498f48ad1cb552d11d49eea223319051dde831"
+WINDOWS15579_REPAIRED_SHA256 = "466824620fd2348229c24d477d114e4c7acc0a5e75a8f1b162729809a0dfccde"
+WINDOWS15579_RECORDS = (
+    MappingProxyType({
+        "identity": MappingProxyType({
+            "chromium_version": "155.0.8059.79",
+            "ungoogled_commit": "9f145d8815e6e50cc4a2537fcac40966d911e027",
+            "head_sha": "a1e3123c8d543b5c9a1eecfaf0f06cf242c0db37",
+            "platform": "windows", "arch": "x64",
+            "repository": "ungoogled-software/ungoogled-chromium-windows",
+            "repository_id": 177210827,
+            "head_branch": "155.0.8059.79-1.1", "event": "push",
+            "workflow_path": ".github/workflows/build-x64.yml",
+            "run_id": 38678495080,
+            "artifact_id": 12099451094, "artifact_name": "build-artifact",
+            "artifact_digest": "sha256:6cdf0ed9773532f172cbc9999ed3589ef16c81b14629f36da55d8f2d0a4dd768",
+            "artifact_size_in_bytes": 15695268453,
+        }),
+        "before_sha256": WINDOWS15579_ORIGINAL_SHA256,
+        "after_sha256": WINDOWS15579_REPAIRED_SHA256,
+    }),
+    MappingProxyType({
+        "identity": MappingProxyType({
+            "chromium_version": "155.0.8059.79",
+            "ungoogled_commit": "9f145d8815e6e50cc4a2537fcac40966d911e027",
+            "head_sha": "a1e3123c8d543b5c9a1eecfaf0f06cf242c0db37",
+            "platform": "windows", "arch": "arm64",
+            "repository": "ungoogled-software/ungoogled-chromium-windows",
+            "repository_id": 177210827,
+            "head_branch": "155.0.8059.79-1.1", "event": "push",
+            "workflow_path": ".github/workflows/build-arm.yml",
+            "run_id": 38678494961,
+            "artifact_id": 12107338297, "artifact_name": "build-artifact-arm",
+            "artifact_digest": "sha256:fa6e16ffd91dc85a1dcf945e8eea338a9a497da159c5cb36301aff9b841faa88",
+            "artifact_size_in_bytes": 15984393421,
+        }),
+        "before_sha256": WINDOWS15579_ORIGINAL_SHA256,
+        "after_sha256": WINDOWS15579_REPAIRED_SHA256,
+    }),
+)
 BEFORE = b"""            open(file_path, 'wb').close()
         shutil.copy(file_path, outdir)
 """
@@ -166,6 +209,11 @@ def transform154(payload: bytes) -> bytes:
 def transform155(payload: bytes) -> bytes:
     """Accept only independently reconstructed Windows155 donor or repaired bytes."""
     return _transform(payload, WINDOWS155_ORIGINAL_SHA256, WINDOWS155_REPAIRED_SHA256)
+
+
+def transform15579(payload: bytes) -> bytes:
+    """Accept only independently reconstructed Windows155.79 donor or repaired bytes."""
+    return _transform(payload, WINDOWS15579_ORIGINAL_SHA256, WINDOWS15579_REPAIRED_SHA256)
 
 
 def _exact_identity(identity: dict, expected) -> bool:
@@ -498,7 +546,8 @@ def _proof(src: Path, identity: dict, *, before_sha256=ORIGINAL_SHA256,
 
 
 def apply(src: Path, platform: str, arch: str, identity: dict, *,
-          records=WINDOWS154_RECORDS, records155=WINDOWS155_RECORDS) -> dict:
+          records=WINDOWS154_RECORDS, records155=WINDOWS155_RECORDS,
+          records15579=WINDOWS15579_RECORDS) -> dict:
     """Match a strict-restore identity against independent, reviewed donor pins."""
     if platform != "windows":
         return {"status": "not_applicable"}
@@ -515,6 +564,11 @@ def apply(src: Path, platform: str, arch: str, identity: dict, *,
         record = _windows154_record(identity, arch, records)
         before_sha256, after_sha256 = record["before_sha256"], record["after_sha256"]
         repair = transform154
+    elif version == "155.0.8059.79":
+        record = _versioned_record(identity, arch, records15579, "155.0.8059.79",
+                                   WINDOWS15579_ORIGINAL_SHA256, WINDOWS15579_REPAIRED_SHA256)
+        before_sha256, after_sha256 = record["before_sha256"], record["after_sha256"]
+        repair = transform15579
     elif version.startswith("155."):
         record = _versioned_record(identity, arch, records155, "155.0.8059.39",
                                    WINDOWS155_ORIGINAL_SHA256, WINDOWS155_REPAIRED_SHA256)

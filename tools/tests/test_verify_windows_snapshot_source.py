@@ -379,7 +379,7 @@ def test_current_base_has_224_patches_and_no_midl_overlap():
         _, entries = verify.arp.transform_patch((ROOT / name).read_bytes(), set(), [])
         assert verify.MIDL_SOURCE not in {entry[0] for entry in entries}
     assert verify.VERSION == "153.0.8010.47"
-    assert verify.load_pins(ROOT, "windows")["ChromiumVersion"] == "155.0.8059.39"
+    assert verify.load_pins(ROOT, "windows")["ChromiumVersion"] == "155.0.8059.79"
 
 
 @pytest.mark.parametrize("mutation", ["shallow", "target-sha", "missing-run", "wrong-job", "grandchild", "same-sha"])
@@ -655,7 +655,7 @@ def test_windows155_allowlist_is_exact_and_does_not_expand_other_profiles():
     assert "tools/install_windows_metagen_bindings.py" not in verify.ALLOWED_CHANGES | verify.STAGE8_ALLOWED_CHANGES
 
 
-@pytest.mark.parametrize("ref", ["HEAD", verify.WINDOWS155_SHA])
+@pytest.mark.parametrize("ref", ["cc28d2ca381d1bcfdfc7af61b0c53e969e632cf6", verify.WINDOWS155_SHA])
 def test_windows155_full_donor_checkout_inputs_reject_later_linux_branch(tmp_path, monkeypatch, ref):
     import io
     import tarfile
@@ -663,11 +663,10 @@ def test_windows155_full_donor_checkout_inputs_reject_later_linux_branch(tmp_pat
     monkeypatch.setattr(verify.identity, "WINDOWS", True)
     previous, target = tmp_path / "previous", tmp_path / "target"
     previous.mkdir()
-    if ref != "HEAD":
-        try:
-            git(ROOT, "cat-file", "-e", ref + "^{commit}")
-        except subprocess.CalledProcessError:
-            pytest.skip("exact donor object is absent from the shallow checkout")
+    try:
+        git(ROOT, "cat-file", "-e", ref + "^{commit}")
+    except subprocess.CalledProcessError:
+        pytest.skip("exact donor object is absent from the shallow checkout")
     payload = git(ROOT, "archive", ref)
     with tarfile.open(fileobj=io.BytesIO(payload)) as archive:
         archive.extractall(previous, filter="data")

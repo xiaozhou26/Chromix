@@ -15,19 +15,42 @@ from tools import install_windows_metagen_bindings as bindings
 ROOT = Path(__file__).resolve().parents[2]
 FILES = {"__init__.py": b"# pinned LLVM package\n", "cindex.py": b"# pinned cindex\n"}
 HASHES = {name: hashlib.sha256(data).hexdigest() for name, data in FILES.items()}
+V8_PINS = {
+    "155.0.8059.39": "56832c166a78bd1eb61068ac69876d6880eaabdf",
+    "155.0.8059.79": "d89479ac5446a374c55a35be19b5a23437558d99",
+}
 
 
 def pe_dll(machine=bindings.AMD64):
-    data = bytearray(240)
+    # PE32+ headers and one aligned .text section; not a libclang implementation.
+    data = bytearray(1024)
     data[:2] = b"MZ"
     struct.pack_into("<I", data, 60, 64)
     data[64:68] = b"PE\0\0"
     struct.pack_into("<HH", data, 68, machine, 1)
-    struct.pack_into("<HHH", data, 84, 112, 0x2002, 0x20B)
+    struct.pack_into("<HHH", data, 84, 240, 0x2022, 0x20B)
+    optional = 88
+    struct.pack_into("<I", data, optional + 4, 512)
+    struct.pack_into("<I", data, optional + 20, 0x1000)
+    struct.pack_into("<Q", data, optional + 24, 0x180000000)
+    struct.pack_into("<II", data, optional + 32, 0x1000, 512)
+    struct.pack_into("<HH", data, optional + 40, 6, 0)
+    struct.pack_into("<HH", data, optional + 48, 6, 0)
+    struct.pack_into("<II", data, optional + 56, 0x2000, 512)
+    struct.pack_into("<H", data, optional + 68, 3)
+    struct.pack_into("<QQQQ", data, optional + 72, 0x100000, 0x1000, 0x100000, 0x1000)
+    struct.pack_into("<I", data, optional + 108, 16)
+    section = optional + 240
+    data[section:section + 8] = b".text\0\0\0"
+    struct.pack_into("<IIII", data, section + 8, 1, 0x1000, 512, 512)
+    struct.pack_into("<I", data, section + 36, 0x60000020)
+    data[512] = 0xC3
     return bytes(data)
 
 
 class WindowsMetagenBindingsTest(unittest.TestCase):
+    version = "155.0.8059.39"
+
     def setUp(self):
         temporary = tempfile.TemporaryDirectory()
         self.addCleanup(temporary.cleanup)
@@ -35,7 +58,9 @@ class WindowsMetagenBindingsTest(unittest.TestCase):
         self.src = self.root / "source cache/src"
         self.out = self.src / "out/Default"
         self.out.mkdir(parents=True)
-        self.put(self.src / "chrome/VERSION", b"MAJOR=155\nMINOR=0\nBUILD=8059\nPATCH=39\n")
+        self.put(self.src / "chrome/VERSION", "".join(
+            f"{key}={value}\n" for key, value in zip(
+                ("MAJOR", "MINOR", "BUILD", "PATCH"), self.version.split("."))).encode())
         self.put(self.out / "args.gn", b'target_cpu = "x64"\n')
         self.site = self.root / "runtime Python/Lib/site-packages"
         self.library = self.src / "third_party/llvm-build/Release+Asserts/bin/libclang.dll"
@@ -44,7 +69,7 @@ class WindowsMetagenBindingsTest(unittest.TestCase):
         self.put(self.resource / "include/stddef.h", b"headers")
         self.script = self.src / "v8/tools/metagen/metagen.py"
         self.put(self.script, b"# metagen")
-        self.put(self.src / "DEPS", f"vars = {{'v8_revision': '{bindings.V8_REVISION}'}}".encode())
+        self.put(self.src / "DEPS", f"vars = {{'v8_revision': '{V8_PINS[self.version]}'}}".encode())
         patch = mock.patch.object(bindings, "HASHES", HASHES)
         patch.start()
         self.addCleanup(patch.stop)
@@ -225,37 +250,67 @@ class WindowsMetagenBindingsTest(unittest.TestCase):
                     'third_party/llvm-build/Release+Asserts/bin/libclang.dll"\n'
                     'v8_metagen_libclang_bindings_dir = "C:/hostedtoolcache/windows/Python/3.12.10/x64/Lib/site-packages"\n')
         args.write_text(original)
-        self.assertEqual(bindings.configure(self.src, self.out, bindings.CHROMIUM_VERSION)["status"], "rebased")
+        self.assertEqual(bindings.configure(self.src, self.out, self.version)["status"], "rebased")
         self.assertIn(self.library.as_posix(), args.read_text())
         self.assertIn(original.splitlines()[2], args.read_text())
         before = args.read_bytes(), args.stat().st_mtime_ns
-        bindings.configure(self.src, self.out, bindings.CHROMIUM_VERSION)
+        bindings.configure(self.src, self.out, self.version)
         self.assertEqual(before, (args.read_bytes(), args.stat().st_mtime_ns))
         args.write_text(original.replace("C:/ungoogled-chromium-windows", "C:/unknown"))
         before = args.read_bytes()
-        self.assertEqual(bindings.configure(self.src, self.out, bindings.CHROMIUM_VERSION)["status"], "unchanged")
+        self.assertEqual(bindings.configure(self.src, self.out, self.version)["status"], "unchanged")
         self.assertEqual(before, args.read_bytes())
 
+    def test_exact_version_table_preserves_historical_pins(self):
+        self.assertEqual(bindings.PINS, {
+            "154.0.8037.97": None,
+            **{version: {"v8_revision": revision, "target_cpus": ("x64", "arm64")}
+               for version, revision in V8_PINS.items()},
+        })
+        self.assertEqual(bindings.CHROMIUM_VERSION, "155.0.8059.39")
+        self.assertEqual(bindings.V8_REVISION, V8_PINS["155.0.8059.39"])
+
+    def test_other_supported_source_version_is_rejected_before_side_effects(self):
+        other = next(version for version in V8_PINS if version != self.version)
+        before = (self.out / "args.gn").read_bytes()
+        with mock.patch.object(bindings.subprocess, "run") as ninja:
+            with mock.patch.object(bindings, "provision") as provision:
+                with self.assertRaisesRegex(ValueError, "chrome/VERSION"):
+                    bindings.configure(self.src, self.out, other)
+                with self.assertRaisesRegex(ValueError, "chrome/VERSION"):
+                    bindings.install(self.src, self.out, Path("ninja"), other, download=True)
+                ninja.assert_not_called()
+                provision.assert_not_called()
+        self.assertEqual((self.out / "args.gn").read_bytes(), before)
+
     def test_exact_deps_guard_before_installation(self):
-        (self.src / "DEPS").write_text("vars = {'v8_revision': '" + "0" * 40 + "'}")
-        with mock.patch.object(bindings, "provision") as provision:
-            with self.assertRaisesRegex(ValueError, "exact DEPS"):
-                bindings.install(self.src, self.out, Path("ninja"), bindings.CHROMIUM_VERSION, download=True)
-            provision.assert_not_called()
+        other = next(revision for version, revision in V8_PINS.items() if version != self.version)
+        revisions = ("0" * 40, other)
+        invalid_deps = [f"vars = {{'v8_revision': '{revision}'}}" for revision in revisions]
+        invalid_deps += ["vars = {}", f"vars = {{'v8_revision': '{V8_PINS[self.version]}', "
+                         f"'v8_revision': '{V8_PINS[self.version]}'}}"]
+        for deps in invalid_deps:
+            (self.src / "DEPS").write_text(deps)
+            with self.subTest(deps=deps), mock.patch.object(bindings.subprocess, "run") as ninja:
+                with mock.patch.object(bindings, "provision") as provision:
+                    with self.assertRaisesRegex(ValueError, "exact DEPS"):
+                        bindings.install(self.src, self.out, Path("ninja"), self.version, download=True)
+                    ninja.assert_not_called()
+                    provision.assert_not_called()
 
     def test_154_without_metagen_skips_but_155_missing_source_fails(self):
         self.script.unlink()
         self.assertEqual(bindings.install(self.src, self.out, Path("ninja"), "154.0.8037.97",
                                           download=False)["status"], "not_required")
         with self.assertRaisesRegex(ValueError, "missing"):
-            bindings.install(self.src, self.out, Path("ninja"), bindings.CHROMIUM_VERSION, download=True)
+            bindings.install(self.src, self.out, Path("ninja"), self.version, download=True)
 
     def test_install_runs_actual_runtime_python_in_isolation(self):
         self.package(self.src / bindings.SOURCE_PACKAGES[0])
         replies = [self.runtime(), {"api_preflight": "passed", "libclang_version": "clang version 23.1.0"}]
         with mock.patch.object(bindings.subprocess, "run", return_value=SimpleNamespace(stdout=self.command())) as ninja:
             with mock.patch.object(bindings, "run_json", side_effect=replies) as run:
-                result = bindings.install(self.src, self.out, Path("ninja"), bindings.CHROMIUM_VERSION, download=False)
+                result = bindings.install(self.src, self.out, Path("ninja"), self.version, download=False)
         self.assertEqual(ninja.call_args.args[0][-2:], ["commands", bindings.TARGET])
         probe_argv = run.call_args_list[1].args[0]
         self.assertEqual(probe_argv[:4], [sys.executable, "-I", "-S", "-B"])
@@ -318,7 +373,7 @@ class WindowsMetagenBindingsTest(unittest.TestCase):
         before = (self.out / "args.gn").read_bytes(), self.library.read_bytes()
         with mock.patch.object(bindings.subprocess, "run", return_value=SimpleNamespace(stdout=self.command())):
             with mock.patch.object(bindings, "run_json", side_effect=[self.runtime(), {"api_preflight": "passed"}]):
-                result = bindings.install(self.src, self.out, Path("ninja"), bindings.CHROMIUM_VERSION, download=False)
+                result = bindings.install(self.src, self.out, Path("ninja"), self.version, download=False)
         self.assertEqual(result["target_cpu"], "arm64")
         self.assertEqual(before, ((self.out / "args.gn").read_bytes(), self.library.read_bytes()))
 
@@ -328,7 +383,7 @@ class WindowsMetagenBindingsTest(unittest.TestCase):
                 'pgo_data_path = "arm64.profdata"\nis_official_build = true\n'
                 f'v8_metagen_libclang_so = "{donor}"\n')
         (self.out / "args.gn").write_text(args)
-        self.assertEqual(bindings.configure(self.src, self.out, bindings.CHROMIUM_VERSION)["status"], "rebased")
+        self.assertEqual(bindings.configure(self.src, self.out, self.version)["status"], "rebased")
         self.assertEqual((self.out / "args.gn").read_text(), args.replace(donor, self.library.as_posix()))
 
     def test_strict_source_version_and_target_table(self):
@@ -345,14 +400,14 @@ class WindowsMetagenBindingsTest(unittest.TestCase):
             (self.out / "args.gn").write_text(args)
             with self.subTest(args=args), mock.patch.object(bindings, "provision") as provision:
                 with self.assertRaises(ValueError):
-                    bindings.install(self.src, self.out, Path("ninja"), bindings.CHROMIUM_VERSION, download=False)
+                    bindings.install(self.src, self.out, Path("ninja"), self.version, download=False)
                 provision.assert_not_called()
         (self.out / "args.gn").write_text('target_cpu = "arm64"\n')
         for text in ("MAJOR=155\nMINOR=0\nBUILD=8059\nPATCH=40\n",
                      "MAJOR=155\nMINOR=0\nBUILD=8059\nPATCH=39\nPATCH=39\n"):
             (self.src / "chrome/VERSION").write_text(text)
             with self.assertRaisesRegex(ValueError, "chrome/VERSION"):
-                bindings.configure(self.src, self.out, bindings.CHROMIUM_VERSION)
+                bindings.configure(self.src, self.out, self.version)
 
     def test_python_313_amd64_on_arm_host_is_explicitly_rejected(self):
         for runtime in (dict(self.runtime(), native_machine=0xAA64),
@@ -395,9 +450,17 @@ class WindowsMetagenBindingsTest(unittest.TestCase):
                 imports.assert_not_called()
 
     def test_non_amd64_and_malformed_dlls_rejected_before_import_or_provision(self):
-        bad_offset = bytearray(pe_dll())
-        struct.pack_into("<I", bad_offset, 60, 0xFFFFFFFF)
-        for data in (pe_dll(0xAA64), pe_dll(0xA641), pe_dll(0x14C), b"not PE", pe_dll()[:90], bytes(bad_offset)):
+        malformed = [pe_dll(0xAA64), pe_dll(0xA641), pe_dll(0x14C), b"not PE",
+                     pe_dll()[:90], pe_dll()[:367]]
+        for offset, format_, value in ((60, "<I", 0xFFFFFFFF), (60, "<I", 32),
+                                       (64, "<I", 0), (70, "<H", 0), (70, "<H", 97),
+                                       (84, "<H", 111), (84, "<H", 0xFFFF),
+                                       (86, "<H", 0x0002), (86, "<H", 0x2000),
+                                       (88, "<H", 0x10B)):
+            data = bytearray(pe_dll())
+            struct.pack_into(format_, data, offset, value)
+            malformed.append(bytes(data))
+        for data in malformed:
             self.library.write_bytes(data)
             with self.subTest(data=data[:8]), mock.patch.object(bindings, "runtime_info", return_value=self.runtime()):
                 with mock.patch.object(bindings.importlib, "import_module") as imports:
@@ -408,7 +471,7 @@ class WindowsMetagenBindingsTest(unittest.TestCase):
                     with mock.patch.object(bindings, "run_json", return_value=self.runtime()):
                         with mock.patch.object(bindings, "provision") as provision:
                             with self.assertRaisesRegex(ValueError, "PE"):
-                                bindings.install(self.src, self.out, Path("ninja"), bindings.CHROMIUM_VERSION, download=False)
+                                bindings.install(self.src, self.out, Path("ninja"), self.version, download=False)
                             provision.assert_not_called()
 
     def test_runtime_subprocess_code_is_valid_and_cross_platform(self):
@@ -416,7 +479,7 @@ class WindowsMetagenBindingsTest(unittest.TestCase):
             with mock.patch.object(bindings, "run_json", return_value=self.runtime()) as run:
                 with mock.patch.object(bindings, "provision", side_effect=ValueError("stop after runtime")):
                     with self.assertRaisesRegex(ValueError, "stop after runtime"):
-                        bindings.install(self.src, self.out, Path("ninja"), bindings.CHROMIUM_VERSION, download=False)
+                        bindings.install(self.src, self.out, Path("ninja"), self.version, download=False)
         argv = run.call_args.args[0]
         self.assertEqual(argv[:3], [sys.executable, "-I", "-c"])
         result = subprocess.run(argv, capture_output=True, text=True, check=True)
@@ -426,7 +489,7 @@ class WindowsMetagenBindingsTest(unittest.TestCase):
         argv = [sys.executable, str(ROOT / "tools/install_windows_metagen_bindings.py"),
                 "--configure", "--src", str(self.src), "--out", str(self.out), "--chromium-version"]
         (self.out / "args.gn").write_text('target_cpu = "arm64"\n')
-        result = subprocess.run([*argv, bindings.CHROMIUM_VERSION], capture_output=True, text=True, check=True)
+        result = subprocess.run([*argv, self.version], capture_output=True, text=True, check=True)
         self.assertEqual(json.loads(result.stdout)["status"], "bundled")
         result = subprocess.run([*argv, "155.0.8059.40"], capture_output=True, text=True)
         self.assertEqual(result.returncode, 1)
@@ -445,6 +508,10 @@ class WindowsMetagenBindingsTest(unittest.TestCase):
         result = subprocess.run([sys.executable, str(ROOT / "tools/install_windows_metagen_bindings.py"), "--help"],
                                 capture_output=True, text=True, check=True)
         self.assertIn("--configure", result.stdout)
+
+
+class Windows15579MetagenBindingsTest(WindowsMetagenBindingsTest):
+    version = "155.0.8059.79"
 
 
 if __name__ == "__main__":

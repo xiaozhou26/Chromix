@@ -29,8 +29,30 @@ RENDERER = "content/renderer/render_thread_impl.cc"
 BRIDGE = "third_party/blink/renderer/controller/blink_initializer.cc"
 PUBLIC = "third_party/blink/public/web/blink.h"
 WEB_STRING = "third_party/blink/public/platform/web_string.h"
-EVIDENCE = json.loads(gzip.decompress(
-    (FIXTURES / "windows155_timezone_sources.json.gz").read_bytes()))
+EVIDENCE_PINS = {
+    "155.0.8059.39": ("windows155_timezone_sources.json.gz",
+                      "04cbc6ded84ceb31a054c370d300af29efdcc42b6c89b1ea6d7d1e689c11fab6"),
+    "155.0.8059.79": ("windows15579_timezone_sources.json.gz",
+                      "72affb69c886fdf048dbf8a2fab8b57f58915f5e349a4e742d94da7009a159a5"),
+}
+
+
+@pytest.fixture(scope="module", params=tuple(EVIDENCE_PINS))
+def evidence(request):
+    name, sha256 = EVIDENCE_PINS[request.param]
+    raw = (FIXTURES / name).read_bytes()
+    assert hashlib.sha256(raw).hexdigest() == sha256
+    data = json.loads(gzip.decompress(raw))
+    assert data["version"] == request.param
+    if request.param == "155.0.8059.79":
+        revision = "a49e2e3d4addfd84e765b52afe230bedb81096db"
+        assert data["chromium_revision"] == revision
+        assert data["url_prefix"] == f"https://raw.githubusercontent.com/chromium/chromium/{revision}/"
+        assert data["sources"]["chrome/VERSION"]["text"] == (
+            "MAJOR=155\nMINOR=0\nBUILD=8059\nPATCH=79\n")
+    else:
+        assert data["url_prefix"] == "https://chromium.googlesource.com/chromium/src/+/155.0.8059.39/"
+    return data
 
 
 def run_patch(directory, path, reverse=False):
@@ -44,10 +66,9 @@ def run_patch(directory, path, reverse=False):
 
 
 @pytest.fixture(scope="module")
-def sources(tmp_path_factory):
-    directory = tmp_path_factory.mktemp("windows155-timezone")
-    assert EVIDENCE["version"] == (ROOT / "CHROMIUM_WINDOWS_VERSION").read_text().strip()
-    for name, entry in EVIDENCE["sources"].items():
+def sources(tmp_path_factory, evidence):
+    directory = tmp_path_factory.mktemp("windows155-timezone-" + evidence["version"])
+    for name, entry in evidence["sources"].items():
         raw = entry["text"].encode()
         assert hashlib.sha256(raw).hexdigest() == entry["sha256"]
         target = directory / name
@@ -55,7 +76,7 @@ def sources(tmp_path_factory):
         target.write_bytes(raw)
     for number in (5, 7, 19):
         run_patch(directory, next((ROOT / "patches").glob(f"{number:04d}-*.patch")))
-    before = {name: (directory / name).read_bytes() for name in EVIDENCE["sources"]}
+    before = {name: (directory / name).read_bytes() for name in evidence["sources"]}
     for patch in PATCHES:
         run_patch(directory, ROOT / patch)
     result = {name: (directory / name).read_text() for name in before}
@@ -89,8 +110,8 @@ def test_exact_source_install_boundary_and_layering(sources):
         "GetRendererInterface()->InitializeRenderer(")
 
 
-def test_native_notification_and_devtools_paths_are_preserved(sources):
-    original = EVIDENCE["sources"][CONTROLLER + ".cc"]["text"]
+def test_native_notification_and_devtools_paths_are_preserved(sources, evidence):
+    original = evidence["sources"][CONTROLLER + ".cc"]["text"]
     patched = sources[CONTROLLER + ".cc"]
     for signature in (
         "bool TimeZoneController::SetIcuTimeZoneAndNotifyV8(",
@@ -132,7 +153,15 @@ def test_selector_authenticates_target231_and_donor230_manifest():
 
     manifest = ROOT / patch_selection.WINDOWS155_ADDITIONS_MANIFEST
     data = json.loads(manifest.read_bytes())
-    donor = {**data, "patches": data["patches"][:-1]}
+    assert data["chromium_version"] == (ROOT / "CHROMIUM_WINDOWS_VERSION").read_text().strip() == "155.0.8059.79"
+    assert data["core_commit"] == "9f145d8815e6e50cc4a2537fcac40966d911e027"
+    assert data["platform_commit"] == "a1e3123c8d543b5c9a1eecfaf0f06cf242c0db37"
+    historical = {**data, "chromium_version": "155.0.8059.39",
+                  "core_commit": "ffeb45a2bb88bc56a1dfed31410aeb10e9efcd5a",
+                  "platform_commit": "989b4382364baaddb8b3180e1eb1030ca96a7273"}
+    assert hashlib.sha256((json.dumps(historical, indent=2) + "\n").encode()).hexdigest() == (
+        patch_selection.WINDOWS155_ADDITIONS_SHA256)
+    donor = {**historical, "patches": historical["patches"][:-1]}
     assert hashlib.sha256((json.dumps(donor, indent=2) + "\n").encode()).hexdigest() == (
         "5e7983a05e07f8f3ec10806fa06f180fb5ef20490568d8d83ce1b1e3db5fa104")
     identity, patches = patch_selection.select(ROOT, "windows")
@@ -140,7 +169,7 @@ def test_selector_authenticates_target231_and_donor230_manifest():
     assert identity["selection"]["additions"]["patches"] == data["patches"]
     assert patches[-1][0] == PATCHES[-1]
     assert hashlib.sha256(manifest.read_bytes()).hexdigest() == (
-        patch_selection.WINDOWS155_ADDITIONS_SHA256)
+        patch_selection.WINDOWS15579_ADDITIONS_SHA256)
     correction = (ROOT / PATCHES[-1]).read_text().splitlines()
     removed = [line[1:] for line in correction if line.startswith("-") and not line.startswith("---")]
     added_lines = [line[1:] for line in correction if line.startswith("+") and not line.startswith("+++")]
@@ -149,7 +178,7 @@ def test_selector_authenticates_target231_and_donor230_manifest():
     assert "FromUTF8" in removed[0]
 
 
-def test_new_timezone_calls_match_exact_declarations(sources):
+def test_new_timezone_calls_match_exact_declarations(sources, evidence):
     web_string = sources[WEB_STRING]
     assert "static WebString FromUtf8(std::string_view s);" in web_string
     assert "FromUTF8" not in web_string
@@ -162,7 +191,7 @@ def test_new_timezone_calls_match_exact_declarations(sources):
     assert "using AutoLock = internal::BasicAutoLock<Lock>;" in sources[
         "base/synchronization/lock.h"]
     assert "std::string Get(const std::string& key) const;" in added(3)
-    original = EVIDENCE["sources"][CONTROLLER + ".cc"]["text"]
+    original = evidence["sources"][CONTROLLER + ".cc"]["text"]
     install = block(sources[CONTROLLER + ".cc"], "bool TimeZoneController::SetDefaultTimeZone(")
     native = block(original, "bool TimeZoneController::SetIcuTimeZoneAndNotifyV8(")
     for call in (
@@ -178,8 +207,8 @@ def test_new_timezone_calls_match_exact_declarations(sources):
         assert signature in sources[CONTROLLER + ".h"]
 
 
-def test_single_file_split_preserves_original_diff_bytes_and_order():
-    split = EVIDENCE["patch_split"]
+def test_single_file_split_preserves_original_diff_bytes_and_order(evidence):
+    split = evidence["patch_split"]
     assert [entry["path"] for entry in split["patches"]] == list(PATCHES[:-1])
     assert [entry["target"] for entry in split["patches"]] == [
         CONTROLLER + ".h", CONTROLLER + ".cc", PUBLIC, BRIDGE, RENDERER,
@@ -355,9 +384,11 @@ def test_harness_detects_install_and_notification_regressions(native_binary, tmp
     assert "assert" in result.stderr.lower()
 
 
-def test_optional_independent_exact_sources():
-    directory = os.environ.get("CHROMIX_WINDOWS155_TIMEZONE_SOURCES")
+def test_optional_independent_exact_sources(evidence):
+    variable = ("CHROMIX_WINDOWS15579_TIMEZONE_SOURCES" if evidence["version"] == "155.0.8059.79"
+                else "CHROMIX_WINDOWS155_TIMEZONE_SOURCES")
+    directory = os.environ.get(variable)
     if not directory:
-        pytest.skip("set CHROMIX_WINDOWS155_TIMEZONE_SOURCES to independently fetched exact tag")
-    for name, entry in EVIDENCE["sources"].items():
+        pytest.skip(f"set {variable} to independently fetched exact tag")
+    for name, entry in evidence["sources"].items():
         assert hashlib.sha256((Path(directory) / name).read_bytes()).hexdigest() == entry["sha256"]

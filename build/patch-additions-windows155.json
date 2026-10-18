@@ -1,9 +1,9 @@
 {
   "schema_version": 1,
   "kind": "windows155-compiled-png-recovery",
-  "chromium_version": "155.0.8059.39",
-  "core_commit": "ffeb45a2bb88bc56a1dfed31410aeb10e9efcd5a",
-  "platform_commit": "989b4382364baaddb8b3180e1eb1030ca96a7273",
+  "chromium_version": "155.0.8059.79",
+  "core_commit": "9f145d8815e6e50cc4a2537fcac40966d911e027",
+  "platform_commit": "a1e3123c8d543b5c9a1eecfaf0f06cf242c0db37",
   "patches": [
     {
       "path": "patches/chromium155-windows/0227-opaque-png-export-consistency.patch",

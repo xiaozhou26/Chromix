@@ -23,6 +23,9 @@ from tools.tests.test_patch_selection import clone_repo, set_platform_pins
 ROOT = Path(__file__).resolve().parents[2]
 VERSION = "155.0.8059.39"
 CORE = "ffeb45a2bb88bc56a1dfed31410aeb10e9efcd5a"
+WINDOWS79_VERSION = "155.0.8059.79"
+WINDOWS79_CORE = "9f145d8815e6e50cc4a2537fcac40966d911e027"
+WINDOWS79_PLATFORM = "a1e3123c8d543b5c9a1eecfaf0f06cf242c0db37"
 COMMITS = {
     "linux": "025d99db1673a21992534551598b73ca79360762",
     "windows": "989b4382364baaddb8b3180e1eb1030ca96a7273",
@@ -270,9 +273,15 @@ def test_optional_independent_155_full_stack(tmp_path, repo155, substituted):
 @pytest.mark.parametrize("additions,expected", [(False, 224), (True, 231)])
 def test_windows155_manifest_presence_distinguishes_historical_and_current(tmp_path, additions, expected):
     repo = clone_repo(tmp_path, additions=False)
+    set_platform_pins(repo, "windows", VERSION, CORE, COMMITS["windows"])
     if additions:
         manifest = selection.WINDOWS155_ADDITIONS_MANIFEST
-        shutil.copy2(ROOT / manifest, repo / manifest)
+        data = json.loads((ROOT / manifest).read_bytes())
+        data.update(chromium_version=VERSION, core_commit=CORE,
+                    platform_commit=COMMITS["windows"])
+        raw = (json.dumps(data, indent=2) + "\n").encode()
+        assert selection.digest(raw) == "4e4b2c3655b2ba1c1f5b2601d5d467ee58f98e8f535214719f1f92c5016ebddd"
+        (repo / manifest).write_bytes(raw)
         shutil.copytree(ROOT / selection.WINDOWS155_ADDITIONS_ROOT,
                         repo / selection.WINDOWS155_ADDITIONS_ROOT)
     identity, patches = selection.select(repo, "windows")
@@ -316,3 +325,154 @@ def test_windows155_historical_225_selection_identity(tmp_path):
     }]
     key = subprocess.run([*command, "--key", "windows"], check=True, capture_output=True, text=True).stdout.strip()
     assert key == "8bb13f960d706837d90bbedd76cc4144430ef8c518ba7fdf34694792b2881667"
+
+
+@pytest.fixture
+def windows79(tmp_path):
+    repo = clone_repo(tmp_path)
+    set_platform_pins(repo, "windows", WINDOWS79_VERSION, WINDOWS79_CORE, WINDOWS79_PLATFORM)
+    return repo
+
+
+def test_windows15579_selects_exact_231_with_unchanged_patch_bytes(windows79):
+    identity, patches = selection.select(windows79, "windows")
+    assert len(patches) == 231
+    assert identity["selection"]["version"] == WINDOWS79_VERSION
+    assert identity["selection"]["core_commit"] == WINDOWS79_CORE
+    assert identity["selection"]["platform_commit"] == WINDOWS79_PLATFORM
+    manifest = windows79 / selection.WINDOWS155_ADDITIONS_MANIFEST
+    assert selection.digest(manifest.read_bytes()) == (
+        "af343acabc84085f49841168cc05edcd4596da061638a81110adb8ee7c0da49e")
+    assert identity["selection"]["additions"]["patches"] == identity["patches"][224:]
+    keys = {style: selection.preparation_key(windows79, "windows", style)
+            for style in ("windows", "posix")}
+    data = json.loads(manifest.read_bytes())
+    data.update(chromium_version=VERSION, core_commit=CORE, platform_commit=COMMITS["windows"])
+    manifest.write_text(json.dumps(data, indent=2) + "\n")
+    set_platform_pins(windows79, "windows", VERSION, CORE, COMMITS["windows"])
+    old_identity, old_patches = selection.select(windows79, "windows")
+    assert old_patches == patches
+    assert old_identity["selection"]["version"] == VERSION
+    for style, key in keys.items():
+        assert selection.preparation_key(windows79, "windows", style) != key
+
+
+@pytest.mark.parametrize("field,value", [
+    ("WindowsUngoogledCommit", CORE), ("WindowsUngoogledCommit", "0" * 40),
+    ("UngoogledWindowsCommit", COMMITS["windows"]), ("UngoogledWindowsCommit", "0" * 40),
+    ("WindowsUngoogledVersion", VERSION + "-1"),
+    ("UngoogledWindowsVersion", WINDOWS79_VERSION + "-1.2"),
+])
+def test_windows15579_rejects_wrong_pins(windows79, field, value):
+    path = windows79 / "build/ungoogled-revisions.psd1"
+    path.write_text(re.sub(rf'(?m)^(  {field} = )"[^"]+"', rf'\g<1>"{value}"', path.read_text()))
+    with pytest.raises(selection.SelectionError, match="pins|Ungoogled"):
+        selection.select(windows79, "windows")
+
+
+@pytest.mark.parametrize("which", ["src", "core"])
+@pytest.mark.parametrize("version", [None, VERSION, selection.VERSION, WINDOWS79_VERSION])
+def test_windows15579_requires_exact_source_and_core(windows79, tmp_path, which, version):
+    directory = tmp_path / which
+    path = directory / ("chrome/VERSION" if which == "src" else "chromium_version.txt")
+    path.parent.mkdir(parents=True)
+    if version:
+        text = ("".join(f"{key}={value}\n" for key, value in zip(
+            ("MAJOR", "MINOR", "BUILD", "PATCH"), version.split(".")))
+                if which == "src" else version + "\n")
+        path.write_text(text)
+    if version == WINDOWS79_VERSION:
+        assert len(selection.select(windows79, "windows", **{which: directory})[1]) == 231
+    else:
+        with pytest.raises(selection.SelectionError, match="version|missing patch input"):
+            selection.select(windows79, "windows", **{which: directory})
+
+
+@pytest.mark.parametrize("version", [VERSION, WINDOWS79_VERSION])
+def test_windows155_manifests_cannot_cross_versions(windows79, version):
+    manifest = windows79 / selection.WINDOWS155_ADDITIONS_MANIFEST
+    if version == WINDOWS79_VERSION:
+        data = json.loads(manifest.read_bytes())
+        data.update(chromium_version=VERSION, core_commit=CORE, platform_commit=COMMITS["windows"])
+        manifest.write_text(json.dumps(data, indent=2) + "\n")
+    else:
+        set_platform_pins(windows79, "windows", VERSION, CORE, COMMITS["windows"])
+    with pytest.raises(selection.SelectionError, match="manifest"):
+        selection.select(windows79, "windows")
+
+
+@pytest.mark.parametrize("mutation", ["no-inputs", "no-manifest", "no-directory", "missing-patch",
+                                      "extra-patch", "changed-patch", "changed-manifest",
+                                      "linked-manifest", "linked-directory", "linked-patch"])
+def test_windows15579_additions_fail_closed(windows79, mutation):
+    manifest = windows79 / selection.WINDOWS155_ADDITIONS_MANIFEST
+    directory = windows79 / selection.WINDOWS155_ADDITIONS_ROOT
+    patch = directory / "0233-renderer-timezone-webstring-api.patch"
+    if mutation in ("no-inputs", "no-manifest"):
+        manifest.unlink()
+    if mutation in ("no-inputs", "no-directory"):
+        shutil.rmtree(directory)
+    elif mutation == "missing-patch":
+        patch.unlink()
+    elif mutation == "extra-patch":
+        (directory / "unexpected.patch").write_bytes(b"unexpected")
+    elif mutation == "changed-patch":
+        patch.write_bytes(patch.read_bytes() + b"\n")
+    elif mutation == "changed-manifest":
+        manifest.write_bytes(manifest.read_bytes() + b"\n")
+    elif mutation == "linked-manifest":
+        manifest.unlink()
+        manifest.symlink_to(ROOT / selection.WINDOWS155_ADDITIONS_MANIFEST)
+    elif mutation == "linked-directory":
+        shutil.rmtree(directory)
+        directory.symlink_to(ROOT / selection.WINDOWS155_ADDITIONS_ROOT, target_is_directory=True)
+    elif mutation == "linked-patch":
+        patch.unlink()
+        patch.symlink_to(ROOT / selection.WINDOWS155_ADDITIONS_ROOT / patch.name)
+    with pytest.raises(selection.SelectionError):
+        selection.select(windows79, "windows")
+
+
+@pytest.mark.parametrize("platform", ["linux", "macos"])
+def test_windows15579_does_not_authorize_other_platforms(windows79, platform):
+    set_platform_pins(windows79, platform, WINDOWS79_VERSION, WINDOWS79_CORE, WINDOWS79_PLATFORM)
+    with pytest.raises(selection.SelectionError, match="require Windows"):
+        selection.select(windows79, platform)
+
+
+def test_windows15579_cli_dispatch_paths_and_source_rejection(windows79, tmp_path):
+    command = [sys.executable, str(ROOT / "tools/patch_selection.py"),
+               "--repo", str(windows79), "--platform", "windows", "--paths"]
+    result = subprocess.run(command, capture_output=True, text=True, check=True)
+    assert len(result.stdout.splitlines()) == 231
+    assert result.stdout.splitlines()[-1] == (
+        "patches/chromium155-windows/0233-renderer-timezone-webstring-api.patch")
+    src = tmp_path / "src"
+    (src / "chrome").mkdir(parents=True)
+    (src / "chrome/VERSION").write_text("MAJOR=155\nMINOR=0\nBUILD=8059\nPATCH=39\n")
+    result = subprocess.run([*command, "--src", str(src)], capture_output=True, text=True)
+    assert result.returncode == 1
+    assert "source version" in result.stderr
+    assert not result.stdout
+
+
+@pytest.mark.parametrize("mutation", ["missing-override", "changed-override", "extra-override",
+                                      "changed-predecessor", "incomplete-series"])
+def test_windows15579_root_override_inventory_stays_authenticated(windows79, mutation):
+    name = sorted(NEW_OVERRIDES)[0]
+    directory = windows79 / selection.OVERRIDE155_ROOT
+    override = directory / name
+    if mutation == "missing-override":
+        override.unlink()
+    elif mutation == "changed-override":
+        override.write_bytes(override.read_bytes() + b"\n")
+    elif mutation == "extra-override":
+        (directory / "unexpected.patch").write_bytes(b"unexpected")
+    elif mutation == "changed-predecessor":
+        predecessor = windows79 / "patches" / name
+        predecessor.write_bytes(predecessor.read_bytes() + b"\n")
+    else:
+        series = windows79 / "patches/series"
+        series.write_text(series.read_text().replace("patches/" + name + "\n", ""))
+    with pytest.raises(selection.SelectionError):
+        selection.select(windows79, "windows")

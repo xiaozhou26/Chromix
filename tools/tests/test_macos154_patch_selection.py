@@ -238,7 +238,8 @@ def test_current_macos_addition_is_isolated_and_keeps_historical_prefix(tmp_path
     windows = selection.select(repo, "windows")
     linux_key = selection.preparation_key(repo, "linux", "posix")
     assert len(windows[1]) == 231
-    assert windows[0]["selection"]["additions"]["manifest"]["sha256"] == selection.WINDOWS155_ADDITIONS_SHA256
+    assert windows[0]["selection"]["version"] == selection.WINDOWS15579_VERSION
+    assert windows[0]["selection"]["additions"]["manifest"]["sha256"] == selection.WINDOWS15579_ADDITIONS_SHA256
     if "additions" in linux[0].get("selection", {}):
         assert len(linux[1]) == 226
         assert selection.digest(arp._json(linux[0])) == (

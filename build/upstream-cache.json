@@ -68,36 +68,36 @@
       }
     },
     "windows": {
-      "chromium_version": "155.0.8059.39",
-      "ungoogled_commit": "ffeb45a2bb88bc56a1dfed31410aeb10e9efcd5a",
+      "chromium_version": "155.0.8059.79",
+      "ungoogled_commit": "9f145d8815e6e50cc4a2537fcac40966d911e027",
       "repository": "ungoogled-software/ungoogled-chromium-windows",
       "repository_id": 177210827,
-      "head_sha": "989b4382364baaddb8b3180e1eb1030ca96a7273",
-      "head_branch": "155.0.8059.39-1.1",
+      "head_sha": "a1e3123c8d543b5c9a1eecfaf0f06cf242c0db37",
+      "head_branch": "155.0.8059.79-1.1",
       "event": "push",
       "workflow_path": ".github/workflows/build-x64.yml",
-      "run_id": 37831345909,
+      "run_id": 38678495080,
       "source_roots": [
         "src",
         "build/src"
       ],
       "artifacts": {
         "x64": {
-          "id": 11670281902,
+          "id": 12099451094,
           "name": "build-artifact",
-          "size_in_bytes": 15705197543,
-          "digest": "sha256:4648e4426093106521986dc5a4dc66b47d861250710b3391f5ed7cf73d11db5c",
-          "expires_at": "2026-10-14T12:44:25Z",
+          "size_in_bytes": 15695268453,
+          "digest": "sha256:6cdf0ed9773532f172cbc9999ed3589ef16c81b14629f36da55d8f2d0a4dd768",
+          "expires_at": "2026-10-21T11:10:21Z",
           "inner_archive": "artifacts.zip"
         },
         "arm64": {
-          "id": 11702070420,
+          "id": 12107338297,
           "name": "build-artifact-arm",
-          "size_in_bytes": 16004417072,
-          "digest": "sha256:08244eb203c3fc6551c761f70bcb4744ec55735c4e1d1a6f51c67a77c12d4f50",
-          "expires_at": "2026-10-15T11:49:46Z",
+          "size_in_bytes": 15984393421,
+          "digest": "sha256:fa6e16ffd91dc85a1dcf945e8eea338a9a497da159c5cb36301aff9b841faa88",
+          "expires_at": "2026-10-21T16:44:10Z",
           "inner_archive": "artifacts.zip",
-          "run_id": 37831345827,
+          "run_id": 38678494961,
           "workflow_path": ".github/workflows/build-arm.yml"
         }
       }

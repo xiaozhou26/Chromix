@@ -364,38 +364,40 @@ class FetchUpstreamCacheTest(unittest.TestCase):
         self.assertEqual(manifest["ungoogled_commit"], "dd8fb9b5c837982faf41ba58cd30a5664e77c329")
         source = manifest["sources"]["windows"]
         self.assertEqual(source, {
-            "chromium_version": "155.0.8059.39",
-            "ungoogled_commit": "ffeb45a2bb88bc56a1dfed31410aeb10e9efcd5a",
+            "chromium_version": "155.0.8059.79",
+            "ungoogled_commit": "9f145d8815e6e50cc4a2537fcac40966d911e027",
             "repository": "ungoogled-software/ungoogled-chromium-windows",
             "repository_id": 177210827,
-            "head_sha": "989b4382364baaddb8b3180e1eb1030ca96a7273",
-            "head_branch": "155.0.8059.39-1.1",
+            "head_sha": "a1e3123c8d543b5c9a1eecfaf0f06cf242c0db37",
+            "head_branch": "155.0.8059.79-1.1",
             "event": "push", "workflow_path": ".github/workflows/build-x64.yml",
-            "run_id": 37831345909, "source_roots": ["src", "build/src"],
+            "run_id": 38678495080, "source_roots": ["src", "build/src"],
             "artifacts": {"x64": {
-                "id": 11670281902, "name": "build-artifact", "size_in_bytes": 15705197543,
-                "digest": "sha256:4648e4426093106521986dc5a4dc66b47d861250710b3391f5ed7cf73d11db5c",
-                "expires_at": "2026-10-14T12:44:25Z", "inner_archive": "artifacts.zip",
+                "id": 12099451094, "name": "build-artifact", "size_in_bytes": 15695268453,
+                "digest": "sha256:6cdf0ed9773532f172cbc9999ed3589ef16c81b14629f36da55d8f2d0a4dd768",
+                "expires_at": "2026-10-21T11:10:21Z", "inner_archive": "artifacts.zip",
             }, "arm64": {
-                "id": 11702070420, "name": "build-artifact-arm", "size_in_bytes": 16004417072,
-                "digest": "sha256:08244eb203c3fc6551c761f70bcb4744ec55735c4e1d1a6f51c67a77c12d4f50",
-                "expires_at": "2026-10-15T11:49:46Z", "inner_archive": "artifacts.zip",
-                "run_id": 37831345827, "workflow_path": ".github/workflows/build-arm.yml",
+                "id": 12107338297, "name": "build-artifact-arm", "size_in_bytes": 15984393421,
+                "digest": "sha256:fa6e16ffd91dc85a1dcf945e8eea338a9a497da159c5cb36301aff9b841faa88",
+                "expires_at": "2026-10-21T16:44:10Z", "inner_archive": "artifacts.zip",
+                "run_id": 38678494961, "workflow_path": ".github/workflows/build-arm.yml",
             }},
         })
-        pin, identity = cache.load_manifest("windows", "x64", 37831345909, root=cache.ROOT)
+        pin, identity = cache.load_manifest("windows", "x64", 38678495080, root=cache.ROOT)
         self.assertEqual(pin, {**{key: value for key, value in source.items() if key != "artifacts"},
                                "artifact": source["artifacts"]["x64"]})
         self.assertEqual({key: identity[key] for key in (
             "chromium_version", "head_sha", "run_id", "artifact_id", "artifact_digest")}, {
-            "chromium_version": "155.0.8059.39", "head_sha": source["head_sha"],
-            "run_id": 37831345909, "artifact_id": 11670281902,
+            "chromium_version": "155.0.8059.79", "head_sha": source["head_sha"],
+            "run_id": 38678495080, "artifact_id": 12099451094,
             "artifact_digest": source["artifacts"]["x64"]["digest"],
         })
-        self.assert_metadata_provenance(pin, datetime(2026, 10, 11, tzinfo=timezone.utc))
+        self.assert_metadata_provenance(pin, datetime(2026, 10, 18, tzinfo=timezone.utc))
         for arch, run_id, reason in (("arm64", 37100793757, "run_id_mismatch"),
-                                     ("arm64", 37831345909, "run_id_mismatch"),
-                                     ("x64", 37831345827, "run_id_mismatch"),
+                                     ("arm64", 37831345827, "run_id_mismatch"),
+                                     ("x64", 37831345909, "run_id_mismatch"),
+                                     ("arm64", 38678495080, "run_id_mismatch"),
+                                     ("x64", 38678494961, "run_id_mismatch"),
                                      ("x64", 37100793859, "run_id_mismatch"),
                                      ("x64", 37100793757, "run_id_mismatch"),
                                      ("x64", 34806882978, "run_id_mismatch"),
@@ -409,19 +411,19 @@ class FetchUpstreamCacheTest(unittest.TestCase):
 
     def test_checked_in_windows155_arm64_exact_metadata_and_restore_identity(self):
         from tools.restore_upstream_cache import identities
-        from tools.tests.test_windows155_midl import ARM_IDENTITY
+        from tools.tests.test_windows155_midl import ARM_IDENTITY15579
 
-        pin, identity = cache.load_manifest("windows", "arm64", 37831345827, root=cache.ROOT)
+        pin, identity = cache.load_manifest("windows", "arm64", 38678494961, root=cache.ROOT)
         self.assertEqual(identity["target"], "windows-arm64")
-        self.assertEqual(identity["run_id"], 37831345827)
+        self.assertEqual(identity["run_id"], 38678494961)
         self.assertEqual(identity["workflow_path"], ".github/workflows/build-arm.yml")
-        self.assertEqual(identity["artifact_id"], 11702070420)
+        self.assertEqual(identity["artifact_id"], 12107338297)
         restored, selected, _ = identities(cache.ROOT, "windows", "arm64")
-        self.assertEqual(restored, ARM_IDENTITY)
+        self.assertEqual(restored, ARM_IDENTITY15579)
         self.assertEqual(selected, pin)
         for value in (pin, pin["artifact"], identity, restored):
             self.assertFalse(cache.CHECKPOINT_FIELDS.intersection(value))
-        self.assert_metadata_provenance(pin, datetime(2026, 10, 13, tzinfo=timezone.utc))
+        self.assert_metadata_provenance(pin, datetime(2026, 10, 18, tzinfo=timezone.utc))
         x64, _ = cache.load_manifest("windows", "x64", root=cache.ROOT)
         run, _ = metadata(pin)
         _, artifact = metadata(x64)
@@ -437,15 +439,15 @@ class FetchUpstreamCacheTest(unittest.TestCase):
         client.json.side_effect = (run, artifact)
         client.download.side_effect = cache.CacheMiss("metadata_verified")
         with mock.patch.object(cache, "datetime", wraps=datetime) as clock:
-            clock.now.return_value = datetime(2026, 10, 13, tzinfo=timezone.utc)
-            result = cache.fetch("windows", "arm64", self.destination, 37831345827,
+            clock.now.return_value = datetime(2026, 10, 18, tzinfo=timezone.utc)
+            result = cache.fetch("windows", "arm64", self.destination, 38678494961,
                                  root=cache.ROOT, client=client)
         self.assertEqual(result["reason"], "metadata_verified")
         self.assertEqual(result["download_bytes"], 0)
         base = "/repos/ungoogled-software/ungoogled-chromium-windows/actions"
         self.assertEqual(client.json.call_args_list, [
-            mock.call(base + "/runs/37831345827"),
-            mock.call(base + "/artifacts/11702070420"),
+            mock.call(base + "/runs/38678494961"),
+            mock.call(base + "/artifacts/12107338297"),
         ])
         client.download.assert_called_once()
 
