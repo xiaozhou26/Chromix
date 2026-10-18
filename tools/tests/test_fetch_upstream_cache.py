@@ -287,30 +287,30 @@ class FetchUpstreamCacheTest(unittest.TestCase):
         manifest = json.loads(cache.MANIFEST.read_text())
         source = manifest["sources"]["linux"]
         self.assertEqual(source, {
-            "chromium_version": "155.0.8059.39",
-            "ungoogled_commit": "ffeb45a2bb88bc56a1dfed31410aeb10e9efcd5a",
+            "chromium_version": "155.0.8059.79",
+            "ungoogled_commit": "9f145d8815e6e50cc4a2537fcac40966d911e027",
             "repository": "ungoogled-software/ungoogled-chromium-portablelinux",
             "repository_id": 177191557,
-            "head_sha": "025d99db1673a21992534551598b73ca79360762",
-            "head_branch": "155.0.8059.39-1", "event": "push",
+            "head_sha": "6b86f45adc4a7f7ac4c3897a8b651eb34784d761",
+            "head_branch": "155.0.8059.79-1", "event": "push",
             "workflow_path": ".github/workflows/build.yml",
-            "run_id": 37906884923, "source_roots": ["build/src"],
+            "run_id": 38629815756, "source_roots": ["build/src"],
             "artifacts": {
                 "x64": {
-                    "id": 11652570743, "name": "build-cache-x86_64", "size_in_bytes": 4733942111,
-                    "digest": "sha256:34182b5fdbec949fbe29d320a7d7200eb9cd4b284c18b8daa0c516ab4816fa1a",
-                    "expires_at": "2027-01-07T08:45:03Z", "inner_archive": "build-cache-x86_64.tar.zst",
+                    "id": 11962976864, "name": "build-cache-x86_64", "size_in_bytes": 4734859038,
+                    "digest": "sha256:10c73ca0ce1796446256466a7ebf275e4b219dcf5e55a0fb3d418868df22d1ec",
+                    "expires_at": "2027-01-12T20:10:31Z", "inner_archive": "build-cache-x86_64.tar.zst",
                 },
                 "arm64": {
-                    "id": 11656090008, "name": "build-cache-arm64", "size_in_bytes": 5677163828,
-                    "digest": "sha256:a4c0bfd8020cd34f27a652ae449f9e8547a468b8b813a11a64acf8a0891db447",
-                    "expires_at": "2027-01-07T08:45:03Z", "inner_archive": "build-cache-arm64.tar.zst",
+                    "id": 11992866704, "name": "build-cache-arm64", "size_in_bytes": 5677157482,
+                    "digest": "sha256:e6e7b4da0b120809f67117b65a42cec1bebb413fb81273cf368e0cd373ec8c18",
+                    "expires_at": "2027-01-12T20:10:31Z", "inner_archive": "build-cache-arm64.tar.zst",
                 },
             },
         })
         for arch in ("x64", "arm64"):
             with self.subTest(arch=arch):
-                pin, identity = cache.load_manifest("linux", arch, 37906884923, root=cache.ROOT)
+                pin, identity = cache.load_manifest("linux", arch, 38629815756, root=cache.ROOT)
                 self.assertEqual(pin, {
                     **{key: value for key, value in source.items() if key != "artifacts"},
                     "artifact": source["artifacts"][arch],

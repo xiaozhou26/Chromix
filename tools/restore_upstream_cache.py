@@ -77,6 +77,20 @@ LINUX155_ESBUILD_ARTIFACTS = {
     "arm64": (11656090008, "build-cache-arm64", 5677163828,
               "sha256:a4c0bfd8020cd34f27a652ae449f9e8547a468b8b813a11a64acf8a0891db447"),
 }
+LINUX15579_ESBUILD_IDENTITY = {
+    "chromium_version": "155.0.8059.79",
+    "ungoogled_commit": "9f145d8815e6e50cc4a2537fcac40966d911e027",
+    "head_sha": "6b86f45adc4a7f7ac4c3897a8b651eb34784d761",
+    "platform": "linux", "repository": "ungoogled-software/ungoogled-chromium-portablelinux",
+    "repository_id": 177191557, "head_branch": "155.0.8059.79-1", "event": "push",
+    "workflow_path": ".github/workflows/build.yml", "run_id": 38629815756,
+}
+LINUX15579_ESBUILD_ARTIFACTS = {
+    "x64": (11962976864, "build-cache-x86_64", 4734859038,
+            "sha256:10c73ca0ce1796446256466a7ebf275e4b219dcf5e55a0fb3d418868df22d1ec"),
+    "arm64": (11992866704, "build-cache-arm64", 5677157482,
+              "sha256:e6e7b4da0b120809f67117b65a42cec1bebb413fb81273cf368e0cd373ec8c18"),
+}
 MAC154_ESBUILD_LINK = "third_party/devtools-frontend/src/node_modules/esbuild"
 MAC154_ESBUILD_ALIAS = "third_party/devtools-frontend/src/node_modules/.bin/esbuild"
 MAC154_ESBUILD_IDENTITY = {
@@ -203,7 +217,8 @@ def is_known_external_link(relative: str, platform: str, identity: dict | None =
             return False
         records = ((MAC154_ESBUILD_IDENTITY, MAC154_ESBUILD_ARTIFACTS),) if platform == "macos" else (
             (LINUX154_ESBUILD_IDENTITY, LINUX154_ESBUILD_ARTIFACTS),
-            (LINUX155_ESBUILD_IDENTITY, LINUX155_ESBUILD_ARTIFACTS))
+            (LINUX155_ESBUILD_IDENTITY, LINUX155_ESBUILD_ARTIFACTS),
+            (LINUX15579_ESBUILD_IDENTITY, LINUX15579_ESBUILD_ARTIFACTS))
         arch = identity.get("arch")
         if not isinstance(arch, str):
             return False

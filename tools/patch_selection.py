@@ -59,6 +59,10 @@ PLATFORM155_COMMITS = {
     "windows": "989b4382364baaddb8b3180e1eb1030ca96a7273",
     "linux": "025d99db1673a21992534551598b73ca79360762",
 }
+LINUX15579_VERSION = "155.0.8059.79"
+LINUX15579_CORE = "9f145d8815e6e50cc4a2537fcac40966d911e027"
+LINUX15579_PLATFORM = "6b86f45adc4a7f7ac4c3897a8b651eb34784d761"
+LINUX15579_ADDITIONS_SHA256 = "c5f695bdd9c61e651a56a6aafdd38167873e4bcf3d7ab8bcfb66ea83edd1a780"
 OVERRIDE155_ROOT = "patches/chromium155"
 LINUX155_ADDITIONS_ROOT = "patches/chromium155-linux"
 LINUX155_ADDITIONS_MANIFEST = "build/patch-additions-linux155.json"
@@ -163,16 +167,20 @@ def validate_overrides(repo: Path, root: str = OVERRIDE_ROOT,
             raise SelectionError(f"changed Chromium {label} override: " + name)
 
 
-def linux155_additions(repo: Path) -> tuple[list[str], dict | None]:
+def linux155_additions(repo: Path, version: str = VERSION155) -> tuple[list[str], dict | None]:
     manifest = repo / LINUX155_ADDITIONS_MANIFEST
     directory = repo / LINUX155_ADDITIONS_ROOT
     # Pre-addition donors have neither input; their exact commit is authenticated by migration.
     if not manifest.exists() and not manifest.is_symlink():
         if directory.exists() or directory.is_symlink():
             raise SelectionError("Linux155 additions directory requires its pinned manifest")
+        if version == LINUX15579_VERSION:
+            raise SelectionError("Linux15579 requires both reviewed additions")
         return [], None
     raw = read(repo, LINUX155_ADDITIONS_MANIFEST)
-    if digest(raw) not in (LINUX155_LEGACY_ADDITIONS_SHA256, LINUX155_ADDITIONS_SHA256):
+    allowed = ((LINUX15579_ADDITIONS_SHA256,) if version == LINUX15579_VERSION else
+               (LINUX155_LEGACY_ADDITIONS_SHA256, LINUX155_ADDITIONS_SHA256))
+    if digest(raw) not in allowed:
         raise SelectionError("changed Linux155 additions manifest")
     additions = json.loads(raw)
     if directory.is_symlink() or not directory.is_dir():
@@ -281,13 +289,13 @@ def select(repo: Path, platform: str | None = None, *, src: Path | None = None,
     macos152 = platform == "macos" and version == MACOS152_VERSION
     if src is not None and version is not None:
         source_version_path = Path(src) / "chrome/VERSION"
-        if version in (VERSION, VERSION155) or macos152 or source_version_path.is_symlink():
+        if version in (VERSION, VERSION155, LINUX15579_VERSION) or macos152 or source_version_path.is_symlink():
             observed = source_version(Path(src))
             if observed != version:
                 raise SelectionError("source version does not match selected repository pins")
     if core is not None and version is not None:
         core_version_path = Path(core) / "chromium_version.txt"
-        if version in (VERSION, VERSION155) or macos152 or core_version_path.is_symlink():
+        if version in (VERSION, VERSION155, LINUX15579_VERSION) or macos152 or core_version_path.is_symlink():
             observed = read(Path(core), "chromium_version.txt").decode("ascii").strip()
             if observed != version:
                 raise SelectionError("core version does not match selected repository pins")
@@ -311,14 +319,19 @@ def select(repo: Path, platform: str | None = None, *, src: Path | None = None,
         selection = {"schema_version": 1, "version": VERSION, "platform": platform,
                      "core_commit": core_commit, "platform_commit": PLATFORM_COMMITS[platform],
                      "base_series_sha256": digest(series)}
-    elif version == VERSION155:
+    elif version in (VERSION155, LINUX15579_VERSION):
+        if version == LINUX15579_VERSION and platform != "linux":
+            raise SelectionError("Chromium 155.0.8059.79 overrides require Linux")
         if platform not in PLATFORM155_COMMITS:
             raise SelectionError("Chromium 155 overrides require Windows or Linux")
         prefix = "Ungoogled" + PLATFORMS[platform]
-        platform_version = VERSION155 + ("-1.1" if platform == "windows" else "-1")
-        if (pins["UngoogledCommit"] != CORE155
-                or pins["UngoogledVersion"] != VERSION155 + "-1"
-                or pins[prefix + "Commit"] != PLATFORM155_COMMITS[platform]
+        core_commit = LINUX15579_CORE if version == LINUX15579_VERSION else CORE155
+        platform_commit = (LINUX15579_PLATFORM if version == LINUX15579_VERSION
+                           else PLATFORM155_COMMITS[platform])
+        platform_version = version + ("-1.1" if platform == "windows" else "-1")
+        if (pins["UngoogledCommit"] != core_commit
+                or pins["UngoogledVersion"] != version + "-1"
+                or pins[prefix + "Commit"] != platform_commit
                 or pins[prefix + "Version"] != platform_version):
             raise SelectionError("Chromium 155 core/platform pins do not match reviewed overrides")
         validate_overrides(repo, OVERRIDE155_ROOT, OVERRIDES155, "155")
@@ -326,8 +339,8 @@ def select(repo: Path, platform: str | None = None, *, src: Path | None = None,
             raise SelectionError("Chromium 155 requires the complete 224-patch base series")
         selected = [OVERRIDE155_ROOT + "/" + Path(name).name
                     if Path(name).name in OVERRIDES155 else name for name in names]
-        selection = {"schema_version": 1, "version": VERSION155, "platform": platform,
-                     "core_commit": CORE155, "platform_commit": PLATFORM155_COMMITS[platform],
+        selection = {"schema_version": 1, "version": version, "platform": platform,
+                     "core_commit": core_commit, "platform_commit": platform_commit,
                      "base_series_sha256": digest(series)}
     elif macos152:
         if (pins["UngoogledCommit"] != MACOS152_CORE
@@ -351,8 +364,8 @@ def select(repo: Path, platform: str | None = None, *, src: Path | None = None,
         effective_series = "".join(
             line.replace(name, mapping[name], 1) if (name := line.split("#", 1)[0].strip()) else line
             for line in series.decode("utf-8").splitlines(keepends=True)).encode("utf-8")
-    if version == VERSION155 and platform == "linux":
-        additions, addition_identity = linux155_additions(repo)
+    if version in (VERSION155, LINUX15579_VERSION) and platform == "linux":
+        additions, addition_identity = linux155_additions(repo, version)
         if addition_identity is not None:
             selected = [*selected, *additions]
             if not effective_series.endswith(b"\n"):

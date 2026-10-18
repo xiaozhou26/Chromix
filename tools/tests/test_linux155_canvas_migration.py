@@ -312,7 +312,7 @@ def test_compiled_checkpoint_still_authenticates_repository_workflow_path(change
         assert report["artifacts"][0]["size_in_bytes"] == 5009170838
 
 
-def test_windows_selector_keeps_exact_posix_identities_and_historical_hashes(tmp_path):
+def test_current_selector_keeps_historical_identities_and_all_posix_patch_bytes(tmp_path):
     import io
     import tarfile
     from tools import patch_selection
@@ -331,12 +331,23 @@ def test_windows_selector_keeps_exact_posix_identities_and_historical_hashes(tmp
     for platform, (count, identity) in expected.items():
         old = patch_selection.select(baseline, platform)
         current = patch_selection.select(ROOT, platform)
-        assert current == old
-        assert len(current[1]) == count
-        assert arp._sha(arp._json(current[0])) == identity
+        assert current[1] == old[1]
+        assert len(old[1]) == count
+        assert arp._sha(arp._json(old[0])) == identity
+        if platform == "linux":
+            assert current[0]["selection"]["version"] == "155.0.8059.79"
+            assert current[0] != old[0]
+        else:
+            assert current == old
+    current_selector = arp._sha((ROOT / SELECTOR).read_bytes())
+    for allowed in (migration.LINUX155_PNG_SUPPORTING_SELECTORS,
+                    migration.LINUX155_SUPPORTING_SELECTORS,
+                    migration.MACOS154_SUPPORTING_SELECTORS):
+        assert current_selector not in allowed
     assert migration.LINUX155_PNG_SUPPORTING_SELECTORS == (
         "7e59710e98b88556c19d5cf53563eee0dc4f94b2cdabed0051adcad68fe11542",
         "4c2392a036f0e3c754ed887b41e67e624d80350f53d0059f7308205d05ca5185",
+        migration.LINUX15579_SELECTOR,
     )
     assert migration.LINUX155_SUPPORTING_SELECTORS == (
         "9a706c5ec4aca59a1a06154fe7c592746f32c2c28571ee33a7c5d55fd523bb26",

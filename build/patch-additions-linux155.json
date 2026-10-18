@@ -1,9 +1,9 @@
 {
   "schema_version": 2,
   "kind": "linux155-compiled-png-recovery",
-  "chromium_version": "155.0.8059.39",
-  "core_commit": "ffeb45a2bb88bc56a1dfed31410aeb10e9efcd5a",
-  "platform_commit": "025d99db1673a21992534551598b73ca79360762",
+  "chromium_version": "155.0.8059.79",
+  "core_commit": "9f145d8815e6e50cc4a2537fcac40966d911e027",
+  "platform_commit": "6b86f45adc4a7f7ac4c3897a8b651eb34784d761",
   "patches": [
     {
       "path": "patches/chromium155-linux/0225-managed-profile-controller-link.patch",

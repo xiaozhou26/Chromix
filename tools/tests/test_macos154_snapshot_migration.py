@@ -60,6 +60,10 @@ def test_production_policy_accepts_exact_donor_without_executing_it(tmp_path, ar
     ):
         assert arp.patch_selection.preparation_key(previous, "macos", style) == expected
         assert arp.patch_selection.preparation_key(repo, "macos", style) != expected
+    fixtures.put(repo, SELECTOR, (ROOT / SELECTOR).read_bytes())
+    with pytest.raises(arp.ApplyError, match="selector hash"):
+        migration._same_inputs(previous, repo, "macos", arch)
+    target_files(repo)
     fixtures.put(previous, SELECTOR, donor_file(SELECTOR) + b"\n")
     with pytest.raises(arp.ApplyError, match="selector hash"):
         migration._same_inputs(previous, repo, "macos", arch)

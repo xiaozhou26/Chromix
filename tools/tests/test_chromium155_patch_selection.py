@@ -316,3 +316,76 @@ def test_windows155_historical_225_selection_identity(tmp_path):
     }]
     key = subprocess.run([*command, "--key", "windows"], check=True, capture_output=True, text=True).stdout.strip()
     assert key == "8bb13f960d706837d90bbedd76cc4144430ef8c518ba7fdf34694792b2881667"
+
+
+def test_linux15579_retains_successful_226_stack_without_sharing_windows_pins(tmp_path):
+    repo = clone_repo(tmp_path)
+    current, patches = selection.select(repo, "linux")
+    assert current["selection"]["version"] == "155.0.8059.79"
+    assert current["selection"]["core_commit"] == "9f145d8815e6e50cc4a2537fcac40966d911e027"
+    assert current["selection"]["platform_commit"] == "6b86f45adc4a7f7ac4c3897a8b651eb34784d761"
+    assert len(patches) == 226
+    assert [Path(name).name for name, _ in patches[-2:]] == [
+        "0225-managed-profile-controller-link.patch", "0227-opaque-png-export-consistency.patch"]
+    windows = selection.select(repo, "windows")
+    assert windows[0]["selection"]["version"] == VERSION
+    key = selection.preparation_key(repo, "linux", "posix")
+    for ref in ("eda1d96", "ac66168"):
+        manifest = subprocess.run(["git", "-C", str(ROOT), "show",
+            ref + ":" + selection.LINUX155_ADDITIONS_MANIFEST],
+            check=True, capture_output=True).stdout
+        (repo / selection.LINUX155_ADDITIONS_MANIFEST).write_bytes(manifest)
+        set_platform_pins(repo, "linux", VERSION, CORE, COMMITS["linux"])
+        old, old_patches = selection.select(repo, "linux")
+        assert old_patches == patches
+        assert old["series_sha256"] == current["series_sha256"]
+        assert selection.preparation_key(repo, "linux", "posix") != key
+        assert selection.select(repo, "windows") == windows
+
+
+@pytest.mark.parametrize("mutation", ["core", "overlay", "version", "manifest-old", "missing", "patch"])
+def test_linux15579_rejects_mixed_identity_or_dropped_repairs(tmp_path, mutation):
+    repo = clone_repo(tmp_path)
+    if mutation in ("core", "overlay", "version"):
+        set_platform_pins(repo, "linux",
+            "155.0.8059.80" if mutation == "version" else selection.LINUX15579_VERSION,
+            CORE if mutation == "core" else selection.LINUX15579_CORE,
+            COMMITS["linux"] if mutation == "overlay" else selection.LINUX15579_PLATFORM)
+    elif mutation == "manifest-old":
+        (repo / selection.LINUX155_ADDITIONS_MANIFEST).write_bytes(subprocess.run(
+            ["git", "-C", str(ROOT), "show", "eda1d96:" + selection.LINUX155_ADDITIONS_MANIFEST],
+            check=True, capture_output=True).stdout)
+    elif mutation == "missing":
+        (repo / selection.LINUX155_ADDITIONS_MANIFEST).unlink()
+        shutil.rmtree(repo / selection.LINUX155_ADDITIONS_ROOT)
+    else:
+        path = repo / selection.LINUX155_ADDITIONS_ROOT / "0227-opaque-png-export-consistency.patch"
+        path.write_bytes(path.read_bytes() + b"\n")
+    with pytest.raises(selection.SelectionError):
+        selection.select(repo, "linux")
+
+
+@pytest.mark.parametrize("platform", ["windows", "macos"])
+def test_linux15579_cannot_authorize_another_platform(tmp_path, platform):
+    repo = clone_repo(tmp_path)
+    set_platform_pins(repo, platform, selection.LINUX15579_VERSION,
+                      selection.LINUX15579_CORE, selection.LINUX15579_PLATFORM)
+    with pytest.raises(selection.SelectionError, match="require Linux"):
+        selection.select(repo, platform)
+
+
+@pytest.mark.parametrize("which", ["src", "core"])
+def test_linux15579_requires_actual_source_version(tmp_path, which):
+    repo = clone_repo(tmp_path)
+    source = tmp_path / which
+    path = source / ("chrome/VERSION" if which == "src" else "chromium_version.txt")
+    path.parent.mkdir(parents=True)
+    for version in (VERSION, selection.LINUX15579_VERSION):
+        path.write_text("".join(f"{key}={value}\n" for key, value in
+            zip(("MAJOR", "MINOR", "BUILD", "PATCH"), version.split(".")))
+            if which == "src" else version + "\n")
+        if version == VERSION:
+            with pytest.raises(selection.SelectionError, match="version"):
+                selection.select(repo, "linux", **{which: source})
+        else:
+            assert len(selection.select(repo, "linux", **{which: source})[1]) == 226

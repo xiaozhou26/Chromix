@@ -58,6 +58,10 @@ def test_production_policy_accepts_exact_donor_without_executing_it(tmp_path):
         assert len(arp.patch_selection.select(target, "linux")[1]) == 225
     with pytest.raises(arp.ApplyError):
         migration._same_inputs(previous, ROOT, "linux", "x64")
+    fixtures.put(target, SELECTOR, (ROOT / SELECTOR).read_bytes())
+    with pytest.raises(arp.ApplyError, match="selector hash"):
+        migration._same_inputs(previous, target, "linux", "x64")
+    target_files(target)
     fixtures.put(previous, SELECTOR, donor_file(SELECTOR) + b"\n")
     with pytest.raises(arp.ApplyError, match="selector hash"):
         migration._same_inputs(previous, target, "linux", "x64")
@@ -264,3 +268,17 @@ def test_generated_resume_mapping_is_exact(field, value):
                             env=env, capture_output=True, text=True, check=True)
     expected = "build/chromium155-donors-20261011" if field is None else env["RECOVERY_BRANCH"]
     assert result.stdout == expected
+
+
+@pytest.mark.parametrize("arch", ["x64", "arm64"])
+def test_current_donor_continues_only_its_own_versioned_checkpoint(tmp_path, arch):
+    migration._same_inputs(ROOT, ROOT, "linux", arch)
+    key = migration.source_ready_key(ROOT, "linux", arch)
+    assert key.startswith(f"linux|{arch}|155.0.8059.79|9f145d8815e6e50cc4a2537fcac40966d911e027|")
+    previous = tmp_path / "previous"
+    subprocess.run(["git", "clone", "--shared", "--no-checkout", str(ROOT), str(previous)],
+                   check=True, capture_output=True)
+    fixtures.git(previous, "checkout", "--detach", "14535a9f86865fe58b47a9f593f2b925c94ce0fe")
+    assert migration.source_ready_key(previous, "linux", arch) != key
+    with pytest.raises(arp.ApplyError, match="identical pins/preparation tooling"):
+        migration._same_inputs(previous, ROOT, "linux", arch)

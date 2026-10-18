@@ -50,13 +50,15 @@ LINUX155_NEW_SELECTOR = "9a706c5ec4aca59a1a06154fe7c592746f32c2c28571ee33a7c5d55
 MACOS154_NEW_SELECTOR = "3eb4381914588389feec36640cfd70c7838c38d9da2ba0ab34c3e53dfa3281f3"
 LINUX155_PNG_SELECTOR = "7e59710e98b88556c19d5cf53563eee0dc4f94b2cdabed0051adcad68fe11542"
 WINDOWS155_PNG_SELECTOR = "4c2392a036f0e3c754ed887b41e67e624d80350f53d0059f7308205d05ca5185"
+LINUX15579_SELECTOR = "5924597c7cf2836651d818f7cc711acbe26c1483377c340904f58a6e365bdf1a"
 LINUX155_SUPPORTING_SELECTORS = (
     LINUX155_NEW_SELECTOR, MACOS154_NEW_SELECTOR, LINUX155_PNG_SELECTOR, WINDOWS155_PNG_SELECTOR,
+    LINUX15579_SELECTOR,
 )
 MACOS154_SUPPORTING_SELECTORS = (
-    MACOS154_NEW_SELECTOR, LINUX155_PNG_SELECTOR, WINDOWS155_PNG_SELECTOR,
+    MACOS154_NEW_SELECTOR, LINUX155_PNG_SELECTOR, WINDOWS155_PNG_SELECTOR, LINUX15579_SELECTOR,
 )
-LINUX155_PNG_SUPPORTING_SELECTORS = (LINUX155_PNG_SELECTOR, WINDOWS155_PNG_SELECTOR)
+LINUX155_PNG_SUPPORTING_SELECTORS = (LINUX155_PNG_SELECTOR, WINDOWS155_PNG_SELECTOR, LINUX15579_SELECTOR)
 LINUX155_MANIFEST = "build/patch-additions-linux155.json"
 LINUX155_MANIFEST_SHA256 = "28fb67c9207bfe6e9b8314a0e56856c5136cc6a98461ad826f9ad7e8c4fbe38f"
 LINUX155_PATCH = "patches/chromium155-linux/0225-managed-profile-controller-link.patch"
@@ -87,6 +89,18 @@ LINUX155_PNG_MANIFEST_SHA256 = "5480c06026cf67f27f23fc4bdff4122c294cb0a8a16c4b5d
 LINUX155_PNG_PATCH = "patches/chromium155-linux/0227-opaque-png-export-consistency.patch"
 LINUX155_PNG_PATCH_SHA256 = "4c048a50930c3541a3bb9e4442ad7f18e94c04ebccf86c0cfbfc286b15a70751"
 LINUX155_PNG_SOURCE = "third_party/blink/renderer/core/html/canvas/canvas_async_blob_creator.cc"
+
+
+# Historical 155.39 recovery must not borrow the new donor's version/tool identities.
+HISTORICAL_PREPARATION_HASHES = {
+    "build/prepare-ungoogled.sh": "585dfbf764936e1b1b04a006a1f045ccf2d7423473d05813bb660bf4fba61384",
+    "tools/linux_restored_generators.py": "51c08b4bd442430d37a9a6fa779db01e9467a1346e0f3e402af0e41ed2a74c8b",
+}
+
+
+def _trusted_preparation(name: str, raw: bytes) -> bool:
+    return (raw == arp._read(Path(__file__).resolve().parents[1], name)
+            or arp._sha(raw) == HISTORICAL_PREPARATION_HASHES.get(name))
 
 
 def _pins(repo: Path, platform: str) -> dict:
@@ -135,7 +149,7 @@ def _linux155_selector_transition(previous: Path, repo: Path, platform: str,
         if original != _donor_git(previous, repo, "cat-file", "blob", LINUX155_DONOR + ":" + name):
             raise arp.ApplyError("Linux155 donor preparation bytes changed: " + name)
         if name != selector and (original != arp._read(repo, name)
-                                 or original != arp._read(Path(__file__).resolve().parents[1], name)):
+                                 or not _trusted_preparation(name, original)):
             raise arp.ApplyError("Linux155 migration requires preserved preparation tooling: " + name)
     manifest = arp._read(repo, LINUX155_MANIFEST)
     patch = arp._read(repo, LINUX155_PATCH)
@@ -180,7 +194,7 @@ def _linux155_png_selector_transition(previous: Path, repo: Path, platform: str,
             raise arp.ApplyError("Linux155 PNG donor preparation bytes changed: " + name)
         if name != selector and original != arp._read(repo, name):
             raise arp.ApplyError("Linux155 PNG migration requires preserved inputs: " + name)
-        if name in LINUX155_PRESERVED and original != arp._read(Path(__file__).resolve().parents[1], name):
+        if name in LINUX155_PRESERVED and not _trusted_preparation(name, original):
             raise arp.ApplyError("Linux155 PNG migration requires trusted preparation tooling: " + name)
     if (arp._sha(arp._read(previous, LINUX155_MANIFEST)) != LINUX155_MANIFEST_SHA256
             or arp._sha(arp._read(repo, LINUX155_MANIFEST)) != LINUX155_PNG_MANIFEST_SHA256):
@@ -227,7 +241,7 @@ def _linux155_arm64_selector_transition(previous: Path, repo: Path, platform: st
             raise arp.ApplyError("Linux155 ARM64 donor preparation bytes changed: " + name)
         if name != selector and original != arp._read(repo, name):
             raise arp.ApplyError("Linux155 ARM64 migration requires preserved inputs: " + name)
-        if name in LINUX155_PRESERVED and original != arp._read(Path(__file__).resolve().parents[1], name):
+        if name in LINUX155_PRESERVED and not _trusted_preparation(name, original):
             raise arp.ApplyError("Linux155 ARM64 migration requires trusted preparation tooling: " + name)
     if arp._sha(arp._read(repo, LINUX155_MANIFEST)) != LINUX155_PNG_MANIFEST_SHA256:
         raise arp.ApplyError("Linux155 ARM64 migration manifest hash mismatch")
@@ -337,7 +351,11 @@ def _same_inputs(previous: Path, repo: Path, platform: str = "linux",
         # The exact macOS donor tooling was authenticated above, never executed here.
         if macos_transition and name in (*MACOS154_PRESERVED, "tools/patch_selection.py"):
             continue
-        if arp._read(repo, name) != arp._read(Path(__file__).resolve().parents[1], name):
+        raw = arp._read(repo, name)
+        historical_linux = (platform == "linux" and arp._read(previous, "tools/patch_selection.py")
+                            != arp._read(repo, "tools/patch_selection.py"))
+        if (raw != arp._read(Path(__file__).resolve().parents[1], name)
+                and not (historical_linux and _trusted_preparation(name, raw))):
             raise arp.ApplyError(f"repository preparation tooling differs from running trusted checkout: {name}")
 
 

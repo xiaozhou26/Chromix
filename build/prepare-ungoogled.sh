@@ -47,7 +47,7 @@ if [ -f "$READY" ] && [ "$(cat "$READY")" = "$KEY" ]; then
       --core "$CORE_REPO" --platform-tooling "$PLATFORM_REPO" \
       --platform "$PLATFORM" --patch-bin "$PATCH_BIN" --check
   fi
-  if [ "$RESTORED" -eq 1 ] || [ "$CHROMIUM_VERSION" = "154.0.8037.97" ] || [ "$CHROMIUM_VERSION" = "155.0.8059.39" ]; then
+  if [ "$RESTORED" -eq 1 ] || [ "$CHROMIUM_VERSION" = "154.0.8037.97" ] || [ "$CHROMIUM_VERSION" = "155.0.8059.39" ] || [ "$CHROMIUM_VERSION" = "155.0.8059.79" ]; then
     SOURCE_CHECK="$(mktemp "${TMPDIR:-/tmp}/chromix-warm-patches-XXXXXX.json")"
     rm "$SOURCE_CHECK"
     python3 "$REPO/tools/verify_patch_stack.py" --src "$SRC" --repo "$REPO" \

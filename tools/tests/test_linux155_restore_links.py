@@ -23,9 +23,15 @@ ARM_IDENTITY = dict(
     artifact_digest="sha256:a4c0bfd8020cd34f27a652ae449f9e8547a468b8b813a11a64acf8a0891db447")
 
 
+NEW_IDENTITIES = tuple(dict(
+    restore.LINUX15579_ESBUILD_IDENTITY, arch=arch, artifact_id=artifact,
+    artifact_name=name, artifact_size_in_bytes=size, artifact_digest=digest)
+    for arch, (artifact, name, size, digest) in restore.LINUX15579_ESBUILD_ARTIFACTS.items())
+
+
 class Linux155RestoreLinksTest(unittest.TestCase):
     def test_every_field_type_and_platform_is_exact(self):
-        for identity in (IDENTITY, ARM_IDENTITY):
+        for identity in (IDENTITY, ARM_IDENTITY, *NEW_IDENTITIES):
             for name in (restore.LINUX154_ESBUILD_LINK, restore.LINUX154_ESBUILD_ALIAS):
                 self.assertTrue(restore.is_known_external_link(name, "linux", identity))
                 for platform in ("windows", "macos", "off"):
@@ -55,12 +61,24 @@ class Linux155RestoreLinksTest(unittest.TestCase):
                 self.assertFalse(restore.is_known_external_link(restore.LINUX154_ESBUILD_LINK,
                     platform, dict(identity, chromium_version="155.0.8059.39")))
 
+    def test_current_metadata_matches_only_the_exact_architecture(self):
+        from tools.import_upstream_cache import repository_identity
+        from pathlib import Path
+        repo = Path(__file__).resolve().parents[2]
+        for identity in NEW_IDENTITIES:
+            self.assertEqual(repository_identity(repo, "linux", identity["arch"])[0], identity)
+            for old in (IDENTITY, ARM_IDENTITY):
+                mixed = dict(identity, artifact_id=old["artifact_id"],
+                             artifact_digest=old["artifact_digest"])
+                self.assertFalse(restore.is_known_external_link(
+                    restore.LINUX154_ESBUILD_LINK, "linux", mixed))
+
     def test_omitted_chain_is_recorded_but_never_recreated(self):
         fixture = previous.Linux154RestoreLinksTest()
         fixture.setUp()
         self.addCleanup(fixture.doCleanups)
         cache = fixture.fixture
-        for identity in (IDENTITY, ARM_IDENTITY):
+        for identity in (IDENTITY, ARM_IDENTITY, *NEW_IDENTITIES):
             cache.make_cache("linux", identity["arch"])
             relative = cache.donor.relative_to(cache.cache / "tree").as_posix()
             paths = [restore.LINUX154_ESBUILD_LINK, restore.LINUX154_ESBUILD_ALIAS]

@@ -83,6 +83,8 @@ SOURCE_REPAIRS = {
 
 PINS155 = ("155.0.8059.39", "ffeb45a2bb88bc56a1dfed31410aeb10e9efcd5a",
            "025d99db1673a21992534551598b73ca79360762")
+PINS15579 = ("155.0.8059.79", "9f145d8815e6e50cc4a2537fcac40966d911e027",
+             "6b86f45adc4a7f7ac4c3897a8b651eb34784d761")
 # Rebuilt from cd7bfad9bba968ac23ba67e538f9e1d499991d25, donor patches and core domains.
 TYPESCRIPT155_PORTABLE = "99034dad55a0805c052f928fca1f03c335a59a4e61bc3ad4c183bb3c0ff4c471"
 TYPESCRIPT155_REPAIRED = {
@@ -208,7 +210,7 @@ def generator_profile(pins: tuple = PINS) -> dict:
                 "module": MODULE_FILES, "archives": ARCHIVES, "binaries": BINARY_HASHES,
                 "sources": SOURCE_REPAIRS, "typescript_portable": TYPESCRIPT_PORTABLE,
                 "typescript_repaired": TYPESCRIPT_REPAIRED, "typescript_tree": TYPESCRIPT_TREE}
-    if pins == PINS155:
+    if pins in (PINS155, PINS15579):
         return {"version": ESBUILD155_VERSION, "lock": LOCK155_SHA256,
                 "module": MODULE155_FILES, "archives": ARCHIVES155, "binaries": BINARY155_HASHES,
                 "sources": SOURCE155_REPAIRS, "typescript_portable": TYPESCRIPT155_PORTABLE,
