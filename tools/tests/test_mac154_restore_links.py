@@ -162,7 +162,11 @@ class Mac154RestoreLinksTest(unittest.TestCase):
                 fixture.make_cache("macos", arch)
                 fixture.work = Path(fixture.tmp.name) / ("work-" + arch)
                 identity, _, manifest = restore.identities(fixture.repo, "macos", arch)
-                self.assertEqual(identity, identity_for(arch))
+                expected = dict(restore.MAC155_ESBUILD_IDENTITY, arch=arch)
+                artifact = restore.MAC155_ESBUILD_ARTIFACTS[arch]
+                expected.update(zip(("artifact_id", "artifact_name", "artifact_size_in_bytes",
+                                     "artifact_digest"), artifact))
+                self.assertEqual(identity, expected)
                 archive = io.BytesIO(fixtures.archive_bytes(links()))
                 extracted = fetcher.extract_tar(archive, fixture.cache / "tree",
                                                fetcher.SourceSelection(["src"], platform="macos"))

@@ -56,6 +56,7 @@ OVERRIDES = {
 VERSION155 = "155.0.8059.39"
 CORE155 = "ffeb45a2bb88bc56a1dfed31410aeb10e9efcd5a"
 PLATFORM155_COMMITS = {
+    "macos": "b1238bb72b02cd36219991d9029c1c65183ea295",
     "windows": "989b4382364baaddb8b3180e1eb1030ca96a7273",
     "linux": "025d99db1673a21992534551598b73ca79360762",
 }
@@ -313,9 +314,9 @@ def select(repo: Path, platform: str | None = None, *, src: Path | None = None,
                      "base_series_sha256": digest(series)}
     elif version == VERSION155:
         if platform not in PLATFORM155_COMMITS:
-            raise SelectionError("Chromium 155 overrides require Windows or Linux")
+            raise SelectionError("Chromium 155 overrides require Windows, Linux, or macOS")
         prefix = "Ungoogled" + PLATFORMS[platform]
-        platform_version = VERSION155 + ("-1.1" if platform == "windows" else "-1")
+        platform_version = VERSION155 + ("-1.1" if platform in ("windows", "macos") else "-1")
         if (pins["UngoogledCommit"] != CORE155
                 or pins["UngoogledVersion"] != VERSION155 + "-1"
                 or pins[prefix + "Commit"] != PLATFORM155_COMMITS[platform]

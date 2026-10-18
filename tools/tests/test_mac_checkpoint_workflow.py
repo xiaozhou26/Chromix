@@ -81,6 +81,8 @@ class PosixCheckpointWorkflowTest(unittest.TestCase):
                 self.assertIn('!cancelled()', upload['if'])
                 self.assertIn("steps.checkpoint.outcome == 'success'", upload['if'])
                 self.assertNotIn('success()', upload['if'])
+                self.assertEqual(upload['with']['retention-days'],
+                                 "${{ inputs.platform == 'macos' && 14 || 3 }}")
             final = next(step for step in steps if step.get('name') == 'Upload final bundle')
             self.assertEqual(final['if'], "steps.stage.outputs.finished == 'true'")
 
@@ -100,7 +102,8 @@ class PosixCheckpointWorkflowTest(unittest.TestCase):
                          '/dist/${{ inputs.artifact }}.zip'):
                 self.assertIn(path, failed['with']['path'])
             snapshot = next(step for step in steps if step.get('id') == 'runtime_checkpoint')
-            self.assertEqual(snapshot['if'], failed['if'])
+            self.assertEqual(snapshot['if'], "${{ !cancelled() && inputs.platform == 'macos' && steps.stage.outputs.compiled_ready == 'true' }}")
+            self.assertNotIn("steps.stage.outcome == 'failure'", snapshot['if'])
             self.assertLess(steps.index(failed), steps.index(snapshot))
             verify = next(step for step in steps if step.get('id') == 'checkpoint')
             self.assertLess(steps.index(snapshot), steps.index(verify))

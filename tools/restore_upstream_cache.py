@@ -93,6 +93,20 @@ MAC154_ESBUILD_ARTIFACTS = {
     "arm64": (11520487436, "github_build_artifact_arm64", 10872477177,
               "sha256:4fc2c995fc01213d3e819ff05db169fb14f0f93487b387f23cbf9a7b2e493e6a"),
 }
+MAC155_ESBUILD_IDENTITY = {
+    "chromium_version": "155.0.8059.39",
+    "ungoogled_commit": "ffeb45a2bb88bc56a1dfed31410aeb10e9efcd5a",
+    "head_sha": "b1238bb72b02cd36219991d9029c1c65183ea295",
+    "platform": "macos", "repository": "ungoogled-software/ungoogled-chromium-macos",
+    "repository_id": 177203026, "head_branch": "155.0.8059.39", "event": "push",
+    "workflow_path": ".github/workflows/build.yml", "run_id": 38682673288,
+}
+MAC155_ESBUILD_ARTIFACTS = {
+    "x64": (11992595839, "github_build_artifact_x86_64", 12608343117,
+            "sha256:9c3f303d6b3e362a1c5efd956a12d0a76ea3083a9d9e92fb231b60fef6e8c437"),
+    "arm64": (11971638847, "github_build_artifact_arm64", 10999897218,
+              "sha256:8eaaa618155c759175a9a3bb9bed279ecc8893c2a9dae4a8d0e184a42848f970"),
+}
 MAC_EXTERNAL_TOOL_LINKS = {"third_party/dawn/tools/golang/mac-arm64/bin/go",
                            "third_party/dawn/tools/golang/mac-amd64/bin/go"}
 MAC_XCODE_LINK_ROOT = Path("out/Default/sdk/xcode_links")
@@ -201,7 +215,8 @@ def is_known_external_link(relative: str, platform: str, identity: dict | None =
     if relative in (LINUX154_ESBUILD_LINK, LINUX154_ESBUILD_ALIAS):
         if platform not in ("linux", "macos") or not isinstance(identity, dict):
             return False
-        records = ((MAC154_ESBUILD_IDENTITY, MAC154_ESBUILD_ARTIFACTS),) if platform == "macos" else (
+        records = ((MAC154_ESBUILD_IDENTITY, MAC154_ESBUILD_ARTIFACTS),
+                   (MAC155_ESBUILD_IDENTITY, MAC155_ESBUILD_ARTIFACTS)) if platform == "macos" else (
             (LINUX154_ESBUILD_IDENTITY, LINUX154_ESBUILD_ARTIFACTS),
             (LINUX155_ESBUILD_IDENTITY, LINUX155_ESBUILD_ARTIFACTS))
         arch = identity.get("arch")

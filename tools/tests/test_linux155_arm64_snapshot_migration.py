@@ -25,6 +25,11 @@ DONOR = "e1263e2a52ea8eb7fa4f6c3a9a1930b92a8afe7e"
 SOURCE_FIXTURE = "tools/tests/fixtures/linux155_opaque_png_sources.json.gz"
 
 
+@pytest.fixture(autouse=True)
+def exact_historical_runner(tmp_path, monkeypatch):
+    return fixtures.historical_runner(tmp_path, monkeypatch, HISTORICAL_TARGET)
+
+
 def donor_file(name):
     return subprocess.run(["git", "-C", str(ROOT), "show", DONOR + ":" + name],
                           check=True, capture_output=True).stdout

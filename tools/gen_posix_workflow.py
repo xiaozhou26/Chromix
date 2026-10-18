@@ -365,9 +365,9 @@ RUNTIME_FAILURE = """      - name: Upload failed macOS runtime bundle
           retention-days: 14
           compression-level: 0
 
-      - name: Preserve failed macOS runtime checkpoint
+      - name: Preserve latest macOS compiled checkpoint
         id: runtime_checkpoint
-        if: ${{ !cancelled() && inputs.platform == 'macos' && steps.stage.outcome == 'failure' && steps.stage.outputs.package_ready == 'true' && steps.stage.outputs.runtime_failed == 'true' }}
+        if: ${{ !cancelled() && inputs.platform == 'macos' && steps.stage.outputs.compiled_ready == 'true' }}
         run: |
           set -euo pipefail
           WORK="${RUNNER_TEMP}/chromix-build"
@@ -394,7 +394,7 @@ UPLOAD_PARTS = """      - name: Upload tree part 1
           name: ${{ inputs.artifact }}-tree-s%(stage)d-attempt-${{ github.run_attempt }}-part1
           path: ${{ runner.temp }}/chromix-build/.snapshot-stage-%(stage)d/p1/
           if-no-files-found: warn
-          retention-days: 3
+          retention-days: ${{ inputs.platform == 'macos' && 14 || 3 }}
           compression-level: 0
       - name: Upload tree part 2
         if: ${{ !cancelled() && (steps.stage.outputs.upload_snapshot == 'true' || steps.runtime_checkpoint.outputs.upload_snapshot == 'true' || (inputs.platform == 'linux' && steps.linux_runtime_checkpoint.outputs.upload_snapshot == 'true')) && steps.checkpoint.outcome == 'success' }}
@@ -403,7 +403,7 @@ UPLOAD_PARTS = """      - name: Upload tree part 1
           name: ${{ inputs.artifact }}-tree-s%(stage)d-attempt-${{ github.run_attempt }}-part2
           path: ${{ runner.temp }}/chromix-build/.snapshot-stage-%(stage)d/p2/
           if-no-files-found: warn
-          retention-days: 3
+          retention-days: ${{ inputs.platform == 'macos' && 14 || 3 }}
           compression-level: 0
       - name: Upload tree part 3
         if: ${{ !cancelled() && (steps.stage.outputs.upload_snapshot == 'true' || steps.runtime_checkpoint.outputs.upload_snapshot == 'true' || (inputs.platform == 'linux' && steps.linux_runtime_checkpoint.outputs.upload_snapshot == 'true')) && steps.checkpoint.outcome == 'success' }}
@@ -412,7 +412,7 @@ UPLOAD_PARTS = """      - name: Upload tree part 1
           name: ${{ inputs.artifact }}-tree-s%(stage)d-attempt-${{ github.run_attempt }}-part3
           path: ${{ runner.temp }}/chromix-build/.snapshot-stage-%(stage)d/p3/
           if-no-files-found: warn
-          retention-days: 3
+          retention-days: ${{ inputs.platform == 'macos' && 14 || 3 }}
           compression-level: 0
       - name: Upload tree part 4
         if: ${{ !cancelled() && (steps.stage.outputs.upload_snapshot == 'true' || steps.runtime_checkpoint.outputs.upload_snapshot == 'true' || (inputs.platform == 'linux' && steps.linux_runtime_checkpoint.outputs.upload_snapshot == 'true')) && steps.checkpoint.outcome == 'success' }}
@@ -421,7 +421,7 @@ UPLOAD_PARTS = """      - name: Upload tree part 1
           name: ${{ inputs.artifact }}-tree-s%(stage)d-attempt-${{ github.run_attempt }}-part4
           path: ${{ runner.temp }}/chromix-build/.snapshot-stage-%(stage)d/p4/
           if-no-files-found: warn
-          retention-days: 3
+          retention-days: ${{ inputs.platform == 'macos' && 14 || 3 }}
           compression-level: 0
 """
 

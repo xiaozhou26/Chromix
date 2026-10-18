@@ -105,9 +105,10 @@ class PrepareRestoredBuildTest(unittest.TestCase):
                 path.rename(destination)
                 path.symlink_to(Path("..") / name / "bin" / name)
             self.write(rust / "version", "1.91.0-nightly (2026-06-16)")
-            if identity["chromium_version"] == "154.0.8037.97":
+            if identity["chromium_version"] in ("154.0.8037.97", "155.0.8059.39"):
                 from tools import macos_restored_generators as mac154
-                fixture = json.loads((Path(__file__).parent / "fixtures/macos154_generators.json").read_text())
+                version = identity["chromium_version"].split(".")[0]
+                fixture = json.loads((Path(__file__).parent / f"fixtures/macos{version}_generators.json").read_text())
                 for name, content in fixture["sources"].items():
                     self.write(self.src / mac154.DEVTOOLS / name, content)
                 # Package integrity and native probes have separate generator tests.
@@ -408,7 +409,7 @@ class PrepareRestoredBuildTest(unittest.TestCase):
         for name in ("build.ninja", "args.gn", ".ninja_deps", ".ninja_log"):
             self.assertTrue((self.out / name).exists())
 
-    def test_mac154_generator_repairs_are_fingerprinted_and_invalidate_generated_readers(self):
+    def test_mac_generator_repairs_are_fingerprinted_and_invalidate_generated_readers(self):
         from tools import macos_restored_generators as mac154
         self.fixture()
         with self.native_context():
@@ -419,7 +420,7 @@ class PrepareRestoredBuildTest(unittest.TestCase):
         self.assertTrue(before["repair_needed"])
         self.assertFalse(after["repair_needed"])
         self.assertEqual(finished["counters"]["generator_rechecks"], 1)
-        self.assertEqual(after["manifest_sha256"], mac154.manifest_digest())
+        self.assertEqual(after["manifest_sha256"], mac154.manifest_digest(tuple(after["pins"])))
         self.assertNotEqual(before["sources"], after["sources"])
         self.assertNotIn("probe", after)
         probe = finished["macos_generator_probe"]
