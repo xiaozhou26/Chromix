@@ -123,12 +123,12 @@ class MacGeneratorsTest(unittest.TestCase):
         name = next(iter(gen.SOURCE_REPAIRS))
         path = self.src / gen.DEVTOOLS / name
         path.write_bytes(path.read_bytes() + b"unknown")
-        with mock.patch.object(gen, "smoke") as smoke, self.assertRaisesRegex(ValueError, "unknown mac154"):
+        with mock.patch.object(gen, "smoke") as smoke, self.assertRaisesRegex(ValueError, "unknown macOS"):
             self.inspect(repair=True)
         smoke.assert_not_called()
         with mock.patch.object(platform_pins, "load_pins", return_value={
                 "ChromiumVersion": gen.PINS[0], "UngoogledCommit": "unknown", "UngoogledMacOSCommit": gen.PINS[2]}), \
-                self.assertRaisesRegex(ValueError, "exact mac154 pins"):
+                self.assertRaisesRegex(ValueError, "exact reviewed pins"):
             self.inspect()
 
     def test_archives_require_both_integrity_and_full_inventory(self):

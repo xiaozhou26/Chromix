@@ -21,6 +21,11 @@ HISTORICAL_TARGET = "14535a9f86865fe58b47a9f593f2b925c94ce0fe"
 SOURCE_LINE = b'      "signin/managed_profile_creation_controller.cc",\n'
 
 
+@pytest.fixture(autouse=True)
+def exact_historical_runner(tmp_path, monkeypatch):
+    return fixtures.historical_runner(tmp_path, monkeypatch, HISTORICAL_TARGET)
+
+
 def donor_file(name):
     return subprocess.run(["git", "-C", str(ROOT), "show", migration.LINUX155_DONOR + ":" + name],
                           check=True, capture_output=True).stdout
@@ -36,7 +41,7 @@ def target_files(repo, selector_ref=HISTORICAL_TARGET):
             check=True, capture_output=True).stdout)
 
 
-def test_production_policy_accepts_exact_donor_without_executing_it(tmp_path):
+def test_production_policy_accepts_exact_donor_without_executing_it(tmp_path, monkeypatch):
     previous = tmp_path / "previous"
     subprocess.run(["git", "clone", "--shared", "--no-checkout", str(ROOT), str(previous)],
                    check=True, capture_output=True)
@@ -56,6 +61,10 @@ def test_production_policy_accepts_exact_donor_without_executing_it(tmp_path):
         assert arp._sha((target / SELECTOR).read_bytes()) == expected
         migration._same_inputs(previous, target, "linux", "x64")
         assert len(arp.patch_selection.select(target, "linux")[1]) == 225
+    with monkeypatch.context() as current_runner:
+        current_runner.setattr(migration, "__file__", str(ROOT / "tools/migrate_restored_snapshot.py"))
+        with pytest.raises(arp.ApplyError, match="preserved preparation tooling"):
+            migration._same_inputs(previous, target, "linux", "x64")
     with pytest.raises(arp.ApplyError):
         migration._same_inputs(previous, ROOT, "linux", "x64")
     fixtures.put(previous, SELECTOR, donor_file(SELECTOR) + b"\n")

@@ -1,0 +1,37 @@
+name: build-mac155-x64-stage7-resume
+run-name: mac155 Intel donor 39104895441 attempt2 stage7 + eight continuation stages
+
+on:
+  workflow_dispatch:
+    inputs:
+      compile_jobs:
+        description: 'Ninja jobs: auto or a positive integer; donor source/GN identity is fixed'
+        type: string
+        default: auto
+
+permissions:
+  actions: read
+  contents: read
+
+concurrency:
+  group: mac155-x64-stage7-resume-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  resume:
+    name: mac155 Intel (original stage7 + isolated continuation 1..8)
+    uses: ./.github/workflows/build-posix-github.yml
+    with:
+      platform: macos
+      arch: x64
+      runner: macos-15-intel
+      artifact: chromix-mac-x64
+      max-stages: 8
+      build_profile: fast
+      compile_jobs: ${{ inputs.compile_jobs || 'auto' }}
+      resume_run_id: '39104895441'
+      resume_tree_stage: '7'
+      resume_attempt: '2'
+      resume_artifact_ids: '12180797398'
+      use_upstream_cache: true
+    secrets: inherit

@@ -37,6 +37,21 @@ def put(root, name, data):
     return path
 
 
+def historical_runner(root, monkeypatch, revision):
+    """Bind historical migrations to exact Git-pinned preparation files."""
+    runner = root / "historical-runner"
+    names = dict.fromkeys((*migration.SCRIPT_FILES, *migration.LINUX155_PRESERVED,
+                          "tools/migrate_restored_snapshot.py"))
+    for name in names:
+        data = subprocess.run(["git", "-C", str(ROOT), "show", revision + ":" + name],
+                              check=True, capture_output=True).stdout
+        put(runner, name, data)
+    script = runner / "tools/migrate_restored_snapshot.py"
+    assert script.read_bytes() == Path(migration.__file__).read_bytes()
+    monkeypatch.setattr(migration, "__file__", str(script))
+    return runner
+
+
 def patch(name="listed.txt", old="base example.com", new="old example.com"):
     return (f"diff --git a/{name} b/{name}\nindex 1111111..2222222 100644\n"
             f"--- a/{name}\n+++ b/{name}\n@@ -1 +1 @@\n-{old}\n+{new}\n").encode()

@@ -66,7 +66,7 @@ BINDGEN_154_SCOPED_ENV = b'''        env = os.environ.copy()
                 env["DYLD_LIBRARY_PATH"] = library_path
 '''
 # Digests are after the complete pinned core/mac patch series and domain rules.
-# At 154 neither series nor the domain file list touches this wrapper.
+# At 154/155 neither series nor the domain file list touches this wrapper.
 BINDGEN_REPAIRS = {
     "152.0.7977.82": {
         "core_version": "152.0.7977.82-1",
@@ -77,6 +77,16 @@ BINDGEN_REPAIRS = {
         "patched_sha256": BINDGEN_PATCHED_SHA256,
         "original_env": BINDGEN_ORIGINAL_ENV,
         "scoped_env": BINDGEN_SCOPED_ENV,
+    },
+    "155.0.8059.39": {
+        "core_version": "155.0.8059.39-1",
+        "core_revision": "ffeb45a2bb88bc56a1dfed31410aeb10e9efcd5a",
+        "macos_version": "155.0.8059.39-1.1",
+        "macos_revision": "b1238bb72b02cd36219991d9029c1c65183ea295",
+        "original_sha256": BINDGEN_154_ORIGINAL_SHA256,
+        "patched_sha256": BINDGEN_154_PATCHED_SHA256,
+        "original_env": BINDGEN_154_ORIGINAL_ENV,
+        "scoped_env": BINDGEN_154_SCOPED_ENV,
     },
     "154.0.8037.97": {
         "core_version": "154.0.8037.97-1",

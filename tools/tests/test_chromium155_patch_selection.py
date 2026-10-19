@@ -155,10 +155,10 @@ def test_155_separates_keys_without_changing_154(repo155, style):
     assert selection.preparation_key(repo, platform, style) == historical
 
 
-def test_155_does_not_enable_macos(tmp_path):
+def test_155_rejects_linux_commit_for_macos(tmp_path):
     repo = clone_repo(tmp_path)
     set_platform_pins(repo, "macos", VERSION, CORE, COMMITS["linux"])
-    with pytest.raises(selection.SelectionError, match="require Windows or Linux"):
+    with pytest.raises(selection.SelectionError, match="core/platform pins"):
         selection.select(repo, "macos")
 
 

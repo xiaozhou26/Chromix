@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Install exact macOS 154 npm packages without running npm or lifecycle scripts."""
+"""Install exact macOS npm packages without running npm or lifecycle scripts."""
 from __future__ import annotations
 
 import argparse

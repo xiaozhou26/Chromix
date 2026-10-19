@@ -14,7 +14,7 @@ import pytest
 from tools import apply_restored_patches as arp
 from tools import patch_selection as selection
 from tools.tests.test_macos152_patch_selection import run_patch
-from tools.tests.test_patch_selection import clone_repo, set_macos_pins
+from tools.tests.test_patch_selection import clone_repo, set_macos_pins, set_platform_pins
 
 ROOT = Path(__file__).resolve().parents[2]
 VERSION = "154.0.8037.97"
@@ -218,6 +218,8 @@ def test_optional_independent_154_full_stack(tmp_path, macos154_repo, substitute
 def test_current_macos_addition_is_isolated_and_keeps_historical_prefix(tmp_path):
     repo = clone_repo(tmp_path)
     old_repo = clone_repo(tmp_path / "historical", additions=False)
+    for definitions in (repo, old_repo):
+        set_platform_pins(definitions, "macos", VERSION, CORE, PLATFORM)
     current, patches = selection.select(repo, "macos")
     old, old_patches = selection.select(old_repo, "macos")
     assert len(old_patches) == 224 and len(patches) == 225
@@ -262,6 +264,7 @@ def test_current_macos_addition_is_isolated_and_keeps_historical_prefix(tmp_path
 ])
 def test_current_macos_addition_inventory_fails_closed(tmp_path, change):
     repo = clone_repo(tmp_path)
+    set_macos_pins(repo)
     manifest = repo / selection.MACOS154_ADDITIONS_MANIFEST
     directory = repo / selection.MACOS154_ADDITIONS_ROOT
     patch = next(directory.iterdir())

@@ -71,7 +71,7 @@ class PosixCheckpointWorkflowTest(unittest.TestCase):
             verify = next(step for step in steps if step.get('id') == 'checkpoint')
             self.assertIn('set -euo pipefail', verify['run'])
             self.assertIn('python3 tools/snapshot_volumes.py "$SNAP"', verify['run'])
-            self.assertIn('zstd -d -T0 | tar -tf -', verify['run'])
+            self.assertIn('zstd -d -T0 | python3 tools/verify_snapshot_tar.py', verify['run'])
             self.assertIn('!cancelled()', verify['if'])
             self.assertIn("steps.stage.outputs.upload_snapshot == 'true'", verify['if'])
             self.assertNotIn('success()', verify['if'])
@@ -81,6 +81,8 @@ class PosixCheckpointWorkflowTest(unittest.TestCase):
                 self.assertIn('!cancelled()', upload['if'])
                 self.assertIn("steps.checkpoint.outcome == 'success'", upload['if'])
                 self.assertNotIn('success()', upload['if'])
+                self.assertEqual(upload['with']['retention-days'],
+                                 "${{ inputs.platform == 'macos' && 14 || 3 }}")
             final = next(step for step in steps if step.get('name') == 'Upload final bundle')
             self.assertEqual(final['if'], "steps.stage.outputs.finished == 'true'")
 
@@ -100,7 +102,8 @@ class PosixCheckpointWorkflowTest(unittest.TestCase):
                          '/dist/${{ inputs.artifact }}.zip'):
                 self.assertIn(path, failed['with']['path'])
             snapshot = next(step for step in steps if step.get('id') == 'runtime_checkpoint')
-            self.assertEqual(snapshot['if'], failed['if'])
+            self.assertEqual(snapshot['if'], "${{ !cancelled() && inputs.platform == 'macos' && steps.stage.outputs.compiled_ready == 'true' }}")
+            self.assertNotIn("steps.stage.outcome == 'failure'", snapshot['if'])
             self.assertLess(steps.index(failed), steps.index(snapshot))
             verify = next(step for step in steps if step.get('id') == 'checkpoint')
             self.assertLess(steps.index(snapshot), steps.index(verify))

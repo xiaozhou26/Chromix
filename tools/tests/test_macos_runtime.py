@@ -336,7 +336,7 @@ if __name__ == '__main__':
 
 
 def wrapper_fixture(src, version="152.0.7977.82"):
-    data = (PINNED_154_BINDGEN_WRAPPER if version == "154.0.8037.97"
+    data = (PINNED_154_BINDGEN_WRAPPER if version in ("154.0.8037.97", "155.0.8059.39")
             else PINNED_BINDGEN_WRAPPER).encode()
     assert hashlib.sha256(data).hexdigest() == runtime.BINDGEN_REPAIRS[version]["original_sha256"]
     path = src / runtime.BINDGEN_WRAPPER
@@ -617,7 +617,8 @@ class MacOSRuntimeTest(unittest.TestCase):
                     path = wrapper_fixture(self.src, version)
                     original = path.read_bytes()
                     before = path.stat().st_mtime_ns
-                    with mock.patch.dict(repair, {field: value}), self.assertRaisesRegex(ValueError, message):
+                    with mock.patch.dict(runtime.BINDGEN_REPAIRS, {version: dict(repair, **{field: value})}, clear=True), \
+                            self.assertRaisesRegex(ValueError, message):
                         runtime.repair_bindgen_wrapper(self.src, "arm64")
                     self.assertEqual(path.read_bytes(), original)
                     self.assertEqual(path.stat().st_mtime_ns, before)

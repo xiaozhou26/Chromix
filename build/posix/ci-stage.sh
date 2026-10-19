@@ -104,6 +104,16 @@ if [ -n "$FROM_SNAPSHOT" ] && [ -d "$FROM_SNAPSHOT" ]; then
     die "POSIX build snapshot restore failed"
 fi
 
+MAC155_CONTINUATION=0
+if [ "${GITHUB_WORKFLOW:-}" = build-mac155-x64-stage7-resume ] ||
+   [ -e "$WORK/fingerprint-diagnostics/mac155-stage7-resume.json" ]; then
+  [ "$PLATFORM:$ARCH:$MAX_STAGES" = macos:x64:8 ] || die "invalid mac155 continuation configuration"
+  MAC155_CONTINUATION=1
+  python3 "$REPO/tools/validate_macos155_stage7_checkpoint.py" \
+    --repo "$REPO" --workdir "$WORK" --stage "$STAGE_INDEX" --phase before ||
+    die "mac155 stage7 continuation admission failed; cold fallback forbidden"
+fi
+
 # Cache opt-in is mandatory in CI; helper APIs still report optional misses.
 if [ "${CHROMIX_USE_UPSTREAM_CACHE:-0}" = 1 ]; then
   # Own snapshots take precedence, but cold snapshots cannot satisfy this mode.
@@ -221,6 +231,16 @@ set +e
     "$BUILD_SCRIPT" "$WORK" "$ARCH"
 RC=$?
 set -e
+if [ "$MAC155_CONTINUATION" -eq 1 ]; then
+  python3 "$REPO/tools/validate_macos155_stage7_checkpoint.py" \
+    --repo "$REPO" --workdir "$WORK" --stage "$STAGE_INDEX" --phase after ||
+    die "mac155 continuation changed admitted source/GN/preparation identity"
+  if [ "$RC" -ne 0 ] && [ "$RC" -ne 124 ]; then
+    mkdir -p "$SNAPSHOT_DIR"
+    bash "$REPO/build/posix/ci-parts.sh" "$WORK" "$SNAPSHOT_DIR"
+    emit upload_snapshot true
+  fi
+fi
 if [ "$RC" -eq 124 ]; then
   handoff "deadline reached after ${NINJA_BUDGET}m"
 elif [ "$RC" -ne 0 ]; then
@@ -234,6 +254,8 @@ if [ "$PLATFORM" = linux ]; then
   emit runtime_verified false
 else
   [ -d "$OUT/Chromium.app" ] || die "build exited 0 but $OUT/Chromium.app is missing"
+  emit compiled_ready true
+  emit runtime_verified false
 fi
 
 DEST_DIST="$WORK/dist"
