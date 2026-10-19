@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Pinned macOS 154 DevTools generators, without Homebrew or npm lifecycle scripts."""
+"""Pinned macOS DevTools generators, without Homebrew or npm lifecycle scripts."""
 from __future__ import annotations
 
 import base64
@@ -23,6 +23,8 @@ except ImportError:
 
 PINS = ("154.0.8037.97", "3e46b13825f808f0886e484d44532372655e5fe4",
         "f7ba75f94442abda7ac3ea81790c217f8636d3ba")
+PINS155 = ("155.0.8059.39", "ffeb45a2bb88bc56a1dfed31410aeb10e9efcd5a",
+           "b1238bb72b02cd36219991d9029c1c65183ea295")
 DEVTOOLS = "third_party/devtools-frontend/src"
 PACKAGES = DEVTOOLS + "/third_party/chromix-macos/node_modules"
 # npm integrity plus SHA256 of the archive and sorted JSON [path, mode, SHA256] file inventory.
@@ -128,24 +130,54 @@ SOURCE_REPAIRS = {'scripts/build/esbuild.js': ('f7d01510b0e62357f04d74e5e80bbe42
                                             b'cmd = [GetNodePath(), GetBinaryPath()] + cmd_parts')))}
 
 
+# DevTools cd7bfad9bba968ac23ba67e538f9e1d499991d25 + core/mac series + domain substitution.
+SOURCE155_HASHES = {'scripts/build/esbuild.js': ('c10b89b1e642911227984b1cf60a731a1ca0bfac5813b5a33bfcc55e67c8b40d',
+                              'af9ad24f819a4f92db714eaf768a1584806b9ede35e596fab48aec1c5617a5ed'),
+ 'scripts/build/ninja/bundle.gni': ('b5aabea6c7deccd38a2c05fcc317be8903c0d791915b3ca2993763c5524aa96c',
+                                    'e5f1a574effb1fd3ceae6eba3a097b830c41ae6198ef006dcea8f242680e75ef'),
+ 'scripts/build/typescript/typescript.gni': ('b9b10d5452d78217851fd404dd48775e38a7a0479f7b937cc626a5de347bcf3f',
+                                             'b9b10d5452d78217851fd404dd48775e38a7a0479f7b937cc626a5de347bcf3f'),
+ 'scripts/build/typescript/typescript_vars.gni': ('94f495ee819bca553a093a0a03ba3d4c1a558156e008598e01d665ef76d914e8',
+                                                  '155352f9a9014616bdefefbc2ee1a44f0e9a82c45357113e6db6c2db60c67ba2'),
+ 'scripts/devtools_paths.py': ('45ff53ad956151b62fa3b8695c95cf66c471fdd1f2d01b2e98b96b7914d6ba45',
+                               '37081ce1f0222710902807cc8c3e4eacfd4df147c649dd6049e5aa24f2e343e1'),
+ 'third_party/typescript/typescript.py': ('10f70e5ec0770a757e1aab9679ad0e0cb19516c832a4271922bcca38db5f93d5',
+                                          '816346e33d16e17e5a9313bfd2043707c19db6b55704742a48c40d17403d5b75')}
+SOURCE155_REPAIRS = {
+    name: (*hashes, () if name == "scripts/build/typescript/typescript.gni"
+           else SOURCE_REPAIRS[name][2])
+    for name, hashes in SOURCE155_HASHES.items()
+}
+
+
 def sha256(data: bytes) -> str:
     return hashlib.sha256(data).hexdigest()
 
 
-def manifest_digest() -> str:
-    value = {"pins": PINS, "archives": ARCHIVES,
-             "sources": {name: entry[:2] for name, entry in SOURCE_REPAIRS.items()}}
+def manifest_digest(pins=PINS) -> str:
+    repairs = source_repairs(pins)
+    value = {"pins": pins, "archives": ARCHIVES,
+             "sources": {name: entry[:2] for name, entry in repairs.items()}}
     return sha256(json.dumps(value, sort_keys=True, separators=(",", ":")).encode())
 
 
-def check_pins(repo: Path) -> None:
+def source_repairs(pins):
+    if pins == PINS:
+        return SOURCE_REPAIRS
+    if pins == PINS155:
+        return SOURCE155_REPAIRS
+    raise ValueError("macOS generators require exact reviewed pins")
+
+
+def check_pins(repo: Path) -> tuple:
     try:
         from .platform_pins import load_pins
     except ImportError:
         from platform_pins import load_pins
     pins = load_pins(repo, "macos")
-    if tuple(pins[key] for key in ("ChromiumVersion", "UngoogledCommit", "UngoogledMacOSCommit")) != PINS:
-        raise ValueError("macOS generators require exact mac154 pins")
+    identity = tuple(pins[key] for key in ("ChromiumVersion", "UngoogledCommit", "UngoogledMacOSCommit"))
+    source_repairs(identity)
+    return identity
 
 
 def package_keys(host_arch: str) -> tuple[str, ...]:
@@ -318,24 +350,24 @@ def install_package(src: Path, key: str, files: dict, *, before_publish=None) ->
     package_identity(src, key)
 
 
-def source_plan(src: Path) -> tuple[dict, list]:
+def source_plan(src: Path, pins=PINS) -> tuple[dict, list]:
     sources, changes = {}, []
-    for relative, (before, after, replacements) in SOURCE_REPAIRS.items():
+    for relative, (before, after, replacements) in source_repairs(pins).items():
         name = DEVTOOLS + "/" + relative
         safe.regular(src, name)
         data, metadata = safe._read_verified_with_metadata(src, name)
         digest = sha256(data)
         if digest not in (before, after):
-            raise ValueError(f"unknown mac154 generator source: {name}")
+            raise ValueError(f"unknown macOS generator source: {name}")
         sources[name] = {"sha256": digest, "original_sha256": before, "repaired_sha256": after}
-        if digest == before:
+        if digest == before and before != after:
             repaired = data
             for old, new in replacements:
                 if old not in repaired:
-                    raise ValueError("missing exact mac154 generator repair")
+                    raise ValueError("missing exact macOS generator repair")
                 repaired = repaired.replace(old, new)
             if sha256(repaired) != after:
-                raise ValueError("mac154 repaired source digest mismatch")
+                raise ValueError("macOS repaired source digest mismatch")
             changes.append((name, data, repaired, metadata))
     return sources, changes
 
@@ -404,12 +436,12 @@ def smoke(src: Path, host_arch: str) -> dict:
 
 
 def prepare(src: Path, *, host_arch: str, repo: Path, repair=False, before_publish=None) -> dict:
-    check_pins(repo)
+    pins = check_pins(repo)
     keys = package_keys(host_arch)
-    sources, changes = source_plan(src)
+    sources, changes = source_plan(src, pins)
     packages = {key: package_identity(src, key) for key in keys}
     missing = any(value is None for value in packages.values())
-    result = {"manifest_sha256": manifest_digest(), "pins": list(PINS), "host_arch": host_arch,
+    result = {"manifest_sha256": manifest_digest(pins), "pins": list(pins), "host_arch": host_arch,
               "sources": sources, "packages": packages, "install_needed": missing,
               "repair_needed": missing or bool(changes)}
     if not repair:
@@ -419,7 +451,7 @@ def prepare(src: Path, *, host_arch: str, repo: Path, repair=False, before_publi
     probe = smoke(src, host_arch)
     for name, original, repaired, metadata in changes:
         atomic_replace(src, name, original, repaired, expected_metadata=metadata, before_publish=before_publish)
-    sources, changes = source_plan(src)
+    sources, changes = source_plan(src, pins)
     if changes or {key: package_identity(src, key) for key in keys} != packages:
         raise ValueError("macOS generator inputs changed during preparation")
     result = dict(result, sources=sources, repair_needed=False)

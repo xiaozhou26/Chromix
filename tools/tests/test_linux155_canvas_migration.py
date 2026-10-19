@@ -24,6 +24,11 @@ DONOR = "12a501c7abe607552c49d5daaabf29d891dde9ae"
 SOURCE_FIXTURE = "tools/tests/fixtures/linux155_opaque_png_sources.json.gz"
 
 
+@pytest.fixture(autouse=True)
+def exact_historical_runner(tmp_path, monkeypatch):
+    return fixtures.historical_runner(tmp_path, monkeypatch, HISTORICAL_TARGET)
+
+
 def donor_file(name):
     return subprocess.run(["git", "-C", str(ROOT), "show", DONOR + ":" + name],
                           check=True, capture_output=True).stdout
@@ -324,13 +329,21 @@ def test_windows_selector_keeps_exact_posix_identities_and_historical_hashes(tmp
     with tarfile.open(fileobj=io.BytesIO(archive)) as tree:
         tree.extractall(baseline, filter="data")
     assert arp._sha((baseline / SELECTOR).read_bytes()) == migration.LINUX155_PNG_SELECTOR
+    from tools.tests.test_patch_selection import clone_repo, set_platform_pins
+    reviewed = clone_repo(tmp_path / "reviewed")
+    set_platform_pins(reviewed, "macos", migration.MACOS154_VERSION,
+                      migration.MACOS154_CORE, migration.MACOS154_OVERLAY)
+    assert patch_selection.select(reviewed, "linux") == patch_selection.select(ROOT, "linux")
+    assert len(patch_selection.select(reviewed, "windows")[1]) == 231
+    assert patch_selection.select(ROOT, "macos")[0]["selection"]["version"] == "155.0.8059.39"
+    assert len(patch_selection.select(ROOT, "macos")[1]) == 224
     expected = {
         "linux": (226, "446ae87099e7804ab8e7d975ade6b1e75c1080e78b84c0bcf58a2f786b373586"),
         "macos": (225, "82c050b84d7d1cd0cd1424d7afdab3b566d403dd10dbd2ee40054872ae9ca69e"),
     }
     for platform, (count, identity) in expected.items():
         old = patch_selection.select(baseline, platform)
-        current = patch_selection.select(ROOT, platform)
+        current = patch_selection.select(reviewed, platform)
         assert current == old
         assert len(current[1]) == count
         assert arp._sha(arp._json(current[0])) == identity

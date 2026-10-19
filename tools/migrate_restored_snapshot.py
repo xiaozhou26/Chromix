@@ -648,8 +648,25 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--patch-bin", help="trusted host GNU patch (otherwise PATCH_BIN/gpatch/patch)")
     args = parser.parse_args(argv)
     try:
-        result = migrate(args.workdir, args.previous_repo, args.repo, args.platform, args.arch,
-                         patch_bin=args.patch_bin)
+        if os.environ.get("GITHUB_WORKFLOW") == "build-mac155-arm64-stage8-resume":
+            try:
+                from . import validate_macos155_arm64_stage8_checkpoint as mac155_arm64
+            except ImportError:
+                import validate_macos155_arm64_stage8_checkpoint as mac155_arm64
+            mac155_arm64.require((args.platform, args.arch) == ("macos", "arm64"),
+                                 "stage8 continuation requires macOS ARM64")
+            result = mac155_arm64.admit(args.workdir.resolve(), args.previous_repo.resolve(), args.repo.resolve())
+        elif os.environ.get("GITHUB_WORKFLOW") == "build-mac155-x64-stage7-resume":
+            try:
+                from . import validate_macos155_stage7_checkpoint as mac155
+            except ImportError:
+                import validate_macos155_stage7_checkpoint as mac155
+            mac155.require((args.platform, args.arch) == ("macos", "x64"),
+                           "stage7 continuation requires macOS Intel")
+            result = mac155.admit(args.workdir.resolve(), args.previous_repo.resolve(), args.repo.resolve())
+        else:
+            result = migrate(args.workdir, args.previous_repo, args.repo, args.platform, args.arch,
+                             patch_bin=args.patch_bin)
     except (OSError, ValueError, KeyError, TypeError, RuntimeError, subprocess.SubprocessError) as exc:
         print(f"snapshot migration failed: {exc}. {arp.CLEAN}", file=sys.stderr)
         return 1

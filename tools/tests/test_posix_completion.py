@@ -285,8 +285,7 @@ class PosixCompletionTest(unittest.TestCase):
                          (root / "runtime-calls.jsonl").read_text().splitlines()]
         expected_calls = ["timeout"]
         initial_outputs = ["status=running", "finished=false"]
-        compiled_outputs = initial_outputs + (["compiled_ready=true", "runtime_verified=false"]
-                                             if platform == "linux" else [])
+        compiled_outputs = initial_outputs + ["compiled_ready=true", "runtime_verified=false"]
         ready_outputs = compiled_outputs + ["package_ready=true"]
         if platform == "macos":
             ready_outputs.append("runtime_verified=false")

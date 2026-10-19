@@ -173,10 +173,32 @@ def main() -> int:
     parser.add_argument("--report", type=Path, required=True)
     args = parser.parse_args()
     client = Client(args.repository, os.environ.get("GH_TOKEN", ""))
-    report = validate(client, args.repository, positive(args.run_id, "run ID"),
-                      positive(args.stage, "stage"), positive(args.attempt, "attempt"), args.arch,
-                      [positive(value.strip(), "artifact ID") for value in args.artifact_ids.split(",")],
-                      platform=args.platform, recovery_branch=args.recovery_branch)
+    try:
+        from . import validate_macos155_stage7_checkpoint as mac155
+    except ImportError:
+        import validate_macos155_stage7_checkpoint as mac155
+    try:
+        from . import validate_macos155_arm64_stage8_checkpoint as mac155_arm64
+    except ImportError:
+        import validate_macos155_arm64_stage8_checkpoint as mac155_arm64
+    run_id = positive(args.run_id, "run ID")
+    artifact_ids = [positive(value.strip(), "artifact ID") for value in args.artifact_ids.split(",")]
+    if run_id == mac155_arm64.RUN or os.environ.get("GITHUB_WORKFLOW") == mac155_arm64.WORKFLOW:
+        mac155_arm64.require(os.environ.get("GITHUB_WORKFLOW") != mac155.WORKFLOW,
+                            "ARM64 donor cannot enter Intel continuation")
+        mac155_arm64.require((run_id, positive(args.stage, "stage"), positive(args.attempt, "attempt"),
+                              args.platform, args.arch) == (mac155_arm64.RUN, 8, 3, "macos", "arm64"),
+                             "exact mac155 ARM64 stage8 attempt3 selection required")
+        report = mac155_arm64.validate_metadata(client, args.repository, artifact_ids)
+    elif run_id == mac155.RUN or os.environ.get("GITHUB_WORKFLOW") == mac155.WORKFLOW:
+        mac155.require((run_id, positive(args.stage, "stage"), positive(args.attempt, "attempt"),
+                        args.platform, args.arch) == (mac155.RUN, 7, 2, "macos", "x64"),
+                       "exact mac155 Intel stage7 attempt2 selection required")
+        report = mac155.validate_metadata(client, args.repository, artifact_ids)
+    else:
+        report = validate(client, args.repository, run_id,
+                          positive(args.stage, "stage"), positive(args.attempt, "attempt"), args.arch,
+                          artifact_ids, platform=args.platform, recovery_branch=args.recovery_branch)
     args.report.parent.mkdir(parents=True, exist_ok=True)
     args.report.write_text(json.dumps(report, indent=2, sort_keys=True) + "\n")
     if os.environ.get("GITHUB_OUTPUT"):
