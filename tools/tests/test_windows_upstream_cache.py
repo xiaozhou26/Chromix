@@ -28,8 +28,19 @@ def windows_source_fixture(repo):
     return source
 
 
+def stage_source() -> str:
+    """Isolate legacy preparation slices; the stage12 admission has separate tests."""
+    source = STAGE.read_text(encoding="utf-8")
+    start = source.index('if ($ResumeStage12DonorRepo) {\n  if (-not $RestoredUpstream)')
+    end = source.index('\n} else {\n', start) + len('\n} else {\n')
+    source = source[:start] + source[end:]
+    source = source.replace('\n}\n\nif ($ValidateOnly -or ($StageIndex -eq 1 -and -not $FromArtifact))',
+                            '\nif ($ValidateOnly -or ($StageIndex -eq 1 -and -not $FromArtifact))', 1)
+    return source
+
+
 def stage_budget_source() -> str:
-    stage = STAGE.read_text()
+    stage = stage_source()
     return stage[stage.index('$StageMinutes ='):stage.index('\nfunction Write-OutVar')]
 
 
@@ -48,7 +59,7 @@ def workflow_runs(source: str) -> list[str]:
 class WindowsUpstreamCacheRegressionTest(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
-        cls.stage = STAGE.read_text(encoding="utf-8")
+        cls.stage = stage_source()
         cls.prepare = PREPARE.read_text(encoding="utf-8")
         cls.workflow = WORKFLOW.read_text(encoding="utf-8")
         cls.build_one = workflow_job(cls.workflow, "build-1")
@@ -122,8 +133,11 @@ class WindowsUpstreamCacheRegressionTest(unittest.TestCase):
     def test_snapshot_outputs_fail_closed_but_keep_small_diagnostics(self):
         import yaml
 
-        self.assertIn('Write-OutVar snapshot_safe $(if ($FromSynced -or $env:CHROMIX_WINDOWS_VERIFY_SOURCE_REPO -or '
-                      '$env:CHROMIX_WINDOWS_VERIFY_SOURCE_SHA) { "false" } else { "true" })\nAssert-CiScripts', self.stage)
+        gate = ('Write-OutVar snapshot_safe $(if ($ResumeStage12DonorRepo -or $FromSynced -or '
+                '$env:CHROMIX_WINDOWS_VERIFY_SOURCE_REPO -or $env:CHROMIX_WINDOWS_VERIFY_SOURCE_SHA) '
+                '{ "false" } else { "true" })')
+        self.assertIn(gate, self.stage)
+        self.assertLess(self.stage.index(gate), self.stage.index('\nAssert-CiScripts\n'))
         tracked_start = self.stage.index("function Invoke-Tracked {")
         tracked_end = self.stage.index("function Get-FreeGB", tracked_start)
         tracked = self.stage[tracked_start:tracked_end]
@@ -316,7 +330,7 @@ class WindowsStageBudgetTest(unittest.TestCase):
         self.powershell = shutil.which("pwsh") or "/opt/pwsh/pwsh"
         if not Path(self.powershell).is_file():
             self.skipTest("pwsh is unavailable")
-        self.stage = STAGE.read_text()
+        self.stage = stage_source()
 
     def run_ps(self, code):
         return subprocess.run([self.powershell, "-NoLogo", "-NoProfile", "-NonInteractive", "-Command",
@@ -452,7 +466,7 @@ class WindowsRequiredCacheTest(unittest.TestCase):
         path.write_text(json.dumps(manifest))
         self.fixture.put(self.fixture.repo / 'build/windows/assert-target-arch.ps1',
                          (REPO / 'build/windows/assert-target-arch.ps1').read_bytes())
-        stage = STAGE.read_text()
+        stage = stage_source()
         policy = next(line for line in stage.splitlines() if line.startswith("$RequireUpstreamCache ="))
         start = stage.index('# Cache restores establish the marker')
         end = stage.index('\nif (-not (Test-Path (Join-Path $Src ".chromix-source-ready"))', start)
@@ -1120,7 +1134,7 @@ Add-Content -LiteralPath $env:MOCK_CALLS -Value "package"
         # This harness stubs native tool execution; the real Node helper has
         # its own Windows execution tests.
         self.put(self.root / "configure-node.ps1", 'param($NodePath)\n')
-        stage = STAGE.read_text()
+        stage = stage_source()
         start = stage.index('$domainProgress = Join-Path $Src')
         body = stage[start:]
         # PE execution is stubbed on Linux; PowerShell control flow and Python helpers are real.
@@ -1479,7 +1493,7 @@ class WindowsRestoreStageMockTest(unittest.TestCase):
         (self.root / "tools").mkdir()
         for name in ("verify_patch_stack.py", "apply_restored_patches.py", "patch_selection.py", "platform_pins.py"):
             shutil.copyfile(REPO / "tools" / name, self.root / "tools" / name)
-        stage = STAGE.read_text()
+        stage = stage_source()
         start = stage.index('$domainProgress = Join-Path $Src')
         end = stage.index('\nNew-Item -ItemType Directory -Force -Path $OutDir', start)
         self.script = self.root / "stage.ps1"

@@ -12,6 +12,7 @@ param(
   [ValidateRange(60, 300)] [int]$StageBudgetMinutes = 300,
   [switch]$FromArtifact,
   [switch]$FromSynced,
+  [string]$ResumeStage12DonorRepo = "",
   [string]$MigrationReceipt = "",
   [string]$MigrationDonorRepo = "",
   [ValidateSet("stage7", "stage8", "stage8-api")] [string]$MigrationCheckpoint = "stage7",
@@ -774,7 +775,16 @@ function Verify-FinalBundle {
 Write-Host "==> Chromix CI stage $StageIndex | Chromium $($Revisions.ChromiumVersion) | remaining $(Get-RemainingMin) min"
 Write-OutVar finished false
 Write-OutVar upload_parts false
-Write-OutVar snapshot_safe $(if ($FromSynced -or $env:CHROMIX_WINDOWS_VERIFY_SOURCE_REPO -or $env:CHROMIX_WINDOWS_VERIFY_SOURCE_SHA) { "false" } else { "true" })
+Write-OutVar snapshot_safe $(if ($ResumeStage12DonorRepo -or $FromSynced -or $env:CHROMIX_WINDOWS_VERIFY_SOURCE_REPO -or $env:CHROMIX_WINDOWS_VERIFY_SOURCE_SHA) { "false" } else { "true" })
+if ($ResumeStage12DonorRepo -and (
+    -not $FromArtifact -or $FromSynced -or $StageIndex -lt 13 -or $StageIndex -gt 24 -or
+    $MaxStages -ne 24 -or $Arch -cne 'arm64' -or $BuildProfile -cne 'native' -or
+    -not $RequireUpstreamCache -or $ValidateOnly -or $MigrationReceipt -or $MigrationDonorRepo -or
+    $env:CHROMIX_WINDOWS_MIGRATION_REPO -or $env:CHROMIX_WINDOWS_MIGRATION_SHA -or
+    $env:CHROMIX_WINDOWS_MIGRATION_PROFILE -or $env:CHROMIX_WINDOWS_VERIFY_SOURCE_REPO -or
+    $env:CHROMIX_WINDOWS_VERIFY_SOURCE_SHA -or $Revisions.ChromiumVersion -cne '155.0.8059.79')) {
+  throw 'stage12 unchanged-source resume requires ARM64 .79, stages 13..24 and no preparation/migration'
+}
 Assert-CiScripts
 Free-Disk
 Initialize-VisualStudio
@@ -859,6 +869,12 @@ if (-not $FromArtifact -and -not $FromSynced -and $StageIndex -gt 1) {
   throw "stage $StageIndex requires -FromArtifact or the guarded -FromSynced entry"
 }
 if ($FromArtifact) {
+  if ($ResumeStage12DonorRepo) {
+    if (Test-Path -LiteralPath $WorkDir) { throw 'stage12 resume destination already exists' }
+    & python (Join-Path $Repo 'tools\validate_windows15579_arm64_stage12_checkpoint.py') `
+      --archive 'C:\restore\tree.7z.001' --report "$env:RUNNER_TEMP\stage12-archive.json"
+    if ($LASTEXITCODE -ne 0) { throw 'stage12 continuation archive rejected' }
+  }
   $sevenZip = Resolve-7Zip
   & $sevenZip t "C:\restore\tree.7z.001" | Select-Object -Last 3
   if ($LASTEXITCODE -ne 0) { throw "7z archive test failed" }
@@ -1059,6 +1075,28 @@ if ($StageIndex -eq 1 -and -not $FromArtifact -and
   }
 }
 
+if ($ResumeStage12DonorRepo) {
+  if (-not $RestoredUpstream) { throw 'stage12 resume requires original upstream receipt' }
+  $RecoveryDiagnostics = Join-Path $WorkDir "fingerprint-diagnostics\stage12-resume-$env:GITHUB_RUN_ID-$env:GITHUB_RUN_ATTEMPT-$StageIndex"
+  if (Test-Path -LiteralPath $RecoveryDiagnostics) { throw 'current continuation diagnostics already exist' }
+  New-Item -ItemType Directory -Path $RecoveryDiagnostics | Out-Null
+  $FingerprintSourceReport = Join-Path $RecoveryDiagnostics 'source-verification.json'
+  & python -X utf8 (Join-Path $Repo 'tools\validate_windows15579_arm64_stage12_checkpoint.py') `
+    --workdir $WorkDir --donor-repo $ResumeStage12DonorRepo --stage $StageIndex `
+    --source-output $FingerprintSourceReport --report (Join-Path $RecoveryDiagnostics 'admission.json')
+  if ($LASTEXITCODE -ne 0) { throw 'stage12 unchanged-source admission failed; no cold fallback' }
+  Write-OutVar snapshot_safe true
+  $env:PATH = "$(Join-Path $Src 'third_party\ninja');$(Join-Path $Src 'third_party\node\win');$env:PATH"
+  $Ninja = & python (Join-Path $Repo 'tools\restore_ninja.py') --workdir $WorkDir --platform windows --arch arm64
+  if ($LASTEXITCODE -ne 0 -or -not $Ninja) { throw 'stage12 Ninja compatibility check failed' }
+  $env:NINJA = $Ninja
+  # Host Python packages are not stored in the snapshot; this does not rewrite GN/source.
+  & python -X utf8 (Join-Path $Repo 'tools\install_windows_metagen_bindings.py') `
+    --src $Src --out $OutDir --ninja $Ninja --chromium-version $Revisions.ChromiumVersion --download
+  if ($LASTEXITCODE -ne 0) { throw 'stage12 metagen host bindings/API preflight failed' }
+  & $Ninja -C $OutDir -n chrome *> (Join-Path $WorkDir 'upstream-cache-plan.log')
+  if ($LASTEXITCODE -ne 0) { throw 'stage12 incremental build-plan check failed' }
+} else {
 if (-not (Test-Path (Join-Path $Src ".chromix-source-ready")) -and
     (Get-RemainingMin) -lt ($PackReserveMin + 30)) {
   if ($ValidateOnly) { throw "validate-only: insufficient preparation budget" }
@@ -1217,6 +1255,8 @@ for relative, keys in RESTORED.items():
   }
 } finally {
   Pop-Location
+}
+
 }
 
 if ($ValidateOnly -or ($StageIndex -eq 1 -and -not $FromArtifact)) {
