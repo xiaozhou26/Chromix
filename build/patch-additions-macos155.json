@@ -1,0 +1,13 @@
+{
+  "schema_version": 1,
+  "kind": "macos155-managed-profile-controller-link",
+  "chromium_version": "155.0.8059.39",
+  "core_commit": "ffeb45a2bb88bc56a1dfed31410aeb10e9efcd5a",
+  "platform_commit": "b1238bb72b02cd36219991d9029c1c65183ea295",
+  "patches": [
+    {
+      "path": "patches/chromium155-macos/0225-managed-profile-controller-link.patch",
+      "sha256": "350b333232d5865d9dff93a32b1e7b9c2e16a0c1fd31479809a0fd9106db700a"
+    }
+  ]
+}

@@ -65,6 +65,9 @@ LINUX155_ADDITIONS_ROOT = "patches/chromium155-linux"
 LINUX155_ADDITIONS_MANIFEST = "build/patch-additions-linux155.json"
 LINUX155_LEGACY_ADDITIONS_SHA256 = "28fb67c9207bfe6e9b8314a0e56856c5136cc6a98461ad826f9ad7e8c4fbe38f"
 LINUX155_ADDITIONS_SHA256 = "5480c06026cf67f27f23fc4bdff4122c294cb0a8a16c4b5dfd7865a72e6c6f1f"
+MACOS155_ADDITIONS_ROOT = "patches/chromium155-macos"
+MACOS155_ADDITIONS_MANIFEST = "build/patch-additions-macos155.json"
+MACOS155_ADDITIONS_SHA256 = "94bb12f24f1c840f5a434bdc24971ab948be908944fd7c2fb51e6a39852af64f"
 WINDOWS155_ADDITIONS_ROOT = "patches/chromium155-windows"
 WINDOWS155_ADDITIONS_MANIFEST = "build/patch-additions-windows155.json"
 WINDOWS155_ADDITIONS_SHA256 = "4e4b2c3655b2ba1c1f5b2601d5d467ee58f98e8f535214719f1f92c5016ebddd"
@@ -218,6 +221,33 @@ def macos154_additions(repo: Path) -> tuple[list[str], dict | None]:
     }
 
 
+def macos155_additions(repo: Path) -> tuple[list[str], dict | None]:
+    manifest = repo / MACOS155_ADDITIONS_MANIFEST
+    directory = repo / MACOS155_ADDITIONS_ROOT
+    # Pre-addition donors have neither input; their exact commit is authenticated by migration.
+    if not manifest.exists() and not manifest.is_symlink():
+        if directory.exists() or directory.is_symlink():
+            raise SelectionError("macOS155 additions directory requires its pinned manifest")
+        return [], None
+    raw = read(repo, MACOS155_ADDITIONS_MANIFEST)
+    if digest(raw) != MACOS155_ADDITIONS_SHA256:
+        raise SelectionError("changed macOS155 additions manifest")
+    additions = json.loads(raw)
+    if directory.is_symlink() or not directory.is_dir():
+        raise SelectionError("missing or linked macOS155 additions directory")
+    entries = additions["patches"]
+    if {path.name for path in directory.iterdir()} != {Path(entry["path"]).name for entry in entries}:
+        raise SelectionError("partial or unexpected macOS155 additions inventory")
+    for entry in entries:
+        if digest(read(repo, entry["path"])) != entry["sha256"]:
+            raise SelectionError("changed macOS155 addition: " + entry["path"])
+    return [entry["path"] for entry in entries], {
+        "schema_version": additions["schema_version"], "kind": additions["kind"],
+        "manifest": {"path": MACOS155_ADDITIONS_MANIFEST, "sha256": digest(raw)},
+        "patches": entries,
+    }
+
+
 def windows155_additions(repo: Path) -> tuple[list[str], dict | None]:
     manifest = repo / WINDOWS155_ADDITIONS_MANIFEST
     directory = repo / WINDOWS155_ADDITIONS_ROOT
@@ -276,6 +306,7 @@ def select(repo: Path, platform: str | None = None, *, src: Path | None = None,
               "CHROMIUM_MACOS_VERSION", OVERRIDE_ROOT, MACOS152_OVERRIDE_ROOT,
               OVERRIDE155_ROOT, LINUX155_ADDITIONS_ROOT, LINUX155_ADDITIONS_MANIFEST,
               MACOS154_ADDITIONS_ROOT, MACOS154_ADDITIONS_MANIFEST,
+              MACOS155_ADDITIONS_ROOT, MACOS155_ADDITIONS_MANIFEST,
               WINDOWS155_ADDITIONS_ROOT, WINDOWS155_ADDITIONS_MANIFEST)):
         raise SelectionError("patch version selection requires complete repository pins")
     version = pins["ChromiumVersion"] if pins else None
@@ -362,6 +393,14 @@ def select(repo: Path, platform: str | None = None, *, src: Path | None = None,
             selection["additions"] = addition_identity
     if version == VERSION and platform == "macos":
         additions, addition_identity = macos154_additions(repo)
+        if addition_identity is not None:
+            selected = [*selected, *additions]
+            if not effective_series.endswith(b"\n"):
+                effective_series += b"\n"
+            effective_series += "".join(name + "\n" for name in additions).encode("utf-8")
+            selection["additions"] = addition_identity
+    if version == VERSION155 and platform == "macos":
+        additions, addition_identity = macos155_additions(repo)
         if addition_identity is not None:
             selected = [*selected, *additions]
             if not effective_series.endswith(b"\n"):

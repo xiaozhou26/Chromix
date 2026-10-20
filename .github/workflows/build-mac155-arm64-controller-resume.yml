@@ -1,0 +1,37 @@
+name: build-mac155-arm64-controller-resume
+run-name: mac155 ARM64 latest failed stage6 controller fix + logical stages 15..22
+
+on:
+  workflow_dispatch:
+    inputs:
+      compile_jobs:
+        description: 'Ninja jobs: auto or a positive integer; reviewed source migration and GN arguments are fixed'
+        type: string
+        default: auto
+
+permissions:
+  actions: read
+  contents: read
+
+concurrency:
+  group: mac155-arm64-stage8-resume-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  resume:
+    name: mac155 ARM64 (latest stage6 + controller migration 1..8)
+    uses: ./.github/workflows/build-posix-github.yml
+    with:
+      platform: macos
+      arch: arm64
+      runner: macos-15
+      artifact: chromix-mac-arm64
+      max-stages: 8
+      build_profile: fast
+      compile_jobs: ${{ inputs.compile_jobs || 'auto' }}
+      resume_run_id: '39280602881'
+      resume_tree_stage: '6'
+      resume_attempt: '1'
+      resume_artifact_ids: '12266957738,12267091707'
+      use_upstream_cache: true
+    secrets: inherit

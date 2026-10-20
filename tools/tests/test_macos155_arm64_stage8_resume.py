@@ -12,6 +12,7 @@ from unittest.mock import patch
 from tools import validate_macos155_arm64_stage8_checkpoint as arm
 from tools import validate_macos155_stage7_checkpoint as intel
 from tools import migrate_restored_snapshot as migration
+from tools.tests.macos155_historical_fixture import historical_recipes
 from tools import validate_posix_snapshot as snapshots
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -126,6 +127,12 @@ class MetadataTest(unittest.TestCase):
 
 
 class SourceTest(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        cls.repository = tempfile.TemporaryDirectory()
+        cls.addClassCleanup(cls.repository.cleanup)
+        cls.repo = historical_recipes(Path(cls.repository.name) / 'repo')
+
     def setUp(self):
         self.temp = tempfile.TemporaryDirectory()
         self.addCleanup(self.temp.cleanup)
@@ -152,11 +159,11 @@ class SourceTest(unittest.TestCase):
         with patch.object(migration, '_donor_git', side_effect=[arm.SHA.encode(), arm.TREE.encode(), b'']), \
                 patch.object(migration.restore, 'verify_restored'), patch.object(migration, '_verify_tooling'), \
                 patch.object(arm, 'live_source'):
-            return arm.admit(self.work, ROOT, ROOT)
+            return arm.admit(self.work, self.repo, self.repo)
 
     def test_real_arm_receipts_and_source_hashes_not_string_substituted_intel(self):
-        self.assertEqual(migration.source_ready_key(ROOT, 'macos', 'arm64'), arm.KEY)
-        self.assertEqual(len(arm.source_state(ROOT, self.work, initial=True)), 3)
+        self.assertEqual(migration.source_ready_key(self.repo, 'macos', 'arm64'), arm.KEY)
+        self.assertEqual(len(arm.source_state(self.repo, self.work, initial=True)), 3)
         for name, digest in arm.PINNED_FILES.items():
             self.assertEqual(arm.sha(FIXTURE['files'][name].encode()), digest)
         source = json.loads(FIXTURE['files']['fingerprint-diagnostics/source-final.json'])
@@ -177,10 +184,10 @@ class SourceTest(unittest.TestCase):
             original = path.read_bytes()
             path.unlink()
             with self.subTest(name=name), self.assertRaises((ValueError, RuntimeError, OSError)):
-                arm.source_state(ROOT, self.work, initial=True)
+                arm.source_state(self.repo, self.work, initial=True)
             path.symlink_to(self.work / 'src/out/Default/obj/retained.o')
             with self.assertRaises((ValueError, RuntimeError)):
-                arm.source_state(ROOT, self.work, initial=True)
+                arm.source_state(self.repo, self.work, initial=True)
             path.unlink()
             path.write_bytes(original)
         for name in arm.PINNED_FILES:
@@ -188,7 +195,7 @@ class SourceTest(unittest.TestCase):
             original = path.read_bytes()
             path.write_bytes(original + b' ')
             with self.assertRaises(ValueError):
-                arm.source_state(ROOT, self.work)
+                arm.source_state(self.repo, self.work)
             path.write_bytes(original)
 
     def test_intel_prepare_gn_receipts_and_invalidating_preparation_are_rejected(self):
@@ -198,7 +205,7 @@ class SourceTest(unittest.TestCase):
             original = path.read_bytes()
             path.write_text(INTEL['files'][name])
             with self.subTest(name=name), self.assertRaises(ValueError):
-                arm.source_state(ROOT, self.work)
+                arm.source_state(self.repo, self.work)
             path.write_bytes(original)
         for field in ('first_finish', 'tool_swap_invalidations', 'toolchain_invalidated_outputs'):
             data = json.loads(FIXTURE['files']['upstream-cache-preparation.json'])
@@ -209,7 +216,7 @@ class SourceTest(unittest.TestCase):
         self.put('upstream-cache-preparation.json', FIXTURE['files']['upstream-cache-preparation.json'])
         self.put('src/.chromix-source-ready', intel.KEY)
         with self.assertRaises(RuntimeError):
-            arm.source_state(ROOT, self.work)
+            arm.source_state(self.repo, self.work)
 
     def test_admission_read_only_and_continuation_logical9_to16(self):
         before = {p: (p.read_bytes(), p.stat().st_mtime_ns) for p in (self.work / 'src').rglob('*') if p.is_file()}
@@ -219,15 +226,15 @@ class SourceTest(unittest.TestCase):
         with patch.dict(os.environ, {'CHROMIX_BUILD_PROFILE': 'fast', 'CHROMIX_USE_UPSTREAM_CACHE': '1',
                                      'GITHUB_RUN_ID': 'new-arm-run', 'GITHUB_RUN_ATTEMPT': '1'}), \
                 patch.object(arm, 'live_source'):
-            start = arm.continuation(ROOT, self.work, 1, 'before')
-            end = arm.continuation(ROOT, self.work, 8, 'after')
+            start = arm.continuation(self.repo, self.work, 1, 'before')
+            end = arm.continuation(self.repo, self.work, 8, 'after')
             self.assertEqual((start['logical_stage'], end['logical_stage']), (9, 16))
             self.assertEqual(start['run_id'], arm.RUN)
             self.assertEqual(start['continuation_run'], 'new-arm-run')
             self.put('src/out/Default/.ninja_log', 'incremental compilation advanced')
-            arm.continuation(ROOT, self.work, 2, 'after')
+            arm.continuation(self.repo, self.work, 2, 'after')
             with self.assertRaisesRegex(ValueError, 'initial Ninja state'):
-                arm.continuation(ROOT, self.work, 1, 'before')
+                arm.continuation(self.repo, self.work, 1, 'before')
         for path, state in before.items():
             if path.name != '.ninja_log':
                 self.assertEqual((path.read_bytes(), path.stat().st_mtime_ns), state)
@@ -235,17 +242,17 @@ class SourceTest(unittest.TestCase):
     def test_no_cold_fallback_or_cross_arch_provenance(self):
         env = {'CHROMIX_BUILD_PROFILE': 'fast', 'CHROMIX_USE_UPSTREAM_CACHE': '1'}
         with patch.dict(os.environ, env), self.assertRaises((ValueError, OSError)):
-            arm.continuation(ROOT, self.work, 1, 'before')
+            arm.continuation(self.repo, self.work, 1, 'before')
         receipt = self.admit()
         for field, value in (('arch', 'x64'), ('run_id', intel.RUN), ('stage', 7),
                              ('attempt', 2), ('preparation_key', intel.KEY)):
             self.put(arm.RECEIPT, json.dumps(dict(receipt, **{field: value})))
             with patch.dict(os.environ, env), self.assertRaises(ValueError):
-                arm.continuation(ROOT, self.work, 1, 'before')
+                arm.continuation(self.repo, self.work, 1, 'before')
         self.put(arm.RECEIPT, json.dumps(receipt))
         for change in ({'CHROMIX_BUILD_PROFILE': 'release'}, {'CHROMIX_USE_UPSTREAM_CACHE': '0'}):
             with patch.dict(os.environ, dict(env, **change)), self.assertRaises(ValueError):
-                arm.continuation(ROOT, self.work, 1, 'before')
+                arm.continuation(self.repo, self.work, 1, 'before')
 
     def test_live_source_requires_real_patch_identity_outputs_and_version(self):
         output = self.work / 'live.json'
@@ -259,17 +266,28 @@ class SourceTest(unittest.TestCase):
             with patch.object(arm.subprocess, 'run', side_effect=lambda *a, **k: output.write_text(json.dumps(data))):
                 if field:
                     with self.assertRaises(ValueError):
-                        arm.live_source(ROOT, self.work, output)
+                        arm.live_source(self.repo, self.work, output)
                 else:
-                    arm.live_source(ROOT, self.work, output)
+                    arm.live_source(self.repo, self.work, output)
 
     def test_donor_sha_tree_dirty_checkout_and_recipe_change_are_rejected(self):
         for responses in ([b'a' * 40], [arm.SHA.encode(), b'b' * 40],
                           [arm.SHA.encode(), arm.TREE.encode(), b' M build/args.macos.gn']):
             with patch.object(migration, '_donor_git', side_effect=responses), self.assertRaises(ValueError):
-                arm.admit(self.work, ROOT, ROOT)
+                arm.admit(self.work, self.repo, self.repo)
         with patch.object(migration, 'source_ready_key', return_value=intel.KEY), self.assertRaises(ValueError):
-            arm.recipes(ROOT)
+            arm.recipes(self.repo)
+
+
+    def test_new_controller_recipe_is_not_an_unchanged_source_exception(self):
+        with self.assertRaisesRegex(ValueError, 'preparation key changed'):
+            arm.recipes(ROOT, self.repo)
+        with self.assertRaisesRegex(ValueError, 'preparation key changed'):
+            arm.source_state(ROOT, self.work)
+        self.admit()
+        with patch.dict(os.environ, {'CHROMIX_BUILD_PROFILE': 'fast', 'CHROMIX_USE_UPSTREAM_CACHE': '1'}), \
+                self.assertRaisesRegex(ValueError, 'preparation key changed'):
+            arm.continuation(ROOT, self.work, 1, 'before')
 
 
 class WorkflowTest(unittest.TestCase):

@@ -67,9 +67,9 @@ def test_new_stack_never_appends_mac154_quit_manifest(tmp_path):
     repo = clone_repo(tmp_path)
     set_platform_pins(repo, "macos", VERSION, CORE, MAC)
     identity, patches = selection.select(repo, "macos")
-    assert len(patches) == 224
+    assert len(patches) == 225
     assert identity["selection"]["platform_commit"] == MAC
-    assert "additions" not in identity["selection"]
+    assert identity["selection"]["additions"]["manifest"]["path"] == selection.MACOS155_ADDITIONS_MANIFEST
     assert sum(name.startswith("patches/chromium155/") for name, _ in patches) == 10
     assert not any("chromium154" in name or "0226" in name for name, _ in patches)
     # A retained historical manifest is not part of the 155 recipe.
@@ -136,7 +136,7 @@ def test_155_upstream_quit_and_bindgen_bytes(tmp_path):
 
 
 @pytest.mark.parametrize("substituted", [False, True])
-def test_independent_full_224_stack(tmp_path, substituted):
+def test_independent_full_225_stack(tmp_path, substituted):
     location = os.environ.get("CHROMIX_MACOS155_SOURCES")
     if not location:
         pytest.skip("set CHROMIX_MACOS155_SOURCES to independent pristine/core/mac inputs")
@@ -145,7 +145,7 @@ def test_independent_full_224_stack(tmp_path, substituted):
     src = tmp_path / "src"
     shutil.copytree(donor / "pristine", src)
     _, patches = selection.select(ROOT, "macos", src=src, core=core)
-    assert len(patches) == 224
+    assert len(patches) == 225
     targets = {name for _, raw in patches for name, _, _ in arp.transform_patch(raw, set(), [])[1]}
     log = []
     for tooling in (core, mac):
@@ -164,7 +164,7 @@ def test_independent_full_224_stack(tmp_path, substituted):
                 text, encoding = arp._decode(path.read_bytes())
                 path.write_bytes(arp._substitute(text, rules).encode(encoding))
         report = arp.run_apply(src, ROOT, core, mac, "macos", shutil.which("gpatch") or "patch")
-        assert report["status"] == "applied" and report["patch_count"] == 224
+        assert report["status"] == "applied" and report["patch_count"] == 225
         (tmp_path / "applied.json").write_text(json.dumps(report, indent=2))
         assert arp.run_apply(src, ROOT, core, mac, "macos", shutil.which("gpatch") or "patch",
                              check=True)["status"] == "checked"
@@ -184,5 +184,5 @@ def test_independent_full_224_stack(tmp_path, substituted):
         capture_output=True, text=True)
     assert result.returncode == 0, result.stdout + result.stderr
     report = json.loads(output.read_text())
-    assert report["status"] == "verified" and report["patch_count"] == 224
+    assert report["status"] == "verified" and report["patch_count"] == 225
     assert report["domain_substituted"] == substituted

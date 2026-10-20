@@ -19,6 +19,7 @@ def clone_repo(tmp_path: Path, *, historical: bool = False, additions: bool = Tr
     for directory_name, manifest in (
         (selection.LINUX155_ADDITIONS_ROOT, selection.LINUX155_ADDITIONS_MANIFEST),
         (selection.MACOS154_ADDITIONS_ROOT, selection.MACOS154_ADDITIONS_MANIFEST),
+        (selection.MACOS155_ADDITIONS_ROOT, selection.MACOS155_ADDITIONS_MANIFEST),
         (selection.WINDOWS155_ADDITIONS_ROOT, selection.WINDOWS155_ADDITIONS_MANIFEST),
     ):
         directory = repo / directory_name

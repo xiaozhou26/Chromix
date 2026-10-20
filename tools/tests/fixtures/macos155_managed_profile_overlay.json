@@ -1,0 +1,218 @@
+{
+  "platform_commit": "b1238bb72b02cd36219991d9029c1c65183ea295",
+  "core_gitlink": "ffeb45a2bb88bc56a1dfed31410aeb10e9efcd5a",
+  "archive_sha256": "9a6d159c3b8bc3f6b91b7be9fb5154f4311e659335fc6f1ac91485fdcb1ddbc4",
+  "series": "ungoogled-chromium/macos/build-bindgen.patch\nungoogled-chromium/macos/disable-clang-version-check.patch\nungoogled-chromium/macos/disable-crashpad-handler.patch\nungoogled-chromium/macos/disable-symbol-order-verification.patch\nungoogled-chromium/macos/fix-build-with-rust.patch\nungoogled-chromium/macos/fix-clang-format-path.patch\nungoogled-chromium/macos/fix-disabling-safebrowsing.patch\nungoogled-chromium/macos/fix-dsymutil.patch\nungoogled-chromium/macos/no-unknown-warnings.patch\nungoogled-chromium/macos/build-bindgen-target-override.patch\nungoogled-chromium/macos/bindgen-disable-static.patch\nungoogled-chromium/macos/set-rustc-nightly-capability.patch\nungoogled-chromium/macos/revert-v8-sanitizer-changes.patch\nungoogled-chromium/macos/fix-nasm-build-config.patch\nungoogled-chromium/macos/fix-anyappleos-availability.patch\nungoogled-chromium/macos/fix-build-without-crubit.patch\nungoogled-chromium/macos/use-system-python.patch\nungoogled-chromium/macos/fix-disable-verification-token.patch\nungoogled-chromium/macos/fix-esbuild.patch\nungoogled-chromium/macos/fix-typescript.patch\nungoogled-chromium/macos/fix-gn-compatibility.patch\nungoogled-chromium/macos/fix-typescript-isolated-declarations.patch\nungoogled-chromium/macos/fix-complex-builtins.patch\n",
+  "series_sha256": "01749d41c829517e9bcdcf56a1698edf9c2c4cfb0232aa3060ea8e4ee4d76b28",
+  "patches": {
+    "ungoogled-chromium/macos/build-bindgen.patch": {
+      "sha256": "d3193804875074dd8e17a2a2b56aec215c7dc59ef5fde5842ddc25050a218678",
+      "git_blob": "db0c8e1265dd6a24183048184f45a9b97495903a",
+      "targets": [
+        "tools/rust/build_bindgen.py"
+      ]
+    },
+    "ungoogled-chromium/macos/disable-clang-version-check.patch": {
+      "sha256": "1ec9d36202a5627f462305f7dd9e2857bfcbae203f24be154cd719b38800171d",
+      "git_blob": "3bd19c591eab1bd699d4ab3ca4408277fde9dd64",
+      "targets": [
+        "build/config/compiler/BUILD.gn",
+        "build/toolchain/toolchain.gni"
+      ]
+    },
+    "ungoogled-chromium/macos/disable-crashpad-handler.patch": {
+      "sha256": "a30bbab9e76ba1b54a41a9cda43f758bc42812adeaca386b1fea8b5163f53418",
+      "git_blob": "02c8f13b6751809e949c40df18cf63967360672f",
+      "targets": [
+        "third_party/crashpad/crashpad/client/crashpad_client_mac.cc"
+      ]
+    },
+    "ungoogled-chromium/macos/disable-symbol-order-verification.patch": {
+      "sha256": "22db63162fa49378bff00f038bcd240c6151eea5dd78f47ac6ca235234c9f8ba",
+      "git_blob": "bd12096b4f750e75a746750fb8d373ceced71840",
+      "targets": [
+        "chrome/BUILD.gn"
+      ]
+    },
+    "ungoogled-chromium/macos/fix-build-with-rust.patch": {
+      "sha256": "324934c2f26cedd17416e9d44ececd31dbb4faab48f68cd60dc16d4eae362954",
+      "git_blob": "3f7bd2c45898bcab8daf736b4dca37515a59b0e3",
+      "targets": [
+        "build/config/clang/BUILD.gn",
+        "build/config/rust.gni"
+      ]
+    },
+    "ungoogled-chromium/macos/fix-clang-format-path.patch": {
+      "sha256": "9c17ec553026025ba994cf8c4395e1249751a49e7dd554165d2cc5af25fda644",
+      "git_blob": "63d6c568c03e67da958e8f9b1a84b923d5bf11fc",
+      "targets": [
+        "third_party/blink/renderer/bindings/scripts/bind_gen/style_format.py"
+      ]
+    },
+    "ungoogled-chromium/macos/fix-disabling-safebrowsing.patch": {
+      "sha256": "372f26d43b3675e811a10e81a5f01b54de5cdf7973205b009b8cd6ffbce96821",
+      "git_blob": "c55e05f976da35b97e0cd58a7fb313d940dcd5ce",
+      "targets": [
+        "chrome/browser/chrome_content_browser_client.cc",
+        "chrome/browser/extensions/BUILD.gn",
+        "chrome/browser/policy/configuration_policy_handler_list_factory.cc",
+        "chrome/browser/ui/BUILD.gn",
+        "chrome/services/file_util/BUILD.gn",
+        "chrome/test/BUILD.gn"
+      ]
+    },
+    "ungoogled-chromium/macos/fix-dsymutil.patch": {
+      "sha256": "c2ce394fdcb1b22328ab5cf161f9b72a76da537fc3ddb6fbb3229617191a0f2c",
+      "git_blob": "7f78c9cfe56764575dc12e438492efaf33c47468",
+      "targets": [
+        "build/toolchain/apple/toolchain.gni",
+        "tools/mac/dump-static-initializers.py"
+      ]
+    },
+    "ungoogled-chromium/macos/no-unknown-warnings.patch": {
+      "sha256": "fe1734ec4bef5b7eb7ca2d772b04afd93e7a8c738e309f0eaaf47380a4bcf6e1",
+      "git_blob": "d490d2c35393721aaccdcfdd45803fb975b8fb04",
+      "targets": [
+        "build/config/mac/BUILD.gn"
+      ]
+    },
+    "ungoogled-chromium/macos/build-bindgen-target-override.patch": {
+      "sha256": "3872bbc4fd6bc64955b5964a93b58c61ee2e0e72e90f4448948ee7df26d7885d",
+      "git_blob": "bf245c04378f6f4a477e73f22afdfc2cbf251eea",
+      "targets": [
+        "build/rust/rust_bindgen_generator.gni",
+        "tools/rust/build_bindgen.py"
+      ]
+    },
+    "ungoogled-chromium/macos/bindgen-disable-static.patch": {
+      "sha256": "8632ce9567361c5cc1c1e7eb3fd1b3ea7b02bb49b2c24ee68a73dd11fd50da04",
+      "git_blob": "0e64c391bae366640a850de797f74f4236c2fd89",
+      "targets": [
+        "tools/rust/build_bindgen.py"
+      ]
+    },
+    "ungoogled-chromium/macos/set-rustc-nightly-capability.patch": {
+      "sha256": "0c02a139dc5db01a167fe4740dbd4eeffec748ad7b83bce2136934a340137ea8",
+      "git_blob": "83254eb86daadb10580d7f937fc46949eaf4fee5",
+      "targets": [
+        "build/config/rust.gni"
+      ]
+    },
+    "ungoogled-chromium/macos/revert-v8-sanitizer-changes.patch": {
+      "sha256": "27bc6b842a1c22d6b10512b703f58788db29dbfd8021a926b258125e9fec77e2",
+      "git_blob": "677e0fafe8dc5a29e54508dd39900ece8e560cfe",
+      "targets": [
+        "v8/BUILD.gn",
+        "v8/gni/v8.gni",
+        "v8/src/base/macros.h"
+      ]
+    },
+    "ungoogled-chromium/macos/fix-nasm-build-config.patch": {
+      "sha256": "7edab94489ce48ceac4d1c682c698e8663df563aa319d709abfe7f9afc277297",
+      "git_blob": "79c0042d7202ed1cea66186b9de7f70ead74a010",
+      "targets": [
+        "third_party/nasm/config/config-mac.h"
+      ]
+    },
+    "ungoogled-chromium/macos/fix-anyappleos-availability.patch": {
+      "sha256": "242ecabba4db1f799aaef4f5db953e80bed29d9b5d62ad349c83aa6f1243931e",
+      "git_blob": "da62652535f725886fc3ae55b9cde11bcf278405",
+      "targets": [
+        "net/base/apple/url_conversions.mm",
+        "net/base/apple/url_conversions_unittest.mm"
+      ]
+    },
+    "ungoogled-chromium/macos/fix-build-without-crubit.patch": {
+      "sha256": "85217fbc43f075068167643f0357e3df19a46805efd81a3eae00f966e04290eb",
+      "git_blob": "a30ba2ac875abf2b36584133881dd050e8308cc7",
+      "targets": [
+        "components/cbor/BUILD.gn",
+        "components/web_package/BUILD.gn",
+        "components/web_package/signed_web_bundles/ecdsa_p256_sha256_signature.cc",
+        "components/web_package/signed_web_bundles/ed25519_signature.cc",
+        "components/web_package/signed_web_bundles/integrity_block_parser.cc",
+        "components/web_package/signed_web_bundles/integrity_block_parser.h",
+        "components/web_package/signed_web_bundles/rust/BUILD.gn",
+        "components/web_package/signed_web_bundles/signed_web_bundle_signature_verifier.cc",
+        "components/web_package/signed_web_bundles/signed_web_bundle_utils.cc",
+        "third_party/blink/renderer/platform/BUILD.gn",
+        "third_party/blink/renderer/platform/fonts/opentype/font_format_check.cc",
+        "third_party/blink/renderer/platform/fonts/opentype/font_format_check.h",
+        "third_party/blink/renderer/platform/fonts/opentype/format_check.rs"
+      ]
+    },
+    "ungoogled-chromium/macos/use-system-python.patch": {
+      "sha256": "2a79214f80cd0d1851dc7b759bf87029a0c00affa8213a02f002df2ae7a5f65a",
+      "git_blob": "149bd76554d135e6290b6e1f86c5847a47e361a7",
+      "targets": [
+        ".gn"
+      ]
+    },
+    "ungoogled-chromium/macos/fix-disable-verification-token.patch": {
+      "sha256": "d42a5a72c1b085d2623b00caad958f18a6970dbed27558ce7b564e0468f3e252",
+      "git_blob": "e067e58f24953916e96a2d657a22de36c21d3174",
+      "targets": [
+        "chrome/browser/BUILD.gn",
+        "chrome/browser/browsing_data/BUILD.gn",
+        "chrome/browser/browsing_data/chrome_browsing_data_model_delegate.cc",
+        "chrome/browser/browsing_data/chrome_browsing_data_remover_delegate.cc",
+        "chrome/browser/chrome_content_browser_client.cc",
+        "chrome/browser/component_updater/BUILD.gn",
+        "chrome/browser/component_updater/private_verification_tokens_installer.cc",
+        "chrome/browser/private_verification_tokens/BUILD.gn",
+        "chrome/browser/profiles/BUILD.gn",
+        "chrome/browser/profiles/chrome_browser_main_extra_parts_profiles.cc",
+        "chrome/test/BUILD.gn",
+        "components/BUILD.gn",
+        "components/component_updater/installer_policies/BUILD.gn"
+      ]
+    },
+    "ungoogled-chromium/macos/fix-esbuild.patch": {
+      "sha256": "0805876428567ad284ab3b156bf903d31943ffaa1e8b58c703f61e7a8a830309",
+      "git_blob": "bc1af177faf23fca3a742f36df51452191bb4010",
+      "targets": [
+        "third_party/devtools-frontend/src/front_end/core/host/DispatchHttpRequestClient.ts",
+        "third_party/devtools-frontend/src/scripts/build/esbuild.js",
+        "third_party/devtools-frontend/src/scripts/build/ninja/bundle.gni",
+        "third_party/devtools-frontend/src/scripts/devtools_paths.py"
+      ]
+    },
+    "ungoogled-chromium/macos/fix-typescript.patch": {
+      "sha256": "48176806bc7822099940fe75bba5c79bce6c46d66a7824b5cb04cea077df8679",
+      "git_blob": "cb08669b7c99ed67a77e90604e98f05bec26a830",
+      "targets": [
+        "third_party/devtools-frontend/src/scripts/build/typescript/typescript_vars.gni",
+        "third_party/devtools-frontend/src/third_party/typescript/typescript.py",
+        "ui/webui/webui_features.gni"
+      ]
+    },
+    "ungoogled-chromium/macos/fix-gn-compatibility.patch": {
+      "sha256": "81a9014afff7e2a836c2ba2da69a9023d42d2f69a46cb91a0504642c480f6cc7",
+      "git_blob": "22d5b26b0f45fe7dd085377b05ca07fd4a1d6265",
+      "targets": [
+        "build/config/BUILDCONFIG.gn",
+        "third_party/devtools-frontend/src/front_end/models/ai_assistance/skills/BUILD.gn",
+        "third_party/devtools-frontend/src/scripts/build/ninja/copy.gni",
+        "third_party/devtools-frontend/src/scripts/build/ninja/devtools_pre_built.gni",
+        "third_party/devtools-frontend/src/scripts/build/typescript/typescript.gni",
+        "third_party/protobuf/proto_library.gni"
+      ]
+    },
+    "ungoogled-chromium/macos/fix-typescript-isolated-declarations.patch": {
+      "sha256": "d7888f44ea5b2d20642671d832a9843c10cd5b75c385d25af7fccdcafe6f7467",
+      "git_blob": "bd48a133f51b2d64d14efce0d42f2f21ab3303c5",
+      "targets": [
+        "third_party/devtools-frontend/src/front_end/ui/legacy/ARIAUtils.ts",
+        "third_party/devtools-frontend/src/front_end/ui/legacy/Widget.ts"
+      ]
+    },
+    "ungoogled-chromium/macos/fix-complex-builtins.patch": {
+      "sha256": "961c9a8f776508319ab7db47022eacd02da9d29710011b8de4fd90039775711a",
+      "git_blob": "0d975b2366ae3666465ff0de3b8cdc9b8e75f8bd",
+      "targets": [
+        "build/config/BUILD.gn",
+        "third_party/compiler-rt/BUILD.gn"
+      ]
+    }
+  }
+}

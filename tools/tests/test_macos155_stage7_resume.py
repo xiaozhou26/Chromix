@@ -12,6 +12,7 @@ from unittest.mock import patch
 from tools import validate_macos155_stage7_checkpoint as resume
 from tools import validate_posix_snapshot as snapshots
 from tools import migrate_restored_snapshot as migration
+from tools.tests.macos155_historical_fixture import historical_recipes
 
 ROOT = Path(__file__).resolve().parents[2]
 FIXTURE = json.loads(gzip.decompress((ROOT / 'tools/tests/fixtures/macos155_stage7_receipts.json.gz').read_bytes()))
@@ -119,12 +120,17 @@ class MetadataTest(unittest.TestCase):
 
 
 class SourceTest(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        cls.repository = tempfile.TemporaryDirectory()
+        cls.addClassCleanup(cls.repository.cleanup)
+        cls.repo = historical_recipes(Path(cls.repository.name) / 'repo')
+
     def setUp(self):
         self.temp = tempfile.TemporaryDirectory()
         self.addCleanup(self.temp.cleanup)
         self.work = Path(self.temp.name) / 'work'
-        self.donor = Path(self.temp.name) / 'donor'
-        self.donor.mkdir()
+        self.donor = self.repo
         for name, data in FIXTURE['files'].items():
             self.put(name, data)
         self.put('src/.chromix-source-ready', resume.KEY + '\n')
@@ -142,28 +148,28 @@ class SourceTest(unittest.TestCase):
         return path
 
     def test_recorded_receipts_and_real_recipe_key_are_mac155_not_mac154(self):
-        state = resume.source_state(ROOT, self.work, initial=True)
+        state = resume.source_state(self.repo, self.work, initial=True)
         self.assertEqual(set(state), set(resume.STATE_FILES))
-        self.assertEqual(migration.source_ready_key(ROOT, 'macos', 'x64'), resume.KEY)
+        self.assertEqual(migration.source_ready_key(self.repo, 'macos', 'x64'), resume.KEY)
         source = json.loads(FIXTURE['files']['fingerprint-diagnostics/source-final.json'])
         self.assertEqual(resume.identity_hash(source['identity']), resume.SOURCE_IDENTITY)
         self.assertEqual(resume.identity_hash(source['outputs']), resume.SOURCE_OUTPUTS)
         self.assertEqual(source['patch_count'], 224)
 
     def test_exact_donor_checkout_and_unchanged_recipe_are_required(self):
-        self.assertEqual(resume.recipes(ROOT, ROOT), resume.recipes(ROOT))
+        self.assertEqual(resume.recipes(self.repo, self.repo), resume.recipes(self.repo))
         original_read = resume.read
         def changed_read(root, name):
-            data = original_read(ROOT, name)
-            return data + b'changed' if root == self.donor else data
+            data = original_read(self.repo, name)
+            return data + b'changed' if root == self.work else data
         with patch.object(resume, 'read', side_effect=changed_read), self.assertRaises(ValueError):
-            resume.recipes(ROOT, self.donor)
+            resume.recipes(self.repo, self.work)
         for head, tree, dirty in ((b'a' * 40, resume.TREE.encode(), b''),
                                    (resume.SHA.encode(), b'b' * 40, b''),
                                    (resume.SHA.encode(), resume.TREE.encode(), b' M build/args.macos.gn')):
             with patch.object(migration, '_donor_git', side_effect=[head, tree, dirty]), \
                     self.assertRaises(ValueError):
-                resume.admit(self.work, self.donor, ROOT)
+                resume.admit(self.work, self.donor, self.repo)
 
     def test_each_source_gn_and_prepare_receipt_is_pinned(self):
         for name in (*resume.PINNED_FILES, 'upstream-cache-preparation.json',
@@ -172,7 +178,7 @@ class SourceTest(unittest.TestCase):
             data = path.read_bytes()
             path.write_bytes(data + b' ')
             with self.subTest(name=name), self.assertRaises(ValueError):
-                resume.source_state(ROOT, self.work, initial=True)
+                resume.source_state(self.repo, self.work, initial=True)
             path.write_bytes(data)
 
     def test_missing_or_symlinked_ninja_state_and_interrupted_preparation_fail(self):
@@ -181,20 +187,20 @@ class SourceTest(unittest.TestCase):
             data = path.read_bytes()
             path.unlink()
             with self.assertRaises((ValueError, OSError)):
-                resume.source_state(ROOT, self.work)
+                resume.source_state(self.repo, self.work)
             path.symlink_to(self.work / 'src/out/Default/obj/retained.o')
             with self.assertRaises(ValueError):
-                resume.source_state(ROOT, self.work)
+                resume.source_state(self.repo, self.work)
             path.unlink()
             path.write_bytes(data)
         for name in (migration.TRANSACTION, resume.arp.IN_PROGRESS):
             path = self.put('src/' + name, 'interrupted')
             with self.assertRaises(ValueError):
-                resume.source_state(ROOT, self.work)
+                resume.source_state(self.repo, self.work)
             path.unlink()
         self.put('src/.chromix-source-ready', resume.KEY.replace('155.', '154.'))
         with self.assertRaises(RuntimeError):
-            resume.source_state(ROOT, self.work)
+            resume.source_state(self.repo, self.work)
 
     def test_repreparation_or_invalidating_cached_objects_is_forbidden(self):
         name = 'upstream-cache-preparation.json'
@@ -215,11 +221,9 @@ class SourceTest(unittest.TestCase):
         def git(donor, repo, *args):
             return {'HEAD': resume.SHA.encode(), 'HEAD^{tree}': resume.TREE.encode()}.get(args[-1], b'')
         with patch.object(migration, '_donor_git', side_effect=git), \
-                patch.object(resume, 'recipes', return_value=resume.recipes(ROOT)), \
-                patch.object(migration, 'source_ready_key', return_value=resume.KEY), \
                 patch.object(migration.restore, 'verify_restored'), \
                 patch.object(migration, '_verify_tooling'), patch.object(resume, 'live_source'):
-            return resume.admit(self.work, self.donor, ROOT)
+            return resume.admit(self.work, self.donor, self.repo)
 
     def test_admission_and_continuation_never_rewrite_source_gn_or_objects(self):
         before = {p: (p.read_bytes(), p.stat().st_mtime_ns) for p in (self.work / 'src').rglob('*') if p.is_file()}
@@ -229,14 +233,14 @@ class SourceTest(unittest.TestCase):
         env = {'CHROMIX_BUILD_PROFILE': 'fast', 'CHROMIX_USE_UPSTREAM_CACHE': '1',
                'GITHUB_RUN_ID': 'new-run', 'GITHUB_RUN_ATTEMPT': '1'}
         with patch.dict(os.environ, env), patch.object(resume, 'live_source'):
-            report = resume.continuation(ROOT, self.work, 1, 'before')
+            report = resume.continuation(self.repo, self.work, 1, 'before')
             self.assertEqual(report['logical_stage'], 8)
             self.assertEqual(report['run_id'], resume.RUN)
             self.assertEqual(report['continuation_run'], 'new-run')
             self.put('src/out/Default/.ninja_log', 'new incremental progress')
-            resume.continuation(ROOT, self.work, 8, 'after')
+            resume.continuation(self.repo, self.work, 8, 'after')
             with self.assertRaisesRegex(ValueError, 'initial Ninja state changed'):
-                resume.continuation(ROOT, self.work, 1, 'before')
+                resume.continuation(self.repo, self.work, 1, 'before')
         for path, (data, mtime) in before.items():
             if path.name != '.ninja_log':
                 self.assertEqual((path.read_bytes(), path.stat().st_mtime_ns), (data, mtime))
@@ -244,16 +248,16 @@ class SourceTest(unittest.TestCase):
     def test_continuation_fails_closed_without_provenance_or_with_cold_release_mode(self):
         env = {'CHROMIX_BUILD_PROFILE': 'fast', 'CHROMIX_USE_UPSTREAM_CACHE': '1'}
         with patch.dict(os.environ, env), self.assertRaises((ValueError, OSError)):
-            resume.continuation(ROOT, self.work, 2, 'before')
+            resume.continuation(self.repo, self.work, 2, 'before')
         self.admit()
         for change in ({'CHROMIX_BUILD_PROFILE': 'release'}, {'CHROMIX_USE_UPSTREAM_CACHE': '0'}):
             with patch.dict(os.environ, dict(env, **change)), self.assertRaises(ValueError):
-                resume.continuation(ROOT, self.work, 2, 'before')
+                resume.continuation(self.repo, self.work, 2, 'before')
         receipt = json.loads((self.work / resume.RECEIPT).read_text())
         receipt['head_sha'] = 'a' * 40
         self.put(resume.RECEIPT, json.dumps(receipt))
         with patch.dict(os.environ, env), self.assertRaises(ValueError):
-            resume.continuation(ROOT, self.work, 2, 'before')
+            resume.continuation(self.repo, self.work, 2, 'before')
 
     def test_live_source_checks_exact_recorded_identity_and_outputs(self):
         output = self.work / 'live-source.json'
@@ -269,9 +273,20 @@ class SourceTest(unittest.TestCase):
             with patch.object(resume.subprocess, 'run', side_effect=run):
                 if field:
                     with self.subTest(field=field), self.assertRaises(ValueError):
-                        resume.live_source(ROOT, self.work, output)
+                        resume.live_source(self.repo, self.work, output)
                 else:
-                    resume.live_source(ROOT, self.work, output)
+                    resume.live_source(self.repo, self.work, output)
+
+
+    def test_new_controller_recipe_is_not_an_unchanged_source_exception(self):
+        with self.assertRaisesRegex(ValueError, 'preparation key changed'):
+            resume.recipes(ROOT, self.repo)
+        with self.assertRaisesRegex(ValueError, 'preparation key changed'):
+            resume.source_state(ROOT, self.work)
+        self.admit()
+        with patch.dict(os.environ, {'CHROMIX_BUILD_PROFILE': 'fast', 'CHROMIX_USE_UPSTREAM_CACHE': '1'}), \
+                self.assertRaisesRegex(ValueError, 'preparation key changed'):
+            resume.continuation(ROOT, self.work, 1, 'before')
 
 
 class StageExecutionTest(unittest.TestCase):

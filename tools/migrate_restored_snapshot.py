@@ -517,7 +517,7 @@ def _unchanged(src: Path, before: dict) -> None:
 
 
 def migrate(workdir: Path | str, previous_repo: Path | str, repo: Path | str,
-            platform: str, arch: str, *, patch_bin: str | None = None) -> dict:
+            platform: str, arch: str, *, patch_bin: str | None = None, policy=None) -> dict:
     """Verify, stage, and publish only net source changes, retaining Ninja state."""
     if platform not in PLATFORM_TOOLING or arch not in ("x64", "arm64"):
         raise arp.ApplyError("migration supports only linux/macos x64/arm64")
@@ -534,7 +534,8 @@ def migrate(workdir: Path | str, previous_repo: Path | str, repo: Path | str,
     for name in (TRANSACTION, arp.IN_PROGRESS):
         if _marker(src, name).exists():
             raise arp.ApplyError(f"in-progress/partial migration detected: {name}. {arp.CLEAN}")
-    _same_inputs(previous, repo, platform, arch)
+    validate_inputs = _same_inputs if policy is None else policy.validate_inputs
+    validate_inputs(previous, repo, platform, arch)
     old_receipt = restore.verify_restored(work, platform, arch, repo=previous)
     receipt = restore.verify_restored(work, platform, arch, repo=repo)
     if old_receipt != receipt:
@@ -596,7 +597,7 @@ def migrate(workdir: Path | str, previous_repo: Path | str, repo: Path | str,
         arp.run_apply(stage, repo, core, tooling, platform, program, check=True)
         after = arp._snapshot(stage, set(before))
         _unchanged(stage, stage_version)
-        _same_inputs(previous, repo, platform, arch)
+        validate_inputs(previous, repo, platform, arch)
         _verify_tooling(work, repo, roots, platform)
         if (arp._load(previous, core, tooling, platform) != (old_identity, old_patches, old_lite)
                 or arp._load(repo, core, tooling, platform) != (identity, patches, lite)
@@ -615,6 +616,8 @@ def migrate(workdir: Path | str, previous_repo: Path | str, repo: Path | str,
                    and stat.S_IMODE(before[name][1].st_mode) != stat.S_IMODE(after[name][1].st_mode)]
         if SOURCE_VERSION in changed:
             raise arp.ApplyError("staged immutable chrome/VERSION changed during migration")
+        if policy is not None:
+            policy.validate_staged(src, stage, changed)
         for name in changed:
             path = arp._path(src, name)
             data, info = after[name]
@@ -634,6 +637,8 @@ def migrate(workdir: Path | str, previous_repo: Path | str, repo: Path | str,
         restore.verify_restored(work, platform, arch, repo=repo)
         _ready(src, key)
         _unchanged(src, {SOURCE_VERSION: before[SOURCE_VERSION]})
+        if policy is not None:
+            policy.validate_preserved(src)
         report["changed_files"] = changed
     _marker(src, TRANSACTION).unlink()
     return report
@@ -648,7 +653,17 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--patch-bin", help="trusted host GNU patch (otherwise PATCH_BIN/gpatch/patch)")
     args = parser.parse_args(argv)
     try:
-        if os.environ.get("GITHUB_WORKFLOW") == "build-mac155-arm64-stage8-resume":
+        if os.environ.get("GITHUB_WORKFLOW") == "build-mac155-arm64-controller-resume":
+            try:
+                from . import migrate_macos155_arm64_controller_snapshot as controller
+            except ImportError:
+                import migrate_macos155_arm64_controller_snapshot as controller
+            controller.require((args.platform, args.arch) == ("macos", "arm64"),
+                               "controller continuation requires macOS ARM64")
+            result = controller.migrate(args.workdir, args.previous_repo, args.repo,
+                                        logs=Path(os.environ["RUNNER_TEMP"]) / "chromix-logs",
+                                        patch_bin=args.patch_bin)
+        elif os.environ.get("GITHUB_WORKFLOW") == "build-mac155-arm64-stage8-resume":
             try:
                 from . import validate_macos155_arm64_stage8_checkpoint as mac155_arm64
             except ImportError:
