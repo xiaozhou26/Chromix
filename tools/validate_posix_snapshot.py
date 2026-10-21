@@ -185,9 +185,20 @@ def main() -> int:
         from . import validate_macos155_arm64_controller_checkpoint as controller
     except ImportError:
         import validate_macos155_arm64_controller_checkpoint as controller
+    try:
+        from . import validate_macos155_intel_controller_checkpoint as intel_controller
+    except ImportError:
+        import validate_macos155_intel_controller_checkpoint as intel_controller
     run_id = positive(args.run_id, "run ID")
     artifact_ids = [positive(value.strip(), "artifact ID") for value in args.artifact_ids.split(",")]
-    if run_id == controller.RUN or os.environ.get("GITHUB_WORKFLOW") == controller.WORKFLOW:
+    if run_id == intel_controller.RUN or os.environ.get("GITHUB_WORKFLOW") == intel_controller.WORKFLOW:
+        intel_controller.require(os.environ.get("GITHUB_WORKFLOW") == intel_controller.WORKFLOW,
+                                 "latest Intel stage8 donor requires its controller migration workflow")
+        intel_controller.require((run_id, positive(args.stage, "stage"), positive(args.attempt, "attempt"),
+                                  args.platform, args.arch) == (intel_controller.RUN, 8, 1, "macos", "x64"),
+                                 "exact latest mac155 Intel stage8 attempt1 selection required")
+        report = intel_controller.validate_metadata(client, args.repository, artifact_ids)
+    elif run_id == controller.RUN or os.environ.get("GITHUB_WORKFLOW") == controller.WORKFLOW:
         controller.require(os.environ.get("GITHUB_WORKFLOW") == controller.WORKFLOW,
                            "latest stage6 donor requires controller migration workflow")
         controller.require((run_id, positive(args.stage, "stage"), positive(args.attempt, "attempt"),

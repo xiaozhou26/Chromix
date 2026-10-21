@@ -1,0 +1,37 @@
+name: build-mac155-intel-controller-resume
+run-name: mac155 Intel latest budget stage8 controller fix + logical stages 16..23
+
+on:
+  workflow_dispatch:
+    inputs:
+      compile_jobs:
+        description: 'Ninja jobs: auto or a positive integer; reviewed source migration and GN arguments are fixed'
+        type: string
+        default: auto
+
+permissions:
+  actions: read
+  contents: read
+
+concurrency:
+  group: mac155-intel-controller-resume-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  resume:
+    name: mac155 Intel (latest stage8 + controller migration 1..8)
+    uses: ./.github/workflows/build-posix-github.yml
+    with:
+      platform: macos
+      arch: x64
+      runner: macos-15-intel
+      artifact: chromix-mac-x64
+      max-stages: 8
+      build_profile: fast
+      compile_jobs: ${{ inputs.compile_jobs || 'auto' }}
+      resume_run_id: '39277477057'
+      resume_tree_stage: '8'
+      resume_attempt: '1'
+      resume_artifact_ids: '12312896348'
+      use_upstream_cache: true
+    secrets: inherit

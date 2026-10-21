@@ -106,7 +106,17 @@ fi
 
 MAC155_CONTINUATION=0
 MAC155_HELPER=tools/validate_macos155_stage7_checkpoint.py
-if [ "${GITHUB_WORKFLOW:-}" = build-mac155-arm64-controller-resume ] ||
+if [ "${GITHUB_WORKFLOW:-}" = build-mac155-intel-controller-resume ] ||
+   [ -e "$WORK/fingerprint-diagnostics/mac155-intel-controller-migration.json" ]; then
+  [ "$PLATFORM:$ARCH:$MAX_STAGES" = macos:x64:8 ] || die "invalid mac155 Intel controller continuation configuration"
+  [ ! -e "$WORK/fingerprint-diagnostics/mac155-arm64-stage8-resume.json" ] || die "mixed ARM64/Intel controller receipts"
+  [ ! -e "$WORK/fingerprint-diagnostics/mac155-arm64-controller-migration.json" ] || die "mixed controller receipts"
+  MAC155_CONTINUATION=1
+  MAC155_HELPER=tools/migrate_macos155_intel_controller_snapshot.py
+  python3 "$REPO/$MAC155_HELPER" \
+    --repo "$REPO" --workdir "$WORK" --stage "$STAGE_INDEX" --phase before ||
+    die "mac155 Intel controller migration admission failed; cold fallback forbidden"
+elif [ "${GITHUB_WORKFLOW:-}" = build-mac155-arm64-controller-resume ] ||
    [ -e "$WORK/fingerprint-diagnostics/mac155-arm64-controller-migration.json" ]; then
   [ "$PLATFORM:$ARCH:$MAX_STAGES" = macos:arm64:8 ] || die "invalid mac155 controller continuation configuration"
   [ ! -e "$WORK/fingerprint-diagnostics/mac155-stage7-resume.json" ] || die "mixed Intel/controller receipts"
@@ -125,8 +135,7 @@ elif [ "${GITHUB_WORKFLOW:-}" = build-mac155-arm64-stage8-resume ] ||
   python3 "$REPO/$MAC155_HELPER" \
     --repo "$REPO" --workdir "$WORK" --stage "$STAGE_INDEX" --phase before ||
     die "mac155 ARM64 stage8 continuation admission failed; cold fallback forbidden"
-fi
-if [ "${GITHUB_WORKFLOW:-}" = build-mac155-x64-stage7-resume ] ||
+elif [ "${GITHUB_WORKFLOW:-}" = build-mac155-x64-stage7-resume ] ||
    [ -e "$WORK/fingerprint-diagnostics/mac155-stage7-resume.json" ]; then
   [ "$PLATFORM:$ARCH:$MAX_STAGES" = macos:x64:8 ] || die "invalid mac155 continuation configuration"
   MAC155_CONTINUATION=1
