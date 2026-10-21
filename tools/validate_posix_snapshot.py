@@ -191,7 +191,19 @@ def main() -> int:
         import validate_macos155_intel_controller_checkpoint as intel_controller
     run_id = positive(args.run_id, "run ID")
     artifact_ids = [positive(value.strip(), "artifact ID") for value in args.artifact_ids.split(",")]
-    if run_id == intel_controller.RUN or os.environ.get("GITHUB_WORKFLOW") == intel_controller.WORKFLOW:
+    try:
+        from . import validate_macos155_png_checkpoint as png
+    except ImportError:
+        import validate_macos155_png_checkpoint as png
+    png_donors = png.checkpoints()
+    if (run_id in {d["run_id"] for d in png_donors.values()}
+            or os.environ.get("GITHUB_WORKFLOW") in {d["consumer_workflow"] for d in png_donors.values()}):
+        d = png.checkpoint(args.arch)
+        png.require(os.environ.get("GITHUB_WORKFLOW") == d["consumer_workflow"]
+                    and (run_id, positive(args.stage, "stage"), positive(args.attempt, "attempt"), args.platform)
+                    == (d["run_id"], 1, 1, "macos"), "exact compiled PNG workflow/donor selection required")
+        report = png.validate_metadata(client, args.repository, artifact_ids, args.arch)
+    elif run_id == intel_controller.RUN or os.environ.get("GITHUB_WORKFLOW") == intel_controller.WORKFLOW:
         intel_controller.require(os.environ.get("GITHUB_WORKFLOW") == intel_controller.WORKFLOW,
                                  "latest Intel stage8 donor requires its controller migration workflow")
         intel_controller.require((run_id, positive(args.stage, "stage"), positive(args.attempt, "attempt"),

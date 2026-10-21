@@ -22,6 +22,7 @@ from tools.tests.test_patch_selection import clone_repo, set_platform_pins
 ROOT = Path(__file__).resolve().parents[2]
 BASELINE = "1a7d4b9c8f4e7c3530534682b4c233275f1f99a2"
 PATCH = selection.MACOS155_ADDITIONS_ROOT + "/0225-managed-profile-controller-link.patch"
+PNG_PATCH = selection.MACOS155_ADDITIONS_ROOT + "/0227-opaque-png-export-consistency.patch"
 OVERLAY = ROOT / "tools/tests/fixtures/macos155_managed_profile_overlay.json"
 OVERLAY_SHA256 = "a647e4b016d42f4caf83178ae21062b4ac0304d9fa0768c68e438ff7c549d433"
 
@@ -41,15 +42,16 @@ def test_exact_append_and_historical_identity(tmp_path, baseline_selector):
     historical, old = baseline_selector.select(repo, "macos")
     current, patches = selection.select(repo, "macos")
     manifest = json.loads((repo / selection.MACOS155_ADDITIONS_MANIFEST).read_bytes())
-    assert len(old) == 224 and len(patches) == 225
+    assert len(old) == 224 and len(patches) == 226
     assert manifest == {
-        "schema_version": 1, "kind": "macos155-managed-profile-controller-link",
+        "schema_version": 2, "kind": "macos155-compiled-png-recovery",
         "chromium_version": selection.VERSION155, "core_commit": selection.CORE155,
         "platform_commit": selection.PLATFORM155_COMMITS["macos"],
-        "patches": [{"path": PATCH, "sha256": selection.digest((ROOT / PATCH).read_bytes())}],
+        "patches": [{"path": name, "sha256": selection.digest((ROOT / name).read_bytes())}
+                    for name in (PATCH, PNG_PATCH)],
     }
     assert selection.digest((repo / selection.MACOS155_ADDITIONS_MANIFEST).read_bytes()) == selection.MACOS155_ADDITIONS_SHA256
-    assert patches == old + [(PATCH, (ROOT / PATCH).read_bytes())]
+    assert patches == old + [(name, (ROOT / name).read_bytes()) for name in (PATCH, PNG_PATCH)]
     assert current["patches"] == historical["patches"] + manifest["patches"]
     assert {k: v for k, v in current["selection"].items() if k != "additions"} == historical["selection"]
     assert current["selection"]["additions"]["manifest"] == {
@@ -75,8 +77,8 @@ def test_apply_receipt_binds_only_the_gn_addition(tmp_path, source_data):
         (core / name).write_text(source_data["tooling"]["core/" + name]["text"])
     identity, patches, _ = arp._load(repo, core, tmp_path / "mac", "macos")
     selected, _ = selection.select(repo, "macos", core=core)
-    assert len(patches) == 225 and patches[-1][0] == PATCH
-    assert patches[-1][2] == [(BUILD, "modify", None)]
+    assert len(patches) == 226 and patches[-2][0] == PATCH and patches[-1][0] == PNG_PATCH
+    assert patches[-2][2] == [(BUILD, "modify", None)]
     assert identity["selection"] == selected["selection"]
     assert identity["series"]["sha256"] == selected["series_sha256"]
     assert identity["series"]["patches"] == selected["patches"]

@@ -67,7 +67,8 @@ LINUX155_LEGACY_ADDITIONS_SHA256 = "28fb67c9207bfe6e9b8314a0e56856c5136cc6a98461
 LINUX155_ADDITIONS_SHA256 = "5480c06026cf67f27f23fc4bdff4122c294cb0a8a16c4b5dfd7865a72e6c6f1f"
 MACOS155_ADDITIONS_ROOT = "patches/chromium155-macos"
 MACOS155_ADDITIONS_MANIFEST = "build/patch-additions-macos155.json"
-MACOS155_ADDITIONS_SHA256 = "94bb12f24f1c840f5a434bdc24971ab948be908944fd7c2fb51e6a39852af64f"
+MACOS155_LEGACY_ADDITIONS_SHA256 = "94bb12f24f1c840f5a434bdc24971ab948be908944fd7c2fb51e6a39852af64f"
+MACOS155_ADDITIONS_SHA256 = "3184e6676d3664217bf316912b4ac1fe7322f7d7a4bc3f55135de92f6ee90462"
 WINDOWS155_ADDITIONS_ROOT = "patches/chromium155-windows"
 WINDOWS155_ADDITIONS_MANIFEST = "build/patch-additions-windows155.json"
 WINDOWS155_ADDITIONS_SHA256 = "4e4b2c3655b2ba1c1f5b2601d5d467ee58f98e8f535214719f1f92c5016ebddd"
@@ -230,7 +231,7 @@ def macos155_additions(repo: Path) -> tuple[list[str], dict | None]:
             raise SelectionError("macOS155 additions directory requires its pinned manifest")
         return [], None
     raw = read(repo, MACOS155_ADDITIONS_MANIFEST)
-    if digest(raw) != MACOS155_ADDITIONS_SHA256:
+    if digest(raw) not in (MACOS155_LEGACY_ADDITIONS_SHA256, MACOS155_ADDITIONS_SHA256):
         raise SelectionError("changed macOS155 additions manifest")
     additions = json.loads(raw)
     if directory.is_symlink() or not directory.is_dir():

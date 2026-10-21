@@ -24,6 +24,17 @@ FIXTURE = json.loads(gzip.decompress(
     (ROOT / "tools/tests/fixtures/macos155_intel_controller_receipts.json.gz").read_bytes()))
 
 
+@pytest.fixture(scope="module", autouse=True)
+def historical_controller_target(tmp_path_factory):
+    # The controller gate admits exactly 225 patches, not the later PNG target.
+    root = donor_checkout(tmp_path_factory.mktemp("controller-target") / "repo", "611b27f211a8763278d7c4a51795768d48ec26d4")
+    subprocess.run(["git", "-C", str(root), "sparse-checkout", "add", "/.github/"], check=True)
+    with pytest.MonkeyPatch.context() as context:
+        context.setitem(globals(), "ROOT", root)
+        context.setattr(controller, "__file__", str(root / "tools" / Path(controller.__file__).name))
+        yield root
+
+
 class Client:
     def __init__(self):
         self.data = copy.deepcopy(FIXTURE)

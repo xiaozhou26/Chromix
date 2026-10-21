@@ -268,29 +268,49 @@
 
   async function record(mime) {
     const c = canvas(), stream = c.captureStream(30); let recorder;
-    const chunks = [];
+    const chunks = [], started = performance.now(), elapsed = () => performance.now() - started;
+    const diagnostics = {events:[], drawRequests:0, phase:'construct'};
+    const event = (name, detail = {}) => diagnostics.events.push({event:name, at:elapsed(),
+      phase:diagnostics.phase, state:recorder?.state ?? null, ...detail});
     try {
       recorder = new MediaRecorder(stream, mime ? {mimeType:mime} : {});
+      event('constructed');
       const done = new Promise((resolve, reject) => {
-        recorder.ondataavailable = e => { if (e.data.size) chunks.push(e.data); };
-        recorder.onerror = e => reject(new Error(e.error?.name || 'recorder error')); recorder.onstop = resolve;
+        recorder.onstart = () => event('start');
+        recorder.ondataavailable = e => {
+          event('dataavailable', {bytes:e.data.size, mime:e.data.type});
+          if (e.data.size) chunks.push(e.data);
+        };
+        recorder.onerror = e => {
+          event('error', {error:e.error ? errorDetails(e.error) : null});
+          reject(new Error(e.error?.name || 'recorder error'));
+        };
+        recorder.onstop = () => { event('stop'); resolve(); };
       });
       done.catch(() => {});
-      recorder.start();
+      diagnostics.phase = 'start'; recorder.start();
+      diagnostics.phase = 'draw';
       for (let i=0;i<3;i++) {
         c.getContext('2d').fillStyle = ['red','green','blue'][i]; c.getContext('2d').fillRect(0,0,64,64);
-        stream.getVideoTracks()[0].requestFrame(); await delay(60);
+        stream.getVideoTracks()[0].requestFrame(); diagnostics.drawRequests++; await delay(60);
       }
-      recorder.stop(); await bounded(done);
+      diagnostics.phase = 'stop'; recorder.stop(); await bounded(done);
+      diagnostics.phase = 'serialize';
       const blob = new Blob(chunks, {type:recorder.mimeType});
       if (blob.size > 1048576) throw new Error('recording fixture exceeded 1 MiB');
       return {status:'recorded', bytes:blob.size, requestedMime:mime, mime:recorder.mimeType,
         mimeSupported:MediaRecorder.isTypeSupported(recorder.mimeType),
         canPlay:document.createElement('video').canPlayType(recorder.mimeType),
         mseSupported:typeof MediaSource !== 'undefined' && MediaSource.isTypeSupported(recorder.mimeType),
-        chunkMimes:chunks.map(chunk => chunk.type), data:b64(new Uint8Array(await blob.arrayBuffer()))};
-    } catch (e) { return {status:'rejected', bytes:chunks.reduce((n,b) => n+b.size,0), error:e.name + ':' + e.message}; }
-    finally {
+        chunkMimes:chunks.map(chunk => chunk.type), data:b64(new Uint8Array(await blob.arrayBuffer())), diagnostics};
+    } catch (e) {
+      diagnostics.failure = {phase:diagnostics.phase, at:elapsed(), ...errorDetails(e)};
+      return {status:'rejected', requestedMime:mime, bytes:chunks.reduce((n,b) => n+b.size,0),
+        error:e.name + ':' + e.message, diagnostics};
+    } finally {
+      diagnostics.beforeCleanup = {at:elapsed(), state:recorder?.state ?? null,
+        mime:recorder?.mimeType ?? null, tracks:stream.getTracks().map(track => ({kind:track.kind,
+          enabled:track.enabled, muted:track.muted, readyState:track.readyState, settings:track.getSettings?.()}))};
       if (recorder?.state === 'recording') recorder.stop();
       stream.getTracks().forEach(track => track.stop());
     }
@@ -479,9 +499,13 @@
       const decoding = await capability('decodingInfo', {type:'file',
         video:{contentType:spec.mime, width:64, height:64, bitrate:200000, framerate:30}});
       const rtcName = spec.rtpMime.toLowerCase();
+      // Keep the original advertisement for assessment; later queries are diagnostics only.
+      const recorderQueries = {advertised:recorderSupported,
+        beforeRecord:MediaRecorder.isTypeSupported(spec.mime)};
       const recorded = recorderSupported || forbidden ? await record(spec.mime) : {status:'unavailable'};
+      recorderQueries.afterRecord = MediaRecorder.isTypeSupported(spec.mime);
       const recording = forbidden ? fixtures[name]?.recorded : recorded;
-      out[name] = {encoderSupported, decoderSupported, recorderSupported, mseSupported, mime:spec.mime,
+      out[name] = {encoderSupported, decoderSupported, recorderSupported, recorderQueries, mseSupported, mime:spec.mime,
         canPlay:document.createElement('video').canPlayType(spec.mime), encoding, decoding, encoded,
         decoded:await decode(forbidden ? fixtures[name]?.encoded : encoded), recorded,
         playback:await play(recording), mse:mseSupported || forbidden ? await play(recording, spec.mime) : {status:'unavailable'},

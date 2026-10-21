@@ -653,7 +653,17 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--patch-bin", help="trusted host GNU patch (otherwise PATCH_BIN/gpatch/patch)")
     args = parser.parse_args(argv)
     try:
-        if os.environ.get("GITHUB_WORKFLOW") == "build-mac155-intel-controller-resume":
+        if os.environ.get("GITHUB_WORKFLOW") in ("build-mac155-intel-png-resume", "build-mac155-arm64-png-resume"):
+            try:
+                from . import migrate_macos155_png_snapshot as png
+            except ImportError:
+                import migrate_macos155_png_snapshot as png
+            d = png.donor.checkpoint(args.arch)
+            png.require(args.platform == "macos" and os.environ["GITHUB_WORKFLOW"] == d["consumer_workflow"],
+                        "PNG continuation requires exact native architecture workflow")
+            result = png.migrate(args.workdir, args.previous_repo, args.repo, args.arch,
+                                 logs=Path(os.environ["RUNNER_TEMP"]) / "chromix-logs", patch_bin=args.patch_bin)
+        elif os.environ.get("GITHUB_WORKFLOW") == "build-mac155-intel-controller-resume":
             try:
                 from . import migrate_macos155_intel_controller_snapshot as intel_controller
             except ImportError:

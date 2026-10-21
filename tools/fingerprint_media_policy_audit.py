@@ -227,6 +227,28 @@ def _assess(report):
     return sorted(set(errors)), sorted(set(gaps))
 
 
+def runtime_diagnostics(browser):
+    result = {'collected': 'after_media_operations', 'errors': []}
+    session = None
+    try:
+        session = browser.new_browser_cdp_session()
+        for key, method in (('command_line', 'Browser.getBrowserCommandLine'),
+                            ('system_info', 'SystemInfo.getInfo')):
+            try:
+                result[key] = session.send(method)
+            except Exception as error:
+                result['errors'].append(method + ': ' + type(error).__name__ + ': ' + str(error))
+    except Exception as error:
+        result['errors'].append(type(error).__name__ + ': ' + str(error))
+    finally:
+        if session is not None:
+            try:
+                session.detach()
+            except Exception as error:
+                result['errors'].append('detach: ' + type(error).__name__ + ': ' + str(error))
+    return result
+
+
 def run(browser, headed=False):
     report = {'schema_version': 1, 'collected_at': datetime.now(timezone.utc).isoformat(),
         'browser_sha256': launch.pool.file_hash(browser), 'probe_sha256': launch.pool.file_hash(PROBE),
@@ -253,7 +275,8 @@ def run(browser, headed=False):
                         page.goto(origin, timeout=30000)
                         observed = page.evaluate('async args => await chromixBackendProbe.codecs(args)',
                                                 {'fixtures': fixtures, 'disabled': list(CASES[name])})
-                        report['runs'].append({'name': name, 'launch_args': args, 'observation': observed})
+                        report['runs'].append({'name': name, 'launch_args': args, 'observation': observed,
+                                               'runtime_diagnostics': runtime_diagnostics(instance)})
                         if name == 'native':
                             fixtures = observed['families']
                     finally:

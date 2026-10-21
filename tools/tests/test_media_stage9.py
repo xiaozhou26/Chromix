@@ -392,6 +392,116 @@ assert.equal(result.bytes,2);assert.equal(stopped,true);
 ''')
 
 
+@pytest.mark.parametrize('failure', ['construct', 'start', 'empty', 'success'])
+def test_recorder_diagnostics_preserve_failure_phase_and_fixed_workload(node, failure):
+    run_js(node, 'const failure = ' + json.dumps(failure) + ';\n' + r'''
+let constructions = 0, draws = 0, stops = 0, cleaned = false;
+const track = {kind:'video', enabled:true, muted:false, readyState:'live',
+  getSettings:() => ({width:64,height:64}), requestFrame(){draws++}, stop(){cleaned=true}};
+const stream = {getVideoTracks:() => [track], getTracks:() => [track]};
+globalThis.document = {createElement:tag => tag === 'canvas' ?
+  {getContext:() => ({fillRect(){}}), captureStream:fps => {assert.equal(fps,30);return stream}} :
+  {canPlayType:() => 'probably'}};
+globalThis.MediaSource = {isTypeSupported:() => true};
+globalThis.MediaRecorder = class {
+  constructor(input, options) {
+    constructions++; assert.equal(input,stream); assert.equal(options.mimeType,testMedia.specs.hevc.mime);
+    if (failure === 'construct') throw new DOMException('native initialize rejected','NotSupportedError');
+    this.state='inactive';this.mimeType=options.mimeType;
+  }
+  static isTypeSupported() {return true}
+  start() {
+    if (failure === 'start') throw new DOMException('encoder start rejected','NotSupportedError');
+    this.state='recording';this.onstart();
+  }
+  stop() {
+    stops++;this.state='inactive';
+    this.ondataavailable({data:new Blob([failure === 'empty' ? '' : 'xx'],{type:this.mimeType})});
+    this.onstop();
+  }
+};
+const result = await testMedia.record(testMedia.specs.hevc.mime);
+assert.equal(constructions,1);assert.equal(cleaned,true);
+assert.equal(result.requestedMime,testMedia.specs.hevc.mime);
+assert.deepEqual(result.diagnostics.beforeCleanup.tracks[0].settings,{width:64,height:64});
+if (failure === 'construct' || failure === 'start') {
+  assert.equal(result.status,'rejected');assert.match(result.error,/^NotSupportedError:/);
+  assert.equal(result.bytes,0);assert.equal(result.diagnostics.failure.phase,failure);
+  assert.equal(draws,0);assert.equal(stops,0);
+} else {
+  assert.equal(result.status,'recorded');assert.equal(result.bytes,failure === 'empty' ? 0 : 2);
+  assert.equal(draws,3);assert.equal(stops,1);assert.equal(result.diagnostics.drawRequests,3);
+  assert.deepEqual(result.diagnostics.events.map(e => e.event),['constructed','start','dataavailable','stop']);
+}
+''')
+
+
+@pytest.mark.parametrize('advertised,before,after', [(True, False, False), (True, True, True)])
+def test_hevc_diagnostics_cannot_replace_advertisement_or_accept_failed_recording(advertised, before, after):
+    report = stage9_report()
+    row = report['runs'][0]['observation']['families']['hevc']
+    row['recorderSupported'] = advertised
+    row['recorderQueries'] = {'advertised': advertised, 'beforeRecord': before, 'afterRecord': after}
+    row['recorded'] = {'status': 'rejected', 'bytes': 0, 'error': 'NotSupportedError:initialize',
+                       'diagnostics': {'failure': {'phase': 'construct'}}}
+    assert 'native: hevc: supported recorder failed to record' in media.assess(report)[0]
+
+
+@pytest.mark.parametrize('advertised,forbidden', [(True, False), (False, True), (False, False)])
+def test_recorder_query_changes_never_skip_advertised_or_disabled_attempt(node, advertised, forbidden):
+    run_js(node, 'const advertised = ' + json.dumps(advertised) + ', forbidden = ' + json.dumps(forbidden) + ';\n' + r'''
+const start = source.indexOf('      const recorderSupported = MediaRecorder.isTypeSupported(spec.mime);');
+const end = source.indexOf('      const recording = forbidden ?',start);
+assert.ok(start > 0 && end > start);
+const AsyncFunction = Object.getPrototypeOf(async function(){}).constructor;
+const sample = new AsyncFunction('MediaRecorder','MediaSource','spec','capability','record','forbidden',
+  source.slice(start,end) + '\nreturn {recorderSupported,recorderQueries,recorded};');
+let queries = 0, attempts = 0;
+const result = await sample({isTypeSupported(mime){
+  assert.equal(mime,testMedia.specs.hevc.mime);return queries++ === 0 ? advertised : false;
+}}, {isTypeSupported:() => false}, testMedia.specs.hevc, async () => ({supported:false}),
+async mime => {attempts++;assert.equal(mime,testMedia.specs.hevc.mime);
+  return {status:'rejected',error:'NotSupportedError',bytes:0};}, forbidden);
+assert.equal(result.recorderSupported,advertised);
+assert.deepEqual(result.recorderQueries,{advertised,beforeRecord:false,afterRecord:false});
+assert.equal(attempts,advertised || forbidden ? 1 : 0);
+assert.equal(result.recorded.status,advertised || forbidden ? 'rejected' : 'unavailable');
+''')
+
+
+def test_empty_hevc_recording_remains_a_failure():
+    report = stage9_report()
+    report['runs'][0]['observation']['families']['hevc']['recorded'].update(bytes=0, data='')
+    assert media.assess(report)[0]
+
+
+@pytest.mark.parametrize('unavailable', [False, True])
+def test_runtime_diagnostics_capture_real_flags_and_gpu_without_launch_changes(unavailable):
+    class Session:
+        detached = False
+
+        def send(self, method):
+            if unavailable:
+                raise RuntimeError('CDP unavailable')
+            return {'arguments': ['--use-angle']} if method == 'Browser.getBrowserCommandLine' else {
+                'gpu': {'featureStatus': {'video_encode': 'disabled_software'}}}
+
+        def detach(self):
+            self.detached = True
+
+    session = Session()
+    browser = type('Browser', (), {'new_browser_cdp_session': lambda self: session})()
+    result = media.runtime_diagnostics(browser)
+    assert session.detached
+    assert result['collected'] == 'after_media_operations'
+    if unavailable:
+        assert len(result['errors']) == 2
+    else:
+        assert result['command_line']['arguments'] == ['--use-angle']
+        assert result['system_info']['gpu']['featureStatus']['video_encode'] == 'disabled_software'
+        assert not result['errors']
+
+
 @pytest.mark.parametrize('decoded_frames', [0, 3])
 def test_rtc_js_retains_transfer_stats_and_classifies_cleanup_abort(node, decoded_frames):
     run_js(node, 'const decodedFrames = ' + str(decoded_frames) + ';\n' + r'''

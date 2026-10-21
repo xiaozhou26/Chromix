@@ -1,6 +1,6 @@
 {
-  "schema_version": 1,
-  "kind": "macos155-managed-profile-controller-link",
+  "schema_version": 2,
+  "kind": "macos155-compiled-png-recovery",
   "chromium_version": "155.0.8059.39",
   "core_commit": "ffeb45a2bb88bc56a1dfed31410aeb10e9efcd5a",
   "platform_commit": "b1238bb72b02cd36219991d9029c1c65183ea295",
@@ -8,6 +8,10 @@
     {
       "path": "patches/chromium155-macos/0225-managed-profile-controller-link.patch",
       "sha256": "350b333232d5865d9dff93a32b1e7b9c2e16a0c1fd31479809a0fd9106db700a"
+    },
+    {
+      "path": "patches/chromium155-macos/0227-opaque-png-export-consistency.patch",
+      "sha256": "4c048a50930c3541a3bb9e4442ad7f18e94c04ebccf86c0cfbfc286b15a70751"
     }
   ]
 }

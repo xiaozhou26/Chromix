@@ -12,6 +12,7 @@ import hashlib
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 import json
 import math
+import os
 from pathlib import Path
 import struct
 import threading
@@ -354,6 +355,52 @@ def _assess(report):
     return sorted(set(errors)), sorted(set(gaps))
 
 
+class BackendDiagnostics:
+    """Sidecar evidence only; never contributes observations to the acceptance matrix."""
+    def __init__(self, path):
+        self.path = path
+        self.cases = []
+        self.current = None
+        self.errors = []
+
+    def record(self, event, **details):
+        row = {'at': datetime.now(timezone.utc).isoformat(),
+               'case': self.current['name'] if self.current else None, 'event': event, **details}
+        try:
+            with self.path.open('a', encoding='utf-8') as stream:
+                stream.write(json.dumps(row, ensure_ascii=True) + '\n')
+        except OSError as error:
+            message = str(error)
+            if message not in self.errors:
+                self.errors.append(message)
+
+    def start(self, name, args):
+        self.current = {'name': name, 'launch_args': args, 'status': 'launching'}
+        self.cases.append(self.current)
+        self.record('launch', args=args)
+
+    def failure(self, error):
+        if self.current is None or 'failure' in self.current:
+            return
+        failure = {'error': type(error).__name__ + ': ' + str(error),
+                   'last_command': self.current.get('last_command')}
+        self.current.update(status='failed', failure=failure)
+        # Snapshot before fixture disposal and browser.close() remove descendants.
+        try:
+            import psutil
+            processes = []
+            for process in [psutil.Process(), *psutil.Process().children(recursive=True)]:
+                try:
+                    processes.append(process.as_dict(attrs=['pid', 'ppid', 'name', 'status',
+                        'cmdline', 'create_time', 'cpu_times', 'memory_info']))
+                except psutil.Error as process_error:
+                    processes.append({'pid': process.pid, 'error': str(process_error)})
+            failure['processes'] = processes
+        except Exception as diagnostic_error:
+            failure['process_error'] = str(diagnostic_error)
+        self.record('failure', **failure)
+
+
 class FixtureProtocolError(RuntimeError):
     def __init__(self, method, error):
         super().__init__(method + ': ' + json.dumps(error))
@@ -363,7 +410,10 @@ class FixtureProtocolError(RuntimeError):
 
 class FixtureSession:
     """CDP target session in a context Playwright does not own or emulate."""
-    def __init__(self, root, target):
+    def __init__(self, root, target, diagnostics=None):
+        self.diagnostics = diagnostics
+        self.target = target
+        self.phase = 'initialization'
         self.root = root
         self.responses = {}
         self.sequence = 0
@@ -376,23 +426,46 @@ class FixtureSession:
             message = json.loads(event['message'])
             if 'id' in message:
                 self.responses[message['id']] = message
+            elif self.diagnostics and message.get('method') in (
+                    'Runtime.exceptionThrown', 'Runtime.executionContextCreated',
+                    'Runtime.executionContextDestroyed', 'Runtime.executionContextsCleared',
+                    'Inspector.targetCrashed', 'Page.frameNavigated', 'Page.frameStoppedLoading'):
+                self.diagnostics.record('target_event', target=self.target,
+                    session_id=self.session_id, message=message)
 
     def send(self, method, params=None):
         self.sequence += 1
         sequence = self.sequence
-        self.root.send('Target.sendMessageToTarget', {'sessionId': self.session_id,
-            'message': json.dumps({'id': sequence, 'method': method, 'params': params or {}})})
-        deadline = time.monotonic() + 30
-        while sequence not in self.responses:
-            if time.monotonic() >= deadline:
-                raise TimeoutError('CDP fixture timed out: ' + method)
-            # A protocol round trip pumps Playwright's synchronous event dispatcher.
-            self.root.send('Browser.getVersion')
-            time.sleep(0.01)
-        response = self.responses.pop(sequence)
-        if 'error' in response:
-            raise FixtureProtocolError(method, response['error'])
-        return response.get('result', {})
+        command = {'target': self.target, 'session_id': self.session_id,
+                   'sequence': sequence, 'phase': self.phase, 'method': method, 'params': params or {},
+                   'dispatcher_round_trips': 0}
+        if self.diagnostics:
+            self.diagnostics.current['last_command'] = command
+            self.diagnostics.record('command', **command)
+        try:
+            self.root.send('Target.sendMessageToTarget', {'sessionId': self.session_id,
+                'message': json.dumps({'id': sequence, 'method': method, 'params': params or {}})})
+            deadline = time.monotonic() + 30
+            while sequence not in self.responses:
+                if time.monotonic() >= deadline:
+                    raise TimeoutError('CDP fixture timed out: ' + method)
+                # A protocol round trip pumps Playwright's synchronous event dispatcher.
+                self.root.send('Browser.getVersion')
+                command['dispatcher_round_trips'] += 1
+                time.sleep(0.01)
+            response = self.responses.pop(sequence)
+            if 'error' in response:
+                raise FixtureProtocolError(method, response['error'])
+            if self.diagnostics:
+                self.diagnostics.record('command_completed', target=self.target,
+                    session_id=self.session_id, sequence=sequence)
+            return response.get('result', {})
+        except Exception as error:
+            if self.diagnostics:
+                self.diagnostics.record('command_failed', **command, error=str(error))
+                if isinstance(error, TimeoutError):
+                    self.diagnostics.failure(error)
+            raise
 
     def evaluate(self, expression, argument=None):
         if argument is not None:
@@ -426,12 +499,14 @@ class FixtureSession:
                       ' && document.readyState === "complete" && !!globalThis.chromixBackendProbe')
 
     def goto(self, url):
+        self.phase = 'navigation'
         response = self.send('Page.navigate', {'url': url})
         if response.get('errorText'):
             raise RuntimeError('fixture navigation: ' + response['errorText'])
         self.ready(url)
 
     def freeze_resume(self):
+        self.phase = 'freeze_resume'
         self.send('Emulation.setFocusEmulationEnabled', {'enabled': False})
         self.send('Page.setWebLifecycleState', {'state': 'frozen'})
         failed = False
@@ -468,7 +543,7 @@ class FixtureSession:
 
 
 @contextmanager
-def clean_fixture(instance):
+def clean_fixture(instance, diagnostics=None):
     root = instance.new_browser_cdp_session()
     context_id = None
     page = None
@@ -476,14 +551,16 @@ def clean_fixture(instance):
     try:
         context_id = root.send('Target.createBrowserContext', {'disposeOnDetach': True})['browserContextId']
         target = root.send('Target.createTarget', {'url': 'about:blank', 'browserContextId': context_id})['targetId']
-        page = FixtureSession(root, target)
+        page = FixtureSession(root, target, diagnostics)
         page.send('Page.enable')
         page.send('Runtime.enable')
         # No Playwright page session has installed media, touch or focus overrides.
         page.send('Emulation.setFocusEmulationEnabled', {'enabled': False})
         yield page, root, context_id
-    except BaseException:
+    except BaseException as error:
         failed = True
+        if diagnostics:
+            diagnostics.failure(error)
         raise
     finally:
         cleanup_errors = []
@@ -499,7 +576,8 @@ def clean_fixture(instance):
             raise cleanup_errors[0]
 
 
-def evaluate(page, method):
+def evaluate(page, method, phase=None):
+    page.phase = phase or method
     return page.evaluate('async method => await chromixBackendProbe[method]()', method)
 
 
@@ -516,25 +594,26 @@ def collect(page, root, context_id, origin, name):
         session.send('Input.dispatchTouchEvent', {'type': 'touchStart', 'touchPoints': [{'x': 30, 'y': 30}]})
         session.send('Input.dispatchTouchEvent', {'type': 'touchEnd', 'touchPoints': []})
     out['input_events'] = page.evaluate('backendInputEvents')
-    out['clocks']['window'] = evaluate(page, 'clocks')
+    out['clocks']['window'] = evaluate(page, 'clocks', 'clocks.window')
     session.freeze_resume()
-    out['clocks']['after_freeze'] = evaluate(page, 'clocks')
+    out['clocks']['after_freeze'] = evaluate(page, 'clocks', 'clocks.after_freeze')
     out['lifecycle_events'] = page.evaluate('chromixBackendProbe.lifecycle')
     history = session.send('Page.getNavigationHistory')
     entry = history['entries'][history['currentIndex']]['id']
     page.goto(origin + '/next')
     session.send('Page.navigateToHistoryEntry', {'entryId': entry})
     page.ready(origin + '/')
-    out['clocks']['history'] = evaluate(page, 'clocks')
+    out['clocks']['history'] = evaluate(page, 'clocks', 'clocks.history')
     out['history_events'] = page.evaluate('chromixBackendProbe.lifecycle')
     page.evaluate('globalThis.backendReloadMarker = true')
     session.send('Page.reload')
     page.wait_for('!globalThis.backendReloadMarker && document.readyState === "complete"'
                   ' && !!globalThis.chromixBackendProbe')
-    out['clocks']['reloaded'] = evaluate(page, 'clocks')
+    out['clocks']['reloaded'] = evaluate(page, 'clocks', 'clocks.reloaded')
     out['preferences_reloaded'] = evaluate(page, 'preferences')
     page.evaluate("() => {const f=document.createElement('iframe'); f.src='/child'; document.body.append(f);}")
     page.wait_for("!!document.querySelector('iframe')?.contentWindow.chromixBackendProbe")
+    page.phase = 'clocks.iframe'
     out['clocks']['iframe'] = page.evaluate("document.querySelector('iframe').contentWindow.chromixBackendProbe.clocks()")
     page.evaluate("document.querySelector('iframe').remove()")
     cross_site = origin.replace('127.0.0.1', 'localhost') + '/child'
@@ -549,9 +628,9 @@ def collect(page, root, context_id, origin, name):
         if time.monotonic() >= deadline:
             raise TimeoutError('cross-site frame process boundary was not observed')
         time.sleep(0.01)
-    with FixtureSession(root, target['targetId']) as frame:
+    with FixtureSession(root, target['targetId'], page.diagnostics) as frame:
         frame.ready(cross_site)
-        out['clocks']['oopif'] = evaluate(frame, 'clocks')
+        out['clocks']['oopif'] = evaluate(frame, 'clocks', 'clocks.oopif')
         out['oopif_observed'] = True
     page.evaluate("document.querySelector('iframe').remove()")
     out['clocks'].update(evaluate(page, 'workers'))
@@ -559,6 +638,7 @@ def collect(page, root, context_id, origin, name):
     out['capabilities'] = evaluate(page, 'capabilities')
     session.send('DOM.enable')
     session.send('CSS.enable')
+    page.phase = 'fonts'
     out['fonts'] = page.evaluate(FONT_NODES)
     document = session.send('DOM.getDocument')['root']['nodeId']
     nodes = session.send('DOM.querySelectorAll', {'nodeId': document, 'selector': '#p0-fonts > span'})['nodeIds']
@@ -577,7 +657,7 @@ def collect(page, root, context_id, origin, name):
     return out
 
 
-def run(browser, headed=False):
+def run(browser, headed=False, diagnostics=None):
     report = {'schema_version': 1, 'collected_at': datetime.now(timezone.utc).isoformat(),
         'browser_sha256': launch.pool.file_hash(browser), 'probe_sha256': launch.pool.file_hash(PROBE),
         'font_asset_sha256': launch.pool.file_hash(AUTHOR_FONT), 'runs': [], 'restricted_family': '', 'errors': [],
@@ -590,30 +670,48 @@ def run(browser, headed=False):
             capabilities = {}
             for name in CASES:
                 args = case_args(name, report['restricted_family'], capabilities)
+                if diagnostics:
+                    diagnostics.start(name, args)
                 instance = pw.chromium.launch(executable_path=str(browser.resolve()), headless=not headed,
                     chromium_sandbox=True, args=args, ignore_default_args=IGNORED_DEFAULT_ARGS)
                 try:
                     if report.setdefault('browser_version', instance.version) != instance.version:
                         raise ValueError('browser version changed across restarts')
-                    with clean_fixture(instance) as (page, root, context_id):
+                    with clean_fixture(instance, diagnostics) as (page, root, context_id):
                         page.goto(origin + '/')
                         observation = collect(page, root, context_id, origin, name)
                         observation['launch_args'] = args
                         report['runs'].append(observation)
+                        if diagnostics:
+                            diagnostics.current['status'] = 'collected'
+                            diagnostics.record('collected')
                         if name == 'native':
                             capabilities = observation['capabilities']
                             sample = next(s for s in observation['fonts'] if s['family'] == 'sans-serif' and s['text'] == 'Aa09')
                             report['restricted_family'] = next(f['familyName'] for f in sample['platformFonts']
                                 if f['glyphCount'] > 0 and f['familyName'] and ',' not in f['familyName'])
+                except Exception as error:
+                    if diagnostics:
+                        diagnostics.failure(error)
+                    raise
                 finally:
+                    if diagnostics:
+                        diagnostics.record('browser_close_started')
                     try:
                         instance.close()
+                        if diagnostics:
+                            diagnostics.record('browser_close_completed')
                     except Exception as error:
                         report['errors'].append('browser close: ' + str(error))
     except Exception as error:
+        if diagnostics:
+            diagnostics.failure(error)
         report['errors'].append(type(error).__name__ + ': ' + str(error))
     if launch.pool.file_hash(browser) != report['browser_sha256']:
         report['errors'].append('browser executable changed')
+    if diagnostics:
+        report['diagnostics'] = {'trace': diagnostics.path.name, 'cases': diagnostics.cases,
+                                 'errors': diagnostics.errors}
     report['errors'], report['gaps'] = assess(report)
     report['status'] = 'failed' if report['errors'] else 'incomplete' if report['gaps'] else 'passed'
     return report
@@ -627,8 +725,20 @@ def main(argv=None):
     args = parser.parse_args(argv)
     if not args.browser.is_file() or args.output.exists():
         parser.error('use an existing executable and a new report path')
-    report = run(args.browser, args.headed)
     args.output.parent.mkdir(parents=True, exist_ok=True)
+    trace = args.output.with_suffix('.cdp.jsonl')
+    if trace.exists():
+        parser.error('use a new CDP trace path')
+    # Playwright forwards browser stderr, launch PID and exit status to the suite log.
+    debug = os.environ.get('DEBUG')
+    os.environ['DEBUG'] = ','.join(filter(None, (debug, 'pw:browser')))
+    try:
+        report = run(args.browser, args.headed, BackendDiagnostics(trace))
+    finally:
+        if debug is not None:
+            os.environ['DEBUG'] = debug
+        else:
+            os.environ.pop('DEBUG', None)
     with args.output.open('x', encoding='utf-8') as stream:
         json.dump(report, stream, indent=2, ensure_ascii=True)
     print(json.dumps({'status': report['status'], 'errors': report['errors'], 'gaps': report['gaps']}))

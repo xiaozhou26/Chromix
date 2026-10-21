@@ -106,7 +106,20 @@ fi
 
 MAC155_CONTINUATION=0
 MAC155_HELPER=tools/validate_macos155_stage7_checkpoint.py
-if [ "${GITHUB_WORKFLOW:-}" = build-mac155-intel-controller-resume ] ||
+if [ "${GITHUB_WORKFLOW:-}" = build-mac155-intel-png-resume ] ||
+   [ "${GITHUB_WORKFLOW:-}" = build-mac155-arm64-png-resume ] ||
+   [ -e "$WORK/fingerprint-diagnostics/mac155-png-migration.json" ]; then
+  [ "$PLATFORM:$MAX_STAGES" = macos:8 ] || die "invalid mac155 PNG continuation configuration"
+  case "${GITHUB_WORKFLOW:-}:$ARCH" in
+    build-mac155-intel-png-resume:x64|build-mac155-arm64-png-resume:arm64) ;;
+    *) die "PNG continuation requires exact native architecture workflow; cold fallback forbidden" ;;
+  esac
+  MAC155_CONTINUATION=1
+  MAC155_HELPER=tools/migrate_macos155_png_snapshot.py
+  python3 "$REPO/$MAC155_HELPER" \
+    --repo "$REPO" --workdir "$WORK" --stage "$STAGE_INDEX" --phase before ||
+    die "mac155 PNG migration admission failed; cold fallback forbidden"
+elif [ "${GITHUB_WORKFLOW:-}" = build-mac155-intel-controller-resume ] ||
    [ -e "$WORK/fingerprint-diagnostics/mac155-intel-controller-migration.json" ]; then
   [ "$PLATFORM:$ARCH:$MAX_STAGES" = macos:x64:8 ] || die "invalid mac155 Intel controller continuation configuration"
   [ ! -e "$WORK/fingerprint-diagnostics/mac155-arm64-stage8-resume.json" ] || die "mixed ARM64/Intel controller receipts"

@@ -10,6 +10,8 @@ import shutil
 import struct
 import subprocess
 import sys
+import time
+from types import SimpleNamespace
 import urllib.error
 import urllib.request
 
@@ -292,10 +294,33 @@ def test_fixture_wait_does_not_hide_unrelated_errors(monkeypatch, error):
         assert observed.value is error
 
 
+@pytest.fixture
+def backend_clock(monkeypatch):
+    # Keep finite test clocks out of psutil, subprocess and the event loop.
+    clock = SimpleNamespace(monotonic=time.monotonic, sleep=time.sleep)
+    monkeypatch.setattr(backend, 'time', clock)
+    return clock
+
+
+@pytest.fixture
+def snapshot_child():
+    with subprocess.Popen([sys.executable, '-c', 'import sys; sys.stdin.read()'],
+                          stdin=subprocess.PIPE) as child:
+        try:
+            yield child
+        finally:
+            try:
+                child.communicate(timeout=5)
+            except subprocess.TimeoutExpired:
+                child.kill()
+                child.communicate()
+                raise
+
+
 @pytest.mark.parametrize('waiting', [False, True])
-def test_fixture_timeout_is_bounded(monkeypatch, waiting):
+def test_fixture_timeout_is_bounded(monkeypatch, waiting, backend_clock):
     ticks = iter([0, 31])
-    monkeypatch.setattr(backend.time, 'monotonic', lambda: next(ticks))
+    monkeypatch.setattr(backend_clock, 'monotonic', lambda: next(ticks))
     with backend.FixtureSession(FixtureRoot(), 'target') as page:
         if waiting:
             monkeypatch.setattr(page, 'evaluate', lambda _: False)
@@ -306,6 +331,166 @@ def test_fixture_timeout_is_bounded(monkeypatch, waiting):
             with pytest.raises(TimeoutError, match='Runtime.evaluate'):
                 page.evaluate('new Promise(() => {})')
             page.root.listeners['Target.receivedMessageFromTarget'] = page.listener
+
+
+def test_fixture_diagnostics_preserve_commands_and_results(tmp_path):
+    roots = [FixtureRoot(delayed=True), FixtureRoot(delayed=True)]
+    diagnostics = backend.BackendDiagnostics(tmp_path / 'backend.cdp.jsonl')
+    diagnostics.start('native', backend.case_args('native', '', {}))
+    for root, trace in zip(roots, (None, diagnostics)):
+        with backend.clean_fixture(root, trace) as (page, _, _):
+            assert backend.evaluate(page, 'clocks', 'clocks.window') == 42
+    assert roots[0].calls == roots[1].calls
+    rows = [json.loads(line) for line in diagnostics.path.read_text().splitlines()]
+    command = next(row for row in rows if row.get('method') == 'Runtime.evaluate')
+    assert command['case'] == 'native' and command['phase'] == 'clocks.window'
+    assert command['params']['expression'] == '(async method => await chromixBackendProbe[method]())("clocks")'
+    assert command['target'] == command['session_id'] == 'clean-target'
+    assert any(row['event'] == 'command_completed' and row['sequence'] == command['sequence'] for row in rows)
+    assert 'failure' not in diagnostics.current
+
+
+def test_fixture_timeout_diagnostics_precede_cleanup_and_do_not_retry(
+        monkeypatch, tmp_path, backend_clock, snapshot_child):
+    diagnostics = backend.BackendDiagnostics(tmp_path / 'backend.cdp.jsonl')
+    diagnostics.start('native', [])
+    root = FixtureRoot()
+    with pytest.raises(TimeoutError, match='CDP fixture timed out: Runtime.evaluate'):
+        with backend.clean_fixture(root, diagnostics) as (page, _, _):
+            page.phase = 'audio'
+            root.listeners['Target.receivedMessageFromTarget'] = lambda _: None
+            ticks = iter([0, 1, 31])
+            real_monotonic, real_sleep = time.monotonic, time.sleep
+            monkeypatch.setattr(backend_clock, 'monotonic', lambda: next(ticks))
+            monkeypatch.setattr(backend_clock, 'sleep', lambda _: None)
+            assert time.monotonic is real_monotonic and time.sleep is real_sleep
+            assert subprocess._time is real_monotonic
+            try:
+                page.evaluate('chromixBackendProbe.audio()')
+            finally:
+                root.listeners['Target.receivedMessageFromTarget'] = page.listener
+                failure = diagnostics.current['failure']
+                assert not any(method == 'Target.disposeBrowserContext' for method, _ in root.calls)
+    assert failure['last_command']['phase'] == 'audio'
+    assert failure['last_command']['dispatcher_round_trips'] == 1
+    assert failure['processes'][0]['pid'] == os.getpid()
+    child = next(process for process in failure['processes'] if process['pid'] == snapshot_child.pid)
+    assert child['ppid'] == os.getpid()
+    assert child['cmdline'] and 'cpu_times' in child and 'memory_info' in child
+    assert snapshot_child.poll() is None
+    assert 'process_error' not in failure
+    assert list(ticks) == []
+    messages = [json.loads(params['message']) for method, params in root.calls
+                if method == 'Target.sendMessageToTarget']
+    assert sum(message['method'] == 'Runtime.evaluate' for message in messages) == 1
+    assert sum(method == 'Browser.getVersion' for method, _ in root.calls) == 1
+    rows = [json.loads(line) for line in diagnostics.path.read_text().splitlines()]
+    assert sum(row['event'] == 'failure' for row in rows) == 1
+    assert root.calls[-1] == ('detach', {})
+
+
+def test_diagnostics_record_target_events_and_ignore_other_sessions(tmp_path):
+    diagnostics = backend.BackendDiagnostics(tmp_path / 'backend.cdp.jsonl')
+    diagnostics.start('native', [])
+    with backend.FixtureSession(FixtureRoot(), 'oopif', diagnostics) as page:
+        for session in ('unrelated', 'oopif'):
+            page._received({'sessionId': session, 'message': json.dumps({
+                'method': 'Runtime.exceptionThrown', 'params': {'exceptionDetails': {'text': 'owned'}}})})
+    events = [json.loads(line) for line in diagnostics.path.read_text().splitlines()]
+    assert len(events) == 2
+    assert events[-1]['event'] == 'target_event'
+    assert events[-1]['target'] == 'oopif'
+
+
+def test_navigation_protocol_error_is_not_a_terminal_diagnostic_failure(monkeypatch, tmp_path):
+    diagnostics = backend.BackendDiagnostics(tmp_path / 'backend.cdp.jsonl')
+    diagnostics.start('native', [])
+    root = FixtureRoot(response={'error': {'code': -32000, 'message': 'Execution context was destroyed.'}})
+    with backend.FixtureSession(root, 'target', diagnostics) as page:
+        monkeypatch.setattr(backend.time, 'sleep', lambda _: setattr(root, 'response', None))
+        page.wait_for('true')
+    assert 'failure' not in diagnostics.current
+    rows = [json.loads(line) for line in diagnostics.path.read_text().splitlines()]
+    assert any(row['event'] == 'command_failed' for row in rows)
+    assert not any(row['event'] == 'failure' for row in rows)
+
+
+def test_diagnostic_io_and_process_errors_do_not_mask_primary_failure(monkeypatch, tmp_path):
+    diagnostics = backend.BackendDiagnostics(tmp_path / 'missing' / 'backend.cdp.jsonl')
+    diagnostics.start('native', [])
+    monkeypatch.setitem(sys.modules, 'psutil', None)
+    with pytest.raises(ValueError, match='primary contract failure'):
+        with backend.clean_fixture(FixtureRoot(), diagnostics):
+            raise ValueError('primary contract failure')
+    assert diagnostics.errors
+    assert diagnostics.current['failure']['error'] == 'ValueError: primary contract failure'
+    assert diagnostics.current['failure']['process_error']
+
+
+def test_backend_diagnostics_cannot_satisfy_an_incomplete_matrix():
+    report = backend_report()
+    report['diagnostics'] = {'cases': deepcopy(report['runs'])}
+    report['runs'] = []
+    assert 'backend launch/restart matrix did not complete' in backend.assess(report)[0]
+
+
+def test_backend_run_keeps_failed_native_out_of_matrix(monkeypatch, tmp_path):
+    from types import SimpleNamespace
+    root = FixtureRoot()
+    root.version = '155.0.8059.39'
+    closed, launches = [], []
+    root.close = lambda: closed.append(True)
+    def launch(**kwargs):
+        launches.append(kwargs)
+        return root
+    @backend.contextmanager
+    def fake_playwright():
+        yield SimpleNamespace(chromium=SimpleNamespace(launch=launch))
+    @backend.contextmanager
+    def server():
+        yield 'http://owned'
+    def collect(page, *args):
+        page.phase = 'audio'
+        page.evaluate('chromixBackendProbe.audio()')
+        raise TimeoutError('CDP fixture timed out: Runtime.evaluate')
+    monkeypatch.setitem(sys.modules, 'playwright.sync_api', SimpleNamespace(sync_playwright=fake_playwright))
+    monkeypatch.setattr(backend, 'server', server)
+    monkeypatch.setattr(backend, 'collect', collect)
+    executable = tmp_path / 'browser'
+    executable.write_bytes(b'fixture')
+    diagnostics = backend.BackendDiagnostics(tmp_path / 'backend.cdp.jsonl')
+    report = backend.run(executable, diagnostics=diagnostics)
+    assert report['status'] == 'failed' and report['runs'] == []
+    assert report['errors'] == ['TimeoutError: CDP fixture timed out: Runtime.evaluate',
+                                'backend launch/restart matrix did not complete']
+    assert len(launches) == 1 and closed == [True]
+    assert launches[0]['args'] == backend.case_args('native', '', {})
+    assert launches[0]['ignore_default_args'] == backend.IGNORED_DEFAULT_ARGS
+    case = report['diagnostics']['cases'][0]
+    assert case['name'] == 'native' and case['status'] == 'failed'
+    assert case['failure']['last_command']['phase'] == 'audio'
+    assert json.loads(json.dumps(report))['diagnostics']['trace'] == 'backend.cdp.jsonl'
+
+
+@pytest.mark.parametrize('debug', [None, '', 'pw:api'])
+def test_backend_cli_enables_browser_stderr_without_changing_report(monkeypatch, tmp_path, debug):
+    executable = tmp_path / 'browser'
+    executable.touch()
+    output = tmp_path / 'output' / 'backend_policy.json'
+    if debug is None:
+        monkeypatch.delenv('DEBUG', raising=False)
+    else:
+        monkeypatch.setenv('DEBUG', debug)
+    report = {'status': 'failed', 'errors': ['primary contract failure'], 'gaps': []}
+    def run(browser, headed, diagnostics):
+        assert browser == executable and headed is False
+        assert os.environ['DEBUG'] == (debug + ',' if debug else '') + 'pw:browser'
+        assert diagnostics.path == output.with_suffix('.cdp.jsonl')
+        return report
+    monkeypatch.setattr(backend, 'run', run)
+    assert backend.main(['--browser', str(executable), '--output', str(output)]) == 1
+    assert json.loads(output.read_text()) == report
+    assert os.environ.get('DEBUG') == debug
 
 
 def test_freeze_resume_releases_focus_capture_then_restores_visibility(monkeypatch):
@@ -345,7 +530,7 @@ def test_freeze_resume_cleanup_preserves_interrupt_or_reports_resume_failure(mon
 
 
 @pytest.mark.parametrize('primary_failure', [False, True])
-def test_clean_fixture_real_cdp_lifecycle_async_and_cleanup(primary_failure):
+def test_clean_fixture_real_cdp_lifecycle_async_and_cleanup(primary_failure, tmp_path):
     executable = os.environ.get('CHROMIX_BACKEND_TEST_BROWSER')
     if not executable:
         pytest.skip('explicit Chromium executable required for CDP fixture integration')
@@ -357,8 +542,10 @@ def test_clean_fixture_real_cdp_lifecycle_async_and_cleanup(primary_failure):
             inspector = instance.new_browser_cdp_session()
             try:
                 before = inspector.send('Target.getBrowserContexts')['browserContextIds']
+                diagnostics = backend.BackendDiagnostics(tmp_path / 'integration.cdp.jsonl')
+                diagnostics.start('native', backend.case_args('native', '', {}))
                 def collect():
-                    with backend.clean_fixture(instance) as (page, root, context):
+                    with backend.clean_fixture(instance, diagnostics) as (page, root, context):
                         assert context not in before
                         page.goto(origin + '/')
                         assert page.evaluate('async value => {await new Promise(r => setTimeout(r, 20)); return value;}',
@@ -386,6 +573,10 @@ def test_clean_fixture_real_cdp_lifecycle_async_and_cleanup(primary_failure):
                 else:
                     collect()
                 assert inspector.send('Target.getBrowserContexts')['browserContextIds'] == before
+                rows = [json.loads(line) for line in diagnostics.path.read_text().splitlines()]
+                assert any(row['event'] == 'target_event' for row in rows)
+                assert any(row.get('phase') == 'clocks.oopif' for row in rows)
+                assert bool(diagnostics.current.get('failure')) is primary_failure
             finally:
                 inspector.detach()
         finally:
