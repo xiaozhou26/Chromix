@@ -549,3 +549,150 @@ def test_recovery_provisions_only_host_sdk_before_runtime_verification(arch):
     assert 'copy_dlls' not in script
     if arch == 'arm64':
         assert workflow['jobs']['verify-arm64'] == generator.fresh_workflow(arch)['jobs']['verify-arm64']
+
+
+def test_failed_verification_preserves_original_environment_json(tmp_path, monkeypatch):
+    repo, work = tmp_path / 'repo', tmp_path / 'work'
+    repo.mkdir()
+    out = work / 'src/out/Chromix'
+    out.mkdir(parents=True)
+    raw = b'SYSTEMROOT=C:\\Windows\0INCLUDE=wrong-root\0PATH=source-path\0\0'
+    for cpu in ('x86', 'x64'):
+        (out / ('environment.' + cpu)).write_bytes(raw)
+    origin, receipt = tmp_path / 'origin.json', tmp_path / 'download.json'
+    origin.write_text(json.dumps(recovery.manifest('x64')))
+    receipt.write_text(json.dumps(download('x64')))
+    report, evidence = tmp_path / 'report.json', tmp_path / 'environment.json'
+    monkeypatch.setattr(recovery, 'consumer', lambda arch: 'a' * 40)
+    monkeypatch.setattr(recovery, 'checkout_identity', lambda *args: ('git', {}))
+    monkeypatch.setattr(recovery, 'metadata', lambda *args: recovery.manifest('x64'))
+    monkeypatch.setattr(recovery, 'old_checkout', lambda *args: None)
+    monkeypatch.setattr(recovery, 'verify_source', mock.Mock(side_effect=ValueError('identity failed')))
+    import validate_windows_snapshot
+    monkeypatch.setattr(validate_windows_snapshot, 'Client', lambda *args: None)
+    monkeypatch.setattr(sys, 'argv', ['recovery', '--phase', 'verify', '--arch', 'x64', '--repo', str(repo),
+                                    '--workdir', str(work), '--origin', str(origin), '--download', str(receipt),
+                                    '--report', str(report), '--environment-report', str(evidence)])
+    assert recovery.main() == 1
+    data = json.loads(evidence.read_text())
+    assert data['status'] == 'failed' and data['error'] == 'identity failed'
+    assert data['donor'] == recovery.manifest('x64')
+    assert data['blocks']['environment.x64']['raw'].encode() == raw
+    assert data['blocks']['environment.x64']['sha256'] == hashlib.sha256(raw).hexdigest()
+    assert data['expected_roots']['vs'] == str(recovery.HOST_VS)
+    assert not report.exists()
+    assert (out / 'environment.x64').read_bytes() == raw
+
+
+@pytest.mark.parametrize('arch', ['x64', 'arm64'])
+def test_environment_evidence_upload_runs_even_if_restore_verification_fails(arch):
+    steps = generator.preflight_workflow(arch)['jobs']['build-1']['steps']
+    restore = next(step for step in steps if step.get('name') == 'Restore exact reviewed precompile donor')
+    upload = next(step for step in steps if step.get('name') == 'Upload preflight recovery evidence')
+    assert '--environment-report "$env:RUNNER_TEMP\\windows156-environment.json"' in restore['run']
+    assert upload['if'] == '${{ always() }}'
+    assert upload['with']['path'] == '${{ runner.temp }}/windows156-*.json'
+    assert steps.index(upload) == steps.index(restore) + 1
+
+
+def test_environment_mismatch_explains_actual_expected_and_missing(tmp_path):
+    raw = 'SYSTEMROOT=C:\\Windows\0INCLUDE=C:\\wrong\\include\0PATH=wrong\0\0'
+    (tmp_path / 'environment.x86').write_text(raw)
+    with pytest.raises(ValueError) as error:
+        recovery.environment_contract(tmp_path, 'x64')
+    assert 'actual_include' in str(error.value) and 'expected' in str(error.value) and 'missing' in str(error.value)
+    assert 'C:\\\\wrong' in str(error.value)
+
+
+def test_environment_evidence_records_missing_and_linked_blocks_without_following(tmp_path):
+    target = tmp_path / 'target'
+    target.write_text('not donor data')
+    (tmp_path / 'environment.x64').symlink_to(target)
+    evidence = recovery.environment_evidence(tmp_path, 'x64')
+    assert all('error' in entry and 'raw' not in entry for entry in evidence['blocks'].values())
+
+
+def test_exact_generator_serializes_environment_without_gn_path_rewriting(tmp_path):
+    import ast
+    import types
+    audit = json.loads(gzip.decompress((ROOT / 'tools/tests/fixtures/windows156_runtime_deploy.json.gz').read_bytes()))
+    source = audit['files']['build/toolchain/win/setup_toolchain.py']['text']
+    assert hashlib.sha256(source.encode()).hexdigest() == recovery.DEPLOY_SCRIPTS['build/toolchain/win/setup_toolchain.py']
+    tree = ast.parse(source)
+    functions = ast.Module(body=[node for node in tree.body if isinstance(node, ast.FunctionDef)
+                                and node.name in ('_ExtractImportantEnvironment', '_FormatAsEnvironmentBlock')], type_ignores=[])
+    import ntpath
+    namespace = {'os': types.SimpleNamespace(path=types.SimpleNamespace(dirname=ntpath.dirname, exists=lambda _: True), pathsep=';'),
+                 'sys': types.SimpleNamespace(executable='C:\\Python\\python.exe', platform='win32'), 're': recovery.re}
+    exec(compile(functions, 'pinned-setup-toolchain', 'exec'), namespace)
+    include = 'C:\\Program Files\\Microsoft Visual Studio\\2022\\Enterprise\\VC\\Tools\\MSVC\\14.44.35207\\include;'
+    env = namespace['_ExtractImportantEnvironment']('INCLUDE=' + include + '\nLIB=C:\\lib\nPATH=C:\\bin\nSYSTEMROOT=C:\\Windows\nTEMP=C:\\temp\nTMP=C:\\temp')
+    assert env['INCLUDE'] == include
+    assert env['PATH'] == 'C:\\Python;C:\\bin'
+    env['PATH'] = 'C:\\Windows\\System32;C:\\Windows\\SysWOW64;Arm64Unused;' + env['PATH']
+    block = namespace['_FormatAsEnvironmentBlock'](env)
+    assert block.endswith('\0\0') and 'INCLUDE=' + include + '\0' in block
+    (tmp_path / 'environment.x86').write_bytes(block.encode())
+    evidence = recovery.environment_evidence(tmp_path, 'x64')
+    assert evidence['blocks']['environment.x86']['raw'] == block
+
+
+@pytest.mark.parametrize('value', [
+    'C:\\Program Files\\Microsoft Visual Studio\\2022\\Enterprise\\VC\\Tools\\MSVC\\14.44.35207\\include\\..\\include',
+    'C:\\Program Files\\Microsoft Visual Studio\\2022\\Community\\VC\\Tools\\MSVC\\14.44.35207\\include',
+    '\\\\server\\share\\Microsoft Visual Studio\\2022\\Enterprise\\VC\\Tools\\MSVC\\14.44.35207\\include',
+    'C:\\PROGRA~1\\Microsoft Visual Studio\\2022\\Enterprise\\VC\\Tools\\MSVC\\14.44.35207\\include',
+    'C:Program Files\\Microsoft Visual Studio\\2022\\Enterprise\\VC\\Tools\\MSVC\\14.44.35207\\include',
+])
+def test_unproved_path_aliases_and_escape_are_not_accepted(tmp_path, value):
+    block = ('SYSTEMROOT=C:\\Windows\0INCLUDE=' + value
+             + ';C:\\Program Files (x86)\\Windows Kits\\10\\Include\\10.0.28000.0\\ucrt'
+             + ';C:\\Program Files (x86)\\Windows Kits\\10\\Include\\10.0.28000.0\\um\0'
+             + 'PATH=C:\\Windows\\System32;C:\\Windows\\SysWOW64;Arm64Unused\0\0')
+    for cpu in ('x86', 'x64'):
+        (tmp_path / ('environment.' + cpu)).write_text(block)
+    with pytest.raises(ValueError, match='source roots mismatch|unsafe donor environment path'):
+        recovery.environment_contract(tmp_path, 'x64')
+
+
+@pytest.mark.parametrize('arch', ['x64', 'arm64'])
+def test_authenticated_real_donor_environment_with_repeated_sdk_separators(tmp_path, arch):
+    fixture = json.loads(gzip.decompress((ROOT / 'tools/tests/fixtures/windows156_donor_environment.json.gz').read_bytes()))['donors'][arch]
+    assert fixture['origin'] == recovery.manifest(arch)
+    for name, entry in fixture['blocks'].items():
+        raw = entry['raw'].encode()
+        assert len(raw) == entry['size_in_bytes']
+        assert hashlib.sha256(raw).hexdigest() == entry['sha256']
+        (tmp_path / name).write_bytes(raw)
+        env = dict(item.split('=', 1) for item in entry['raw'].rstrip('\0').split('\0'))
+        assert '10\\\\include\\10.0.28000.0\\\\um' in env['INCLUDE']
+        assert '14.44.35207\\include' in env['INCLUDE']
+        old_normalized = {value.replace('\\', '/').rstrip('/').casefold() for value in env['INCLUDE'].split(';')}
+        assert 'c:/program files (x86)/windows kits/10/include/10.0.28000.0/um' not in old_normalized
+    before = recovery.output_identity(tmp_path)
+    recovery.environment_contract(tmp_path, arch)
+    assert recovery.output_identity(tmp_path) == before
+
+
+@pytest.mark.parametrize('replacement', [
+    r'C:\unknown\include', r'C:\Program Files (x86)\Windows Kits\10\include\10.0.26100.0\um',
+    r'C:\Program Files\Microsoft Visual Studio\2022\Community\VC\Auxiliary\VS\include',
+    r'C:\Program Files (x86)\Windows Kits\10\include\10.0.28000.0\um\..\um',
+    r'\\?\C:\Program Files (x86)\Windows Kits\10\include\10.0.28000.0\um',
+    r'C:\Program Files (x86)\Windows Kits\10\include\10.0.28000.0\um:stream',
+    r'C:\Program Files (x86)\Windows Kits\10\include\10.0.28000.0\um. ',
+])
+def test_real_donor_environment_rejects_extra_unknown_or_escaping_include(tmp_path, replacement):
+    fixture = json.loads(gzip.decompress((ROOT / 'tools/tests/fixtures/windows156_donor_environment.json.gz').read_bytes()))['donors']['x64']
+    for name, entry in fixture['blocks'].items():
+        text = entry['raw'].replace('\0LIB=', ';' + replacement + '\0LIB=')
+        (tmp_path / name).write_bytes(text.encode())
+    with pytest.raises(ValueError, match='source roots mismatch|unsafe donor environment path'):
+        recovery.environment_contract(tmp_path, 'x64')
+
+
+def test_environment_path_normalizes_only_literal_separator_case_and_trailing_separator():
+    path = r'C:\Program Files (x86)\Windows Kits\10\\include\10.0.28000.0\\um'
+    expected = 'c:/program files (x86)/windows kits/10/include/10.0.28000.0/um'
+    assert recovery.normalized_environment_path(path) == expected
+    assert recovery.normalized_environment_path(path.upper().replace('\\', '/') + '/') == expected

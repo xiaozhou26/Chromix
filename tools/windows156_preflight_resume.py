@@ -59,6 +59,7 @@ RECOVERY_FILES = frozenset({
     "tools/tests/fixtures/windows156_metagen.json.gz",
     "tools/tests/fixtures/windows156_preflight_source.json.gz",
     "tools/tests/fixtures/windows156_runtime_deploy.json.gz",
+    "tools/tests/fixtures/windows156_donor_environment.json.gz",
     HELPER,
     *[f".github/workflows/build-win-{arch}-156-{mode}.yml"
       for arch in DONORS for mode in ("fresh", "preflight-resume")],
@@ -199,6 +200,44 @@ HOST_VS = Path("C:/Program Files/Microsoft Visual Studio/2022/Enterprise")
 VC_RUNTIME = ("msvcp140.dll", "msvcp140_atomic_wait.dll", "vccorlib140.dll", "vcruntime140.dll")
 
 
+def environment_evidence(out: Path, arch: str) -> dict:
+    """Preserve the donor-generated blocks even when identity validation rejects them."""
+    report = {"schema_version": 1, "arch": arch, "donor": manifest(arch),
+              "expected_roots": {"windows": str(HOST_WINDOWS), "sdk": str(HOST_SDK), "vs": str(HOST_VS)},
+              "blocks": {}}
+    for cpu in (("x86", "x64", "arm64") if arch == "arm64" else ("x86", "x64")):
+        entry = {}
+        report["blocks"]["environment." + cpu] = entry
+        try:
+            path = files._file(out, "environment." + cpu)
+            with path.open("rb") as stream:
+                raw = stream.read(1024 * 1024 + 1)
+            if len(raw) > 1024 * 1024:
+                raise ValueError("environment block exceeds evidence size limit")
+            text = raw.decode("utf-8")
+            entries = [item for item in text.split("\0") if item]
+            entry.update(sha256=hashlib.sha256(raw).hexdigest(), size_in_bytes=len(raw), raw=text,
+                         entries=entries, fields=[{"name": item.partition("=")[0],
+                                                   "value": item.partition("=")[2]} for item in entries])
+        except (OSError, ValueError, RuntimeError) as error:
+            entry["error"] = str(error)
+    return report
+
+
+def normalized_environment_path(value: str) -> str:
+    """Fold separators/case only; never resolve traversal, devices, UNC or short names."""
+    path = value.replace("\\", "/")
+    if (path.startswith("//") or not (re.match(r"^[A-Za-z]:/", path) or path.startswith("/"))
+            or any(ord(char) < 32 for char in path)):
+        raise ValueError("unsafe donor environment path: " + repr(value))
+    prefix = path[:3] if re.match(r"^[A-Za-z]:/", path) else "/"
+    parts = [part for part in path[len(prefix):].split("/") if part]
+    if any(part in (".", "..") or part.endswith((".", " "))
+           or any(char in part for char in ':~"<>|?*') for part in parts):
+        raise ValueError("unsafe donor environment path: " + repr(value))
+    return (prefix + "/".join(parts)).casefold()
+
+
 def environment_contract(out: Path, arch: str) -> None:
     """Read GN's donor environment blocks as data, never as executable settings."""
     for cpu in (("x86", "x64", "arm64") if arch == "arm64" else ("x86", "x64")):
@@ -211,20 +250,36 @@ def environment_contract(out: Path, arch: str) -> None:
             if not separator or key.upper() in env:
                 raise ValueError("ambiguous GN environment block")
             env[key.upper()] = value
-        def normalized(value):
-            return value.replace("\\", "/").rstrip("/").casefold()
+        normalized = normalized_environment_path
         if normalized(env.get("SYSTEMROOT", "")) != normalized(str(HOST_WINDOWS)):
-            raise ValueError("donor Windows runtime root mismatch")
+            raise ValueError("donor Windows runtime root mismatch: " + json.dumps(
+                {"block": "environment." + cpu, "actual": env.get("SYSTEMROOT", ""),
+                 "expected": str(HOST_WINDOWS)}, sort_keys=True))
         includes = {normalized(value) for value in env.get("INCLUDE", "").split(";") if value}
         required = {normalized(str(HOST_VS / "VC/Tools/MSVC/14.44.35207/include")),
                     normalized(str(HOST_SDK / "Include/10.0.28000.0/ucrt")),
                     normalized(str(HOST_SDK / "Include/10.0.28000.0/um"))}
-        if not required <= includes:
-            raise ValueError("donor SDK/Visual Studio source roots mismatch")
+        allowed = required | {normalized(str(path)) for path in (
+            HOST_VS / "VC/Tools/MSVC/14.44.35207/ATLMFC/include",
+            HOST_VS / "VC/Auxiliary/VS/include",
+            HOST_SDK / "Include/10.0.28000.0/shared",
+            HOST_SDK / "Include/10.0.28000.0/winrt",
+            HOST_SDK / "Include/10.0.28000.0/cppwinrt",
+            HOST_SDK.parent / "NETFXSDK/4.8/include/um",
+        )}
+        if not required <= includes or includes - allowed:
+            raise ValueError("donor SDK/Visual Studio source roots mismatch: " + json.dumps(
+                {"block": "environment." + cpu, "actual_include": env.get("INCLUDE", ""),
+                 "actual_normalized": sorted(includes), "expected": sorted(required),
+                 "missing": sorted(required - includes), "unexpected": sorted(includes - allowed)}, sort_keys=True))
         runtime_dirs = [normalized(str(HOST_WINDOWS / "System32")),
                         normalized(str(HOST_WINDOWS / "SysWOW64")), "arm64unused"]
-        if [normalized(value) for value in env.get("PATH", "").split(";")[:3]] != runtime_dirs:
-            raise ValueError("donor GN runtime search directory mismatch")
+        actual_runtime = env.get("PATH", "").split(";")[:3]
+        if (len(actual_runtime) != 3 or actual_runtime[2] != "Arm64Unused"
+                or [normalized(value) for value in actual_runtime[:2]] != runtime_dirs[:2]):
+            raise ValueError("donor GN runtime search directory mismatch: " + json.dumps(
+                {"block": "environment." + cpu, "actual": env.get("PATH", "").split(";")[:3],
+                 "expected": runtime_dirs}, sort_keys=True))
 
 
 def dll_identity(path: Path, arch: str) -> str:
@@ -465,7 +520,9 @@ def main() -> int:
     parser.add_argument("--origin", type=Path)
     parser.add_argument("--download", type=Path)
     parser.add_argument("--report", type=Path, required=True)
+    parser.add_argument("--environment-report", type=Path)
     args = parser.parse_args()
+    evidence = None
     try:
         sha = consumer(args.arch)
         repo = files._safe(args.repo.resolve(), directory=True)
@@ -481,6 +538,12 @@ def main() -> int:
             work = files._safe(args.workdir.resolve(), directory=True)
             if work == repo or work.is_relative_to(repo) or repo.is_relative_to(work):
                 raise ValueError("source and checkout must be separate")
+            if args.environment_report:
+                destination = files._safe(args.environment_report.absolute(), missing=True)
+                if (destination.exists() or destination == args.report.absolute()
+                        or any(destination.is_relative_to(root) for root in (repo, work))):
+                    raise ValueError("environment evidence must be a new file outside checkout/source")
+                evidence = environment_evidence(work / "src/out/Chromix", args.arch)
             with tempfile.TemporaryDirectory(prefix="windows156-donor-inputs-") as temporary:
                 previous = Path(temporary).resolve()
                 old_checkout(git, repo, previous)
@@ -494,8 +557,15 @@ def main() -> int:
             json.dump(result, stream, sort_keys=True, indent=2)
         return 0
     except (OSError, ValueError, RuntimeError, subprocess.SubprocessError) as error:
+        if evidence is not None:
+            evidence.update(status="failed", error=str(error))
         print(f"Windows156 fixed preflight resume failed: {error}", file=sys.stderr)
         return 1
+    finally:
+        if evidence is not None:
+            evidence.setdefault("status", "verified")
+            with args.environment_report.open("x", encoding="utf-8") as stream:
+                json.dump(evidence, stream, indent=2, sort_keys=True)
 
 
 if __name__ == "__main__":

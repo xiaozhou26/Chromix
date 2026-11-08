@@ -74,7 +74,7 @@ jobs:
 
         python tools/windows156_preflight_resume.py --phase verify --arch arm64 --repo "$env:GITHUB_WORKSPACE" --workdir C:\c\chromix
         --origin "$env:RUNNER_TEMP\windows156-origin.json" --download "$env:RUNNER_TEMP\windows156-download.json" --report
-        "$env:RUNNER_TEMP\windows156-preflight-source.json"
+        "$env:RUNNER_TEMP\windows156-preflight-source.json" --environment-report "$env:RUNNER_TEMP\windows156-environment.json"
 
         if ($LASTEXITCODE -ne 0) { throw ''Unchanged source/GN/PGO verification failed; no cold fallback'' }
 
@@ -87,6 +87,14 @@ jobs:
         Copy-Item "$env:RUNNER_TEMP\windows156-*.json" $evidence
 
         '
+    - name: Upload preflight recovery evidence
+      if: ${{ always() }}
+      uses: actions/upload-artifact@v4
+      with:
+        name: preflight-win-arm64-attempt-${{ github.run_attempt }}
+        path: ${{ runner.temp }}/windows156-*.json
+        if-no-files-found: warn
+        retention-days: 14
     - name: Verify native process-tree cleanup
       shell: powershell
       timeout-minutes: 5

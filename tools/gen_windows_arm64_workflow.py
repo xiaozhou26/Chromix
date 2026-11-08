@@ -266,7 +266,7 @@ if ($LASTEXITCODE -ne 0) {{ throw 'Fixed donor archive authentication failed' }}
 ''' + fresh_extract() + f'''
 build/windows/ensure-windows-sdk.ps1 -Arch {arch} -ChromiumVersion 156.0.8078.79 -DownloadDir C:\\c -Install
 if ($LASTEXITCODE -ne 0) {{ throw 'Pinned runtime source SDK provisioning failed' }}
-python tools/windows156_preflight_resume.py --phase verify --arch {arch} --repo "$env:GITHUB_WORKSPACE" --workdir C:\\c\\chromix --origin "$env:RUNNER_TEMP\\windows156-origin.json" --download "$env:RUNNER_TEMP\\windows156-download.json" --report "$env:RUNNER_TEMP\\windows156-preflight-source.json"
+python tools/windows156_preflight_resume.py --phase verify --arch {arch} --repo "$env:GITHUB_WORKSPACE" --workdir C:\\c\\chromix --origin "$env:RUNNER_TEMP\\windows156-origin.json" --download "$env:RUNNER_TEMP\\windows156-download.json" --report "$env:RUNNER_TEMP\\windows156-preflight-source.json" --environment-report "$env:RUNNER_TEMP\\windows156-environment.json"
 if ($LASTEXITCODE -ne 0) {{ throw 'Unchanged source/GN/PGO verification failed; no cold fallback' }}
 $evidence = 'C:\\c\\chromix\\fingerprint-diagnostics\\preflight-resume'
 if (Test-Path $evidence) {{ throw 'Recovery evidence already exists' }}
@@ -277,6 +277,12 @@ Copy-Item "$env:RUNNER_TEMP\\windows156-*.json" $evidence
                 step.pop('env', None)
                 step['run'] = f'build\\windows\\ci-stage.ps1 -StageIndex {index} -MaxStages 12 -FreshNative -FromSynced'
             steps.append(step)
+            if label == 'Restore latest valid preserved snapshot':
+                steps.append({'name': 'Upload preflight recovery evidence', 'if': '${{ always() }}',
+                              'uses': 'actions/upload-artifact@v4',
+                              'with': {'name': f'preflight-win-{arch}-attempt-${{{{ github.run_attempt }}}}',
+                                       'path': '${{ runner.temp }}/windows156-*.json',
+                                       'if-no-files-found': 'warn', 'retention-days': 14}})
         job['steps'] = steps
     return result
 
