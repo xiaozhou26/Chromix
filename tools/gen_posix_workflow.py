@@ -264,11 +264,18 @@ def run_step(stage: int) -> str:
           if [ "$DEADLINE_EPOCH" -gt "$JOB_DEADLINE_EPOCH" ]; then
             DEADLINE_EPOCH="$JOB_DEADLINE_EPOCH"
           fi
-          build/posix/ci-stage.sh \\
+          if build/posix/ci-stage.sh \\
             --platform '${{ inputs.platform }}' --arch '${{ inputs.arch }}' \\
             --workdir "${RUNNER_TEMP}/chromix-build" \\
             --stage-index __STAGE__ --max-stages '${{ inputs['max-stages'] }}' __RESTORE_ARGS__--deadline-epoch "$DEADLINE_EPOCH" \\
-            2>&1 | tee "${RUNNER_TEMP}/chromix-logs/stage-__STAGE__.log"
+            2>&1 | tee "${RUNNER_TEMP}/chromix-logs/stage-__STAGE__.log"; then
+            exit 0
+          else
+            # Capture both statuses before any command overwrites PIPESTATUS.
+            codes=("${PIPESTATUS[@]}")
+            if [ "${codes[0]}" -ne 0 ]; then exit "${codes[0]}"; fi
+            exit "${codes[1]}"
+          fi
 """
     ).replace("__STAGE__", str(stage)).replace("__RESTORE_ARGS__", restore_args)
 
@@ -382,6 +389,10 @@ SNAPSHOT_ENSURE = """      - name: Verify handoff snapshot
         run: |
           set -euo pipefail
           SNAP="${RUNNER_TEMP}/chromix-build/.snapshot-stage-%(stage)d"
+          if [ '${{ inputs.platform }}' = linux ]; then
+            python3 tools/verify_linux_checkpoint.py --workdir "${RUNNER_TEMP}/chromix-build" --arch '${{ inputs.arch }}' \\
+              > "${RUNNER_TEMP}/chromix-logs/checkpoint-upload-identity-s%(stage)d.json"
+          fi
           test -d "$SNAP/p1"
           python3 tools/snapshot_volumes.py "$SNAP" |
             xargs -0 cat | zstd -d -T0 | python3 tools/verify_snapshot_tar.py
@@ -439,9 +450,9 @@ LINUX_FAILURE = """      - name: Upload failed Linux runtime bundle
           retention-days: 14
           compression-level: 0
 
-      - name: Preserve failed Linux compiled checkpoint
+      - name: Preserve latest failed Linux source/output checkpoint
         id: linux_runtime_checkpoint
-        if: ${{ !cancelled() && inputs.platform == 'linux' && steps.stage.outcome == 'failure' && steps.stage.outputs.compiled_ready == 'true' }}
+        if: ${{ !cancelled() && inputs.platform == 'linux' && steps.stage.outcome == 'failure' }}
         run: |
           set -euo pipefail
           WORK="${RUNNER_TEMP}/chromix-build"
@@ -465,6 +476,8 @@ LINUX_FAILURE = """      - name: Upload failed Linux runtime bundle
               if path.is_dir():
                   shutil.rmtree(path)
           PY
+          python3 tools/verify_linux_checkpoint.py --workdir "$WORK" --arch '${{ inputs.arch }}' \\
+            > "${RUNNER_TEMP}/chromix-logs/checkpoint-identity-s%(stage)d.json"
           bash build/posix/ci-parts.sh "$WORK" "$WORK/.snapshot-stage-%(stage)d"
           echo "upload_snapshot=true" >> "$GITHUB_OUTPUT"
 

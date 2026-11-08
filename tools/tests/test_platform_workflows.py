@@ -6,6 +6,7 @@ import shutil
 import subprocess
 import sys
 import tempfile
+import time
 import unittest
 
 import yaml
@@ -149,7 +150,7 @@ class LinuxFailedCheckpointTest(unittest.TestCase):
                 ('true', 'true', 'true', True, True),
                 ('true', 'true', '', False, True),
                 ('true', '', '', False, True),
-                ('', '', '', False, False),
+                ('', '', '', False, True),
             ):
                 state = {'stage.compiled_ready': compiled, 'stage.package_ready': package,
                          'stage.runtime_failed': runtime, 'stage.finished': 'false'}
@@ -163,6 +164,12 @@ class LinuxFailedCheckpointTest(unittest.TestCase):
             for step in (failed, preserve, verify, *uploads):
                 self.assertNotIn('continue-on-error', step)
             self.assertIn('snapshot_volumes.py', verify['run'])
+            self.assertIn('verify_linux_checkpoint.py', preserve['run'])
+            self.assertIn('verify_linux_checkpoint.py', verify['run'])
+            self.assertLess(preserve['run'].index('verify_linux_checkpoint.py'),
+                            preserve['run'].index('bash build/posix/ci-parts.sh'))
+            self.assertLess(verify['run'].index('verify_linux_checkpoint.py'),
+                            verify['run'].index('snapshot_volumes.py'))
             self.assertIn('zstd -d -T0 | python3 tools/verify_snapshot_tar.py', verify['run'])
             for index, step in enumerate(uploads, 1):
                 self.assertLess(steps.index(verify), steps.index(step))
@@ -217,7 +224,22 @@ class LinuxFailedCheckpointTest(unittest.TestCase):
         self.assertEqual(receipt['artifacts'][0]['id'], 2)
         self.assertEqual(receipt['stage'], 3)
 
-    def run_checkpoint(self, root, code=0):
+    def checkpoint_fixture(self, root, code=0):
+        tools = root / 'tools'
+        tools.mkdir(exist_ok=True)
+        (tools / 'verify_linux_checkpoint.py').write_text(
+            'import sys\n'
+            'from pathlib import Path\n'
+            'assert sys.argv[1:] == ["--workdir", str(Path.cwd() / "chromix-build"), "--arch", "x64"]\n'
+            f'sys.exit({code})\n')
+        (root / 'chromix-logs').mkdir(exist_ok=True)
+
+    def checkpoint_script(self):
+        return next(s['run'] for s in self.jobs['posix-3']['steps']
+                    if s.get('id') == 'linux_runtime_checkpoint').replace("${{ inputs.arch }}", 'x64')
+
+    def run_checkpoint(self, root, code=0, identity_code=0):
+        self.checkpoint_fixture(root, identity_code)
         helper = root / 'build/posix/ci-parts.sh'
         helper.parent.mkdir(parents=True, exist_ok=True)
         helper.write_text('#!/bin/sh\n'
@@ -228,11 +250,144 @@ class LinuxFailedCheckpointTest(unittest.TestCase):
                           f'exit {code}\n')
         output = root / 'output'
         output.write_text('')
-        script = next(s['run'] for s in self.jobs['posix-3']['steps']
-                      if s.get('id') == 'linux_runtime_checkpoint')
+        script = self.checkpoint_script()
         return subprocess.run(['bash', '-c', script], cwd=root, capture_output=True, text=True,
                               env={**os.environ, 'RUNNER_TEMP': str(root), 'GITHUB_OUTPUT': str(output)},
                               timeout=10)
+
+    def test_stage_pipeline_preserves_child_failure_and_tee_failure(self):
+        for number in range(1, 9):
+            stage = next(s for s in self.jobs[f'posix-{number}']['steps'] if s.get('id') == 'stage')
+            script = stage['run'].replace("${{ inputs.platform }}", 'linux').replace("${{ inputs.arch }}", 'x64')
+            script = script.replace("${{ inputs['max-stages'] }}", '8')
+            for child, tee, expected in ((17, 0, 17), (17, 19, 17), (0, 19, 19), (0, 0, 0)):
+                with self.subTest(stage=number, child=child, tee=tee), tempfile.TemporaryDirectory() as temp:
+                    root = Path(temp).resolve()
+                    helper = root / 'build/posix/ci-stage.sh'
+                    helper.parent.mkdir(parents=True)
+                    helper.write_text(f'#!/bin/sh\nprintf "child returned {child}\\n"\nexit {child}\n')
+                    helper.chmod(0o755)
+                    bindir = root / 'bin'
+                    bindir.mkdir()
+                    writer = bindir / 'tee'
+                    writer.write_text(f'#!/bin/sh\ncat\nexit {tee}\n')
+                    writer.chmod(0o755)
+                    result = subprocess.run(['bash', '-euo', 'pipefail', '-c', script], cwd=root,
+                                            env={**os.environ, 'PATH': str(bindir) + os.pathsep + os.environ['PATH'],
+                                                 'RUNNER_TEMP': str(root), 'CHROMIX_JOB_START_EPOCH': str(int(time.time()))},
+                                            capture_output=True, text=True, timeout=10)
+                    self.assertEqual(result.returncode, expected, result.stdout + result.stderr)
+                    self.assertIn(f'child returned {child}', result.stdout)
+
+    @unittest.skipUnless(all(shutil.which(tool) for tool in ('ninja', 'timeout', 'zstd')),
+                         'Ninja, GNU timeout and zstd required')
+    def test_real_ninja_failure_exits_shell_but_latest_objects_are_archived(self):
+        shells = ['bash', '/bin/bash'] if Path('/bin/bash').exists() else ['bash']
+        for number in range(1, 9):
+            for arch in ('x64', 'arm64'):
+                with self.subTest(stage=number, arch=arch), tempfile.TemporaryDirectory() as temp:
+                    root = Path(temp).resolve()
+                    work = root / 'chromix-build'
+                    src = work / 'src'
+                    out = src / 'out/Chromix'
+                    out.mkdir(parents=True)
+                    (src / '.chromix-source-ready').touch()
+                    (src / 'source.cc').write_text('latest verified source fixture')
+                    (out / 'args.gn').write_text(f'target_cpu = "{arch}"\n')
+                    (out / 'build.ninja').write_text(
+                        'rule object\n  command = printf latest-object > latest.o\n'
+                        'rule assertion\n  command = echo TSdeps-assertion >&2; exit 1\n'
+                        'build latest.o: object\n'
+                        'build chrome: assertion latest.o\n')
+                    for name in ('build/posix/ci-stage.sh', 'build/posix/upstream-cache.sh',
+                                 'build/posix/ci-parts.sh', 'tools/snapshot_volumes.py',
+                                 'tools/verify_snapshot_tar.py'):
+                        path = root / name
+                        path.parent.mkdir(parents=True, exist_ok=True)
+                        shutil.copy2(REPO / name, path)
+                    build = root / 'build/build.sh'
+                    build.write_text('#!/usr/bin/env bash\nset -euo pipefail\n'
+                                     'REPO="$PWD"; WORK="$1"; SRC="$1/src"; OUT="$SRC/out/Chromix"; ARCH="$2"\n'
+                                     'source "$REPO/build/posix/upstream-cache.sh"\n'
+                                     'CHROMIX_NINJA="$(command -v ninja)"\n'
+                                     'chromix_build_restored_target linux 1 chrome\n'
+                                     'touch "$WORK/incorrectly-continued"\n')
+                    build.chmod(0o755)
+                    self.checkpoint_fixture(root)
+                    gate = root / 'tools/verify_linux_checkpoint.py'
+                    gate.write_text(gate.read_text().replace('"x64"', repr(arch)))
+                    steps = self.jobs[f'posix-{number}']['steps']
+                    stage = next(s for s in steps if s.get('id') == 'stage')
+                    preserve = next(s for s in steps if s.get('id') == 'linux_runtime_checkpoint')
+                    verify = next(s for s in steps if s.get('id') == 'checkpoint')
+                    def render(script):
+                        script = script.replace("${{ inputs.platform }}", 'linux')
+                        script = script.replace("${{ inputs.arch }}", arch)
+                        script = script.replace("${{ inputs['max-stages'] }}", '8')
+                        # The fixture already holds the restored tree for each stage.
+                        return script.replace('--from-snapshot "${RUNNER_TEMP}/chromix-restore"', '')
+                    output = root / 'output'
+                    env = {**os.environ, 'RUNNER_TEMP': str(root), 'GITHUB_OUTPUT': str(output),
+                           'CHROMIX_JOB_START_EPOCH': str(int(time.time())),
+                           'CHROMIX_USE_UPSTREAM_CACHE': '0', 'CHROMIX_SNAPSHOT_VOLUME_BYTES': '65536'}
+                    shell = shells[number % len(shells)]
+                    failed = subprocess.run([shell, '-euo', 'pipefail', '-c', render(stage['run'])],
+                                            cwd=root, env=env, capture_output=True, text=True, timeout=30)
+                    self.assertEqual(failed.returncode, 1, failed.stdout + failed.stderr)
+                    self.assertIn('build script failed at stage ' + str(number) + ' (exit 1)', failed.stdout)
+                    self.assertIn('TSdeps-assertion', failed.stdout)
+                    self.assertFalse((work / 'incorrectly-continued').exists())
+                    self.assertEqual(output.read_text(), 'status=running\nfinished=false\n')
+                    self.assertTrue(self.allowed(preserve, **{'stage.finished': 'false'}))
+                    keep = ('src/source.cc', 'src/out/Chromix/latest.o', 'src/out/Chromix/args.gn',
+                            'src/out/Chromix/build.ninja', 'src/out/Chromix/.ninja_log')
+                    before = {name: ((work / name).read_bytes(), (work / name).stat().st_mtime_ns) for name in keep}
+                    packed = subprocess.run([shell, '-c', render(preserve['run'])], cwd=root, env=env,
+                                            capture_output=True, text=True, timeout=30)
+                    self.assertEqual(packed.returncode, 0, packed.stdout + packed.stderr)
+                    checked = subprocess.run([shell, '-c', render(verify['run'])], cwd=root, env=env,
+                                             capture_output=True, text=True, timeout=30)
+                    self.assertEqual(checked.returncode, 0, checked.stdout + checked.stderr)
+                    volume = work / f'.snapshot-stage-{number}/p1/tree.tar.zst.001'
+                    archive_bytes = volume.read_bytes()
+                    restored = root / 'restored'
+                    unpacked = subprocess.run([sys.executable, str(REPO / 'tools/restore_posix_snapshot.py'),
+                                               str(work / f'.snapshot-stage-{number}'), str(restored)],
+                                              env=env, capture_output=True, text=True, timeout=30)
+                    self.assertEqual(unpacked.returncode, 0, unpacked.stdout + unpacked.stderr)
+                    for name, state in before.items():
+                        self.assertEqual(((restored / name).read_bytes(), (restored / name).stat().st_mtime_ns), state)
+                    volume.parent.mkdir(parents=True, exist_ok=True)
+                    volume.write_bytes(archive_bytes[:-1])
+                    rejected = subprocess.run([shell, '-c', render(verify['run'])], cwd=root, env=env,
+                                              capture_output=True, text=True, timeout=30)
+                    self.assertNotEqual(rejected.returncode, 0)
+                    self.assertEqual(failed.returncode, 1)
+                    for upload in (s for s in steps if s.get('name', '').startswith('Upload tree part')):
+                        self.assertFalse(self.allowed(upload, **{'linux_runtime_checkpoint.upload_snapshot': 'true',
+                                                                 'checkpoint_outcome': 'failure'}))
+
+    def test_identity_failure_never_packs_or_exposes_upload_output(self):
+        with tempfile.TemporaryDirectory(prefix='linux identity refused ') as temp:
+            root = Path(temp)
+            work = root / 'chromix-build'
+            (work / 'src/out/Default/obj').mkdir(parents=True)
+            object_file = work / 'src/out/Default/obj/latest.o'
+            object_file.write_bytes(b'latest compiler output')
+            result = self.run_checkpoint(root, identity_code=19)
+            self.assertEqual(result.returncode, 19, result.stdout + result.stderr)
+            self.assertFalse((work / 'snapshot-called').exists())
+            self.assertEqual((root / 'output').read_text(), '')
+            self.assertEqual(object_file.read_bytes(), b'latest compiler output')
+            verify = next(s for s in self.jobs['posix-3']['steps'] if s.get('id') == 'checkpoint')
+            script = verify['run'].replace("${{ inputs.platform }}", 'linux').replace("${{ inputs.arch }}", 'x64')
+            checked = subprocess.run(['bash', '-c', script], cwd=root, capture_output=True, text=True,
+                                     env={**os.environ, 'RUNNER_TEMP': str(root)}, timeout=10)
+            self.assertEqual(checked.returncode, 19, checked.stdout + checked.stderr)
+            for upload in (s for s in self.jobs['posix-3']['steps']
+                           if s.get('name', '').startswith('Upload tree part')):
+                self.assertFalse(self.allowed(upload, **{'stage.upload_snapshot': 'true',
+                                                         'checkpoint_outcome': 'failure'}))
 
     def test_cleanup_precedes_snapshot_and_preserves_source_objects_caches_and_bundle(self):
         for code in (0, 23):
@@ -314,11 +469,15 @@ class LinuxFailedCheckpointTest(unittest.TestCase):
             (work / 'tooling/download_cache').symlink_to('../download_cache')
             before = {name: ((work / name).read_bytes(), (work / name).stat().st_mtime_ns,
                              (work / name).stat().st_mode) for name in payloads}
-            script = next(s['run'] for s in self.jobs['posix-3']['steps']
-                          if s.get('id') == 'linux_runtime_checkpoint')
+            self.checkpoint_fixture(root)
+            for name in ('ci-parts.sh', 'restore-snapshot.sh'):
+                path = root / 'build/posix' / name
+                path.parent.mkdir(parents=True, exist_ok=True)
+                shutil.copy2(REPO / 'build/posix' / name, path)
+            script = self.checkpoint_script()
             env = {**os.environ, 'RUNNER_TEMP': temp, 'GITHUB_OUTPUT': str(root / 'output'),
                    'CHROMIX_SNAPSHOT_VOLUME_BYTES': '65536'}
-            result = subprocess.run(['bash', '-c', script], cwd=REPO, env=env,
+            result = subprocess.run(['bash', '-c', script], cwd=root, env=env,
                                     capture_output=True, text=True, timeout=30)
             self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
             self.assertEqual((root / 'output').read_text(), 'upload_snapshot=true\n')

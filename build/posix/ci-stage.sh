@@ -215,12 +215,15 @@ else
   die "neither timeout nor gtimeout is available"
 fi
 
-set +e
-"$TIMEOUT" -k 7m -s SIGTERM "${NINJA_BUDGET}m" \
-  env CHROMIX_SKIP_DEPS=1 CHROMIX_WORKDIR="$WORK" \
-    "$BUILD_SCRIPT" "$WORK" "$ARCH"
-RC=$?
-set -e
+# Guard the external process, not a sourced function: child errexit stays enabled.
+RC=0
+if "$TIMEOUT" -k 7m -s SIGTERM "${NINJA_BUDGET}m" \
+    env CHROMIX_SKIP_DEPS=1 CHROMIX_WORKDIR="$WORK" \
+      "$BUILD_SCRIPT" "$WORK" "$ARCH"; then
+  :
+else
+  RC=$?
+fi
 if [ "$RC" -eq 124 ]; then
   handoff "deadline reached after ${NINJA_BUDGET}m"
 elif [ "$RC" -ne 0 ]; then
