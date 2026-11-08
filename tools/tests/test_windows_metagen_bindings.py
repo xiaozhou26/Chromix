@@ -1,6 +1,7 @@
 """Cross-platform contracts for runner-local Windows V8 metagen dependencies."""
 import gzip
 import hashlib
+import io
 import json
 from pathlib import Path
 import struct
@@ -16,6 +17,7 @@ from tools import install_windows_metagen_bindings as bindings
 ROOT = Path(__file__).resolve().parents[2]
 FILES = {"__init__.py": b"# pinned LLVM package\n", "cindex.py": b"# pinned cindex\n"}
 HASHES = {name: hashlib.sha256(data).hexdigest() for name, data in FILES.items()}
+LLVM_HASHES = dict(bindings.HASHES)
 
 
 def pe_dll(machine=bindings.AMD64):
@@ -126,28 +128,28 @@ class WindowsMetagenBindingsTest(unittest.TestCase):
         source = self.src / bindings.SOURCE_PACKAGES[0]
         self.package(source)
         with mock.patch.object(bindings, "fetch_package", side_effect=AssertionError("unexpected network")):
-            self.assertEqual(bindings.provision(self.src, self.site, download=True), str(source))
+            self.assertEqual(bindings.provision(self.src, self.site, library=self.library, download=True), str(source))
             before = {p: p.stat().st_mtime_ns for p in (self.site / "clang").iterdir()}
-            self.assertEqual(bindings.provision(self.src, self.site, download=False), "already_installed")
+            self.assertEqual(bindings.provision(self.src, self.site, library=self.library, download=False), "already_installed")
             self.assertEqual(before, {p: p.stat().st_mtime_ns for p in before})
         self.assertEqual(self.library.read_bytes(), pe_dll())
 
     def test_each_fresh_runner_gets_bindings_even_with_source_snapshot(self):
         self.package(self.src / bindings.SOURCE_PACKAGES[1])
         for site in (self.site, self.root / "next runner/Lib/site-packages"):
-            bindings.provision(self.src, site, download=False)
+            bindings.provision(self.src, site, library=self.src / "third_party/llvm-libclang/bin/libclang.dll", download=False)
             self.assertEqual(bindings.read_package(site / "clang"), FILES)
 
     def test_download_requires_opt_in(self):
         with mock.patch.object(bindings, "fetch_package") as fetch:
             with self.assertRaisesRegex(ValueError, "explicitly allow"):
-                bindings.provision(self.src, self.site, download=False)
+                bindings.provision(self.src, self.site, library=self.library, download=False)
             fetch.assert_not_called()
         self.assertFalse(self.site.exists())
 
     def test_missing_package_uses_only_pinned_python_files(self):
         with mock.patch.object(bindings, "fetch_package", return_value=FILES):
-            self.assertIn(bindings.LLVM_COMMIT, bindings.provision(self.src, self.site, download=True))
+            self.assertIn(bindings.LLVM_COMMIT, bindings.provision(self.src, self.site, library=self.library, download=True))
         self.assertEqual(set(p.name for p in (self.site / "clang").iterdir()), set(FILES))
         self.assertEqual(self.library.read_bytes(), pe_dll())
 
@@ -171,10 +173,81 @@ class WindowsMetagenBindingsTest(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, 'redirects'):
             bindings.NoRedirect().redirect_request(None, None, 302, '', {}, 'https://elsewhere')
 
+    def test_fresh_download_ignores_bindings_from_a_different_toolchain(self):
+        self.source156()
+        other = self.src / bindings.SOURCE_PACKAGES[1]
+        self.package(other)
+        self.put(other / "cindex.py", b"# Chromium bundled bindings, not LLVM 23.1.0\n")
+        before = {p.name: p.read_bytes() for p in other.iterdir()}
+        target = (self.src / bindings.SOURCE_PACKAGES[0]).parent
+        with mock.patch.object(bindings.subprocess, "run", return_value=SimpleNamespace(
+                stdout=self.command().replace(str(self.site), str(target)))):
+            with mock.patch.object(bindings, "run_json", side_effect=[self.runtime(), {"api_preflight": "passed"}]):
+                with mock.patch.object(bindings, "fetch_package", return_value=FILES) as fetch:
+                    result = bindings.install(self.src, self.out, Path("ninja"), "156.0.8078.79", download=True)
+        fetch.assert_called_once_with()
+        self.assertEqual(result["origin"], "llvm-project@" + bindings.LLVM_COMMIT)
+        self.assertEqual(bindings.read_package(target / "clang"), FILES)
+        self.assertEqual(before, {p.name: p.read_bytes() for p in other.iterdir()})
+
+    def test_unrelated_toolchain_is_not_an_offline_bindings_source(self):
+        self.package(self.src / bindings.SOURCE_PACKAGES[1])
+        with mock.patch.object(bindings, "fetch_package") as fetch:
+            with self.assertRaisesRegex(ValueError, "explicitly allow"):
+                bindings.provision(self.src, self.site, library=self.library, download=False)
+            fetch.assert_not_called()
+        self.assertFalse(self.site.exists())
+
+    def test_bundled_action_uses_its_own_bindings_not_llvm_build(self):
+        other = self.src / bindings.SOURCE_PACKAGES[0]
+        self.package(other)
+        self.put(other / "cindex.py", b"# unrelated toolchain\n")
+        source = self.src / bindings.SOURCE_PACKAGES[1]
+        self.package(source)
+        library = self.src / "third_party/llvm-libclang/bin/libclang.dll"
+        with mock.patch.object(bindings, "fetch_package") as fetch:
+            self.assertEqual(bindings.provision(self.src, self.site, library=library, download=False), str(source))
+            fetch.assert_not_called()
+        self.assertEqual(bindings.read_package(self.site / "clang"), FILES)
+
+    def test_download_rejects_crlf_mutation_before_any_deployment(self):
+        opener = mock.Mock()
+        def response(url, timeout):
+            reply = mock.MagicMock()
+            reply.__enter__.return_value = reply
+            reply.status = 200
+            reply.geturl.return_value = url
+            data = FILES[url.rsplit("/", 1)[1]]
+            if url.endswith("cindex.py"):
+                data = data.replace(b"\n", b"\r\n")
+            reply.read.side_effect = io.BytesIO(data).read
+            return reply
+        opener.open.side_effect = response
+        with mock.patch.object(bindings.urllib.request, "build_opener", return_value=opener):
+            with self.assertRaisesRegex(ValueError, "SHA256 mismatch: https://raw.githubusercontent.com/") as error:
+                bindings.provision(self.src, self.site, library=self.library, download=True)
+        self.assertIn("expected=" + HASHES["cindex.py"], str(error.exception))
+        self.assertIn("actual=" + bindings.digest(FILES["cindex.py"].replace(b"\n", b"\r\n")), str(error.exception))
+        self.assertFalse(self.site.exists())
+
+    def test_windows_text_mode_source_is_rejected_not_normalized(self):
+        source = self.src / bindings.SOURCE_PACKAGES[0]
+        self.package(source)
+        path = source / "cindex.py"
+        with path.open("w", encoding="utf-8", newline="\r\n") as stream:
+            stream.write(FILES["cindex.py"].decode())
+        self.assertEqual(path.read_bytes(), FILES["cindex.py"].replace(b"\n", b"\r\n"))
+        with mock.patch.object(bindings, "fetch_package") as fetch:
+            with self.assertRaisesRegex(ValueError, "SHA256 mismatch") as error:
+                bindings.provision(self.src, self.site, library=self.library, download=True)
+            fetch.assert_not_called()
+        self.assertIn(str(path), str(error.exception))
+        self.assertFalse(self.site.exists())
+
     def test_hash_mismatch_fails_before_writes(self):
         with mock.patch.object(bindings, "fetch_package", return_value=dict(FILES, **{"cindex.py": b"bad"})):
             with self.assertRaisesRegex(ValueError, "SHA256"):
-                bindings.provision(self.src, self.site, download=True)
+                bindings.provision(self.src, self.site, library=self.library, download=True)
         self.assertFalse(self.site.exists())
 
     def test_unverified_source_cannot_silently_fall_back_to_network(self):
@@ -183,21 +256,21 @@ class WindowsMetagenBindingsTest(unittest.TestCase):
         (source / "cindex.py").write_bytes(b"wrong revision")
         with mock.patch.object(bindings, "fetch_package") as fetch:
             with self.assertRaisesRegex(ValueError, "SHA256"):
-                bindings.provision(self.src, self.site, download=True)
+                bindings.provision(self.src, self.site, library=self.library, download=True)
             fetch.assert_not_called()
 
     def test_old_host_bindings_replaced_and_stale_bytecode_removed(self):
         self.put(self.site / "clang/cindex.py", b"old clang 21")
         self.put(self.site / "clang/__pycache__/cindex.pyc", b"old bytecode")
         self.package(self.src / bindings.SOURCE_PACKAGES[0])
-        bindings.provision(self.src, self.site, download=False)
+        bindings.provision(self.src, self.site, library=self.library, download=False)
         self.assertEqual(bindings.read_package(self.site / "clang"), FILES)
         self.assertFalse((self.site / "clang/__pycache__").exists())
 
     def test_pypi_libclang_native_directory_never_overwritten(self):
         self.put(self.site / "clang/native/libclang.dll", b"PyPI libclang 17")
         with self.assertRaisesRegex(ValueError, "bundled runtime"):
-            bindings.provision(self.src, self.site, download=True)
+            bindings.provision(self.src, self.site, library=self.library, download=True)
         self.assertEqual((self.site / "clang/native/libclang.dll").read_bytes(), b"PyPI libclang 17")
 
     def test_symlink_and_hardlink_destinations_refused(self):
@@ -210,13 +283,13 @@ class WindowsMetagenBindingsTest(unittest.TestCase):
         except OSError as error:
             self.skipTest(f"host does not permit directory symlinks: {error}")
         with self.assertRaisesRegex(ValueError, "linked"):
-            bindings.provision(self.src, self.site, download=False)
+            bindings.provision(self.src, self.site, library=self.library, download=False)
         (self.site / "clang").unlink()
         (self.site / "clang").mkdir()
         self.put(external / "cindex.py", b"foreign")
         (self.site / "clang/cindex.py").hardlink_to(external / "cindex.py")
         with self.assertRaisesRegex(ValueError, "destination"):
-            bindings.provision(self.src, self.site, download=False)
+            bindings.provision(self.src, self.site, library=self.library, download=False)
         self.assertEqual((external / "cindex.py").read_bytes(), b"foreign")
 
     def test_rebase_only_exact_donor_dll_and_preserve_site_argument(self):
@@ -451,6 +524,52 @@ class WindowsMetagenBindingsTest(unittest.TestCase):
         for name, text in fixture["files"].items():
             self.put(self.script.parent / name, text.encode())
         return fixture
+
+    def test_official_llvm23_bytes_survive_windows_deployment(self):
+        fixture = self.source156()["llvm_source"]
+        self.assertEqual(fixture["tag"], "llvmorg-23.1.0")
+        self.assertEqual(fixture["tag_object"], "9b0f9b1eb4a233717c6ed014cff6f8a7c65512de")
+        self.assertEqual(fixture["commit"], bindings.LLVM_COMMIT)
+        self.assertEqual(set(fixture["files"]), set(LLVM_HASHES))
+        files = {}
+        for name, info in fixture["files"].items():
+            data = info["text"].encode("utf-8")
+            self.assertEqual(len(data), info["size"])
+            self.assertEqual(bindings.digest(data), LLVM_HASHES[name])
+            self.assertEqual(info["sha256"], LLVM_HASHES[name])
+            self.assertEqual(hashlib.sha1(b"blob " + str(len(data)).encode() + b"\0" + data).hexdigest(), info["git_blob"])
+            self.assertNotIn(b"\r", data)
+            files[name] = data
+        opener = mock.Mock()
+        def response(url, timeout):
+            name = url.rsplit("/", 1)[1]
+            self.assertEqual(url, fixture["files"][name]["url"])
+            reply = mock.MagicMock()
+            reply.__enter__.return_value = reply
+            reply.status = 200
+            reply.geturl.return_value = url
+            reply.read.side_effect = io.BytesIO(files[name]).read
+            return reply
+        opener.open.side_effect = response
+        path_open = Path.open
+        def windows_open(path, mode="r", *args, **kwargs):
+            if "b" not in mode:
+                kwargs.setdefault("newline", "\r\n")
+            return path_open(path, mode, *args, **kwargs)
+        target = (self.src / bindings.SOURCE_PACKAGES[0]).parent
+        self.package(self.src / bindings.SOURCE_PACKAGES[1])
+        for name, data in files.items():
+            self.put(target / "clang" / name, data.replace(b"\n", b"\r\n"))
+        self.put(target / "clang/__pycache__/cindex.pyc", b"stale")
+        with mock.patch.object(bindings, "HASHES", LLVM_HASHES):
+            with mock.patch.object(bindings.urllib.request, "build_opener", return_value=opener):
+                with mock.patch.object(Path, "open", windows_open):
+                    origin = bindings.provision(self.src, target, library=self.library, download=True)
+            self.assertEqual(origin, "llvm-project@" + bindings.LLVM_COMMIT)
+            self.assertEqual(bindings.read_package(target / "clang"), files)
+            self.assertFalse((target / "clang/__pycache__").exists())
+            self.assertEqual(bindings.provision(self.src, target, library=self.library, download=False), "already_installed")
+        self.assertEqual(opener.open.call_count, len(files))
 
     def test_156_real_scripts_and_llvm23_pins_are_exact(self):
         fixture = self.source156()

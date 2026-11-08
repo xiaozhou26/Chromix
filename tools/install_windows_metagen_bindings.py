@@ -138,9 +138,11 @@ def local(path: Path) -> Path:
     return path
 
 
-def checked(data: bytes, name: str) -> bytes:
-    if len(data) > MAX_FILE or digest(data) != HASHES[name]:
-        raise ValueError(f"LLVM {LLVM_VERSION} bindings SHA256 mismatch: {name}")
+def checked(data: bytes, name: str, *, source: str | Path | None = None) -> bytes:
+    actual = digest(data)
+    if len(data) > MAX_FILE or actual != HASHES[name]:
+        raise ValueError(f"LLVM {LLVM_VERSION} bindings SHA256 mismatch: {source or name}; "
+                         f"expected={HASHES[name]}, actual={actual}, bytes={len(data)}")
     return data
 
 
@@ -151,7 +153,7 @@ def read_package(package: Path) -> dict[str, bytes]:
         path = local(package / name)
         if not path.is_file() or path.stat().st_nlink != 1 or path.stat().st_size > MAX_FILE:
             raise ValueError(f"invalid bindings file: {path}")
-        result[name] = checked(path.read_bytes(), name)
+        result[name] = checked(path.read_bytes(), name, source=path)
     return result
 
 
@@ -246,11 +248,11 @@ def fetch_package() -> dict[str, bytes]:
         with opener.open(url, timeout=60) as response:
             if response.status != 200 or response.geturl() != url:
                 raise ValueError("unexpected bindings download response")
-            package[name] = checked(response.read(MAX_FILE + 1), name)
+            package[name] = checked(response.read(MAX_FILE + 1), name, source=url)
     return package
 
 
-def provision(src: Path, bindings: Path, *, download: bool) -> str:
+def provision(src: Path, bindings: Path, *, library: Path, download: bool) -> str:
     package = local(bindings / "clang")
     if package.exists():
         unexpected = set(p.name for p in package.iterdir()) - set(HASHES) - {"__pycache__"}
@@ -268,13 +270,13 @@ def provision(src: Path, bindings: Path, *, download: bool) -> str:
             pass
     files = None
     origin = ""
-    for relative in SOURCE_PACKAGES:
-        candidate = src / relative
-        if candidate == package or not candidate.exists():
-            continue
+    # Chromium's separate llvm-libclang package need not match the action's DLL.
+    candidate = local(library.parent.parent / "bindings/python/clang")
+    if candidate not in [local(src / relative) for relative in SOURCE_PACKAGES]:
+        raise ValueError("metagen bindings source is not the selected source toolchain")
+    if candidate != package and candidate.exists():
         files = read_package(candidate)
         origin = str(candidate)
-        break
     if files is None:
         if not download:
             raise ValueError("missing pinned LLVM bindings; provide source bindings or explicitly allow --download")
@@ -387,7 +389,7 @@ def install(src: Path, out: Path, ninja: Path, version: str, *, download: bool) 
                         + repr(str(Path(__file__).resolve())) + ")['runtime_info']()))"], cwd=out)
     validate_paths(contract, src, runtime)
     library_hash = digest(contract["library"].read_bytes())
-    origin = provision(src, contract["bindings"], download=download)
+    origin = provision(src, contract["bindings"], library=contract["library"], download=download)
     result = run_json([contract["python"], "-I", "-S", "-B", str(Path(__file__).resolve()), "--probe",
                        "--bindings", str(contract["bindings"]), "--library", str(contract["library"]),
                        "--src", str(src), "--chromium-version", version], cwd=out)
