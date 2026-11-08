@@ -13,7 +13,7 @@ import pytest
 
 from tools import apply_restored_patches as arp
 from tools import patch_selection as selection
-from tools.tests.test_macos152_patch_selection import run_patch
+from tools.tests.test_macos152_patch_selection import clone_bf3221b_repo, run_patch
 from tools.tests.test_patch_selection import clone_repo, set_macos_pins
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -216,9 +216,12 @@ def test_optional_independent_154_full_stack(tmp_path, macos154_repo, substitute
 
 
 def test_current_macos_addition_is_isolated_and_keeps_historical_prefix(tmp_path):
-    repo = clone_repo(tmp_path)
-    old_repo = clone_repo(tmp_path / "historical", additions=False)
+    repo = clone_bf3221b_repo(tmp_path)
+    old_repo = clone_bf3221b_repo(tmp_path / "historical", additions=False)
     current, patches = selection.select(repo, "macos")
+    assert current["selection"]["version"] == VERSION
+    assert current["selection"]["core_commit"] == CORE
+    assert current["selection"]["platform_commit"] == PLATFORM
     old, old_patches = selection.select(old_repo, "macos")
     assert len(old_patches) == 224 and len(patches) == 225
     assert patches[:-1] == old_patches

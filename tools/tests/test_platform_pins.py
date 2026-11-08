@@ -74,9 +74,13 @@ def test_checked_in_target_pins(platform, version, core, overlay):
     assert result["Ungoogled" + pins.PLATFORMS[platform] + "Commit"] == overlay
     suffix = "-1" if platform == "linux" else "-1.1"
     assert result["Ungoogled" + pins.PLATFORMS[platform] + "Version"] == version + suffix
-    assert (pins.ROOT / "CHROMIUM_VERSION").read_text().strip() == LINUX_VERSION
-    assert (pins.ROOT / "UNGOOGLED_VERSION").read_text().strip() == LINUX_VERSION + "-1"
+    assert (pins.ROOT / "CHROMIUM_VERSION").read_text().strip() == "156.0.8078.79"
+    assert (pins.ROOT / "UNGOOGLED_VERSION").read_text().strip() == "156.0.8078.79-1"
     assert (pins.ROOT / "UNGOOGLED_WINDOWS_VERSION").read_text().strip() == "156.0.8078.79-1.1"
+    shared = pins.load_shared_pins(pins.ROOT)
+    assert shared["ChromiumVersion"] == "156.0.8078.79"
+    assert shared["UngoogledVersion"] == "156.0.8078.79-1"
+    assert shared["UngoogledCommit"] == "28a211ab4ab6b83d919966a4f58a6df23cf4fb29"
 
 
 @pytest.mark.parametrize("platform", pins.PLATFORMS)

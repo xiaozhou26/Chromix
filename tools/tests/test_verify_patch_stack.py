@@ -50,9 +50,10 @@ def test_reverse_forward_is_read_only_and_detects_old_source(tmp_path, newline):
     assert before == (path.read_bytes(), path.stat().st_mtime_ns)
 
 
-def test_real_new_and_deleted_files_declare_mode():
+@pytest.mark.parametrize('platform', ['linux', 'windows', 'macos'])
+def test_real_new_and_deleted_files_declare_mode(platform):
     repo = Path(__file__).resolve().parents[2]
-    _, patches = stack.load_stack(repo)
+    _, patches = stack.load_stack(repo, platform=platform)
     for name, _, entries in patches:
         for target, action, mode in entries:
             if action in ('create', 'delete'):

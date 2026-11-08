@@ -115,8 +115,9 @@ PLATFORM156_VERSIONS = {
 OVERRIDE156_ROOT = "patches/chromium156"
 ADDITIONS156_ROOT = "patches/chromium156-additions"
 MANIFEST156 = "build/patch-selection-156.json"
-# Selection stays disabled until the reviewed manifest's exact bytes are pinned.
-MANIFEST156_SHA256: str | None = None
+MANIFEST156_SHA256: str | None = "92f552bcfeb8eedc06e2173f2c02ed7e9afb65ad630bf11320a7e8a5191e79da"
+REVIEW156 = "patches/chromium156/manifest.json"
+REVIEW156_SHA256 = "580c39f70ce151473762c26d50eaf58316b3b9f9d5a04bdafdc07315fb4b8387"
 
 
 MACOS152_VERSION = "152.0.7977.82"
@@ -273,8 +274,9 @@ def validate_manifest156(manifest: object) -> dict:
     {version, commit, core_gitlink, additions}; additions is an ordered list
     of {path, sha256} under patches/chromium156-<platform> or the shared
     patches/chromium156-additions root. Shared paths must agree on SHA256
-    across platforms; their union is the exact shared inventory. Empty overrides
-    and additions allow an absent or empty directory, never unlisted files.
+    across platforms; their union is the exact shared inventory. Empty additions
+    allow an absent or empty directory. The override directory must also contain
+    the fixed, separately hash-bound REVIEW156 evidence and no unlisted files.
     """
     def fields(value, expected, label):
         if not isinstance(value, dict) or set(value) != set(expected):
@@ -375,7 +377,9 @@ def select156(repo: Path, platform: str, series: bytes, names: list[str]) -> tup
                 raise SelectionError("changed Chromium 156 patch: " + entry["path"])
 
     inventory("patches", manifest["base_patches"], base=True)
-    inventory(OVERRIDE156_ROOT, manifest["overrides"])
+    # The fixed review evidence is required, not a wildcard inventory exception.
+    review_identity = {"path": REVIEW156, "sha256": REVIEW156_SHA256}
+    inventory(OVERRIDE156_ROOT, [*manifest["overrides"], review_identity])
     shared = {}
     for target, entry in manifest["platforms"].items():
         root = OVERRIDE156_ROOT + "-" + target
@@ -390,6 +394,7 @@ def select156(repo: Path, platform: str, series: bytes, names: list[str]) -> tup
         "schema_version": 1, "version": VERSION156, "platform": platform,
         "core_commit": CORE156, "platform_commit": PLATFORM156_COMMITS[platform],
         "base_series_sha256": digest(series), "manifest": manifest_identity,
+        "review_manifest": review_identity,
         "core_gitlink": manifest["platforms"][platform]["core_gitlink"],
         "overrides": manifest["overrides"],
         "additions": {"schema_version": 1, "kind": manifest["kind"],

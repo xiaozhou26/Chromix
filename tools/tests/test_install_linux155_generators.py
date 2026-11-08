@@ -7,6 +7,8 @@ import struct
 import subprocess
 import tarfile
 import unittest
+from functools import partial
+from pathlib import Path
 from unittest import mock
 
 from tools import install_linux_generators as installer
@@ -30,7 +32,9 @@ class InstallLinux155GeneratorsTest(unittest.TestCase):
         self.fixture = prepare_tests.PrepareRestoredBuildTest()
         self.fixture.setUp()
         self.addCleanup(self.fixture.doCleanups)
-        self.fixture.fixture("linux", "arm64", host_arch="x64", linux_pins=generators.PINS155)
+        with mock.patch.object(prepare_tests, "install_linux_repo_fixture",
+                               partial(prepare_tests.install_linux_repo_fixture, historical_support=True)):
+            self.fixture.fixture("linux", "arm64", host_arch="x64", linux_pins=generators.PINS155)
         self.src, self.work, self.repo = self.fixture.src, self.fixture.work, self.fixture.fixture_repo
         self.downloads = self.work / "offline downloads"
         self.downloads.mkdir()
@@ -63,6 +67,24 @@ class InstallLinux155GeneratorsTest(unittest.TestCase):
             self.cached(key).write_bytes(data)
         self.patch(prepare, "host_identity", return_value=("linux", "x64"))
         self.network = self.patch(installer, "fetch_archive", side_effect=AssertionError("unexpected download"))
+
+    def test_support_platforms_keep_complete_bf3221b_identity(self):
+        historical = json.loads((Path(__file__).parent / "fixtures/windows155_repository.json").read_text())
+        self.assertEqual(historical["commit"], "bf3221bcfa08b652ff62a44f52ccce393ef1d351")
+        expected = json.loads(historical["files"]["build/upstream-cache.json"])
+        actual = json.loads((self.repo / "build/upstream-cache.json").read_text())
+        self.assertEqual({key: actual[key] for key in ("schema_version", "chromium_version", "ungoogled_commit")},
+                         {key: expected[key] for key in ("schema_version", "chromium_version", "ungoogled_commit")})
+        for platform in ("macos", "windows"):
+            self.assertEqual(actual["sources"][platform], expected["sources"][platform])
+            version_file = "CHROMIUM_" + platform.upper() + "_VERSION"
+            self.assertEqual((self.repo / version_file).read_text(), historical["files"][version_file])
+            for arch in ("x64", "arm64"):
+                pin, _ = restore.fetcher.load_manifest(platform, arch, root=self.repo)
+                self.assertEqual(pin["artifact"], expected["sources"][platform]["artifacts"][arch])
+        pins = prepare.load_pins(self.repo, "linux")
+        self.assertEqual(tuple(pins[key] for key in ("ChromiumVersion", "UngoogledCommit", "UngoogledLinuxCommit")),
+                         generators.PINS155)
 
     def patch(self, target, name, *args, **kwargs):
         patcher = mock.patch.object(target, name, *args, **kwargs)

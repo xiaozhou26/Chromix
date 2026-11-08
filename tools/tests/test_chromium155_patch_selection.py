@@ -16,7 +16,7 @@ import pytest
 
 from tools import apply_restored_patches as arp
 from tools import patch_selection as selection
-from tools.tests.test_macos152_patch_selection import run_patch
+from tools.tests.test_macos152_patch_selection import clone_bf3221b_repo, run_patch
 from tools.tests.test_macos154_patch_selection import predecessor_sections
 from tools.tests.test_patch_selection import clone_repo, set_platform_pins
 
@@ -269,16 +269,16 @@ def test_optional_independent_155_full_stack(tmp_path, repo155, substituted):
 
 @pytest.mark.parametrize("additions,expected", [(False, 224), (True, 231)])
 def test_windows155_manifest_presence_distinguishes_historical_and_current(tmp_path, additions, expected):
-    repo = clone_repo(tmp_path, additions=False)
-    if additions:
-        manifest = selection.WINDOWS155_ADDITIONS_MANIFEST
-        shutil.copy2(ROOT / manifest, repo / manifest)
-        shutil.copytree(ROOT / selection.WINDOWS155_ADDITIONS_ROOT,
-                        repo / selection.WINDOWS155_ADDITIONS_ROOT)
+    repo = clone_bf3221b_repo(tmp_path, additions=additions)
     identity, patches = selection.select(repo, "windows")
+    assert identity["selection"]["version"] == VERSION
+    assert identity["selection"]["core_commit"] == CORE
+    assert identity["selection"]["platform_commit"] == COMMITS["windows"]
     assert len(patches) == expected
     assert ("additions" in identity["selection"]) == additions
     if additions:
+        assert identity["selection"]["additions"]["manifest"]["sha256"] == (
+            "4e4b2c3655b2ba1c1f5b2601d5d467ee58f98e8f535214719f1f92c5016ebddd")
         assert patches[224][0] == "patches/chromium155-windows/0227-opaque-png-export-consistency.patch"
         assert patches[-1][0] == "patches/chromium155-windows/0233-renderer-timezone-webstring-api.patch"
         manifest = json.loads((repo / selection.WINDOWS155_ADDITIONS_MANIFEST).read_bytes())

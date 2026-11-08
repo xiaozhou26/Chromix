@@ -171,11 +171,30 @@ def test_macos152_checks_source_and_tooling_version(tmp_path, macos152_repo, whi
             selection.select(macos152_repo, "macos", **kwargs)
 
 
+def clone_bf3221b_repo(tmp_path, *, additions=True):
+    repo = clone_repo(tmp_path, additions=additions)
+    revision = "bf3221bcfa08b652ff62a44f52ccce393ef1d351"
+    paths = ["build/ungoogled-revisions.psd1", "CHROMIUM_VERSION",
+             "CHROMIUM_LINUX_VERSION", "CHROMIUM_WINDOWS_VERSION", "CHROMIUM_MACOS_VERSION"]
+    if additions:
+        paths += [selection.LINUX155_ADDITIONS_MANIFEST, selection.WINDOWS155_ADDITIONS_MANIFEST,
+                  selection.MACOS154_ADDITIONS_MANIFEST]
+    for name in paths:
+        raw = subprocess.run(["git", "-C", str(ROOT), "show", revision + ":" + name],
+                             check=True, capture_output=True, timeout=30).stdout
+        (repo / name).write_bytes(raw)
+    return repo
+
+
 def test_macos152_does_not_change_other_platform_or_legacy_selection(tmp_path):
-    repo = clone_repo(tmp_path)
+    repo = clone_bf3221b_repo(tmp_path)
+    before = {platform: selection.select(repo, platform) for platform in ("linux", "windows", None)}
+    assert before["linux"][0]["selection"]["version"] == selection.VERSION155
+    assert before["windows"][0]["selection"]["version"] == selection.VERSION155
+    assert "selection" not in before[None][0]
     shutil.rmtree(repo / selection.MACOS152_OVERRIDE_ROOT)
-    for platform in ("linux", "windows", None):
-        assert selection.select(repo, platform) == selection.select(ROOT, platform)
+    for platform, expected in before.items():
+        assert selection.select(repo, platform) == expected
     set_linux_version(repo, "152.0.7977.82")
     identity, patches = selection.select(repo, "linux")
     assert "selection" not in identity

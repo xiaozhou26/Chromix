@@ -22,7 +22,7 @@ LINUX153_PINS = ("153.0.8010.36", "dd8fb9b5c837982faf41ba58cd30a5664e77c329",
                  "a5ffa5e4a9fb722b97a5cf7966e29450a150c3dd")
 
 
-def install_linux_repo_fixture(repo, pins=LINUX153_PINS):
+def install_linux_repo_fixture(repo, pins=LINUX153_PINS, *, historical_support=False):
     version, core, linux = pins
     values = {"ChromiumVersion": version, "UngoogledVersion": version + "-1", "UngoogledCommit": core,
               "LinuxChromiumVersion": version, "LinuxUngoogledVersion": version + "-1",
@@ -59,6 +59,24 @@ def install_linux_repo_fixture(repo, pins=LINUX153_PINS):
         "@{\n" + "".join(f'  {key} = "{value}"\n' for key, value in values.items()) + "}\n")
     (repo / "build/upstream-cache.json").write_text(json.dumps({
         "schema_version": 1, "chromium_version": version, "ungoogled_commit": core, "sources": sources}))
+    if historical_support:
+        historical = json.loads((Path(__file__).parent / "fixtures/windows155_repository.json").read_text())
+        for relative, content in historical["files"].items():
+            destination = repo / relative
+            destination.parent.mkdir(parents=True, exist_ok=True)
+            destination.write_text(content)
+        revisions = repo / "build/ungoogled-revisions.psd1"
+        lines = revisions.read_text().splitlines(keepends=True)
+        for index, line in enumerate(lines):
+            key = line.strip().split(" = ", 1)[0]
+            if key in ("LinuxChromiumVersion", "LinuxUngoogledVersion", "LinuxUngoogledCommit",
+                       "UngoogledLinuxVersion", "UngoogledLinuxCommit"):
+                lines[index] = f'  {key} = "{values[key]}"\n'
+        revisions.write_text("".join(lines))
+        (repo / "CHROMIUM_LINUX_VERSION").write_text(version + "\n")
+        manifest = json.loads(historical["files"]["build/upstream-cache.json"])
+        manifest["sources"]["linux"] = sources["linux"]
+        (repo / "build/upstream-cache.json").write_text(json.dumps(manifest))
     return repo
 
 

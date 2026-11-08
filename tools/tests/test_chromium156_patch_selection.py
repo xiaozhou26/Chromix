@@ -1,8 +1,12 @@
-"""Strict 156 manifest fixtures are synthetic, not reviewed production patches."""
+"""Strict synthetic schema cases and authenticated production 156 source replay."""
 from __future__ import annotations
 
 import copy
+import gzip
+import hashlib
+import importlib.util
 import json
+import os
 from pathlib import Path
 import re
 import shutil
@@ -36,6 +40,7 @@ def manifest_fixture(repo):
     if override_root.exists():
         shutil.rmtree(override_root)
     override_root.mkdir()
+    shutil.copy2(ROOT / selection.REVIEW156, repo / selection.REVIEW156)
     overrides = []
     for original in base[:2]:
         name = selection.OVERRIDE156_ROOT + "/" + Path(original["path"]).name
@@ -376,6 +381,8 @@ def test_empty_reviewed_lists_do_not_require_git_empty_directories(repo156, monk
         shutil.rmtree(directory)
         if present:
             directory.mkdir()
+    (repo / selection.OVERRIDE156_ROOT).mkdir(exist_ok=True)
+    shutil.copy2(ROOT / selection.REVIEW156, repo / selection.REVIEW156)
     write_manifest(repo, manifest, monkeypatch)
     identity, patches = selection.select(repo, platform)
     assert len(patches) == 224
@@ -458,3 +465,169 @@ def test_cli_cannot_use_test_only_manifest_trust(repo156):
     assert result.returncode == 1
     assert not result.stdout
     assert "manifest" in result.stderr
+
+
+@pytest.fixture(params=tuple(selection.PLATFORM156_COMMITS))
+def real_repo156(tmp_path, request):
+    repo = clone_repo(tmp_path)
+    shutil.copy2(ROOT / selection.MANIFEST156, repo / selection.MANIFEST156)
+    platform = request.param
+    set_platform_pins(repo, platform, selection.VERSION156, selection.CORE156,
+                      selection.PLATFORM156_COMMITS[platform])
+    return repo, platform
+
+
+@pytest.mark.parametrize("platform,count", [("linux", 226), ("windows", 232), ("macos", 226)])
+def test_integrated_repository_selects_real_156_stack(platform, count):
+    identity, patches = selection.select(ROOT, platform)
+    assert identity["selection"]["version"] == selection.VERSION156
+    assert len(patches) == count
+    assert len([name for name, _ in patches if name.startswith(selection.OVERRIDE156_ROOT + "/")]) == 23
+    assert identity["selection"]["manifest"]["sha256"] == selection.MANIFEST156_SHA256
+    assert identity["selection"]["review_manifest"]["sha256"] == selection.REVIEW156_SHA256
+
+
+def test_production_manifest_matches_review_and_root224_evidence(real_repo156):
+    repo, platform = real_repo156
+    raw = (repo / selection.MANIFEST156).read_bytes()
+    assert selection.digest(raw) == selection.MANIFEST156_SHA256
+    manifest = selection.validate_manifest156(json.loads(raw))
+    raw_review = (repo / selection.REVIEW156).read_bytes()
+    assert selection.digest(raw_review) == selection.REVIEW156_SHA256
+    review = json.loads(raw_review)
+    root_report = json.loads((repo / "patches/chromium156-verification/root224-report.json").read_bytes())
+    assert manifest["base_patches"] == [
+        {"path": entry["base_patch"], "sha256": entry["sha256"]} for entry in root_report["patches"]]
+    assert manifest["base_series_sha256"] == review["base_series_sha256"] == (
+        "71613faf45339ae3debd3dcf8afb95101989c4e6537d14dc7b0cebd1766f5863")
+    assert manifest["overrides"] == [
+        {key: entry[key] for key in ("path", "original_sha256", "sha256")}
+        for entry in review["overrides"]]
+    assert len(manifest["overrides"]) == 23
+    for target, entry in manifest["platforms"].items():
+        assert entry["commit"] == review["platform_commits"][target]
+        assert entry["core_gitlink"] == review["core_commit"] == selection.CORE156
+        assert entry["additions"] == review["additions"][target]
+    identity, patches = selection.select(repo, platform)
+    assert len(patches) == (232 if platform == "windows" else 226)
+    assert identity["selection"]["review_manifest"] == {
+        "path": selection.REVIEW156, "sha256": selection.REVIEW156_SHA256}
+    assert selection.REVIEW156 not in dict(patches)
+    assert identity["selection"]["additions"]["patches"] == review["additions"][platform]
+    result = subprocess.run([sys.executable, str(ROOT / "tools/patch_selection.py"),
+                             "--repo", str(repo), "--platform", platform, "--json"],
+                            check=True, capture_output=True, text=True, timeout=30)
+    assert json.loads(result.stdout) == identity
+
+
+@pytest.mark.parametrize("mutation", ["missing", "contents", "symlink", "extra-json", "renamed"])
+def test_review_evidence_is_required_and_never_a_wildcard_exception(real_repo156, mutation):
+    repo, platform = real_repo156
+    path = repo / selection.REVIEW156
+    if mutation == "missing":
+        path.unlink()
+    elif mutation == "contents":
+        path.write_bytes(path.read_bytes() + b"\n")
+    elif mutation == "symlink":
+        path.unlink()
+        path.symlink_to(ROOT / selection.REVIEW156)
+    elif mutation == "extra-json":
+        (path.parent / "unreviewed.json").write_text("{}")
+    else:
+        path.rename(path.with_name("alternate-manifest.json"))
+    with pytest.raises(selection.SelectionError):
+        selection.select(repo, platform)
+
+
+@pytest.mark.parametrize("platform", tuple(selection.PLATFORM156_COMMITS))
+def test_production_156_manifest_does_not_mix_into_154(tmp_path, platform):
+    repo = clone_repo(tmp_path)
+    core = selection.MACOS154_CORE if platform == "macos" else selection.CORE
+    set_platform_pins(repo, platform, selection.VERSION, core, selection.PLATFORM_COMMITS[platform])
+    before = selection.select(repo, platform)
+    keys = {style: selection.preparation_key(repo, platform, style) for style in ("posix", "windows")}
+    shutil.copy2(ROOT / selection.MANIFEST156, repo / selection.MANIFEST156)
+    (repo / selection.REVIEW156).write_bytes(b"tampered evidence\n")
+    assert selection.select(repo, platform) == before
+    for style, key in keys.items():
+        assert selection.preparation_key(repo, platform, style) == key
+    assert all("chromium156" not in name for name, _ in before[1])
+
+
+@pytest.fixture(scope="module")
+def source_replay156():
+    spec = importlib.util.spec_from_file_location(
+        "chromium156_review_verify", ROOT / "patches/chromium156-verification/verify.py")
+    verifier = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(verifier)
+    raw = (ROOT / selection.REVIEW156).read_bytes()
+    assert selection.digest(raw) == selection.REVIEW156_SHA256
+    review = json.loads(raw)
+    fixture = json.loads(gzip.decompress(verifier.checked(review["fixture"])))
+    assert fixture["source"]["version"] == selection.VERSION156
+    assert fixture["source"]["core_commit"] == selection.CORE156
+    assert fixture["source"]["chromium_commit"] == review["chromium_commit"]
+    assert not fixture["source"]["errors"]
+    for name, entry in fixture["source"]["files"].items():
+        data = fixture["files"][name].encode()
+        assert selection.digest(data) == entry["sha256"], name
+        assert hashlib.sha1(b"blob " + str(len(data)).encode() + b"\0" + data).hexdigest() == entry["git_blob"]
+    return verifier, fixture
+
+
+@pytest.mark.parametrize("substituted", [False, True])
+def test_production_selected_full_source_fixture_roundtrip(tmp_path, real_repo156, source_replay156, substituted):
+    repo, platform = real_repo156
+    verifier, fixture = source_replay156
+    src, core, tooling = (tmp_path / name for name in ("src", "core", "tooling"))
+    for directory in (src, core, tooling):
+        directory.mkdir()
+    (core / "chromium_version.txt").write_text(selection.VERSION156 + "\n")
+    (core / "domain_regex.list").write_text(fixture["domain_regex"])
+    listed_text = fixture["domain_lists"][platform]
+    (core / "domain_substitution.list").write_text(listed_text)
+    (tooling / "domain_substitution.list").write_text(listed_text)
+    for name, text in fixture["files"].items():
+        path = src / name
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(text)
+    env = {key: value for key, value in os.environ.items() if not key.startswith("GIT_")}
+    env.update(GIT_CONFIG_NOSYSTEM="1", GIT_CONFIG_GLOBAL=os.devnull,
+               GIT_CEILING_DIRECTORIES=str(tmp_path))
+    for entry in fixture["predecessors"]["core"] + fixture["predecessors"][platform]:
+        data = entry["text"].encode()
+        assert selection.digest(data) == entry["sha256"]
+        verifier.apply(src, data, env, check=True)
+        verifier.apply(src, data, env)
+    arp = verifier.arp
+    listed = set(listed_text.splitlines()) if substituted else set()
+    rules = arp._rules(fixture["domain_regex"].encode()) if substituted else []
+    for name in listed:
+        path = src / name
+        if path.is_file():
+            path.write_text(arp._substitute(path.read_text(), rules))
+    if substituted:
+        (src / ".chromix-domain-substituted").write_text(selection.CORE156 + "\n")
+    identity, patches = selection.select(repo, platform, src=src, core=core)
+    expected_count = 232 if platform == "windows" else 226
+    assert len(patches) == expected_count
+    for _, raw in patches:
+        data, _ = arp.transform_patch(raw, listed, rules)
+        verifier.apply(src, data, env, check=True)
+        verifier.apply(src, data, env)
+    report = verifier.verify_patch_stack.verify(src, repo, core=core, tooling=tooling, platform=platform)
+    assert report["status"] == "verified"
+    assert report["patch_count"] == expected_count
+    assert report["domain_substituted"] == substituted
+    assert report["identity"]["selection"] == identity["selection"]
+    selected_identity = report["identity"]["series"] if substituted else report["identity"]
+    assert selected_identity["patches"] == identity["patches"]
+    controller = (src / "chrome/browser/enterprise/BUILD.gn").read_text()
+    assert controller.count('"signin/managed_profile_creation_controller.cc"') == 1
+    png = (src / "third_party/blink/renderer/core/html/canvas/canvas_async_blob_creator.cc").read_text()
+    assert "mime_type_ == kMimeTypePng &&" in png
+    if platform == "windows":
+        timezone = (src / "third_party/blink/renderer/core/timezone/timezone_controller.cc").read_text()
+        assert "bool TimeZoneController::SetDefaultTimeZone(" in timezone
+        renderer = (src / "content/renderer/render_thread_impl.cc").read_text()
+        assert "CHECK(blink::SetRendererDefaultTimeZone(blink::WebString::FromUtf8(timezone)))" in renderer
