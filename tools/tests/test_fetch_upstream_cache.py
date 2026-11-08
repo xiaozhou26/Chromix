@@ -285,8 +285,15 @@ class FetchUpstreamCacheTest(unittest.TestCase):
                     with self.assertRaisesRegex(cache.CacheMiss, "pin_mismatch"):
                         cache.load_manifest(target, "x64", root=self.root)
 
-    def test_checked_in_linux_cache_matches_exact_two_arch_metadata(self):
-        manifest = json.loads(cache.MANIFEST.read_text())
+    def test_historical_linux155_cache_matches_exact_two_arch_metadata(self):
+        from tools.tests.test_linux_typescript import install_linux_repo_fixture
+        historical = install_linux_repo_fixture(self.root / "linux155", (
+            "155.0.8059.39", "ffeb45a2bb88bc56a1dfed31410aeb10e9efcd5a",
+            "025d99db1673a21992534551598b73ca79360762"))
+        manifest = json.loads((historical / "build/upstream-cache.json").read_text())
+        manifest["sources"]["linux"] = json.loads(
+            (Path(__file__).parent / "fixtures/linux155_cache.json").read_text())
+        (historical / "build/upstream-cache.json").write_text(json.dumps(manifest))
         source = manifest["sources"]["linux"]
         self.assertEqual(source, {
             "chromium_version": "155.0.8059.39",
@@ -312,7 +319,7 @@ class FetchUpstreamCacheTest(unittest.TestCase):
         })
         for arch in ("x64", "arm64"):
             with self.subTest(arch=arch):
-                pin, identity = cache.load_manifest("linux", arch, 37906884923, root=cache.ROOT)
+                pin, identity = cache.load_manifest("linux", arch, 37906884923, root=historical)
                 self.assertEqual(pin, {
                     **{key: value for key, value in source.items() if key != "artifacts"},
                     "artifact": source["artifacts"][arch],
@@ -323,13 +330,13 @@ class FetchUpstreamCacheTest(unittest.TestCase):
                 self.assert_metadata_provenance(pin, datetime(2026, 10, 11, tzinfo=timezone.utc))
                 run, _ = metadata(pin)
                 other_pin, _ = cache.load_manifest(
-                    "linux", "arm64" if arch == "x64" else "x64", root=cache.ROOT)
+                    "linux", "arm64" if arch == "x64" else "x64", root=historical)
                 _, other_artifact = metadata(other_pin)
                 with self.assertRaisesRegex(cache.CacheMiss, "artifact_mismatch"):
                     cache.validate_metadata(pin, run, other_artifact, NOW)
                 client = mock.Mock()
                 result = cache.fetch("linux", arch, self.destination, 37075483703,
-                                     root=cache.ROOT, client=client)
+                                     root=historical, client=client)
                 self.assertEqual(result["reason"], "run_id_mismatch")
                 self.assertEqual(result["download_bytes"], 0)
                 self.assertEqual(client.mock_calls, [])

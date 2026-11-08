@@ -23,9 +23,15 @@ ARM_IDENTITY = dict(
     artifact_digest="sha256:a4c0bfd8020cd34f27a652ae449f9e8547a468b8b813a11a64acf8a0891db447")
 
 
+NEW_IDENTITIES = tuple(dict(
+    restore.LINUX15579_ESBUILD_IDENTITY, arch=arch, artifact_id=artifact,
+    artifact_name=name, artifact_size_in_bytes=size, artifact_digest=digest)
+    for arch, (artifact, name, size, digest) in restore.LINUX15579_ESBUILD_ARTIFACTS.items())
+
+
 class Linux155RestoreLinksTest(unittest.TestCase):
     def test_every_field_type_and_platform_is_exact(self):
-        for identity in (IDENTITY, ARM_IDENTITY):
+        for identity in (IDENTITY, ARM_IDENTITY, *NEW_IDENTITIES):
             for name in (restore.LINUX154_ESBUILD_LINK, restore.LINUX154_ESBUILD_ALIAS):
                 self.assertTrue(restore.is_known_external_link(name, "linux", identity))
                 for platform in ("windows", "macos", "off"):
@@ -60,7 +66,7 @@ class Linux155RestoreLinksTest(unittest.TestCase):
         fixture.setUp()
         self.addCleanup(fixture.doCleanups)
         cache = fixture.fixture
-        for identity in (IDENTITY, ARM_IDENTITY):
+        for identity in (IDENTITY, ARM_IDENTITY, *NEW_IDENTITIES):
             cache.make_cache("linux", identity["arch"])
             relative = cache.donor.relative_to(cache.cache / "tree").as_posix()
             paths = [restore.LINUX154_ESBUILD_LINK, restore.LINUX154_ESBUILD_ALIAS]

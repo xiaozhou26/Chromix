@@ -354,5 +354,11 @@ def GetNodePath():
         self.network.assert_not_called()
 
 
+class InstallLinux15579GeneratorsTest(InstallLinux155GeneratorsTest):
+    def setUp(self):
+        self.patch(generators, "PINS155", generators.PINS15579)
+        super().setUp()
+
+
 if __name__ == "__main__":
     unittest.main()

@@ -521,6 +521,16 @@ fs.writeFileSync('node-launch.json', JSON.stringify({
             with self.subTest(pins=pins), self.assertRaisesRegex(ValueError, "pins"):
                 generators.generator_profile(pins)
 
+    def test_15579_uses_the_exact_reviewed_repairs_and_rejects_mixed_pins(self):
+        self.assertEqual(generators.generator_profile(generators.PINS15579),
+                         generators.generator_profile(generators.PINS155))
+        self.assertEqual(generators.source_plan(self.src, pins=generators.PINS15579),
+                         generators.source_plan(self.src, pins=generators.PINS155))
+        for pins in ((generators.PINS15579[0], *generators.PINS155[1:]),
+                     (generators.PINS155[0], *generators.PINS15579[1:])):
+            with self.assertRaisesRegex(ValueError, "pins"):
+                generators.generator_profile(pins)
+
     def test_unknown_or_cross_version_sources_fail_before_execution(self):
         for name in generators.SOURCE155_REPAIRS:
             path = self.src / generators.DEVTOOLS / name

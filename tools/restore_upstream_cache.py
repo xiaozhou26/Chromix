@@ -77,6 +77,35 @@ LINUX155_ESBUILD_ARTIFACTS = {
     "arm64": (11656090008, "build-cache-arm64", 5677163828,
               "sha256:a4c0bfd8020cd34f27a652ae449f9e8547a468b8b813a11a64acf8a0891db447"),
 }
+LINUX15579_ESBUILD_IDENTITY = {
+    "chromium_version": "155.0.8059.79",
+    "ungoogled_commit": "9f145d8815e6e50cc4a2537fcac40966d911e027",
+    "head_sha": "6b86f45adc4a7f7ac4c3897a8b651eb34784d761",
+    "platform": "linux", "repository": "ungoogled-software/ungoogled-chromium-portablelinux",
+    "repository_id": 177191557, "head_branch": "155.0.8059.79-1", "event": "push",
+    "workflow_path": ".github/workflows/build.yml", "run_id": 38629815756,
+}
+LINUX15579_ESBUILD_ARTIFACTS = {
+    "x64": (11962976864, "build-cache-x86_64", 4734859038,
+            "sha256:10c73ca0ce1796446256466a7ebf275e4b219dcf5e55a0fb3d418868df22d1ec"),
+    "arm64": (11992866704, "build-cache-arm64", 5677157482,
+              "sha256:e6e7b4da0b120809f67117b65a42cec1bebb413fb81273cf368e0cd373ec8c18"),
+}
+LINUX156_TSC_LINK = "third_party/typescript/linux-amd64/src/lib/tsc"
+LINUX156_ESBUILD_IDENTITY = {
+    "chromium_version": "156.0.8078.79",
+    "ungoogled_commit": "28a211ab4ab6b83d919966a4f58a6df23cf4fb29",
+    "head_sha": "6f0aa178c2394fc0a177edc0fd64e41f402a0418",
+    "platform": "linux", "repository": "ungoogled-software/ungoogled-chromium-portablelinux",
+    "repository_id": 177191557, "head_branch": "156.0.8078.79-1", "event": "push",
+    "workflow_path": ".github/workflows/build.yml", "run_id": 41095740465,
+}
+LINUX156_ESBUILD_ARTIFACTS = {
+    "x64": (13026649061, "build-cache-x86_64", 4645837265,
+            "sha256:05d7ff132b7e8fb6f3efc257d801680efb03328dfdac1b358a7fd833ef3d0e88"),
+    "arm64": (13033900099, "build-cache-arm64", 5589999894,
+              "sha256:996fee570a4f1b0732037a872ddfafa44fec851f8b0dec8dcc75d4521adbbd66"),
+}
 MAC154_ESBUILD_LINK = "third_party/devtools-frontend/src/node_modules/esbuild"
 MAC154_ESBUILD_ALIAS = "third_party/devtools-frontend/src/node_modules/.bin/esbuild"
 MAC154_ESBUILD_IDENTITY = {
@@ -226,14 +255,18 @@ def source_args(src: Path, identity: dict) -> dict:
 def is_known_external_link(relative: str, platform: str, identity: dict | None = None) -> bool:
     if relative in HOST_LINKS:
         return True
-    if relative in (LINUX154_ESBUILD_LINK, LINUX154_ESBUILD_ALIAS):
+    if relative in (LINUX154_ESBUILD_LINK, LINUX154_ESBUILD_ALIAS, LINUX156_TSC_LINK):
         if platform not in ("linux", "macos") or not isinstance(identity, dict):
             return False
         records = ((MAC154_ESBUILD_IDENTITY, MAC154_ESBUILD_ARTIFACTS),
                    (MAC155_ESBUILD_IDENTITY, MAC155_ESBUILD_ARTIFACTS),
                    (MAC156_ESBUILD_IDENTITY, MAC156_ESBUILD_ARTIFACTS)) if platform == "macos" else (
             (LINUX154_ESBUILD_IDENTITY, LINUX154_ESBUILD_ARTIFACTS),
-            (LINUX155_ESBUILD_IDENTITY, LINUX155_ESBUILD_ARTIFACTS))
+            (LINUX155_ESBUILD_IDENTITY, LINUX155_ESBUILD_ARTIFACTS),
+            (LINUX15579_ESBUILD_IDENTITY, LINUX15579_ESBUILD_ARTIFACTS),
+            (LINUX156_ESBUILD_IDENTITY, LINUX156_ESBUILD_ARTIFACTS))
+        if relative == LINUX156_TSC_LINK:
+            records = ((LINUX156_ESBUILD_IDENTITY, LINUX156_ESBUILD_ARTIFACTS),) if platform == "linux" else ()
         arch = identity.get("arch")
         if not isinstance(arch, str):
             return False

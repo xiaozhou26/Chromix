@@ -83,6 +83,8 @@ SOURCE_REPAIRS = {
 
 PINS155 = ("155.0.8059.39", "ffeb45a2bb88bc56a1dfed31410aeb10e9efcd5a",
            "025d99db1673a21992534551598b73ca79360762")
+PINS15579 = ("155.0.8059.79", "9f145d8815e6e50cc4a2537fcac40966d911e027",
+             "6b86f45adc4a7f7ac4c3897a8b651eb34784d761")
 # Rebuilt from cd7bfad9bba968ac23ba67e538f9e1d499991d25, donor patches and core domains.
 TYPESCRIPT155_PORTABLE = "99034dad55a0805c052f928fca1f03c335a59a4e61bc3ad4c183bb3c0ff4c471"
 TYPESCRIPT155_REPAIRED = {
@@ -199,6 +201,164 @@ SOURCE155_REPAIRS = {
 }
 
 
+PINS156 = ("156.0.8078.79", "28a211ab4ab6b83d919966a4f58a6df23cf4fb29",
+           "6f0aa178c2394fc0a177edc0fd64e41f402a0418")
+# DevTools 8c62f844 + portablelinux 6f0aa178 + core 28a211ab domains.
+LOCK156_SHA256 = "d6ea0c70a0b0f0324688d6ff0e4a5b088ff7a8460796735e6d3bacd10fedda73"
+SOURCE156_REPAIRS = {
+    "front_end/ui/legacy/ARIAUtils.ts": (
+        "b8bdfdb829af51ba09253de4cea27880a9481871b82ca5d673a7bdad96cacd4d",
+        "29e9150b81c4c88e60bd29441182e2d1acc5ddbc349bcbb4dfe0527b7bc484ad",
+        b'getOrCreateAnnouncerElement(container: HTMLElement = document.body,',
+        b'getOrCreateAnnouncerElement(container: HTMLElement|undefined = document.body,',
+    ),
+    "front_end/ui/legacy/Widget.ts": (
+        "2bf782c18a9f13f8d4a2ec67176fb99deaad7bd164fc416567284fe9ca389002",
+        "74a224e69cdf9c7c623bc085db0b303c843ed8b25c5a229a709f656031e423cb",
+        b'readonly widgetParams?: Partial<WidgetT>)',
+        b'readonly widgetParams?: Partial<WidgetT>|undefined)',
+    ),
+    "scripts/build/esbuild.js": (
+        "7441e250f11d08744475e1a816d77c69aa265a9581380a475ff8313c80d63947",
+        "05f0876b590b92caf11117f3321fd3af842f8516c125bf5341c08c323ec3eb69",
+        (
+            b"    '/',\n"
+            b"    'usr',\n"
+            b"    'bin',\n"
+        ),
+        (
+            b'    devtoolsRootPath(),\n'
+            b"    'third_party',\n"
+            b"    'esbuild',\n"
+            b"    'chromix-linux',\n"
+        ),
+    ),
+    "scripts/build/ninja/bundle.gni": (
+        "470cd49b818adb42066bbd32edf4262fee0537c28e68f813c4f9762f84757e8f",
+        "dac1c09e5b97c287a76aa7c863a5e39f47eba164057020b3604bf796aa55dd92",
+        b'_esbuild = "/usr/bin/esbuild"',
+        b'_esbuild = devtools_location_prepend + "third_party/esbuild/chromix-linux/esbuild"',
+    ),
+    "scripts/build/typescript/typescript_vars.gni": (
+        "363ac763453f8d5c162b0fb9dfcd405be79a32cbea35d1f2e8f4b1c39b972b21",
+        "24190dad41b137d621e0c97a53f0f6ed80de7232f41610da9349ecbbbd32aba1",
+        (
+            b'  tsc_binary = "/usr/bin/tsc"',
+            b'# Standard TypeScript library definitions',
+            b'typescript_base_inputs = [ tsc_binary ]',
+        ),
+        (
+            b'  tsc_binary = devtools_location_prepend + "node_modules/typescript/lib/tsc.js"',
+            (
+                b'if (host_os == "linux") {\n'
+                b'  tsc_node = "//third_party/node/linux/node-linux-${host_cpu}/bin/node"\n'
+                b'  tsc_command = [\n'
+                b'    rebase_path(tsc_node, root_build_dir),\n'
+                b'    rebase_path(tsc_binary, root_build_dir),\n'
+                b'  ]\n'
+                b'} else {\n'
+                b'  tsc_command = [ rebase_path(tsc_binary, root_build_dir) ]\n'
+                b'}\n'
+                b'\n'
+                b'# Standard TypeScript library definitions'
+            ),
+            (
+                b'typescript_base_inputs = [ tsc_binary ]\n'
+                b'if (host_os == "linux") {\n'
+                b'  typescript_base_inputs += [\n'
+                b'    tsc_node,\n'
+                b'    devtools_location_prepend + "node_modules/typescript/lib/_tsc.js",\n'
+                b'  ]\n'
+                b'}'
+            ),
+        ),
+    ),
+    "scripts/build/typescript/ts_type_check.gni": (
+        "cdcdd21a722d3d4f5ed08854acf2d5c02c77c35583fcd51378af4dc35e5bd5f5",
+        "5a9e57ae03e9d87fe1c3284ee1793ea64e04b0a9cdbb3c596906467a8fe7bdaf",
+        b'      rebase_path(tsc_binary, root_build_dir),',
+        b'    ] + tsc_command + [',
+    ),
+    "scripts/build/typescript/typescript.gni": (
+        "657c6592457401347c9de1d3577e03231c54e826a176826430da35e07c790f77",
+        "6ff5a8536b21e58c31a6d3b48841502a5f3820534bad996ecd2ab3b0abfbe304",
+        (
+            (
+                b'rebase_path(_dts_outputs, root_build_dir) + [ "--" ] + [\n'
+                b'          rebase_path(tsc_binary, root_build_dir),'
+            ),
+            (
+                b'rebase_path(_stamp_file, root_build_dir),\n'
+                b'        "--",\n'
+                b'        rebase_path(tsc_binary, root_build_dir),'
+            ),
+            (
+                b'rebase_path(_js_outputs, root_build_dir) + [ "--" ] + [\n'
+                b'            rebase_path(tsc_binary, root_build_dir),'
+            ),
+        ),
+        (
+            b'rebase_path(_dts_outputs, root_build_dir) + [ "--" ] + tsc_command + [',
+            (
+                b'rebase_path(_stamp_file, root_build_dir),\n'
+                b'        "--",\n'
+                b'      ] + tsc_command + ['
+            ),
+            b'rebase_path(_js_outputs, root_build_dir) + [ "--" ] + tsc_command + [',
+        ),
+    ),
+}
+
+ROOT156_REPAIRS = {
+    "tools/typescript/ts_definitions.gni": (
+        "b0bbe3563d1db30178681e49161d52147199b894e2d2f35b1c3a7d52e9d8182f",
+        "b0bbe3563d1db30178681e49161d52147199b894e2d2f35b1c3a7d52e9d8182f",
+        (),
+        (),
+    ),
+    "tools/typescript/ts_definitions.py": (
+        "81b90da53b500995fa7854ceee49ea5b3a1253935c969a6764b59f5fe3da6463",
+        "81b90da53b500995fa7854ceee49ea5b3a1253935c969a6764b59f5fe3da6463",
+        (),
+        (),
+    ),
+    "tools/typescript/ts_library.gni": (
+        "0b3a2f9a2ba95d7f83ebedbf406f8f85416e588287d49e159df11cf54eba2584",
+        "0b3a2f9a2ba95d7f83ebedbf406f8f85416e588287d49e159df11cf54eba2584",
+        (),
+        (),
+    ),
+    "tools/typescript/ts_library.py": (
+        "73870e124346e37566aa10d942274975568576c717695e89f4051903b9768811",
+        "73870e124346e37566aa10d942274975568576c717695e89f4051903b9768811",
+        (),
+        (),
+    ),
+    "ui/webui/webui_features.gni": (
+        "e47c59160b717673f1b4bce420a9d324afb8bc70bd70966445a5539f583d19a0",
+        "e47c59160b717673f1b4bce420a9d324afb8bc70bd70966445a5539f583d19a0",
+        (),
+        (),
+    ),
+    "third_party/node/node.py": (
+        "ad2c5a8988e92cb71b528fe92bef497a33916beae0627a27170b48e5455987e5",
+        "ad2c5a8988e92cb71b528fe92bef497a33916beae0627a27170b48e5455987e5",
+        (),
+        (),
+    ),
+    "third_party/node/node_modules.py": (
+        "ea173da3702749cc21fecaa9edddaad4ed8f6209b603553f223a9a5d7f4b61a1",
+        "448aa4ced9909d781bb8259cd861a01552e58ef9df055d824a8bdb71c328709c",
+        b"  return _path_in_node_modules('typescript', 'bin', 'tsc')",
+        (
+            b"  return os_path.normpath(os_path.join(os_path.dirname(__file__), '..',\n"
+            b"                                      'devtools-frontend', 'src', 'node_modules',\n"
+            b"                                      'typescript', 'lib', 'tsc.js'))"
+        ),
+    ),
+}
+
+
 def generator_profile(pins: tuple = PINS) -> dict:
     """Select independent versioned pins; never infer a donor from its files."""
     if type(pins) is not tuple or not all(type(value) is str for value in pins):
@@ -208,10 +368,16 @@ def generator_profile(pins: tuple = PINS) -> dict:
                 "module": MODULE_FILES, "archives": ARCHIVES, "binaries": BINARY_HASHES,
                 "sources": SOURCE_REPAIRS, "typescript_portable": TYPESCRIPT_PORTABLE,
                 "typescript_repaired": TYPESCRIPT_REPAIRED, "typescript_tree": TYPESCRIPT_TREE}
-    if pins == PINS155:
+    if pins in (PINS155, PINS15579):
         return {"version": ESBUILD155_VERSION, "lock": LOCK155_SHA256,
                 "module": MODULE155_FILES, "archives": ARCHIVES155, "binaries": BINARY155_HASHES,
                 "sources": SOURCE155_REPAIRS, "typescript_portable": TYPESCRIPT155_PORTABLE,
+                "typescript_repaired": TYPESCRIPT155_REPAIRED, "typescript_tree": TYPESCRIPT155_TREE}
+    if pins == PINS156:
+        return {"version": ESBUILD155_VERSION, "lock": LOCK156_SHA256,
+                "module": MODULE155_FILES, "archives": ARCHIVES155, "binaries": BINARY155_HASHES,
+                "sources": SOURCE156_REPAIRS, "root_sources": ROOT156_REPAIRS,
+                "typescript_portable": TYPESCRIPT155_PORTABLE,
                 "typescript_repaired": TYPESCRIPT155_REPAIRED, "typescript_tree": TYPESCRIPT155_TREE}
     raise ValueError("unverified Linux generator pins")
 
@@ -589,13 +755,28 @@ def binary_identity(src: Path, *, pins: tuple = PINS) -> dict | None:
     return {"path": ESBUILD_BINARY, "sha256": digest, "host_arch": host}
 
 
+def _linux156_typescript_inputs(payload: bytes) -> bytes:
+    start = payload.index(b"typescript_standard_lib_dts_inputs = [")
+    end = payload.index(b"\n]", start) + 2
+    block = payload[start:end]
+    local = block.replace(b'"//third_party/typescript/linux-amd64/src/lib/',
+                          b'devtools_location_prepend + "node_modules/typescript/lib/')
+    local = local.replace(b'/lib/tsc"', b'/lib/tsc.js"')
+    def indent(value):
+        return b"\n".join(b"  " + line for line in value.splitlines())
+    replacement = (b'if (host_os == "linux") {\n' + indent(local)
+                   + b"\n} else {\n" + indent(block) + b"\n}")
+    return payload[:start] + replacement + payload[end:]
+
+
 def source_plan(src: Path, *, pins: tuple = PINS) -> tuple[dict, list]:
     profile = generator_profile(pins)
     if sha256(read_verified(src, LOCK)) != profile["lock"]:
         raise ValueError("unknown Linux DevTools package lock")
     identities, changes = {}, []
-    for relative, (original_hash, repaired_hash, old, new) in profile["sources"].items():
-        name = DEVTOOLS + "/" + relative
+    records = {DEVTOOLS + "/" + name: record for name, record in profile["sources"].items()}
+    records.update(profile.get("root_sources", {}))
+    for name, (original_hash, repaired_hash, old, new) in records.items():
         regular(src, name)
         payload, metadata = _read_verified_with_metadata(src, name)
         digest = sha256(payload)
@@ -610,6 +791,8 @@ def source_plan(src: Path, *, pins: tuple = PINS) -> tuple[dict, list]:
                 if restored.count(before) != 1:
                     raise ValueError(f"unexpected Linux esbuild repair: {name}")
                 restored = restored.replace(before, after, 1)
+            if pins == PINS156 and name == DEVTOOLS + "/scripts/build/typescript/typescript_vars.gni":
+                restored = _linux156_typescript_inputs(restored)
             if sha256(restored) != repaired_hash:
                 raise ValueError(f"unexpected Linux esbuild repair: {name}")
             changes.append((name, payload, restored, metadata))
