@@ -15,8 +15,8 @@ DIRECTORY = REPO / '.github/workflows'
 PLATFORMS = {
     'build-linux-x64': ('linux', 'x64', 'ubuntu-22.04', 'chromix-linux-x64'),
     'build-linux-arm64': ('linux', 'arm64', None, 'chromix-linux-arm64'),
-    'build-macos-x64': ('macos', 'x64', 'macos-15-intel', 'chromix-mac-x64'),
-    'build-macos-arm64': ('macos', 'arm64', 'macos-15', 'chromix-mac-arm64'),
+    'build-macos-x64': ('macos', 'x64', 'macos-26-intel', 'chromix-mac-x64'),
+    'build-macos-arm64': ('macos', 'arm64', 'macos-26', 'chromix-mac-arm64'),
 }
 
 
@@ -29,10 +29,12 @@ def events(workflow):
 
 
 class PlatformWorkflowTest(unittest.TestCase):
-    def test_exactly_six_build_entrypoints(self):
+    def test_exactly_six_push_build_entrypoints(self):
         names = {load(path.stem)['name'] for path in DIRECTORY.glob('build-*.yml')
-                 if 'workflow_dispatch' in events(load(path.stem))}
+                 if 'push' in events(load(path.stem))}
         self.assertEqual(names, set(PLATFORMS) | {'build-win-x64-github', 'build-win-arm64-github'})
+        for name in ('build-win-x64-156-fresh', 'build-win-arm64-156-fresh'):
+            self.assertEqual(set(events(load(name))), {'workflow_dispatch'})
         self.assertFalse((DIRECTORY / 'build-cross-platform.yml').exists())
         self.assertEqual(set(events(load('build-posix-github'))), {'workflow_call'})
 

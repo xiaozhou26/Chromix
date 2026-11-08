@@ -92,7 +92,7 @@ jobs:
     with:
       platform: macos
       arch: arm64
-      runner: macos-15
+      runner: macos-26
       artifact: chromix-mac-arm64
       max-stages: ${{ inputs.build_mode == 'single' && 1 || 8 }}
       build_profile: ${{ inputs.build_profile || 'fast' }}

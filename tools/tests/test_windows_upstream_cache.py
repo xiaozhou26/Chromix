@@ -440,10 +440,12 @@ class WindowsRequiredCacheTest(unittest.TestCase):
         if not Path(self.powershell).is_file():
             self.skipTest("pwsh is unavailable")
         self.fixture.pin_repo = self.fixture.repo
-        for relative in ("CHROMIUM_VERSION", "CHROMIUM_LINUX_VERSION", "CHROMIUM_MACOS_VERSION",
-                         "CHROMIUM_WINDOWS_VERSION", "build/ungoogled-revisions.psd1", "build/upstream-cache.json",
-                         "build/windows/read-platform-pins.ps1"):
-            self.fixture.put(self.fixture.repo / relative, (REPO / relative).read_bytes())
+        historical = json.loads((Path(__file__).parent / "fixtures/windows155_repository.json").read_text())
+        self.assertEqual(historical["commit"], "bf3221bcfa08b652ff62a44f52ccce393ef1d351")
+        for relative, content in historical["files"].items():
+            self.fixture.put(self.fixture.repo / relative, content)
+        self.fixture.put(self.fixture.repo / "build/windows/read-platform-pins.ps1",
+                         (REPO / "build/windows/read-platform-pins.ps1").read_bytes())
         for source in (REPO / "tools").glob("*.py"):
             self.fixture.put(self.fixture.repo / "tools" / source.name, source.read_bytes())
         path = self.fixture.repo / "build/upstream-cache.json"
@@ -510,6 +512,58 @@ Add-Content $env:CALL_LOG ("ninja:" + $OutDir.Replace('\', '/'))
                "CHROMIX_PREFER_UPSTREAM_CACHE": str(int(prefer))}
         return subprocess.run([self.powershell, "-NoLogo", "-NoProfile", "-NonInteractive",
                                "-File", str(self.script)], env=env, capture_output=True, text=True, timeout=20)
+
+    def test_windows156_explicit_fresh_entry_executes_installed_helper(self):
+        exact = json.loads((Path(__file__).parent / "fixtures/windows156_fresh.json").read_text())
+        version = exact["chromium_version"]
+        pins = self.fixture.repo / "build/ungoogled-revisions.psd1"
+        text = pins.read_text()
+        for key, value in {
+            "WindowsChromiumVersion": version,
+            "WindowsUngoogledVersion": version + "-1",
+            "WindowsUngoogledCommit": exact["core"],
+            "UngoogledWindowsVersion": version + "-1.1",
+            "UngoogledWindowsCommit": exact["windows"],
+        }.items():
+            text, count = re.subn(r'(?m)^(\s*' + key + r'\s*=\s*)"[^"\r\n]*"',
+                                  lambda match: match[1] + '"' + value + '"', text)
+            self.assertEqual(count, 1)
+        pins.write_text(text)
+        self.fixture.put(self.fixture.repo / "CHROMIUM_WINDOWS_VERSION", version + "\n")
+        self.fixture.put(self.fixture.repo / "UNGOOGLED_WINDOWS_VERSION", version + "-1.1\n")
+        helper = self.fixture.repo / "tools/windows156_fresh.py"
+        self.assertEqual(helper.read_bytes(), (REPO / "tools/windows156_fresh.py").read_bytes())
+        stage = STAGE.read_text()
+        fresh_policy = stage[stage.index("$Fresh156 ="):stage.index('$PartsDir =')]
+        marker = "# Cache restores establish the marker"
+        self.script.write_text(self.script.read_text().replace(
+            marker, '$BuildProfile = "native"\n$FreshNative = $true\n' + fresh_policy + marker, 1))
+        for arch in ("x64", "arm64"):
+            with self.subTest(arch=arch):
+                shutil.rmtree(self.fixture.work, ignore_errors=True)
+                self.fixture.calls.unlink(missing_ok=True)
+                result = self.run_stage(enabled=False, arch=arch)
+                self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+                self.assertEqual(self.fixture.called(), ["initialize", "prepare",
+                                 f"ninja:{self.fixture.work.as_posix()}/src/out/Chromix"])
+                receipt = json.loads((self.fixture.work / ".chromix-windows156-fresh.json").read_text())
+                self.assertEqual(receipt["chromium_version"], version)
+                self.assertEqual(receipt["core"], exact["core"])
+                self.assertEqual(receipt["windows"], exact["windows"])
+                self.assertEqual(receipt["arch"], arch)
+                self.assertEqual(receipt["host"], "x64")
+                self.assertEqual(receipt["build_profile"], "native")
+                self.assertEqual(receipt["chrome_pgo_phase"], 2)
+                self.assertEqual(receipt["out"], "out/Chromix")
+                self.assertFalse((self.fixture.work / "src").exists())
+        shutil.rmtree(self.fixture.work)
+        self.fixture.calls.unlink()
+        helper.unlink()
+        missing = self.run_stage(enabled=False)
+        self.assertNotEqual(missing.returncode, 0)
+        self.assertIn("Windows156 fresh identity initialization failed", missing.stderr)
+        self.assertEqual(self.fixture.called(), ["initialize"])
+        self.assertFalse((self.fixture.work / ".chromix-windows156-fresh.json").exists())
 
     def test_arm64_restore_initializes_verified_marker_and_resumes_same_target(self):
         self.fixture.seed('windows', 'arm64')
