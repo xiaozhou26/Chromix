@@ -93,6 +93,34 @@ MAC154_ESBUILD_ARTIFACTS = {
     "arm64": (11520487436, "github_build_artifact_arm64", 10872477177,
               "sha256:4fc2c995fc01213d3e819ff05db169fb14f0f93487b387f23cbf9a7b2e493e6a"),
 }
+MAC155_ESBUILD_IDENTITY = {
+    "chromium_version": "155.0.8059.39",
+    "ungoogled_commit": "ffeb45a2bb88bc56a1dfed31410aeb10e9efcd5a",
+    "head_sha": "b1238bb72b02cd36219991d9029c1c65183ea295",
+    "platform": "macos", "repository": "ungoogled-software/ungoogled-chromium-macos",
+    "repository_id": 177203026, "head_branch": "155.0.8059.39", "event": "push",
+    "workflow_path": ".github/workflows/build.yml", "run_id": 38682673288,
+}
+MAC155_ESBUILD_ARTIFACTS = {
+    "x64": (11992595839, "github_build_artifact_x86_64", 12608343117,
+            "sha256:9c3f303d6b3e362a1c5efd956a12d0a76ea3083a9d9e92fb231b60fef6e8c437"),
+    "arm64": (11971638847, "github_build_artifact_arm64", 10999897218,
+              "sha256:8eaaa618155c759175a9a3bb9bed279ecc8893c2a9dae4a8d0e184a42848f970"),
+}
+MAC156_ESBUILD_IDENTITY = {
+    "chromium_version": "156.0.8078.79",
+    "ungoogled_commit": "28a211ab4ab6b83d919966a4f58a6df23cf4fb29",
+    "head_sha": "31f01756a43d55b2c4211e73ca329bfab4ebfcb2",
+    "platform": "macos", "repository": "ungoogled-software/ungoogled-chromium-macos",
+    "repository_id": 177203026, "head_branch": "156.0.8078.79", "event": "push",
+    "workflow_path": ".github/workflows/build.yml", "run_id": 41595328070, "run_attempt": 3,
+}
+MAC156_ESBUILD_ARTIFACTS = {
+    "x64": (13284623799, "github_build_artifact_x86_64", 12645326109,
+            "sha256:4346f6e8a029a9588296013ff5cc79307fe9611ae918ec329e6aad207082a8df"),
+    "arm64": (13269271368, "github_build_artifact_arm64", 11005392438,
+              "sha256:ed150cfe07ed684e7bfb944ac498378ee79b8c3975edc5003d0f5db9ce8786d8"),
+}
 MAC_EXTERNAL_TOOL_LINKS = {"third_party/dawn/tools/golang/mac-arm64/bin/go",
                            "third_party/dawn/tools/golang/mac-amd64/bin/go"}
 MAC_XCODE_LINK_ROOT = Path("out/Default/sdk/xcode_links")
@@ -201,7 +229,9 @@ def is_known_external_link(relative: str, platform: str, identity: dict | None =
     if relative in (LINUX154_ESBUILD_LINK, LINUX154_ESBUILD_ALIAS):
         if platform not in ("linux", "macos") or not isinstance(identity, dict):
             return False
-        records = ((MAC154_ESBUILD_IDENTITY, MAC154_ESBUILD_ARTIFACTS),) if platform == "macos" else (
+        records = ((MAC154_ESBUILD_IDENTITY, MAC154_ESBUILD_ARTIFACTS),
+                   (MAC155_ESBUILD_IDENTITY, MAC155_ESBUILD_ARTIFACTS),
+                   (MAC156_ESBUILD_IDENTITY, MAC156_ESBUILD_ARTIFACTS)) if platform == "macos" else (
             (LINUX154_ESBUILD_IDENTITY, LINUX154_ESBUILD_ARTIFACTS),
             (LINUX155_ESBUILD_IDENTITY, LINUX155_ESBUILD_ARTIFACTS))
         arch = identity.get("arch")

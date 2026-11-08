@@ -34,6 +34,8 @@ def metadata(pin):
     run = {key: pin[key] for key in ("head_sha", "head_branch", "event")}
     run.update(id=pin["run_id"], path=pin["workflow_path"], status="completed", conclusion="success",
                repository=repo.copy(), head_repository=repo.copy())
+    if "run_attempt" in pin:
+        run["run_attempt"] = pin["run_attempt"]
     artifact = {**pin["artifact"], "expired": False, "expires_at": "2099-01-01T00:00:00Z",
                 "workflow_run": {"id": pin["run_id"], "head_sha": pin["head_sha"],
                                  "head_branch": pin["head_branch"],
@@ -131,7 +133,7 @@ def unavailable_source(repo, target, source):
     return {key: value for key, value in dict(
         source, available=False, chromium_version=pins["ChromiumVersion"],
         ungoogled_commit=pins["UngoogledCommit"]).items()
-        if key not in ("run_id", "artifacts")}
+        if key not in ("run_id", "artifacts", "run_attempt")}
 
 
 class Response(io.BytesIO):
@@ -470,44 +472,44 @@ class FetchUpstreamCacheTest(unittest.TestCase):
         self.assertEqual(manifest["ungoogled_commit"], "dd8fb9b5c837982faf41ba58cd30a5664e77c329")
         source = manifest["sources"]["macos"]
         self.assertEqual(source, {
-            "chromium_version": "154.0.8037.97",
-            "ungoogled_commit": "3e46b13825f808f0886e484d44532372655e5fe4",
+            "chromium_version": "156.0.8078.79",
+            "ungoogled_commit": "28a211ab4ab6b83d919966a4f58a6df23cf4fb29",
             "repository": "ungoogled-software/ungoogled-chromium-macos",
             "repository_id": 177203026,
-            "head_sha": "f7ba75f94442abda7ac3ea81790c217f8636d3ba",
-            "head_branch": "154.0.8037.97", "event": "push",
+            "head_sha": "31f01756a43d55b2c4211e73ca329bfab4ebfcb2",
+            "head_branch": "156.0.8078.79", "event": "push",
             "workflow_path": ".github/workflows/build.yml",
-            "run_id": 37654894671, "source_roots": ["src"],
+            "run_id": 41595328070, "run_attempt": 3, "source_roots": ["src"],
             "artifacts": {
                 "x64": {
-                    "id": 11527088964, "name": "github_build_artifact_x86_64",
-                    "size_in_bytes": 12505793478,
-                    "digest": "sha256:f79f7e5769b25d588ab68aa8c2963caeb40e04504b375a97e7288ee77467f186",
-                    "expires_at": "2027-01-05T16:48:13Z", "inner_archive": "build_src.tar.zst",
+                    "id": 13284623799, "name": "github_build_artifact_x86_64",
+                    "size_in_bytes": 12645326109,
+                    "digest": "sha256:4346f6e8a029a9588296013ff5cc79307fe9611ae918ec329e6aad207082a8df",
+                    "expires_at": "2027-02-01T14:12:10Z", "inner_archive": "build_src.tar.zst",
                 },
                 "arm64": {
-                    "id": 11520487436, "name": "github_build_artifact_arm64",
-                    "size_in_bytes": 10872477177,
-                    "digest": "sha256:4fc2c995fc01213d3e819ff05db169fb14f0f93487b387f23cbf9a7b2e493e6a",
-                    "expires_at": "2027-01-05T16:48:13Z", "inner_archive": "build_src.tar.zst",
+                    "id": 13269271368, "name": "github_build_artifact_arm64",
+                    "size_in_bytes": 11005392438,
+                    "digest": "sha256:ed150cfe07ed684e7bfb944ac498378ee79b8c3975edc5003d0f5db9ce8786d8",
+                    "expires_at": "2027-02-01T14:12:10Z", "inner_archive": "build_src.tar.zst",
                 },
             },
         })
         for arch in ("x64", "arm64"):
             with self.subTest(arch=arch):
-                pin, identity = cache.load_manifest("macos", arch, 37654894671, root=cache.ROOT)
+                pin, identity = cache.load_manifest("macos", arch, 41595328070, root=cache.ROOT)
                 self.assertEqual(pin, {
                     **{key: value for key, value in source.items() if key != "artifacts"},
                     "artifact": source["artifacts"][arch],
                 })
                 self.assertEqual({key: identity[key] for key in (
                     "target", "chromium_version", "head_sha", "run_id", "artifact_id", "artifact_digest")}, {
-                    "target": "macos-" + arch, "chromium_version": "154.0.8037.97",
-                    "head_sha": source["head_sha"], "run_id": 37654894671,
+                    "target": "macos-" + arch, "chromium_version": "156.0.8078.79",
+                    "head_sha": source["head_sha"], "run_id": 41595328070,
                     "artifact_id": source["artifacts"][arch]["id"],
                     "artifact_digest": source["artifacts"][arch]["digest"],
                 })
-                self.assert_metadata_provenance(pin, datetime(2026, 10, 9, tzinfo=timezone.utc))
+                self.assert_metadata_provenance(pin, datetime(2026, 11, 8, tzinfo=timezone.utc))
                 run, _ = metadata(pin)
                 other_pin, _ = cache.load_manifest(
                     "macos", "arm64" if arch == "x64" else "x64", root=cache.ROOT)
@@ -521,9 +523,9 @@ class FetchUpstreamCacheTest(unittest.TestCase):
                 self.assertEqual(result["download_bytes"], 0)
                 self.assertEqual(client.mock_calls, [])
 
-    def test_macos_identity_requires_explicit_154_source_under_shared_153(self):
+    def test_macos_identity_requires_explicit_156_source_under_shared_153(self):
         pin, _ = cache.load_manifest("macos", "x64", root=self.root)
-        self.assertEqual(pin["chromium_version"], "154.0.8037.97")
+        self.assertEqual(pin["chromium_version"], "156.0.8078.79")
         for field in ("chromium_version", "ungoogled_commit"):
             value = self.manifest["sources"]["macos"].pop(field)
             self.save_manifest()

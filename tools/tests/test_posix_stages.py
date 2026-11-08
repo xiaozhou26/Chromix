@@ -874,6 +874,117 @@ class PosixStageRestoreRejectsMismatchedSnapshotTest(unittest.TestCase):
         self.assertIn("does not exist", proc.stderr + proc.stdout)
 
 
+@unittest.skipUnless(shutil.which("zstd"), "zstd required")
+class SnapshotVerificationExecutionTest(unittest.TestCase):
+    def setUp(self):
+        import yaml
+        temporary = tempfile.TemporaryDirectory(prefix="chromix verify ")
+        self.addCleanup(temporary.cleanup)
+        self.root = Path(temporary.name)
+        self.snapshot = self.root / "chromix-build/.snapshot-stage-8"
+        self.parts = self.snapshot / "p1"
+        self.parts.mkdir(parents=True)
+        jobs = yaml.safe_load(WORKFLOW.read_text())["jobs"]
+        self.script = next(step["run"] for step in jobs["posix-8"]["steps"]
+                           if step.get("id") == "checkpoint")
+        output = io.BytesIO()
+        with tarfile.open(fileobj=output, mode="w", format=tarfile.PAX_FORMAT) as archive:
+            for name in ("first", "second"):
+                member = tarfile.TarInfo(name)
+                member.size = 1024
+                archive.addfile(member, io.BytesIO(b"x" * member.size))
+        self.tar = output.getvalue()
+        self.end = 2 * (512 + 1024)
+
+    def compress(self, data):
+        return subprocess.run(["zstd", "-q", "-c"], input=data,
+                              capture_output=True, check=True).stdout
+
+    def run_verify(self, compressed):
+        for path in self.snapshot.rglob("tree.tar.zst.*"):
+            path.unlink()
+        # Split across slots, not lexicographic directory order.
+        cuts = (0, len(compressed) // 3, 2 * len(compressed) // 3, len(compressed))
+        for number, slot in enumerate((2, 1, 2), 1):
+            directory = self.snapshot / f"p{slot}"
+            directory.mkdir(exist_ok=True)
+            (directory / f"tree.tar.zst.{number:03d}").write_bytes(
+                compressed[cuts[number - 1]:cuts[number]])
+        return subprocess.run(["/bin/bash", "-e", "-c", self.script], cwd=REPO,
+                              env={**os.environ, "RUNNER_TEMP": str(self.root)},
+                              capture_output=True, text=True, timeout=30)
+
+    def test_valid_tar_and_large_trailing_zero_padding(self):
+        for padding in (b"", b"\0" * (8 * 1024 * 1024)):
+            with self.subTest(padding=len(padding)):
+                result = self.run_verify(self.compress(self.tar + padding))
+                self.assertEqual(result.returncode, 0, result.stderr)
+
+    def test_real_snapshot_writer_pax_links_and_metadata(self):
+        work = self.root / "source"
+        work.mkdir()
+        (work / ("long-name-" * 16)).write_bytes(b"payload")
+        (work / "link").symlink_to("long-name-" * 16)
+        packed = subprocess.run(["bash", str(CI_PARTS), str(work), str(self.snapshot)],
+                                capture_output=True, text=True, timeout=30)
+        self.assertEqual(packed.returncode, 0, packed.stderr)
+        compressed = b"".join(path.read_bytes() for path in
+                              sorted(self.snapshot.rglob("tree.tar.zst.*")))
+        result = self.run_verify(compressed)
+        self.assertEqual(result.returncode, 0, result.stderr)
+
+    def test_nonzero_trailing_data_and_concatenated_tar_fail(self):
+        for trailer in (b"bad", b"bad" * 1024, b"\0" * 8388608 + b"bad", self.tar):
+            with self.subTest(trailer=len(trailer)):
+                result = self.run_verify(self.compress(self.tar + trailer))
+                self.assertNotEqual(result.returncode, 0)
+                self.assertIn("nonzero data after tar end blocks", result.stderr)
+
+    def test_invalid_headers_and_truncated_tar_fail(self):
+        bad_header = bytearray(self.tar)
+        bad_header[1536] ^= 1
+        for data in (b"", b"bad" * 512, bytes(bad_header), self.tar[:1024],
+                     self.tar[:1536 + 200], self.tar[:self.end],
+                     self.tar[:self.end + 512], self.tar[:self.end + 700],
+                     self.tar + b"\0"):
+            with self.subTest(size=len(data)):
+                result = self.run_verify(self.compress(data))
+                self.assertNotEqual(result.returncode, 0)
+                self.assertIn("snapshot tar verification failed", result.stderr)
+
+    def test_decode_failure_after_tar_eof_is_not_hidden(self):
+        compressed = self.compress(self.tar + b"\0" * (8 * 1024 * 1024))
+        bad_checksum = compressed[:-1] + bytes([compressed[-1] ^ 1])
+        for data in (compressed[:-1], compressed[:-8], bad_checksum,
+                     compressed + b"not a zstd frame",
+                     compressed + self.compress(b"\0" * 1024)[:-1]):
+            with self.subTest(size=len(data)):
+                result = self.run_verify(data)
+                self.assertNotEqual(result.returncode, 0)
+                self.assertRegex(result.stderr.lower(), "error|unsupported format")
+                self.assertNotIn("Broken pipe", result.stderr)
+
+    def test_bad_tar_still_drains_producer_and_reports_decode_failure(self):
+        compressed = self.compress(b"bad" * 512 + b"\0" * (8 * 1024 * 1024))
+        compressed = compressed[:-1] + bytes([compressed[-1] ^ 1])
+        result = self.run_verify(compressed)
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("snapshot tar verification failed", result.stderr)
+        self.assertIn("checksum", result.stderr.lower())
+        self.assertNotIn("Broken pipe", result.stderr)
+
+    def test_valid_concatenated_zstd_frames_are_fully_consumed(self):
+        result = self.run_verify(self.compress(self.tar) + self.compress(b"\0" * 1048576))
+        self.assertEqual(result.returncode, 0, result.stderr)
+
+    def test_volume_validation_failure_is_not_hidden(self):
+        result = subprocess.run(["/bin/bash", "-e", "-c", self.script], cwd=REPO,
+                                env={**os.environ, "RUNNER_TEMP": str(self.root)},
+                                capture_output=True, text=True, timeout=30)
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("snapshot volume error", result.stderr)
+
+
 class GenPosixWorkflowTest(unittest.TestCase):
     def test_workflow_matches_generator_output(self):
         with tempfile.TemporaryDirectory(prefix="chromix workflow ") as temp:

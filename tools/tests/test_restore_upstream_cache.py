@@ -152,6 +152,8 @@ class RestoreUpstreamCacheTest(unittest.TestCase):
         run = {key: pin[key] for key in ("head_sha", "head_branch", "event")}
         run.update(id=pin["run_id"], path=pin["workflow_path"], status="completed", conclusion="success",
                    repository=repository, head_repository=repository)
+        if "run_attempt" in pin:
+            run["run_attempt"] = pin["run_attempt"]
         metadata = dict(artifact, expired=False, expires_at="2099-01-01T00:00:00Z", workflow_run={
             "id": pin["run_id"], "head_sha": pin["head_sha"], "head_branch": pin["head_branch"],
             "repository_id": pin["repository_id"], "head_repository_id": pin["repository_id"]})

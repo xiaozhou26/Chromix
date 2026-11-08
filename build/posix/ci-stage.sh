@@ -234,6 +234,8 @@ if [ "$PLATFORM" = linux ]; then
   emit runtime_verified false
 else
   [ -d "$OUT/Chromium.app" ] || die "build exited 0 but $OUT/Chromium.app is missing"
+  emit compiled_ready true
+  emit runtime_verified false
 fi
 
 DEST_DIST="$WORK/dist"

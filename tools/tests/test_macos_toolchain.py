@@ -58,6 +58,11 @@ class MacOSToolchainTest(unittest.TestCase):
         self.temp = tempfile.TemporaryDirectory(prefix="chromix xcode ")
         self.addCleanup(self.temp.cleanup)
         self.root = Path(self.temp.name)
+        self.selector = self.root / "repo/build/macos/select-xcode.sh"
+        self.selector.parent.mkdir(parents=True)
+        self.selector.write_bytes(SELECT_XCODE.read_bytes())
+        self.version = self.root / "repo/CHROMIUM_MACOS_VERSION"
+        self.version.write_text("154.0.8037.97\n")
         self.apps = self.root / "Applications"
         self.apps.mkdir()
         self.home = self.root / "home"
@@ -99,10 +104,10 @@ class MacOSToolchainTest(unittest.TestCase):
             env["GITHUB_ENV"] = str(self.github_env)
         command = [str(self.BASH), "--norc"]
         if script is None:
-            command += [str(SELECT_XCODE)]
+            command += [str(self.selector)]
         else:
             command += ["-e", "-u", "-o", "pipefail", "-c", script,
-                        "test", str(SELECT_XCODE)]
+                        "test", str(self.selector)]
         return subprocess.run(command, capture_output=True, text=True, env=env,
                               timeout=20)
 
@@ -233,7 +238,7 @@ class MacOSToolchainTest(unittest.TestCase):
 
     def run_build(self):
         repo = self.root / "repo"
-        (repo / "build/macos").mkdir(parents=True)
+        (repo / "build/macos").mkdir(parents=True, exist_ok=True)
         shutil.copy2(BUILD, repo / "build/macos/build.sh")
         (repo / "build/posix").mkdir()
         shutil.copy2(REPO / "build/posix/upstream-cache.sh", repo / "build/posix/upstream-cache.sh")

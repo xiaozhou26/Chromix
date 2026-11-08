@@ -130,6 +130,8 @@ class ImportUpstreamCacheTest(unittest.TestCase):
     def receipt(self):
         manifest = {key: self.identity[key] for key in (
             "chromium_version", "repository", "head_sha", "run_id", "artifact_id", "artifact_digest")}
+        if "run_attempt" in self.identity:
+            manifest["run_attempt"] = self.identity["run_attempt"]
         manifest.update(schema_version=1, target=f"{self.platform}-{self.arch}",
                         path=str(self.repo / "build/upstream-cache.json"),
                         sha256=importer.digest_file(self.repo / "build/upstream-cache.json"))

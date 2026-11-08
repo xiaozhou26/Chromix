@@ -123,6 +123,19 @@ class Mac154RestoreLinksTest(unittest.TestCase):
         with mock.patch.object(tempfile, "tempdir", str(Path(tempfile.gettempdir()).resolve())):
             self.fixture.setUp()
         self.addCleanup(self.fixture.doCleanups)
+        from tools.tests.test_patch_selection import set_platform_pins
+        set_platform_pins(self.fixture.repo, "macos", IDENTITY["chromium_version"],
+                          IDENTITY["ungoogled_commit"], IDENTITY["head_sha"])
+        manifest_path = self.fixture.repo / "build/upstream-cache.json"
+        manifest = json.loads(manifest_path.read_text())
+        source = {k: v for k, v in IDENTITY.items() if k != "platform"}
+        source["source_roots"] = ["src"]
+        source["artifacts"] = {
+            arch: dict(zip(("id", "name", "size_in_bytes", "digest"), artifact),
+                       expires_at="2027-01-05T16:48:13Z", inner_archive="build_src.tar.zst")
+            for arch, artifact in ARTIFACTS.items()}
+        manifest["sources"]["macos"] = source
+        manifest_path.write_text(json.dumps(manifest))
         self.fixture.make_cache("macos", "x64")
 
     def record_links(self, paths=(MODULE, ALIAS)):

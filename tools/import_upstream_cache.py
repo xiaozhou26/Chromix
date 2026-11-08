@@ -195,6 +195,8 @@ def repository_identity(repo: Path, platform: str, arch: str) -> tuple[dict, dic
     identity = dict(expected, platform=platform, arch=arch)
     for key in ("repository", "repository_id", "head_branch", "event", "workflow_path", "run_id"):
         identity[key] = pin[key]
+    if platform == "macos" and "run_attempt" in pin:
+        identity["run_attempt"] = pin["run_attempt"]
     for key in ("id", "name", "digest", "size_in_bytes"):
         identity[f"artifact_{key}"] = artifact[key]
     return identity, source
@@ -222,6 +224,8 @@ def donor_source(cache: Path, result: dict, identity: dict, repo: Path) -> Path:
         raise Miss("missing downloader manifest identity")
     expected = {key: identity[key] for key in (
         "chromium_version", "repository", "head_sha", "run_id", "artifact_id", "artifact_digest")}
+    if identity["platform"] == "macos" and "run_attempt" in identity:
+        expected["run_attempt"] = identity["run_attempt"]
     expected.update(schema_version=1, target=f"{identity['platform']}-{identity['arch']}",
                     sha256=digest_file(repo / "build/upstream-cache.json"))
     for key, value in expected.items():

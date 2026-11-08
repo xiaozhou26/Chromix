@@ -285,8 +285,7 @@ class PosixCompletionTest(unittest.TestCase):
                          (root / "runtime-calls.jsonl").read_text().splitlines()]
         expected_calls = ["timeout"]
         initial_outputs = ["status=running", "finished=false"]
-        compiled_outputs = initial_outputs + (["compiled_ready=true", "runtime_verified=false"]
-                                             if platform == "linux" else [])
+        compiled_outputs = initial_outputs + ["compiled_ready=true", "runtime_verified=false"]
         ready_outputs = compiled_outputs + ["package_ready=true"]
         if platform == "macos":
             ready_outputs.append("runtime_verified=false")
@@ -380,7 +379,8 @@ class PosixCompletionTest(unittest.TestCase):
             self.assertFalse((work / "smoke").exists())
             if gate_calls:
                 self.assertEqual(gate_calls[0]["outputs"], [
-                    "status=running", "finished=false", "package_ready=true", "runtime_verified=false"])
+                    "status=running", "finished=false", "compiled_ready=true", "runtime_verified=false",
+                    "package_ready=true", "runtime_verified=false"])
         else:
             self.assertFalse((work / "runtime-smoke-stage-1").exists())
 

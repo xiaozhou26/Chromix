@@ -184,7 +184,13 @@ def load_manifest(platform, arch, run_id=None, root=ROOT):
             require(type(source["repository_id"]) is int and source["repository_id"] > 0, "manifest_id")
             if not available:
                 continue
-            require(not CHECKPOINT_FIELDS.intersection(source), "manifest_checkpoint")
+            if target == "macos" and target_version == "156.0.8078.79":
+                require("run_attempt" in source, "manifest_run_attempt")
+            source_checkpoint = CHECKPOINT_FIELDS.intersection(source)
+            require(not source_checkpoint or (target == "macos"
+                    and source_checkpoint == {"run_attempt"}
+                    and type(source["run_attempt"]) is int and source["run_attempt"] > 0),
+                    "manifest_checkpoint")
             require(type(source["run_id"]) is int and source["run_id"] > 0, "manifest_id")
             targets = set(source["artifacts"])
             require(targets in ({"x64"}, {"x64", "arm64"}) if target == "windows"
@@ -236,6 +242,8 @@ def load_manifest(platform, arch, run_id=None, root=ROOT):
         require(run_id is None or run_id == pin["run_id"], "run_id_mismatch")
         pin["chromium_version"] = version
         identity.update(overrides)
+        if platform == "macos" and "run_attempt" in source:
+            identity["run_attempt"] = source["run_attempt"]
         identity.update(run_id=pin["run_id"], artifact_id=pin["artifact"]["id"],
                         artifact_digest=pin["artifact"]["digest"])
         return pin, identity
@@ -250,6 +258,14 @@ def validate_metadata(pin, run, artifact, now=None, producer=None):
     expected = pin["artifact"]
     require(isinstance(run, dict) and isinstance(artifact, dict), "invalid_api_metadata")
     checkpoint = CHECKPOINT_FIELDS.intersection(pin)
+    if (checkpoint == {"run_attempt"}
+            and pin["repository"] == "ungoogled-software/ungoogled-chromium-macos"
+            and pin["workflow_path"] == ".github/workflows/build.yml"):
+        checkpoint = set()
+    if "run_attempt" in pin:
+        require(type(pin["run_attempt"]) is int and pin["run_attempt"] > 0
+                and type(run.get("run_attempt")) is int
+                and run["run_attempt"] == pin["run_attempt"], "untrusted_run_attempt")
     require(not checkpoint or (checkpoint == CHECKPOINT_FIELDS
             and pin["repository"] == "ungoogled-software/ungoogled-chromium-windows"
             and pin["workflow_path"] == ".github/workflows/build-arm.yml"

@@ -26,6 +26,11 @@ CHROMIUM_VERSION="$(revision ChromiumVersion)"
 CORE_COMMIT="$(revision UngoogledCommit)"
 PLATFORM_COMMIT="$(revision "${PLATFORM_KEY}Commit")"
 PLATFORM_VERSION="$(revision "${PLATFORM_KEY}Version")"
+if [ "$PLATFORM:$CHROMIUM_VERSION" = macos:156.0.8078.79 ] &&
+    [ ! -f "$SRC/.chromix-upstream-restored.json" ]; then
+  echo "macOS156 requires a verified full upstream restore; cold fallback forbidden" >&2
+  exit 1
+fi
 PATCH_HASH="$(python3 "$REPO/tools/patch_selection.py" --repo "$REPO" --platform "$PLATFORM" --key posix)"
 KEY="$PLATFORM|$ARCH|$CHROMIUM_VERSION|$CORE_COMMIT|$PLATFORM_COMMIT|$PATCH_HASH"
 RESTORED=0

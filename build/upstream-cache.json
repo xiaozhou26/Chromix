@@ -36,33 +36,34 @@
       }
     },
     "macos": {
-      "chromium_version": "154.0.8037.97",
-      "ungoogled_commit": "3e46b13825f808f0886e484d44532372655e5fe4",
+      "chromium_version": "156.0.8078.79",
+      "ungoogled_commit": "28a211ab4ab6b83d919966a4f58a6df23cf4fb29",
       "repository": "ungoogled-software/ungoogled-chromium-macos",
       "repository_id": 177203026,
-      "head_sha": "f7ba75f94442abda7ac3ea81790c217f8636d3ba",
-      "head_branch": "154.0.8037.97",
+      "head_sha": "31f01756a43d55b2c4211e73ca329bfab4ebfcb2",
+      "head_branch": "156.0.8078.79",
       "event": "push",
       "workflow_path": ".github/workflows/build.yml",
-      "run_id": 37654894671,
+      "run_id": 41595328070,
+      "run_attempt": 3,
       "source_roots": [
         "src"
       ],
       "artifacts": {
         "x64": {
-          "id": 11527088964,
+          "id": 13284623799,
           "name": "github_build_artifact_x86_64",
-          "size_in_bytes": 12505793478,
-          "digest": "sha256:f79f7e5769b25d588ab68aa8c2963caeb40e04504b375a97e7288ee77467f186",
-          "expires_at": "2027-01-05T16:48:13Z",
+          "size_in_bytes": 12645326109,
+          "digest": "sha256:4346f6e8a029a9588296013ff5cc79307fe9611ae918ec329e6aad207082a8df",
+          "expires_at": "2027-02-01T14:12:10Z",
           "inner_archive": "build_src.tar.zst"
         },
         "arm64": {
-          "id": 11520487436,
+          "id": 13269271368,
           "name": "github_build_artifact_arm64",
-          "size_in_bytes": 10872477177,
-          "digest": "sha256:4fc2c995fc01213d3e819ff05db169fb14f0f93487b387f23cbf9a7b2e493e6a",
-          "expires_at": "2027-01-05T16:48:13Z",
+          "size_in_bytes": 11005392438,
+          "digest": "sha256:ed150cfe07ed684e7bfb944ac498378ee79b8c3975edc5003d0f5db9ce8786d8",
+          "expires_at": "2027-02-01T14:12:10Z",
           "inner_archive": "build_src.tar.zst"
         }
       }

@@ -161,7 +161,7 @@ class LinuxFailedCheckpointTest(unittest.TestCase):
             for step in (failed, preserve, verify, *uploads):
                 self.assertNotIn('continue-on-error', step)
             self.assertIn('snapshot_volumes.py', verify['run'])
-            self.assertIn('zstd -d -T0 | tar -tf -', verify['run'])
+            self.assertIn('zstd -d -T0 | python3 tools/verify_snapshot_tar.py', verify['run'])
             for index, step in enumerate(uploads, 1):
                 self.assertLess(steps.index(verify), steps.index(step))
                 self.assertEqual(step['with']['name'], '${{ inputs.artifact }}-tree-s' + str(number)
