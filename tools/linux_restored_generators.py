@@ -309,7 +309,151 @@ SOURCE156_REPAIRS = {
     ),
 }
 
+LINUX156_TYPESCRIPT_LIBRARIES = {
+    "lib.d.ts": "0e6477e5049e579cc5de741a70ac91235252edc0468b2e569f22de9db3357786",
+    "lib.decorators.d.ts": "1ce14b81c5cc821994aa8ec1d42b220dd41b27fcc06373bce3958af7421b77d4",
+    "lib.decorators.legacy.d.ts": "b3a048b3e9302ef9a34ef4ebb9aecfb28b66abb3bce577206a79fee559c230da",
+    "lib.dom.asynciterable.d.ts": "7f57fc4404ff020bc45b9c620aff2b40f700b95fe31164024c453a5e3c163c54",
+    "lib.dom.d.ts": "8f94946b666574f23ae405f192dce40df552fc49bc048fdfdaeb44ff6203ac41",
+    "lib.dom.iterable.d.ts": "7f57fc4404ff020bc45b9c620aff2b40f700b95fe31164024c453a5e3c163c54",
+    "lib.es2015.collection.d.ts": "105ba8ff7ba746404fe1a2e189d1d3d2e0eb29a08c18dded791af02f29fb4711",
+    "lib.es2015.core.d.ts": "eadcffda2aa84802c73938e589b9e58248d74c59cb7fcbca6474e3435ac15504",
+    "lib.es2015.d.ts": "3f88bedbeb09c6f5a6645cb24c7c55f1aa22d19ae96c8e6959cbd8b85a707bc6",
+    "lib.es2015.generator.d.ts": "00343ca5b2e3d48fa5df1db6e32ea2a59afab09590274a6cccb1dbae82e60c7c",
+    "lib.es2015.iterable.d.ts": "ebd9f816d4002697cb2864bea1f0b70a103124e18a8cd9645eeccc09bdf80ab4",
+    "lib.es2015.promise.d.ts": "2c1afac30a01772cd2a9a298a7ce7706b5892e447bb46bdbeef720f7b5da77ad",
+    "lib.es2015.proxy.d.ts": "7b0225f483e4fa685625ebe43dd584bb7973bbd84e66a6ba7bbe175ee1048b4f",
+    "lib.es2015.reflect.d.ts": "c0a4b8ac6ce74679c1da2b3795296f5896e31c38e888469a8e0f99dc3305de60",
+    "lib.es2015.symbol.d.ts": "3084a7b5f569088e0146533a00830e206565de65cae2239509168b11434cd84f",
+    "lib.es2015.symbol.wellknown.d.ts": "c5079c53f0f141a0698faa903e76cb41cd664e3efb01cc17a5c46ec2eb0bef42",
+    "lib.es2016.array.include.d.ts": "32cafbc484dea6b0ab62cf8473182bbcb23020d70845b406f80b7526f38ae862",
+    "lib.es2016.d.ts": "7fe93b39b810eadd916be8db880dd7f0f7012a5cc6ffb62de8f62a2117fa6f1f",
+    "lib.es2016.full.d.ts": "19adadff5144f8f89fef0a10b299d7a96206f4913d4c17d4864171320e9edbd6",
+    "lib.es2016.intl.d.ts": "16c3ce214b0016bfd49496cf57ef7bd83e16f137e2f3d2fd9e90ac9c4919b4bd",
+    "lib.es2017.arraybuffer.d.ts": "b93ec88115de9a9dc1b602291b85baf825c85666bf25985cc5f698073892b467",
+    "lib.es2017.d.ts": "bb0074cc08b84a2374af33d8bf044b80851ccc9e719a5e202eacf40db2c31600",
+    "lib.es2017.date.d.ts": "f5c06dcc3fe849fcb297c247865a161f995cc29de7aa823afdd75aaaddc1419b",
+    "lib.es2017.full.d.ts": "83635f912d414d0c5a855fba3e18418e9db7e73c2e0e170009c48275cc8c1a36",
+    "lib.es2017.intl.d.ts": "c7b3542146734342e440a84b213384bfa188835537ddbda50d30766f0593aff9",
+    "lib.es2017.object.d.ts": "b77e16112127a4b169ef0b8c3a4d730edf459c5f25fe52d5e436a6919206c4d7",
+    "lib.es2017.sharedmemory.d.ts": "fbffd9337146eff822c7c00acbb78b01ea7ea23987f6c961eba689349e744f8c",
+    "lib.es2017.string.d.ts": "a995c0e49b721312f74fdfb89e4ba29bd9824c770bbb4021d74d2bf560e4c6bd",
+    "lib.es2017.typedarrays.d.ts": "ce6180fa19b1cccd07ee7f7dbb9a367ac19c0ed160573e4686425060b6df7f57",
+    "lib.es2018.asyncgenerator.d.ts": "3f02e2476bccb9dbe21280d6090f0df17d2f66b74711489415a8aa4df73c9675",
+    "lib.es2018.asynciterable.d.ts": "45e3ab34c1c013c8ab2dc1ba4c80c780744b13b5676800ae2e3be27ae862c40c",
+    "lib.es2018.d.ts": "1a7daebe4f45fb03d9ec53d60008fbf9ac45a697fdc89e4ce218bc94b94f94d6",
+    "lib.es2018.full.d.ts": "63787dbe04141f5d3ebce2e08b64bc9bba589beb0a4d22e7994d3005af1e48a6",
+    "lib.es2018.intl.d.ts": "805c86f6cca8d7702a62a844856dbaa2a3fd2abef0536e65d48732441dde5b5b",
+    "lib.es2018.promise.d.ts": "e42e397f1a5a77994f0185fd1466520691456c772d06bf843e5084ceb879a0ad",
+    "lib.es2018.regexp.d.ts": "f4c2b41f90c95b1c532ecc874bd3c111865793b23aebcc1c3cbbabcd5d76ffb0",
+    "lib.es2019.array.d.ts": "ab26191cfad5b66afa11b8bf935ef1cd88fabfcb28d30b2dfa6fad877d050332",
+    "lib.es2019.d.ts": "f94b133a3cb14a288803be545ac2683e0d0ff6661bcd37e31aaaec54fc382aed",
+    "lib.es2019.full.d.ts": "e3de8409485b0c198a5a075bd4a1d06d8f42dc52b377709d33b131b97de56456",
+    "lib.es2019.intl.d.ts": "689da16f46e647cef0d64b0def88910e818a5877ca5379ede156ca3afb780ac3",
+    "lib.es2019.object.d.ts": "2088bc26531e38fb05eedac2951480db5309f6be3fa4a08d2221abb0f5b4200d",
+    "lib.es2019.string.d.ts": "cb9d366c425fea79716a8fb3af0d78e6b22ebbab3bd64d25063b42dc9f531c1e",
+    "lib.es2019.symbol.d.ts": "500934a8089c26d57ebdb688fc9757389bb6207a3c8f0674d68efa900d2abb34",
+    "lib.es2020.bigint.d.ts": "f61286ee5fb2d37508cd98fc6126bad173ead4ee2b8d052185759b7e5f06ddfe",
+    "lib.es2020.d.ts": "f59d0650799f8782fd74cf73c19223730c6d1b9198671b1c5b3a38e1188b5953",
+    "lib.es2020.date.d.ts": "7ca53d13d2957003abb47922a71866ba7cb2068f8d154877c596d63c359fed25",
+    "lib.es2020.full.d.ts": "577cc49be1979782a5a695b46049566d123e2a75382f10bb82f2e5c87e29059a",
+    "lib.es2020.intl.d.ts": "718b25ce8ce9c7857d94bdee1af824c9222ec5992003d86cfc11b0f7452d4544",
+    "lib.es2020.number.d.ts": "b7bf9377723203b5a6a4b920164df22d56a43f593269ba6ae1fdc97774b68855",
+    "lib.es2020.promise.d.ts": "54725f8c4df3d900cb4dac84b64689ce29548da0b4e9b7c2de61d41c79293611",
+    "lib.es2020.sharedmemory.d.ts": "e5594bc3076ac29e6c1ebda77939bc4c8833de72f654b6e376862c0473199323",
+    "lib.es2020.string.d.ts": "2f3eb332c2d73e729f3364fcc0c2b375e72a121e8157d25a82d67a138c83a95c",
+    "lib.es2020.symbol.wellknown.d.ts": "6f4427f9642ce8d500970e4e69d1397f64072ab73b97e476b4002a646ac743b1",
+    "lib.es2021.d.ts": "8a15b4607d9a499e2dbeed9ec0d3c0d7372c850b2d5f1fb259e8f6d41d468a84",
+    "lib.es2021.full.d.ts": "e4a70ead7fea07d9abe520cc9e30c04ac035ebceaab28f9e67211610006c65de",
+    "lib.es2021.intl.d.ts": "34abe1ab58c58c5b81456eb89df245dc88e645556e58aaecd404f90999f3633f",
+    "lib.es2021.promise.d.ts": "db9709688f82c9e5f65a119c64d835f906efe5f559d08b11642d56eb85b79357",
+    "lib.es2021.string.d.ts": "4b25b8c874acd1a4cf8444c3617e037d444d19080ac9f634b405583fd10ce1f7",
+    "lib.es2021.weakref.d.ts": "37be57d7c90cf1f8112ee2636a068d8fd181289f82b744160ec56a7dc158a9f5",
+    "lib.es2022.array.d.ts": "6d3261badeb7843d157ef3e6f5d1427d0eeb0af0cf9df84a62cfd29fd47ac86e",
+    "lib.es2022.d.ts": "26e0fe14baee4e127f4365d1ae0b276f400562e45e19e35fd2d4c296684715e6",
+    "lib.es2022.error.d.ts": "195daca651dde22f2167ac0d0a05e215308119a3100f5e6268e8317d05a92526",
+    "lib.es2022.full.d.ts": "01a30f9e8582b369075c0808df71121e6855cb06fd8d3d39511d9ebb66405205",
+    "lib.es2022.intl.d.ts": "7cd1707984eda8558f39841d488b1fb483e85cd2b3659aecfecbac5e8169272c",
+    "lib.es2022.object.d.ts": "0508571a52475e245b02bc50fa1394065a0a3d05277fbf5120c3784b85651799",
+    "lib.es2022.regexp.d.ts": "fc611fea8d30ea72c6bbfb599c9b4d393ce22e2f5bfef2172534781e7d138104",
+    "lib.es2022.string.d.ts": "8f9af488f510c3015af3cc8c267a9e9d96c4dd38a1fdff0e11dc5a544711415b",
+    "lib.es2023.array.d.ts": "0bd714129fca875f7d4c477a1a392200b0bcd13fb2e80928cd334b63830ea047",
+    "lib.es2023.collection.d.ts": "e2c9037ae6cd2c52d80ceef0b3c5ffdb488627d71529cf4f63776daf11161c9a",
+    "lib.es2023.d.ts": "1e9332c23e9a907175e0ffc6a49e236f97b48838cc8aec9ce7e4cec21e544b65",
+    "lib.es2023.full.d.ts": "821bd6049b8f96b9d24c9fbc49b542dcf7a80d76f9efb330b5ef32c373af83d4",
+    "lib.es2023.intl.d.ts": "135d5cf4d345f59f1a9caadfafcd858d3d9cc68290db616cc85797224448cccc",
+    "lib.es2024.arraybuffer.d.ts": "20b63347da0165bdd340a8000b181d06bbafc6f4038140fe59a1c1ed4e5a4a03",
+    "lib.es2024.collection.d.ts": "4a07f9b76d361f572620927e5735b77d6d2101c23cdd94383eb5b706e7b36357",
+    "lib.es2024.d.ts": "3753fbc1113dc511214802a2342280a8b284ab9094f6420e7aa171e868679f91",
+    "lib.es2024.full.d.ts": "b9f65879de79a7647ad2e5b8089277c215911fa99d4b858d78014df6ba2852f3",
+    "lib.es2024.object.d.ts": "7c4e8dc6ab834cc6baa0227e030606d29e3e8449a9f67cdf5605ea5493c4db29",
+    "lib.es2024.promise.d.ts": "de7ba0fd02e06cd9a5bd4ab441ed0e122735786e67dde1e849cced1cd8b46b78",
+    "lib.es2024.regexp.d.ts": "6148e4e88d720a06855071c3db02069434142a8332cf9c182cda551adedf3156",
+    "lib.es2024.sharedmemory.d.ts": "610b3fdb89f2815c4e8bd4110459030c1211c942eff1149bcc09e85f9c0b3235",
+    "lib.es2024.string.d.ts": "0568d6befee03dd435bed4fc25c4e46865b24bdcb8c563fdc21f580a2c301904",
+    "lib.es2025.collection.d.ts": "30d62269b05b584741f19a5369852d5d34895aa2ac4fd948956f886d15f9cc0d",
+    "lib.es2025.d.ts": "999ca32883495a866aa5737fe1babc764a469e4cde6ee6b136a4b9ae68853e4b",
+    "lib.es2025.float16.d.ts": "f128dae7c44d8f35ee42e0a437000a57c9f06cc04f8b4fb42eebf44954d53dc8",
+    "lib.es2025.full.d.ts": "e03da518b01b46a4c99a1f88cd727ee98ddf14492c43dae1ae7a63e992971bab",
+    "lib.es2025.intl.d.ts": "d34cf31e644d311817a48c1a5e6bffb7ec02d4bbd423a98fcb9ee3f3b4088da2",
+    "lib.es2025.iterator.d.ts": "996fb27b15277369c68a4ba46ed138b4e9e839a02fb4ec756f7997629242fd9f",
+    "lib.es2025.promise.d.ts": "79b712591b270d4778c89706ca2cfc56ddb8c3f895840e477388f1710dc5eda9",
+    "lib.es2025.regexp.d.ts": "20884846cef428b992b9bd032e70a4ef88e349263f63aeddf04dda837a7dba26",
+    "lib.es5.d.ts": "bcd24271a113971ba9eb71ff8cb01bc6b0f872a85c23fdbe5d93065b375933cd",
+    "lib.es6.d.ts": "174a0fa01bb60bcb80e09b0b7bdcdddf688891433d6030244df5b44eb9ebd210",
+    "lib.esnext.array.d.ts": "5fcab789c73a97cd43828ee3cc94a61264cf24d4c44472ce64ced0e0f148bdb2",
+    "lib.esnext.collection.d.ts": "db59a81f070c1880ad645b2c0275022baa6a0c4f0acdc58d29d349c6efcf0903",
+    "lib.esnext.d.ts": "17f13ecb98cbc39243f2eee1f16d45cd8ec4706b03ee314f1915f1a8b42f6984",
+    "lib.esnext.date.d.ts": "673294292640f5722b700e7d814e17aaf7d93f83a48a2c9b38f33cbc940ad8b0",
+    "lib.esnext.decorators.d.ts": "d786b48f934cbca483b3c6d0a798cb43bbb4ada283e76fb22c28e53ae05b9e69",
+    "lib.esnext.disposable.d.ts": "1ecb8e347cb6b2a8927c09b86263663289418df375f5e68e11a0ae683776978f",
+    "lib.esnext.error.d.ts": "142efd4ce210576f777dc34df121777be89eda476942d6d6663b03dcb53be3ff",
+    "lib.esnext.full.d.ts": "ef4a897cd2a3f91000c10264e400b3667c7e51e1b7365f03b62e8081dc53bde6",
+    "lib.esnext.intl.d.ts": "ee997ac55b5bd0d36b3a55a770553afef05aefbfce848e6fb897c0511914e450",
+    "lib.esnext.sharedmemory.d.ts": "ed484fb2aa8a1a23d0277056ec3336e0a0b52f9b8d6a961f338a642faf43235d",
+    "lib.esnext.temporal.d.ts": "4ffedae1d1c2d53fdbca1c96d3c7dda544281f7d262f99b6880634f8fd8d9820",
+    "lib.esnext.typedarrays.d.ts": "83a730b125d477dd264df8ba479afab27a3dae7152b005c214ab94dc7ee44fd3",
+    "lib.scripthost.d.ts": "f13f4b465c99041e912db5c44129a94588e1aafee35a50eab51044833f50b4ee",
+    "lib.webworker.asynciterable.d.ts": "7f57fc4404ff020bc45b9c620aff2b40f700b95fe31164024c453a5e3c163c54",
+    "lib.webworker.d.ts": "a774c2b1879cb16f5d9ee4ea5e3b283b1c956a26fb86b9e66ecc1acd6f064dc3",
+    "lib.webworker.importscripts.d.ts": "2a2de5b9459b3fc44decd9ce6100b72f1b002ef523126c1d3d8b2a4a63d74d78",
+    "lib.webworker.iterable.d.ts": "7f57fc4404ff020bc45b9c620aff2b40f700b95fe31164024c453a5e3c163c54",
+}
+LINUX156_TYPESCRIPT_DEPENDENCY_HELPER = (
+    b"# TypeScript 6.0.2 standard libraries from the verified Linux156 package.\n"
+    b"_CHROMIX_TYPESCRIPT_LIBRARIES = {\n"
+    + b"".join(f"  {name!r}: {digest!r},\n".encode()
+               for name, digest in LINUX156_TYPESCRIPT_LIBRARIES.items())
+    + b'}\n'
+    b'\n'
+    b'\n'
+    b'def _is_chromix_typescript_library(filename):\n'
+    b"  root = pathlib.Path(_SRC_DIR) / 'third_party/devtools-frontend/src/node_modules/typescript/lib'\n"
+    b'  path = pathlib.Path(os.path.abspath(filename))\n'
+    b'  expected = _CHROMIX_TYPESCRIPT_LIBRARIES.get(path.name)\n'
+    b'  return (\n'
+    b'    path.parent == root\n'
+    b'    and expected is not None\n'
+    b'    and root.resolve() == root\n'
+    b'    and not path.is_symlink()\n'
+    b'    and path.is_file()\n'
+    b'    and hashlib.sha256(path.read_bytes()).hexdigest() == expected\n'
+    b'  )\n'
+    b'\n'
+    b'\n'
+)
+
 ROOT156_REPAIRS = {
+    "tools/typescript/validate_tsconfig.py": (
+        "a898d158049f59bc18e84355bfeb54b11c1ab00781cc1939ed5b7b9736c14ff1",
+        "f4b280e7b1776995645e9db53d331ba06cd430201dbdd717e7b64842a73c1032",
+        (b"import os\n", b"def validateDefinitionDeps(\n",
+         b"      and f_from_gen not in definitions_normalized\n"),
+        (b"import hashlib\nimport os\n",
+         LINUX156_TYPESCRIPT_DEPENDENCY_HELPER + b"def validateDefinitionDeps(\n",
+         b"      and f_from_gen not in definitions_normalized\n"
+         b"      and not _is_chromix_typescript_library(f)\n"),
+    ),
     "tools/typescript/ts_definitions.gni": (
         "b0bbe3563d1db30178681e49161d52147199b894e2d2f35b1c3a7d52e9d8182f",
         "b0bbe3563d1db30178681e49161d52147199b894e2d2f35b1c3a7d52e9d8182f",

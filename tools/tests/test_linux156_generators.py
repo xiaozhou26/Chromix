@@ -40,13 +40,13 @@ class Linux156GeneratorsTest(unittest.TestCase):
 
     def test_independent_source_identity_and_all_repairs(self):
         self.assertEqual(hashlib.sha256(RAW).hexdigest(),
-                         "35279f781fbf4d4e0655b4dd6f75c36a02815862c15446dc687c9d35238d8716")
+                         "44327c8f7fd7b90f79c81175b949ab0df3e663212d20708412a4c586254e1c91")
         self.assertEqual(FIXTURE["devtools_commit"], "8c62f844ad8e0664ff41a633bfc17c472f1c5fd6")
         self.assertEqual(FIXTURE["core_commit"], generators.PINS156[1])
         self.assertEqual(FIXTURE["platform_commit"], generators.PINS156[2])
         identities, changes = generators.source_plan(self.src, pins=generators.PINS156)
-        self.assertEqual(len(identities), 14)
-        self.assertEqual(len(changes), 8)
+        self.assertEqual(len(identities), 15)
+        self.assertEqual(len(changes), 9)
         for name, before, after, _ in changes:
             self.assertEqual(before.decode(), SOURCES[name])
             self.assertEqual(generators.sha256(after), identities[name]["repaired_sha256"])
@@ -212,7 +212,7 @@ class InstallLinux156GeneratorsTest(install_previous.InstallLinux155GeneratorsTe
                 result = self.inspect(host, repair=True)
             self.assertFalse(result["repair_needed"])
             self.assertEqual(result["esbuild"]["binary"]["host_arch"], host)
-            self.assertEqual(len(result["esbuild"]["sources"]), 14)
+            self.assertEqual(len(result["esbuild"]["sources"]), 15)
             self.assertEqual([call.kwargs["pins"] for call in esbuild.call_args_list], [generators.PINS156] * 2)
             self.assertTrue(esbuild.call_args_list[1].kwargs["repair"])
             self.assertEqual(run.call_count, 3)
@@ -233,6 +233,6 @@ class InstallLinux156GeneratorsTest(install_previous.InstallLinux155GeneratorsTe
             result = self.inspect(repair=True)
         self.assertEqual(run.call_count, 3)
         self.assertFalse(result["repair_needed"])
-        self.assertEqual(len(result["esbuild"]["sources"]), 14)
+        self.assertEqual(len(result["esbuild"]["sources"]), 15)
         self.assertEqual(result["sha256"], generators.TYPESCRIPT155_REPAIRED["x64"])
         self.assertEqual(self.install()["status"], "already_installed")
