@@ -1,0 +1,38 @@
+name: build-linux156-x64-ts-resume
+run-name: Linux156 x64 latest failed stage1 + exact TypeScript repair
+
+on:
+  workflow_dispatch:
+    inputs:
+      compile_jobs:
+        description: 'Ninja jobs; donor, source/GN identity and migration are fixed'
+        type: string
+        default: auto
+
+permissions:
+  actions: read
+  contents: read
+
+concurrency:
+  group: linux156-x64-ts-resume-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  resume:
+    name: Linux156 x64 (latest failed tree + exact TS migration)
+    uses: ./.github/workflows/build-posix-github.yml
+    with:
+      platform: linux
+      arch: x64
+      runner: ubuntu-22.04
+      artifact: chromix-linux-x64
+      max-stages: 8
+      build_profile: fast
+      compile_jobs: ${{ inputs.compile_jobs || 'auto' }}
+      resume_migration: linux156-ts
+      resume_run_id: '42457985068'
+      resume_tree_stage: '1'
+      resume_attempt: '1'
+      resume_artifact_ids: '13608199661'
+      use_upstream_cache: true
+    secrets: inherit

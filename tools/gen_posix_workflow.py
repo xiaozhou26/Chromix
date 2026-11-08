@@ -47,6 +47,10 @@ on:
         required: false
         type: string
         default: auto
+      resume_migration:
+        required: false
+        type: string
+        default: ''
       resume_run_id:
         required: false
         type: string
@@ -324,9 +328,24 @@ RESUME_STEPS = """      - name: Validate selected POSIX checkpoint
                [ "$RECOVERY_BRANCH" = build/linux155-arm64-stage4-recovery ]; then
             RECOVERY_BRANCH=build/chromium155-donors-20261011
           fi
-          python3 tools/validate_posix_snapshot.py --platform "$BUILD_PLATFORM" --arch '${{ inputs.arch }}' \\
-            --recovery-branch "$RECOVERY_BRANCH" \\
-            --report "${RUNNER_TEMP}/chromix-logs/snapshot-origin.json"
+          if [ '${{ inputs.resume_migration }}' = linux156-ts ]; then
+            test "$BUILD_PLATFORM" = linux
+            test "$BUILD_PROFILE" = fast
+            test "$SNAPSHOT_STAGE" = 1
+            test "$SNAPSHOT_ATTEMPT" = 1
+            if [ '${{ inputs.arch }}' = x64 ]; then
+              test "$SNAPSHOT_RUN_ID:$SNAPSHOT_ARTIFACT_IDS" = 42457985068:13608199661
+            else
+              test "$SNAPSHOT_RUN_ID:$SNAPSHOT_ARTIFACT_IDS" = 42457987604:13609217709
+            fi
+            python3 tools/validate_linux156_ts_checkpoint.py --arch '${{ inputs.arch }}' \\
+              --report "${RUNNER_TEMP}/chromix-logs/snapshot-origin.json"
+          else
+            test -z '${{ inputs.resume_migration }}'
+            python3 tools/validate_posix_snapshot.py --platform "$BUILD_PLATFORM" --arch '${{ inputs.arch }}' \\
+              --recovery-branch "$RECOVERY_BRANCH" \\
+              --report "${RUNNER_TEMP}/chromix-logs/snapshot-origin.json"
+          fi
       - name: Check out checkpoint patch definitions
         if: inputs.resume_run_id != ''
         uses: actions/checkout@v4
@@ -351,10 +370,19 @@ RESUME_STEPS = """      - name: Validate selected POSIX checkpoint
           WORK="${RUNNER_TEMP}/chromix-build"
           test ! -e "$WORK/src"
           bash build/posix/restore-snapshot.sh "$RESTORE" "$WORK"
-          python3 tools/migrate_restored_snapshot.py --workdir "$WORK" \\
-            --previous-repo "$GITHUB_WORKSPACE/.chromix-previous-repo" \\
-            --repo "$GITHUB_WORKSPACE" --platform '${{ inputs.platform }}' --arch '${{ inputs.arch }}' \\
-            2>&1 | tee "${RUNNER_TEMP}/chromix-logs/snapshot-migration.log"
+          if [ '${{ inputs.resume_migration }}' = linux156-ts ]; then
+            python3 tools/migrate_linux156_ts_snapshot.py --workdir "$WORK" \\
+              --previous-repo "$GITHUB_WORKSPACE/.chromix-previous-repo" --repo "$GITHUB_WORKSPACE" \\
+              --arch '${{ inputs.arch }}' --origin "${RUNNER_TEMP}/chromix-logs/snapshot-origin.json" \\
+              --download-report "${RUNNER_TEMP}/chromix-logs/snapshot-download.json" \\
+              2>&1 | tee "${RUNNER_TEMP}/chromix-logs/snapshot-migration.log"
+          else
+            test -z '${{ inputs.resume_migration }}'
+            python3 tools/migrate_restored_snapshot.py --workdir "$WORK" \\
+              --previous-repo "$GITHUB_WORKSPACE/.chromix-previous-repo" \\
+              --repo "$GITHUB_WORKSPACE" --platform '${{ inputs.platform }}' --arch '${{ inputs.arch }}' \\
+              2>&1 | tee "${RUNNER_TEMP}/chromix-logs/snapshot-migration.log"
+          fi
 """
 
 RUNTIME_FAILURE = """      - name: Upload failed macOS runtime bundle
@@ -575,6 +603,23 @@ def job(stage: int) -> str:
     parts.append('      - name: Record snapshot producer attempt\n'
                  '        id: snapshot_origin\n'
                  '        run: echo "attempt=$GITHUB_RUN_ATTEMPT" >> "$GITHUB_OUTPUT"\n')
+    if stage == 1:
+        parts.append("""      - name: Require exact Linux156 recovery inputs
+        if: inputs.resume_migration != ''
+        run: |
+          set -euo pipefail
+          test '${{ inputs.resume_migration }}' = linux156-ts
+          test '${{ inputs.platform }}' = linux
+          test '${{ inputs.use_upstream_cache }}' = true
+          test '${{ inputs.build_profile }}' = fast
+          test '${{ inputs.resume_tree_stage }}' = 1
+          test '${{ inputs.resume_attempt }}' = 1
+          case '${{ inputs.arch }}:${{ inputs.resume_run_id }}:${{ inputs.resume_artifact_ids }}' in
+            x64:42457985068:13608199661|arm64:42457987604:13609217709) ;;
+            *) echo 'Exact latest Linux156 failed checkpoint is required' >&2; exit 1 ;;
+          esac
+
+""")
     parts.append(LINUX_CLEAN)
     parts.append(MAC_STEPS)
     parts.append(NODE_PY)
