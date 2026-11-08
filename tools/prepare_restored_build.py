@@ -570,23 +570,28 @@ def prepare_linux_typescript(src: Path, *, host_arch: str, repair=False, repo: P
         raise ValueError("unexpected pinned TypeScript package metadata")
     for name in ("tsc.js", "_tsc.js", *TYPESCRIPT_LIBRARIES):
         regular(TYPESCRIPT_PACKAGE + "/lib/" + name)
-    digest = hashlib.sha256()
-    def walk_error(error):
-        raise error
-    for directory, dirs, files in os.walk(package.parent, followlinks=False, onerror=walk_error):
-        dirs.sort()
-        for name in dirs:
-            _safe_file(src, (Path(directory) / name).relative_to(src).as_posix())
-        for name in sorted(files):
-            path = regular((Path(directory) / name).relative_to(src).as_posix())
-            digest.update(json.dumps([path.relative_to(package.parent).as_posix(),
-                                      hashlib.sha256(linux_generators.read_verified(src, path.relative_to(src).as_posix())).hexdigest()]).encode())
+    def package_digest():
+        digest = hashlib.sha256()
+        def walk_error(error):
+            raise error
+        for directory, dirs, files in os.walk(package.parent, followlinks=False, onerror=walk_error):
+            dirs.sort()
+            for name in dirs:
+                _safe_file(src, (Path(directory) / name).relative_to(src).as_posix())
+            for name in sorted(files):
+                path = regular((Path(directory) / name).relative_to(src).as_posix())
+                digest.update(json.dumps([path.relative_to(package.parent).as_posix(),
+                                          hashlib.sha256(linux_generators.read_verified(src, path.relative_to(src).as_posix())).hexdigest()]).encode())
+        return digest.hexdigest()
 
-    if profile is not None and digest.hexdigest() != profile["typescript_tree"]:
+    package_sha256 = package_digest()
+
+    if profile is not None and package_sha256 not in (
+            profile["typescript_tree"], profile.get("typescript_repaired_tree", profile["typescript_tree"])):
         raise ValueError("unknown restored Linux TypeScript package bytes/inventory")
     desired = repaired[host_arch]
     result = {"path": TYPESCRIPT_WRAPPER, "sha256": before,
-              "package_sha256": digest.hexdigest(), "version": "6.0.2",
+              "package_sha256": package_sha256, "version": "6.0.2",
               "node": tool_paths("linux", host_arch)["node"].as_posix(),
               "repair_needed": before != desired}
     if profile is not None:
@@ -608,6 +613,10 @@ def prepare_linux_typescript(src: Path, *, host_arch: str, repair=False, repo: P
     if profile is not None:
         result["esbuild"] = linux_generators.prepare_esbuild(
             src, host_arch=host_arch, repair=True, before_publish=before_publish, pins=identity)
+    if profile is not None and "typescript_repaired_tree" in profile:
+        result["package_sha256"] = package_digest()
+        if result["package_sha256"] != profile["typescript_repaired_tree"]:
+            raise ValueError("unexpected repaired Linux TypeScript package bytes/inventory")
     if before != desired:
         lines = original.splitlines(keepends=True)
         start = lines.index(b"def GetBinaryPath():\n")

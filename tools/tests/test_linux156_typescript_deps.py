@@ -48,7 +48,7 @@ class Linux156TypeScriptDepsTest(unittest.TestCase):
         self.assertEqual(hashlib.sha256(SOURCES[HELPER].encode()).hexdigest(),
                          "a898d158049f59bc18e84355bfeb54b11c1ab00781cc1939ed5b7b9736c14ff1")
         self.assertEqual(hashlib.sha256(self.changes[HELPER]).hexdigest(),
-                         "f4b280e7b1776995645e9db53d331ba06cd430201dbdd717e7b64842a73c1032")
+                         "ea4234c9c286bebcb4adc5df2cf4ade0e3c132b9e1433ef18abb428a824565e6")
         original = SOURCES[HELPER].split("  exceptions_list = [", 1)[1].split("  ]", 1)[0]
         repaired = self.changes[HELPER].decode().split("  exceptions_list = [", 1)[1].split("  ]", 1)[0]
         self.assertEqual(original, repaired)
@@ -57,7 +57,7 @@ class Linux156TypeScriptDepsTest(unittest.TestCase):
     def test_only_exact_standard_library_name_root_and_bytes_are_accepted(self):
         module = self.helper()
         library = self.src / LIBROOT / "lib.es5.d.ts"
-        library.parent.mkdir(parents=True)
+        library.parent.mkdir(parents=True, exist_ok=True)
         library.write_text("independent standard library test bytes\n")
         digest = hashlib.sha256(library.read_bytes()).hexdigest()
         with mock.patch.dict(module._CHROMIX_TYPESCRIPT_LIBRARIES, {library.name: digest}, clear=True):
@@ -90,8 +90,10 @@ class Linux156TypeScriptDepsTest(unittest.TestCase):
             self.skipTest("set real Node and independently verified TypeScript package for declaration target")
         package = Path(package).resolve()
         observed = {p.name: hashlib.sha256(p.read_bytes()).hexdigest() for p in (package / "lib").glob("lib*.d.ts")}
-        self.assertEqual(observed, FIXTURE["typescript"]["standard_libraries_sha256"])
-        shutil.copytree(package, self.src / generators.DEVTOOLS / "node_modules/typescript")
+        expected = dict(FIXTURE["typescript"]["standard_libraries_sha256"])
+        expected["lib.dom.d.ts"] = FIXTURE["typescript"]["dom_before_sha256"]
+        self.assertEqual(observed, expected)
+        shutil.copytree(package, self.src / generators.DEVTOOLS / "node_modules/typescript", dirs_exist_ok=True)
         # Chromium's unchanged node.py uses the x64-named host-tool link on Linux.
         executable = self.src / "third_party/node/linux/node-linux-x64/bin/node"
         executable.parent.mkdir(parents=True)

@@ -206,6 +206,64 @@ PINS156 = ("156.0.8078.79", "28a211ab4ab6b83d919966a4f58a6df23cf4fb29",
 # DevTools 8c62f844 + portablelinux 6f0aa178 + core 28a211ab domains.
 LOCK156_SHA256 = "d6ea0c70a0b0f0324688d6ff0e4a5b088ff7a8460796735e6d3bacd10fedda73"
 SOURCE156_REPAIRS = {
+    "node_modules/typescript/lib/lib.dom.d.ts": (
+        "8f94946b666574f23ae405f192dce40df552fc49bc048fdfdaeb44ff6203ac41",
+        "973d88f96c6e775d613bddb9848043b1de35f4ed4f7129d779feb1cd4e3596f8",
+        (
+            (
+                b'     * [MDN Reference](https://developer.m0z111a.qjz9zk/docs/Web/API/Element/innerHTML)\n'
+                b'     */\n'
+                b'    innerHTML: string;'
+            ),
+            (
+                b'     * [MDN Reference](https://developer.m0z111a.qjz9zk/docs/Web/API/HTMLElement/hidden)\n'
+                b'     */\n'
+                b'    hidden: boolean | "until-found";'
+            ),
+            (
+                b'     * [MDN Reference](https://developer.m0z111a.qjz9zk/docs/Web/API/HTMLScriptElement/src)\n'
+                b'     */\n'
+                b'    src: string;'
+            ),
+            (
+                b'     * [MDN Reference](https://developer.m0z111a.qjz9zk/docs/Web/API/ShadowRoot/innerHTML)\n'
+                b'     */\n'
+                b'    innerHTML: string;'
+            ),
+        ),
+        (
+            (
+                b'     * [MDN Reference](https://developer.m0z111a.qjz9zk/docs/Web/API/Element/innerHTML)\n'
+                b'     */\n'
+                b'    // Chromium modification to work around\n'
+                b'    // https://github.com/microsoft/TypeScript/issues/30024.\n'
+                b'    get innerHTML(): string;\n'
+                b'    set innerHTML(html: string|TrustedHTML);'
+            ),
+            (
+                b'     * [MDN Reference](https://developer.m0z111a.qjz9zk/docs/Web/API/HTMLElement/hidden)\n'
+                b'     */\n'
+                b'    // Chromium modification since a lot of errors are thrown when `hidden` is boolean|"until-found"\n'
+                b'    hidden: boolean;'
+            ),
+            (
+                b'     * [MDN Reference](https://developer.m0z111a.qjz9zk/docs/Web/API/HTMLScriptElement/src)\n'
+                b'     */\n'
+                b'    // Chromium modification to work around\n'
+                b'    // https://github.com/microsoft/TypeScript/issues/30024.\n'
+                b'    get src(): string;\n'
+                b'    set src(url: string|TrustedScriptURL);'
+            ),
+            (
+                b'     * [MDN Reference](https://developer.m0z111a.qjz9zk/docs/Web/API/ShadowRoot/innerHTML)\n'
+                b'     */\n'
+                b'    // Chromium modification to work around\n'
+                b'    // https://github.com/microsoft/TypeScript/issues/30024.\n'
+                b'    get innerHTML(): string;\n'
+                b'    set innerHTML(html: string|TrustedHTML);'
+            ),
+        ),
+    ),
     "front_end/ui/legacy/ARIAUtils.ts": (
         "b8bdfdb829af51ba09253de4cea27880a9481871b82ca5d673a7bdad96cacd4d",
         "29e9150b81c4c88e60bd29441182e2d1acc5ddbc349bcbb4dfe0527b7bc484ad",
@@ -309,12 +367,14 @@ SOURCE156_REPAIRS = {
     ),
 }
 
+TYPESCRIPT156_DOM_TREE = "4694d67f47214ca388c2e3287eb33b4531e2e085b6fdea8e43670961366edc44"
+
 LINUX156_TYPESCRIPT_LIBRARIES = {
     "lib.d.ts": "0e6477e5049e579cc5de741a70ac91235252edc0468b2e569f22de9db3357786",
     "lib.decorators.d.ts": "1ce14b81c5cc821994aa8ec1d42b220dd41b27fcc06373bce3958af7421b77d4",
     "lib.decorators.legacy.d.ts": "b3a048b3e9302ef9a34ef4ebb9aecfb28b66abb3bce577206a79fee559c230da",
     "lib.dom.asynciterable.d.ts": "7f57fc4404ff020bc45b9c620aff2b40f700b95fe31164024c453a5e3c163c54",
-    "lib.dom.d.ts": "8f94946b666574f23ae405f192dce40df552fc49bc048fdfdaeb44ff6203ac41",
+    "lib.dom.d.ts": "973d88f96c6e775d613bddb9848043b1de35f4ed4f7129d779feb1cd4e3596f8",
     "lib.dom.iterable.d.ts": "7f57fc4404ff020bc45b9c620aff2b40f700b95fe31164024c453a5e3c163c54",
     "lib.es2015.collection.d.ts": "105ba8ff7ba746404fe1a2e189d1d3d2e0eb29a08c18dded791af02f29fb4711",
     "lib.es2015.core.d.ts": "eadcffda2aa84802c73938e589b9e58248d74c59cb7fcbca6474e3435ac15504",
@@ -446,7 +506,7 @@ LINUX156_TYPESCRIPT_DEPENDENCY_HELPER = (
 ROOT156_REPAIRS = {
     "tools/typescript/validate_tsconfig.py": (
         "a898d158049f59bc18e84355bfeb54b11c1ab00781cc1939ed5b7b9736c14ff1",
-        "f4b280e7b1776995645e9db53d331ba06cd430201dbdd717e7b64842a73c1032",
+        "ea4234c9c286bebcb4adc5df2cf4ade0e3c132b9e1433ef18abb428a824565e6",
         (b"import os\n", b"def validateDefinitionDeps(\n",
          b"      and f_from_gen not in definitions_normalized\n"),
         (b"import hashlib\nimport os\n",
@@ -503,6 +563,16 @@ ROOT156_REPAIRS = {
 }
 
 
+ROOT156_INTERMEDIATE_REPAIRS = {
+    "tools/typescript/validate_tsconfig.py": (
+        "f4b280e7b1776995645e9db53d331ba06cd430201dbdd717e7b64842a73c1032",
+        "ea4234c9c286bebcb4adc5df2cf4ade0e3c132b9e1433ef18abb428a824565e6",
+        b"8f94946b666574f23ae405f192dce40df552fc49bc048fdfdaeb44ff6203ac41",
+        b"973d88f96c6e775d613bddb9848043b1de35f4ed4f7129d779feb1cd4e3596f8",
+    ),
+}
+
+
 def generator_profile(pins: tuple = PINS) -> dict:
     """Select independent versioned pins; never infer a donor from its files."""
     if type(pins) is not tuple or not all(type(value) is str for value in pins):
@@ -521,6 +591,7 @@ def generator_profile(pins: tuple = PINS) -> dict:
         return {"version": ESBUILD155_VERSION, "lock": LOCK156_SHA256,
                 "module": MODULE155_FILES, "archives": ARCHIVES155, "binaries": BINARY155_HASHES,
                 "sources": SOURCE156_REPAIRS, "root_sources": ROOT156_REPAIRS,
+                "typescript_repaired_tree": TYPESCRIPT156_DOM_TREE,
                 "typescript_portable": TYPESCRIPT155_PORTABLE,
                 "typescript_repaired": TYPESCRIPT155_REPAIRED, "typescript_tree": TYPESCRIPT155_TREE}
     raise ValueError("unverified Linux generator pins")
@@ -924,7 +995,13 @@ def source_plan(src: Path, *, pins: tuple = PINS) -> tuple[dict, list]:
         regular(src, name)
         payload, metadata = _read_verified_with_metadata(src, name)
         digest = sha256(payload)
-        if digest not in (original_hash, repaired_hash):
+        intermediate = False
+        if pins == PINS156 and name in ROOT156_INTERMEDIATE_REPAIRS:
+            transition = ROOT156_INTERMEDIATE_REPAIRS[name]
+            if digest == transition[0] and repaired_hash == transition[1]:
+                old, new = transition[2:]
+                intermediate = True
+        if digest not in (original_hash, repaired_hash) and not intermediate:
             raise ValueError(f"unknown Linux esbuild source: {name}")
         identities[name] = {"sha256": digest, "original_sha256": original_hash,
                             "repaired_sha256": repaired_hash}

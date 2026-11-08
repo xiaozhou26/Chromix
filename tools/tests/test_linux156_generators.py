@@ -40,13 +40,13 @@ class Linux156GeneratorsTest(unittest.TestCase):
 
     def test_independent_source_identity_and_all_repairs(self):
         self.assertEqual(hashlib.sha256(RAW).hexdigest(),
-                         "44327c8f7fd7b90f79c81175b949ab0df3e663212d20708412a4c586254e1c91")
+                         "4666a3339967d0b448a79c5e4f082fe75f84cbe9f84ab59d3e5a3db7ddbc096c")
         self.assertEqual(FIXTURE["devtools_commit"], "8c62f844ad8e0664ff41a633bfc17c472f1c5fd6")
         self.assertEqual(FIXTURE["core_commit"], generators.PINS156[1])
         self.assertEqual(FIXTURE["platform_commit"], generators.PINS156[2])
         identities, changes = generators.source_plan(self.src, pins=generators.PINS156)
-        self.assertEqual(len(identities), 15)
-        self.assertEqual(len(changes), 9)
+        self.assertEqual(len(identities), 16)
+        self.assertEqual(len(changes), 10)
         for name, before, after, _ in changes:
             self.assertEqual(before.decode(), SOURCES[name])
             self.assertEqual(generators.sha256(after), identities[name]["repaired_sha256"])
@@ -193,11 +193,21 @@ class InstallLinux156GeneratorsTest(install_previous.InstallLinux155GeneratorsTe
         super().setUp()
         for name in generators.ROOT156_REPAIRS:
             self.write(name, SOURCES[name].encode())
+        from tools.tests.test_linux154_generators import tree_hash
+        dom = self.src / generators.DEVTOOLS / "node_modules/typescript/lib/lib.dom.d.ts"
+        original_dom = dom.read_bytes()
+        repaired_dom = next(after for name, _, after, _ in
+                            generators.source_plan(self.src, pins=generators.PINS156)[1]
+                            if name.endswith("/lib.dom.d.ts"))
+        dom.write_bytes(repaired_dom)
+        repaired_tree = tree_hash(self.src / prepare.TYPESCRIPT_PACKAGE)
+        dom.write_bytes(original_dom)
         original = generators.generator_profile
         def profile(pins=generators.PINS):
             result = original(pins)
             if pins == generators.PINS156:
                 result["root_sources"] = generators.ROOT156_REPAIRS
+                result["typescript_repaired_tree"] = repaired_tree
             return result
         self.patch(generators, "generator_profile", side_effect=profile)
 
@@ -212,7 +222,7 @@ class InstallLinux156GeneratorsTest(install_previous.InstallLinux155GeneratorsTe
                 result = self.inspect(host, repair=True)
             self.assertFalse(result["repair_needed"])
             self.assertEqual(result["esbuild"]["binary"]["host_arch"], host)
-            self.assertEqual(len(result["esbuild"]["sources"]), 15)
+            self.assertEqual(len(result["esbuild"]["sources"]), 16)
             self.assertEqual([call.kwargs["pins"] for call in esbuild.call_args_list], [generators.PINS156] * 2)
             self.assertTrue(esbuild.call_args_list[1].kwargs["repair"])
             self.assertEqual(run.call_count, 3)
@@ -233,6 +243,6 @@ class InstallLinux156GeneratorsTest(install_previous.InstallLinux155GeneratorsTe
             result = self.inspect(repair=True)
         self.assertEqual(run.call_count, 3)
         self.assertFalse(result["repair_needed"])
-        self.assertEqual(len(result["esbuild"]["sources"]), 15)
+        self.assertEqual(len(result["esbuild"]["sources"]), 16)
         self.assertEqual(result["sha256"], generators.TYPESCRIPT155_REPAIRED["x64"])
         self.assertEqual(self.install()["status"], "already_installed")
