@@ -315,6 +315,14 @@ function Assert-RestoredToolchain {
   }
 }
 
+function Repair-FreshMidl {
+  if ($Revisions.ChromiumVersion -ne "156.0.8078.79" -or $RestoredUpstream) { return }
+  Invoke-Checked $Python @(
+    (Join-Path $Repo "tools\windows156_fresh.py"), "--phase", "midl",
+    "--repo", $Repo, "--workdir", $Root, "--arch", $Arch
+  )
+}
+
 function Assert-PreparedLayers {
   $markers = @{
     ".chromix-source-unpacked" = $Revisions.ChromiumVersion
@@ -377,6 +385,7 @@ if (Test-Path $readyMarker) {
   Assert-Arm64RustToolchain
   if (-not $RestoredUpstream) {
     Assert-CurrentPatchStack
+    Repair-FreshMidl
     Write-Host "==> source layers already prepared and verified: $versionKey"
     return
   }
@@ -432,6 +441,9 @@ if (Test-Path (Join-Path $Src ".chromix-layer-in-progress")) {
     }
     Remove-Item (Join-Path $Src ".chromix-layer-in-progress") -Force
   } else {
+    if ($Revisions.ChromiumVersion -eq "156.0.8078.79") {
+      throw "interrupted fresh source layer $interruptedLayer; preserve this tree and restore the latest valid snapshot"
+    }
     Write-Host "==> discarding a source tree interrupted during $interruptedLayer application"
     Remove-Item $Src -Recurse -Force
   }
@@ -486,6 +498,10 @@ if ($RestoredUpstream) {
 }
 
 if (-not (Test-Marker ".chromix-source-unpacked" $Revisions.ChromiumVersion)) {
+  if ($Revisions.ChromiumVersion -eq "156.0.8078.79" -and (Test-Path $Src) -and
+      (Get-ChildItem -LiteralPath $Src -Force | Select-Object -First 1)) {
+    throw "fresh source unpack marker missing; restore the latest valid snapshot; refusing to delete the build tree"
+  }
   if (Test-Path $Src) { Remove-Item $Src -Recurse -Force }
   New-Item -ItemType Directory -Force -Path $Src | Out-Null
   Write-Host "==> retrieving Chromium $($Revisions.ChromiumVersion) tarball"
@@ -504,11 +520,18 @@ if (-not (Test-Marker ".chromix-source-unpacked" $Revisions.ChromiumVersion)) {
     (Join-Path $Ungoogled "utils\downloads.py"), "retrieve",
     "-c", $DownloadCache, "-i", (Join-Path $Windows "downloads.ini")
   )
-  foreach ($directory in @(
+  $dependencyDirectories = @(
     (Join-Path $Src "third_party\microsoft_dxheaders\src"),
     (Join-Path $Src "third_party\microsoft_webauthn\src"),
     (Join-Path $Src "third_party\devtools-frontend\src\third_party\esbuild")
-  )) {
+  )
+  if ($Revisions.ChromiumVersion -eq "156.0.8078.79") {
+    $dependencyDirectories += @(
+      (Join-Path $Src "third_party\typescript\windows-amd64\src"),
+      (Join-Path $Src "third_party\microsoft_multimedia_redirection\src")
+    )
+  }
+  foreach ($directory in $dependencyDirectories) {
     if (Test-Path $directory) { Remove-Item $directory -Recurse -Force }
     New-Item -ItemType Directory -Force -Path $directory | Out-Null
   }
@@ -574,6 +597,7 @@ if (-not (Test-Marker ".chromix-patches" $patchSetKey)) {
 }
 
 Assert-CurrentPatchStack
+Repair-FreshMidl
 
 # Domain substitution is deferred until after build-time downloads. Applying it
 # here rewrites toolchain URLs used by Chromium and the Windows overlay.

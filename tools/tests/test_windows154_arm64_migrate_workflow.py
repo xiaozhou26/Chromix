@@ -125,10 +125,10 @@ def test_prerestored_entry_is_fail_closed_and_cannot_reextract():
                      "src\\.chromix-source-ready", "src\\out\\Default\\build.ninja",
                      ".chromix-windows154-arm64-migration.json", "out\\Chromix"):
         assert required in guard
-    for binding in ("$migrationReceipt.target_sha -cne $env:GITHUB_SHA",
-                    "$migrationReceipt.previous_sha -cne '15a6425cfbd7a7ecd4a69ad206d0650778bf8253'",
-                    "$migrationReceipt.patch_count -ne 224", "$migrationReceipt.donor_run_id -ne 37455471388",
-                    "$migrationReceipt.donor_job_id -ne 113438156537"):
+    for binding in ("$arm64MigrationReceipt.target_sha -cne $env:GITHUB_SHA",
+                    "$arm64MigrationReceipt.previous_sha -cne '15a6425cfbd7a7ecd4a69ad206d0650778bf8253'",
+                    "$arm64MigrationReceipt.patch_count -ne 224", "$arm64MigrationReceipt.donor_run_id -ne 37455471388",
+                    "$arm64MigrationReceipt.donor_job_id -ne 113438156537"):
         assert binding in guard
     assert 'if (-not $FromArtifact -and -not $FromSynced -and $StageIndex -gt 1)' in guard
     assert 'snapshot_safe $(if ($FromSynced -or' in text

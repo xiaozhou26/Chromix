@@ -12,6 +12,7 @@ param(
   [ValidateRange(60, 300)] [int]$StageBudgetMinutes = 300,
   [switch]$FromArtifact,
   [switch]$FromSynced,
+  [switch]$FreshNative,
   [string]$MigrationReceipt = "",
   [string]$MigrationDonorRepo = "",
   [ValidateSet("stage7", "stage8", "stage8-api")] [string]$MigrationCheckpoint = "stage7",
@@ -36,6 +37,13 @@ $RestoredUpstream = $false
 $RecoveryDiagnostics = $null
 # CI opt-in requires a full restore, including validation and artifact resumes.
 $RequireUpstreamCache = $UseUpstreamCache -or $UpstreamRunId -or ($env:CHROMIX_USE_UPSTREAM_CACHE -eq "1")
+$Fresh156 = $FreshNative -and $Revisions.ChromiumVersion -eq "156.0.8078.79"
+if ($FreshNative -and (-not $Fresh156 -or $BuildProfile -cne "native" -or $RequireUpstreamCache -or
+    $env:CHROMIX_PREFER_UPSTREAM_CACHE -eq "1" -or $FromArtifact -or $MigrationReceipt -or $MigrationDonorRepo -or
+    $env:CHROMIX_WINDOWS_MIGRATION_REPO -or $env:CHROMIX_WINDOWS_MIGRATION_SHA -or
+    $env:CHROMIX_WINDOWS_VERIFY_SOURCE_REPO -or $env:CHROMIX_WINDOWS_VERIFY_SOURCE_SHA)) {
+  throw "Windows156 fresh requires native PGO2, explicit cache=false, and no historical recovery inputs"
+}
 $PartsDir = "C:\parts"
 $UpstreamCacheDir = "C:\u"
 # Standalone validation remains available; CI validates inside the first build job.
@@ -828,6 +836,9 @@ if ($MigrationReceipt -or $MigrationDonorRepo) {
   }
   [IO.File]::Copy($MigrationReceipt, (Join-Path $RecoveryDiagnostics 'migration.json'), $false)
   Write-OutVar recovery_report_dir $RecoveryDiagnostics
+} elseif ($FromSynced -and $Fresh156) {
+  python (Join-Path $Repo "tools\windows156_fresh.py") --phase resume --repo $Repo --workdir $WorkDir --arch $Arch
+  if ($LASTEXITCODE -ne 0) { throw "Windows156 preserved tree verification failed; refusing cold fallback" }
 } elseif ($FromSynced) {
   if ($FromArtifact -or $StageIndex -ne 13 -or $Arch -cne 'arm64' -or
       $BuildProfile -cne 'native' -or -not $RequireUpstreamCache -or $ValidateOnly -or
@@ -982,6 +993,15 @@ if ($RequireUpstreamCache -and -not $RestoredUpstream -and
 }
 
 $VerifyRestoredSource = $false
+if ($Fresh156 -and -not $FromSynced) {
+  if ($StageIndex -ne 1 -or (Test-Path $Src)) { throw "Windows156 first fresh entry requires an empty stage1 workdir" }
+  python (Join-Path $Repo "tools\windows156_fresh.py") --phase initialize --repo $Repo --workdir $WorkDir --arch $Arch
+  if ($LASTEXITCODE -ne 0) { throw "Windows156 fresh identity initialization failed" }
+}
+if ($Revisions.ChromiumVersion -eq "156.0.8078.79" -and -not $RestoredUpstream -and
+    -not $RequireUpstreamCache -and -not $Fresh156) {
+  throw "Windows156 source preparation requires explicit -FreshNative; no implicit cold fallback"
+}
 if ($FromArtifact -and -not $RestoredUpstream) {
   $unpackedMarker = Join-Path $Src ".chromix-source-unpacked"
   $readyMarker = Join-Path $Src ".chromix-source-ready"
@@ -1109,6 +1129,11 @@ $mergeArgs += @(
   (Join-Path $Repo "build\args.windows.gn")
 )
 if ($Arch -eq "arm64") { $mergeArgs += (Join-Path $Repo "build\args.windows.arm64.gn") }
+if ($Fresh156) {
+  python (Join-Path $Repo "tools\windows156_fresh.py") --phase overlay --repo $Repo --workdir $WorkDir --arch $Arch
+  if ($LASTEXITCODE -ne 0) { throw "Windows156 native PGO2 overlay failed" }
+  $mergeArgs += (Join-Path $WorkDir "windows156-native.gn")
+}
 python @mergeArgs
 if ($LASTEXITCODE -ne 0) { throw "GN argument merge failed" }
 if ($Arch -eq "arm64") {
@@ -1171,6 +1196,11 @@ for relative, keys in RESTORED.items():
   if (-not (Test-Path $gn)) {
     python tools\gn\bootstrap\bootstrap.py -o $gn --skip-generate-buildfiles
     if ($LASTEXITCODE -ne 0) { throw "GN bootstrap failed" }
+  }
+  if ($Fresh156) {
+    & "$PSScriptRoot\configure-node.ps1" -NodePath (Join-Path $Src "third_party\node\win\node.exe")
+    python (Join-Path $Repo "tools\windows156_fresh.py") --phase probe --repo $Repo --workdir $WorkDir --arch $Arch
+    if ($LASTEXITCODE -ne 0) { throw "Windows156 dependencies/PGO verification failed" }
   }
   if (-not (Test-Path $domainMarker)) {
     # The pinned helper selects compression from the cache filename's suffix.

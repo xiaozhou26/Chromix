@@ -148,6 +148,105 @@ def workflow():
     return result
 
 
+def fresh_workflow(arch):
+    """Keep the one-time 156 source authorization separate from historical entries."""
+    if arch not in ('x64', 'arm64'):
+        raise ValueError('unsupported Windows fresh architecture')
+    result = deepcopy(workflow())
+    name = f'build-win-{arch}-156-fresh'
+    result['name'] = name
+    result['run-name'] = dispatch_run_name(
+        f'w156-{arch}', (('cache', 'use_upstream_cache'), ('run', 'resume_run_id'),
+                        ('jobs', 'compile_jobs')), name)
+    result['on'] = {'workflow_dispatch': {'inputs': {
+        'use_upstream_cache': {'type': 'boolean', 'default': True,
+                               'description': 'Set false explicitly to authorize this Windows156 fresh/native-PGO2 path.'},
+        'resume_run_id': {'type': 'string', 'default': '',
+                          'description': 'After failure: donor run containing the latest valid same-SHA preserved tree; never fresh fallback.'},
+        'compile_jobs': {'type': 'string', 'default': 'auto'},
+    }}}
+    result['concurrency']['group'] = name + '-${{ github.ref }}'
+    result['env'] = dict(CHROMIX_BUILD_PROFILE='native', CHROMIX_TARGET_ARCH=arch,
+                         CHROMIX_JOBS="${{ inputs.compile_jobs || 'auto' }}",
+                         CHROMIX_USE_UPSTREAM_CACHE='0', CHROMIX_PREFER_UPSTREAM_CACHE='0',
+                         DEPOT_TOOLS_WIN_TOOLCHAIN='0', DEPOT_TOOLS_METRICS='0',
+                         DEPOT_TOOLS_COLLECT_METRICS='0')
+    for index in range(1, 13):
+        job = result['jobs'][f'build-{index}']
+        job['name'] = f'Windows156 {arch} stage {index}'
+        steps = []
+        for step in job['steps']:
+            label = step.get('name', '')
+            if label in ('Upload upstream cache diagnostics', 'Upload restored reuse evidence'):
+                continue
+            if label == 'Verify generated Windows ARM64 workflow':
+                step['run'] = ('python tools/gen_windows_arm64_workflow.py --check\n'
+                               'if ($LASTEXITCODE -ne 0) { throw "Windows workflow generation is stale" }')
+            if label == 'Download tree from previous stage':
+                step['with']['pattern'] = (f'win-{arch}-156-tree-s{index-1}-attempt-'
+                    '${{ needs.build-' + str(index - 1) + '.outputs.snapshot_attempt }}-part*')
+            if step.get('id') == 'stage':
+                step.pop('env', None)
+                step['run'] = (f'build\\windows\\ci-stage.ps1 -StageIndex {index} -MaxStages 12 -FreshNative'
+                               + (' -FromSynced' if index > 1 else ' -FromSynced:([bool]$env:RESUME_RUN_ID)'))
+                if index == 1:
+                    step['env'] = {'RESUME_RUN_ID': '${{ inputs.resume_run_id }}'}
+            if label == 'Ensure build tree snapshot':
+                step['env'] = {'UPLOAD_PARTS': '${{ steps.stage.outputs.upload_parts }}',
+                               'STAGE_OUTCOME': '${{ steps.stage.outcome }}'}
+                step['run'] = ("if ($env:UPLOAD_PARTS -ne 'true' -or $env:STAGE_OUTCOME -ne 'success') {\n"
+                               f'  . build\\windows\\ci-parts.ps1 -Root C:\\c -PartsDir C:\\parts -Mode Synced -Arch {arch}\n'
+                               "}\nif (-not (Test-Path 'C:\\parts\\p1\\tree.7z.001')) { throw 'No complete snapshot volume set' }")
+                step['if'] = "${{ always() && steps.stage.outputs.snapshot_safe == 'true' && steps.stage.outputs.finished != 'true' }}"
+            if label.startswith('Upload tree part'):
+                part = label.rsplit(' ', 1)[1]
+                step['with']['name'] = f'win-{arch}-156-tree-s{index}-attempt-${{{{ github.run_attempt }}}}-part{part}'
+                step['with']['retention-days'] = 14
+            if label == 'Upload final bundle':
+                step['with']['name'] = f'win-{arch}'
+                step['with']['path'] = step['with']['path'].replace('win-arm64', f'win-{arch}')
+            if label == 'Upload final source receipt' and arch == 'x64':
+                continue
+            if step.get('uses') == 'actions/checkout@v4':
+                steps.append(step)
+                steps.append({'name': 'Require explicit Windows156 fresh authorization', 'shell': 'powershell',
+                              'env': {'CACHE': '${{ inputs.use_upstream_cache }}'},
+                              'run': "if ($env:CACHE -cne 'false') { throw 'Set use_upstream_cache=false explicitly; no automatic cold fallback' }"})
+                if index == 1:
+                    steps.append({'name': 'Restore latest valid preserved snapshot',
+                                  'if': "${{ inputs.resume_run_id != '' }}", 'shell': 'powershell',
+                                  'env': {'RESUME_RUN_ID': '${{ inputs.resume_run_id }}', 'GH_TOKEN': '${{ github.token }}'},
+                                  'run': f'''python tools/windows156_fresh.py --phase snapshot --repo "$env:GITHUB_WORKSPACE" --workdir C:\\c\\chromix --arch {arch} --run-id "$env:RESUME_RUN_ID" --report "$env:RUNNER_TEMP\\windows156-snapshot.json"
+if ($LASTEXITCODE -ne 0) {{ throw 'No valid preserved snapshot; refusing fresh fallback' }}
+python tools/download_windows_snapshot.py --manifest "$env:RUNNER_TEMP\\windows156-snapshot.json" --destination C:\\restore --report "$env:RUNNER_TEMP\\windows156-download.json"
+if ($LASTEXITCODE -ne 0) {{ throw 'Snapshot download/digest verification failed' }}
+''' + fresh_extract()})
+                continue
+            steps.append(step)
+            if label == 'Download tree from previous stage':
+                steps.append({'name': 'Restore preserved source and output', 'shell': 'powershell', 'run': fresh_extract()})
+        job['steps'] = steps
+    if arch == 'x64':
+        del result['jobs']['verify-arm64']
+        for step in result['jobs']['complete']['steps']:
+            step['run'] = step['run'].replace('win-arm64', 'win-x64')
+    return result
+
+
+def fresh_extract():
+    return '''& 7z.exe t C:\\restore\\tree.7z.001
+if ($LASTEXITCODE -ne 0) { throw 'Preserved tree archive verification failed' }
+if (Test-Path C:\\c\\chromix) { throw 'Refusing to overwrite existing source/output' }
+& 7z.exe x C:\\restore\\tree.7z.001 -oC:\\c -y
+if ($LASTEXITCODE -ne 0) { throw 'Preserved tree restore failed' }
+Remove-Item -LiteralPath C:\\restore -Recurse -Force'''
+
+
+def render_fresh(arch):
+    return ('# Generated by tools/gen_windows_arm64_workflow.py; explicit Windows156 fresh/native-PGO2 only.\n'
+            + yaml.safe_dump(fresh_workflow(arch), sort_keys=False, width=120))
+
+
 def render():
     return ('# Generated by tools/gen_windows_arm64_workflow.py; edit the generator or x64 template.\n'
             '# x64-host cross-build; success requires the separate native ARM64 verification job.\n'
@@ -158,12 +257,15 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--check', action='store_true')
     args = parser.parse_args()
-    expected = render()
-    if args.check:
-        if not OUTPUT.is_file() or OUTPUT.read_text(encoding='utf-8') != expected:
-            parser.exit(1, 'Windows ARM64 workflow is stale; run tools/gen_windows_arm64_workflow.py\n')
-    else:
-        OUTPUT.write_text(expected, encoding='utf-8')
+    outputs = {OUTPUT: render()}
+    outputs.update({OUTPUT.parent / f'build-win-{arch}-156-fresh.yml': render_fresh(arch)
+                    for arch in ('x64', 'arm64')})
+    for path, expected in outputs.items():
+        if args.check:
+            if not path.is_file() or path.read_text(encoding='utf-8') != expected:
+                parser.exit(1, f'{path.name} is stale; run tools/gen_windows_arm64_workflow.py\n')
+        else:
+            path.write_text(expected, encoding='utf-8')
 
 
 if __name__ == '__main__':

@@ -10,6 +10,7 @@
 param(
   [string]$WorkDir = "$PSScriptRoot\..\..\.chromix-build-win",
   [switch]$Resume,
+  [switch]$FreshNative,
   [int]$Jobs = 8,
   [switch]$ApplyDomainSubstitution,
   [ValidateSet("x64", "arm64")]
@@ -22,6 +23,15 @@ $Revisions = & "$PSScriptRoot\read-platform-pins.ps1" -Repo $Repo
 $WorkDir = [IO.Path]::GetFullPath($WorkDir)
 $Src = Join-Path $WorkDir "src"
 $Out = Join-Path $Src "out\Chromix"
+$Fresh156 = $Revisions.ChromiumVersion -eq "156.0.8078.79" -and
+  -not (Test-Path (Join-Path $Src ".chromix-upstream-restored.json"))
+if ($Fresh156) {
+  if (-not $FreshNative -and -not $Resume) { throw "Windows156 first source build requires explicit -FreshNative" }
+  if ($env:CHROMIX_BUILD_PROFILE -and $env:CHROMIX_BUILD_PROFILE -ne "native") { throw "Windows156 fresh requires native PGO2" }
+  $phase = if ($Resume) { "resume" } else { "initialize" }
+  python (Join-Path $Repo "tools\windows156_fresh.py") --phase $phase --repo $Repo --workdir $WorkDir --arch $Arch
+  if ($LASTEXITCODE -ne 0) { throw "Windows156 fresh identity check failed" }
+}
 $UngoogledTooling = Join-Path $WorkDir "tooling\ungoogled-chromium"
 $WindowsTooling = Join-Path $WorkDir "tooling\ungoogled-chromium-windows"
 
@@ -65,6 +75,11 @@ $mergeArgs += @(
 if ($Arch -eq "arm64") { $mergeArgs += (Join-Path $Repo "build\args.windows.arm64.gn") }
 if (Test-Path (Join-Path $Src ".chromix-upstream-restored.json")) {
   $mergeArgs += @("--preserve-pgo-from", $mergedArgs)
+}
+if ($Fresh156) {
+  python (Join-Path $Repo "tools\windows156_fresh.py") --phase overlay --repo $Repo --workdir $WorkDir --arch $Arch
+  if ($LASTEXITCODE -ne 0) { throw "Windows156 native PGO2 overlay failed" }
+  $mergeArgs += (Join-Path $WorkDir "windows156-native.gn")
 }
 python @mergeArgs
 if ($LASTEXITCODE -ne 0) { throw "GN argument merge failed" }
@@ -110,7 +125,25 @@ for relative, keys in RESTORED.items():
     if ($LASTEXITCODE -ne 0) { throw "GN bootstrap failed" }
   }
 
-  if ($ApplyDomainSubstitution) {
+  if ($Fresh156) {
+    python (Join-Path $Repo "tools\windows156_fresh.py") --phase probe --repo $Repo --workdir $WorkDir --arch $Arch
+    if ($LASTEXITCODE -ne 0) { throw "Windows156 dependencies/PGO verification failed" }
+  }
+
+  if ($ApplyDomainSubstitution -and $Fresh156) {
+    $domainMarker = Join-Path $Src ".chromix-domain-substituted"
+    if (-not (Test-Path $domainMarker)) {
+      $cache = Join-Path $WorkDir "domain_substitution_cache.tar.gz"
+      if (Test-Path $cache) { throw "domain substitution cache exists without completion marker" }
+      $progress = Join-Path $Src ".chromix-domain-substitution-in-progress"
+      Set-Content -LiteralPath $progress -Value $Revisions.UngoogledCommit -Encoding ASCII
+      python (Join-Path $UngoogledTooling "utils\domain_substitution.py") apply `
+        -r (Join-Path $UngoogledTooling "domain_regex.list") `
+        -f (Join-Path $WindowsTooling "domain_substitution.list") -c $cache $Src
+      if ($LASTEXITCODE -ne 0) { throw "domain substitution failed" }
+      Move-Item -LiteralPath $progress -Destination $domainMarker
+    }
+  } elseif ($ApplyDomainSubstitution) {
     $cache = Join-Path $WorkDir "domain_substitution_cache.tar"
     if (-not (Test-Path $cache)) {
       Write-Host "==> applying ungoogled domain substitution"
@@ -122,8 +155,20 @@ for relative, keys in RESTORED.items():
     }
   }
 
+  $needsMetagen = $Revisions.ChromiumVersion -eq "156.0.8078.79"
+  $metagenBindings = Join-Path $Repo "tools\install_windows_metagen_bindings.py"
+  if ($needsMetagen) {
+    & python -X utf8 $metagenBindings --configure --src $Src --out $Out `
+      --chromium-version $Revisions.ChromiumVersion
+    if ($LASTEXITCODE -ne 0) { throw "Windows metagen source library configuration failed" }
+  }
   & $gn gen $Out --fail-on-unused-args
   if ($LASTEXITCODE -ne 0) { throw "gn gen failed" }
+  if ($needsMetagen) {
+    & python -X utf8 $metagenBindings --src $Src --out $Out --ninja $Ninja `
+      --chromium-version $Revisions.ChromiumVersion --download
+    if ($LASTEXITCODE -ne 0) { throw "Windows metagen bindings/API preflight failed" }
+  }
 
   if (Test-Path (Join-Path $Src ".chromix-upstream-restored.json")) {
     & $Ninja -C $Out -n chrome *> (Join-Path $WorkDir "upstream-cache-plan.log")
