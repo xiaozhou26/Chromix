@@ -26,8 +26,9 @@ REPOSITORY = "xiaozhou26/Chromix"
 DONOR_SHA = "2e2a85fdeb42f37a7528a7d1ced247deab337452"
 MAIN_BASE = "3dfe10e164966f9d8f99099849c4f2aa1ed9138c"
 OLD_HELPER_SHA256 = "2e04eae3fcdc88c37e7e8a7f1471e7576a2d5059ba0f2f13333b83fc91425c26"
-# The integration commit must explicitly approve the reviewed bindings fix.
-REVIEWED_HELPER_SHA256 = frozenset()
+REVIEWED_HELPER_SHA256 = frozenset({
+    "15cfd59bdef43439ae248f8867910ce04cabcd66d1830025da6f1c4ef6f323fd",
+})
 HELPER = "tools/install_windows_metagen_bindings.py"
 SOURCE_RECEIPT_SHA256 = "9354e1cb764d8d2c3cfd54a7e11dca60814b16d22212d2d97d4415cce6550a5c"
 DONORS = {
