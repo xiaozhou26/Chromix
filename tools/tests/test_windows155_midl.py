@@ -31,6 +31,15 @@ ARM_IDENTITY = {
 }
 
 
+def install_historical_repository(repo):
+    fixture = json.loads((Path(__file__).parent / "fixtures/windows155_repository.json").read_text())
+    for name, content in fixture["files"].items():
+        path = repo / name
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(content)
+    return repo
+
+
 class Windows155MidlTest(unittest.TestCase):
     def setUp(self):
         temporary = tempfile.TemporaryDirectory()
@@ -112,10 +121,10 @@ class Windows155MidlTest(unittest.TestCase):
         self.assertEqual(self.output.read_bytes(), b"regenerated")
 
     def test_arm64_exact_restore_pin_repairs_once_without_touching_source(self):
-        from tools.fetch_upstream_cache import ROOT
         from tools.restore_upstream_cache import identities
 
-        identity, _, _ = identities(ROOT, "windows", "arm64")
+        repo = install_historical_repository(self.src / "historical-repository")
+        identity, _, _ = identities(repo, "windows", "arm64")
         self.assertEqual(identity, ARM_IDENTITY)
         self.assertEqual(len(repair.WINDOWS155_RECORDS), 2)
         self.assertEqual(dict(repair.WINDOWS155_RECORDS[1]["identity"]), ARM_IDENTITY)

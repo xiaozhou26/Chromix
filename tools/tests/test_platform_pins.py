@@ -63,8 +63,8 @@ def save(root, values):
      "025d99db1673a21992534551598b73ca79360762"),
     ("macos", "154.0.8037.97", "3e46b13825f808f0886e484d44532372655e5fe4",
      "f7ba75f94442abda7ac3ea81790c217f8636d3ba"),
-    ("windows", "155.0.8059.39", "ffeb45a2bb88bc56a1dfed31410aeb10e9efcd5a",
-     "989b4382364baaddb8b3180e1eb1030ca96a7273"),
+    ("windows", "156.0.8078.79", "28a211ab4ab6b83d919966a4f58a6df23cf4fb29",
+     "8492884eb30fdd9417ea7816aa92def805c97c74"),
 ])
 def test_checked_in_target_pins(platform, version, core, overlay):
     result = pins.load_pins(pins.ROOT, platform)
@@ -76,7 +76,7 @@ def test_checked_in_target_pins(platform, version, core, overlay):
     assert result["Ungoogled" + pins.PLATFORMS[platform] + "Version"] == version + suffix
     assert (pins.ROOT / "CHROMIUM_VERSION").read_text().strip() == LINUX_VERSION
     assert (pins.ROOT / "UNGOOGLED_VERSION").read_text().strip() == LINUX_VERSION + "-1"
-    assert (pins.ROOT / "UNGOOGLED_WINDOWS_VERSION").read_text().strip() == "155.0.8059.39-1.1"
+    assert (pins.ROOT / "UNGOOGLED_WINDOWS_VERSION").read_text().strip() == "156.0.8078.79-1.1"
 
 
 @pytest.mark.parametrize("platform", pins.PLATFORMS)

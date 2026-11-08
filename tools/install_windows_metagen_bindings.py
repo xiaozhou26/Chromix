@@ -22,6 +22,18 @@ LLVM_COMMIT = "ea7d852a70e8bdfaf601d6626a760f9771b2c4b4"  # llvmorg-23.1.0
 LLVM_VERSION = "23.1.0"
 V8_REVISION = "56832c166a78bd1eb61068ac69876d6880eaabdf"
 CHROMIUM_VERSION = "155.0.8059.39"
+CHROMIUM156_VERSION = "156.0.8078.79"
+V8_156_REVISION = "c9b3cfcab30ace06c21f9b48a0f0a34805e81e9d"
+# Unmodified tools/metagen Python sources at the exact Chromium156 DEPS revision.
+V8_156_HASHES = {
+    "__init__.py": "10f3921b5fd6be69400ee0b4c539f82ec3b63002bd26f6eadd622712c14dcf25",
+    "clang_bootstrap.py": "960febdc33889730f116a0b601d6173d99aa1947272bc7a8de8bb2b6f16685d4",
+    "compile_flags.py": "883f9abe171cace4fab78870badf82018956809903c17456b018c172b23131e5",
+    "cpp_hier.py": "51c74745985c4376cd80fed09a9740789822a0ce44cdc7d5471aacaa427cfde4",
+    "extract.py": "1048e4e679e2769afdb0acb12d18de7c7e76ca46f8c65d02111204992a9712fa",
+    "instance_types.py": "29e4ad046474f9058a50024aa5aef10dbd10c093c506ff91c65b72031ebf5537",
+    "metagen.py": "d3552858b3f30c03e9543afbe17b394e0089f1aa357a7e6af124f40f328bb14b",
+}
 HASHES = {
     "__init__.py": "961d8ad419dc7aa10d8d7b75e5fcd624cc681403a55ce99ad14ae4fe4a7be749",
     "cindex.py": "0d572be5704bd7065420166bbe5e5b3fb5943423bd73ba6e40e4f8e9253c3f08",
@@ -35,6 +47,8 @@ MAX_FILE = 1024 * 1024
 PINS = {
     "154.0.8037.97": None,
     CHROMIUM_VERSION: {"v8_revision": V8_REVISION, "target_cpus": ("x64", "arm64")},
+    CHROMIUM156_VERSION: {"v8_revision": V8_156_REVISION, "target_cpus": ("x64", "arm64"),
+                          "scripts_sha256": V8_156_HASHES},
 }
 AMD64 = 0x8664
 
@@ -285,8 +299,28 @@ def provision(src: Path, bindings: Path, *, download: bool) -> str:
     return origin
 
 
-def probe(bindings: Path, library: Path, src: Path) -> dict:
+def validate_sources(src: Path, version: str) -> dict[str, str]:
+    pin = PINS[version]
+    if not (src / "v8/tools/metagen/metagen.py").is_file():
+        raise ValueError("expected V8 metagen source is missing")
+    deps = (src / "DEPS").read_text(encoding="utf-8")
+    if re.findall(r"['\"]v8_revision['\"]\s*:\s*['\"]([0-9a-f]{40})['\"]", deps) != [pin["v8_revision"]]:
+        raise ValueError("unexpected exact DEPS V8 revision")
+    hashes = pin.get("scripts_sha256", {})
+    for name, expected in hashes.items():
+        path = local(src / "v8/tools/metagen" / name)
+        if (not path.is_file() or path.stat().st_nlink != 1 or path.stat().st_size > MAX_FILE
+                or digest(path.read_bytes()) != expected):
+            raise ValueError("V8 metagen source SHA256 mismatch: " + name)
+    return hashes
+
+
+def probe(bindings: Path, library: Path, src: Path, version: str | None = None) -> dict:
     validate_runtime(runtime_info())
+    if version is not None:
+        if version not in PINS or PINS[version] is None:
+            raise ValueError("unsupported Chromium metagen bindings pin")
+        validate_sources(src, version)
     validate_library(library)
     read_package(bindings / "clang")
     sys.path.insert(0, str(bindings))
@@ -344,11 +378,7 @@ def install(src: Path, out: Path, ninja: Path, version: str, *, download: bool) 
     arch = source_contract(src, out, version)
     if arch is None:
         return {"status": "not_required", "chromium_version": version}
-    if not (src / "v8/tools/metagen/metagen.py").exists():
-        raise ValueError("expected V8 metagen source is missing")
-    deps = (src / "DEPS").read_text(encoding="utf-8")
-    if re.findall(r"['\"]v8_revision['\"]\s*:\s*['\"]([0-9a-f]{40})['\"]", deps) != [PINS[version]["v8_revision"]]:
-        raise ValueError("unexpected exact DEPS V8 revision")
+    source_hashes = validate_sources(src, version)
     commands = subprocess.run([str(ninja), "-C", str(out), "-t", "commands", TARGET],
                               check=True, text=True, capture_output=True, timeout=120).stdout
     contract = action_contract(commands, out)
@@ -360,11 +390,13 @@ def install(src: Path, out: Path, ninja: Path, version: str, *, download: bool) 
     origin = provision(src, contract["bindings"], download=download)
     result = run_json([contract["python"], "-I", "-S", "-B", str(Path(__file__).resolve()), "--probe",
                        "--bindings", str(contract["bindings"]), "--library", str(contract["library"]),
-                       "--src", str(src)], cwd=out)
+                       "--src", str(src), "--chromium-version", version], cwd=out)
+    validate_sources(src, version)
     if digest(contract["library"].read_bytes()) != library_hash:
         raise ValueError("source libclang DLL changed during bindings provisioning")
     return dict(result, status="verified", origin=origin, target_cpu=arch, llvm_commit=LLVM_COMMIT,
-                bindings_sha256=HASHES, library_sha256=library_hash)
+                bindings_sha256=HASHES, library_sha256=library_hash, chromium_version=version,
+                v8_revision=PINS[version]["v8_revision"], scripts_sha256=source_hashes)
 
 
 def main(argv=None) -> int:
@@ -384,7 +416,7 @@ def main(argv=None) -> int:
         if args.probe:
             if not args.bindings or not args.library:
                 parser.error("--probe requires --bindings and --library")
-            result = probe(args.bindings, args.library, args.src)
+            result = probe(args.bindings, args.library, args.src, args.chromium_version)
         elif args.configure:
             if not args.out or not args.chromium_version:
                 parser.error("--configure requires --out and --chromium-version")

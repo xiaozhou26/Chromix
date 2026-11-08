@@ -1,4 +1,5 @@
 """Cross-platform contracts for runner-local Windows V8 metagen dependencies."""
+import gzip
 import hashlib
 import json
 from pathlib import Path
@@ -440,6 +441,127 @@ class WindowsMetagenBindingsTest(unittest.TestCase):
         self.assertIn("inputs.build_profile || 'native'", text)
         stage = (ROOT / "build/windows/ci-stage.ps1").read_text()
         self.assertIn('$mergeArgs += @("--preserve-pgo-from", $gnArgs)', stage)
+
+    def source156(self, arch="x64"):
+        fixture = json.loads(gzip.decompress((ROOT / "tools/tests/fixtures/windows156_metagen.json.gz").read_bytes()))
+        self.assertEqual(fixture["v8_revision"], "c9b3cfcab30ace06c21f9b48a0f0a34805e81e9d")
+        self.put(self.src / "chrome/VERSION", b"MAJOR=156\nMINOR=0\nBUILD=8078\nPATCH=79\n")
+        self.put(self.src / "DEPS", f"vars = {{'v8_revision': '{fixture['v8_revision']}'}}".encode())
+        self.put(self.out / "args.gn", f'target_cpu = "{arch}"\nhost_cpu = "x64"\nchrome_pgo_phase = 2\n'.encode())
+        for name, text in fixture["files"].items():
+            self.put(self.script.parent / name, text.encode())
+        return fixture
+
+    def test_156_real_scripts_and_llvm23_pins_are_exact(self):
+        fixture = self.source156()
+        self.assertEqual(bindings.LLVM_VERSION, "23.1.0")
+        self.assertEqual(bindings.LLVM_COMMIT, "ea7d852a70e8bdfaf601d6626a760f9771b2c4b4")
+        self.assertEqual(set(fixture["files"]), set(bindings.V8_156_HASHES))
+        self.assertEqual(bindings.validate_sources(self.src, "156.0.8078.79"), bindings.V8_156_HASHES)
+        self.assertEqual(bindings.V8_156_HASHES["metagen.py"],
+                         "d3552858b3f30c03e9543afbe17b394e0089f1aa357a7e6af124f40f328bb14b")
+        for option in ("--libclang-so", "--libclang-bindings-dir", "--expect-libclang-major", "--clang-resource-dir"):
+            self.assertIn(option, fixture["files"]["metagen.py"])
+
+    def test_156_both_targets_keep_native_host_gates_and_pgo(self):
+        for arch in ("x64", "arm64"):
+            self.source156(arch)
+            self.package(self.src / bindings.SOURCE_PACKAGES[0])
+            before = (self.out / "args.gn").read_bytes(), self.library.read_bytes()
+            with mock.patch.object(bindings.subprocess, "run", return_value=SimpleNamespace(stdout=self.command())):
+                with mock.patch.object(bindings, "run_json", side_effect=[self.runtime(), {"api_preflight": "passed"}]) as run:
+                    result = bindings.install(self.src, self.out, Path("ninja"), "156.0.8078.79", download=False)
+            self.assertEqual(result["target_cpu"], arch)
+            self.assertEqual(result["scripts_sha256"], bindings.V8_156_HASHES)
+            self.assertEqual(result["v8_revision"], bindings.V8_156_REVISION)
+            self.assertEqual(run.call_args.args[0][-2:], ["--chromium-version", "156.0.8078.79"])
+            self.assertEqual(before, ((self.out / "args.gn").read_bytes(), self.library.read_bytes()))
+            with mock.patch.object(bindings.subprocess, "run", return_value=SimpleNamespace(stdout=self.command())):
+                with mock.patch.object(bindings, "run_json", return_value=dict(self.runtime(), native_machine=0xAA64)):
+                    with mock.patch.object(bindings, "provision") as provision:
+                        with self.assertRaisesRegex(ValueError, "native AMD64"):
+                            bindings.install(self.src, self.out, Path("ninja"), "156.0.8078.79", download=False)
+                        provision.assert_not_called()
+
+    def test_156_changed_missing_and_linked_scripts_fail_before_execution(self):
+        for name in bindings.V8_156_HASHES:
+            for mutation in ("changed", "missing", "symlink", "hardlink"):
+                self.source156()
+                path = self.script.parent / name
+                original = path.read_bytes()
+                path.unlink()
+                if mutation == "changed":
+                    path.write_bytes(original + b"\n# changed\n")
+                elif mutation in ("symlink", "hardlink"):
+                    external = self.root / "external-script"
+                    external.write_bytes(original)
+                    if mutation == "symlink":
+                        path.symlink_to(external)
+                    else:
+                        path.hardlink_to(external)
+                with self.subTest(name=name, mutation=mutation), mock.patch.object(bindings.subprocess, "run") as run:
+                    with self.assertRaisesRegex(ValueError, "SHA256|linked|missing"):
+                        bindings.install(self.src, self.out, Path("ninja"), "156.0.8078.79", download=False)
+                    run.assert_not_called()
+                path.unlink(missing_ok=True)
+
+    def test_156_old_deps_rejected_and_unknown_patch_not_admitted(self):
+        self.source156()
+        (self.src / "DEPS").write_text("vars = {'v8_revision': '" + bindings.V8_REVISION + "'}")
+        with mock.patch.object(bindings.subprocess, "run") as run:
+            with self.assertRaisesRegex(ValueError, "exact DEPS"):
+                bindings.install(self.src, self.out, Path("ninja"), "156.0.8078.79", download=False)
+            for version in ("156.0.8078.78", "156.0.8078.80", "157.0.8103.38"):
+                with self.assertRaisesRegex(ValueError, "unsupported"):
+                    bindings.configure(self.src, self.out, version)
+            run.assert_not_called()
+
+    def test_156_rejects_foreign_pe_and_late_source_changes(self):
+        self.source156("arm64")
+        self.library.write_bytes(pe_dll(0xAA64))
+        with mock.patch.object(bindings.subprocess, "run", return_value=SimpleNamespace(stdout=self.command())):
+            with mock.patch.object(bindings, "run_json", return_value=self.runtime()):
+                with mock.patch.object(bindings, "provision") as provision:
+                    with self.assertRaisesRegex(ValueError, "PE32\\+"):
+                        bindings.install(self.src, self.out, Path("ninja"), "156.0.8078.79", download=False)
+                    provision.assert_not_called()
+        self.library.write_bytes(pe_dll())
+        self.package(self.src / bindings.SOURCE_PACKAGES[0])
+        def late_probe(argv, *, cwd):
+            if "--probe" not in argv:
+                return self.runtime()
+            self.script.write_bytes(b"# changed during provisioning")
+            return {"api_preflight": "passed"}
+        with mock.patch.object(bindings.subprocess, "run", return_value=SimpleNamespace(stdout=self.command())):
+            with mock.patch.object(bindings, "run_json", side_effect=late_probe):
+                with self.assertRaisesRegex(ValueError, "SHA256"):
+                    bindings.install(self.src, self.out, Path("ninja"), "156.0.8078.79", download=False)
+
+    def test_156_cli_configuration_does_not_change_pgo_or_fetch(self):
+        self.source156("arm64")
+        before = (self.out / "args.gn").read_bytes()
+        result = subprocess.run([sys.executable, str(ROOT / "tools/install_windows_metagen_bindings.py"),
+                                 "--configure", "--src", str(self.src), "--out", str(self.out),
+                                 "--chromium-version", "156.0.8078.79"], capture_output=True, text=True, check=True)
+        self.assertEqual(json.loads(result.stdout)["status"], "bundled")
+        self.assertEqual((self.out / "args.gn").read_bytes(), before)
+        self.assertFalse(self.site.exists())
+
+    def test_156_probe_rechecks_scripts_before_import(self):
+        self.source156()
+        self.script.write_bytes(b"# changed")
+        with mock.patch.object(bindings, "runtime_info", return_value=self.runtime()):
+            with mock.patch.object(bindings.importlib, "import_module") as imports:
+                with self.assertRaisesRegex(ValueError, "SHA256"):
+                    bindings.probe(self.site, self.library, self.src, "156.0.8078.79")
+                imports.assert_not_called()
+
+    def test_156_interrupted_prepare_retains_selection_gate(self):
+        source = (ROOT / "build/windows/prepare-ungoogled.ps1").read_text()
+        self.assertIn('@("154.0.8037.97", "155.0.8059.39", "156.0.8078.79")', source)
+        gate = source[source.index('if ($interruptedLayer -eq "chromix")'):source.index('Write-Host "==> retrying interrupted')]
+        self.assertIn('Test-Marker ".chromix-patch-selection" $patchSetKey', gate)
+        self.assertIn('throw "interrupted Chromium', gate)
 
     def test_cli_help_is_cross_platform(self):
         result = subprocess.run([sys.executable, str(ROOT / "tools/install_windows_metagen_bindings.py"), "--help"],

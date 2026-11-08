@@ -55,20 +55,17 @@ class PrepareRestoredBuildTest(unittest.TestCase):
 
     def fixture(self, platform="macos", arch="arm64", donor_arch=None, *, host_arch=None,
                 linux_pins=None):
-        repo = prepare.ROOT
+        temporary = tempfile.TemporaryDirectory(prefix="historical restored fixture pins ")
+        self.addCleanup(temporary.cleanup)
+        repo = Path(temporary.name)
+        historical = json.loads((Path(__file__).parent / "fixtures/windows155_repository.json").read_text())
+        for relative, content in historical["files"].items():
+            self.write(repo / relative, content)
         if platform == "linux" and linux_pins is not None:
             temporary = tempfile.TemporaryDirectory(prefix="historical Linux fixture pins ")
             self.addCleanup(temporary.cleanup)
             repo = install_linux_repo_fixture(Path(temporary.name), linux_pins)
         if platform == "windows":
-            temporary = tempfile.TemporaryDirectory()
-            self.addCleanup(temporary.cleanup)
-            repo = Path(temporary.name)
-            for relative in ("CHROMIUM_VERSION", "CHROMIUM_LINUX_VERSION", "CHROMIUM_MACOS_VERSION", "CHROMIUM_WINDOWS_VERSION",
-                             "build/ungoogled-revisions.psd1", "build/upstream-cache.json"):
-                source = prepare.ROOT / relative
-                if source.is_file():
-                    self.write(repo / relative, source.read_bytes())
             path = repo / "build/upstream-cache.json"
             manifest = json.loads(path.read_text())
             manifest["sources"]["windows"] = windows_source(repo)
@@ -269,7 +266,7 @@ class PrepareRestoredBuildTest(unittest.TestCase):
         self.out = self.src / "out/Default"
         self.fixture()
         with self.native_context():
-            result = prepare.prepare(self.work, "macos", "arm64")
+            result = self.prepare(self.work, "macos", "arm64")
         self.assertTrue(result["ready_for_gn"])
         self.assertTrue((self.work / "upstream-cache-preparation.json").is_file())
         self.assertIsNone(prepare.inside_path(self.out, "sdk/keep.a", output=True))
@@ -356,7 +353,7 @@ class PrepareRestoredBuildTest(unittest.TestCase):
                 self.deps({"obj/sdk.o": ["sdk/xcode_links/MacOSX26.0.sdk/./stddef.h"]})
                 (self.src / prepare.MARKER).unlink(missing_ok=True)
                 with self.native_context():
-                    result = prepare.prepare(self.work, "macos", "arm64")
+                    result = self.prepare(self.work, "macos", "arm64")
                 self.assertEqual(result["dependencies"]["input_reason_outputs"], {"omitted_external_input": 1})
                 self.assertEqual(result["dependencies"]["external_dependency_outputs"], 1)
                 self.assertFalse(output.exists())
@@ -372,7 +369,7 @@ class PrepareRestoredBuildTest(unittest.TestCase):
         self.deps({"obj/generated.o": ["gen/header.h"],
                    "obj/independent.o": ["../../include/a.h"]})
         with self.native_context():
-            result = prepare.prepare(self.work, "macos", "arm64")
+            result = self.prepare(self.work, "macos", "arm64")
         dependencies = result["dependencies"]
         self.assertEqual(dependencies["input_reason_outputs"], {"removed_generated_input": 1})
         self.assertEqual(dependencies["removed_outputs"], 1)
@@ -397,8 +394,8 @@ class PrepareRestoredBuildTest(unittest.TestCase):
         self.write(self.out / "Chromium.app/Contents/_CodeSignature/CodeResources", "signature")
         before = obj.stat().st_mtime_ns
         with self.native_context():
-            inspection = prepare.prepare(self.work, "macos", "arm64", phase="inspect")
-            result = prepare.prepare(self.work, "macos", "arm64")
+            inspection = self.prepare(self.work, "macos", "arm64", phase="inspect")
+            result = self.prepare(self.work, "macos", "arm64")
         self.assertTrue(inspection["native_tools"])
         self.assertFalse((self.src / prepare.CLANG / "cr_build_revision").exists())
         self.assertNotIn("VERSION", {path.name for path in (self.src / prepare.RUST).iterdir()})
@@ -412,8 +409,8 @@ class PrepareRestoredBuildTest(unittest.TestCase):
         from tools import macos_restored_generators as mac154
         self.fixture()
         with self.native_context():
-            inspection = prepare.prepare(self.work, "macos", "arm64", phase="inspect")
-            finished = prepare.prepare(self.work, "macos", "arm64")
+            inspection = self.prepare(self.work, "macos", "arm64", phase="inspect")
+            finished = self.prepare(self.work, "macos", "arm64")
         before = inspection["generator_fingerprint"]["macos154"]
         after = finished["generator_fingerprint"]["macos154"]
         self.assertTrue(before["repair_needed"])
@@ -429,10 +426,10 @@ class PrepareRestoredBuildTest(unittest.TestCase):
         self.assertEqual(json.loads((self.src / prepare.MARKER).read_text())["macos_generator_probe"], probe)
         self.assertEqual(json.loads((self.work / "upstream-cache-preparation.json").read_text())["macos_generator_probe"], probe)
         with self.native_context(), mock.patch.object(mac154, "smoke", return_value={"fresh_probe": True}) as smoke:
-            resumed_inspection = prepare.prepare(self.work, "macos", "arm64", phase="inspect")
+            resumed_inspection = self.prepare(self.work, "macos", "arm64", phase="inspect")
             smoke.assert_not_called()
             self.assertEqual(resumed_inspection["generator_fingerprint"]["macos154"], after)
-            resumed = prepare.prepare(self.work, "macos", "arm64")
+            resumed = self.prepare(self.work, "macos", "arm64")
             smoke.assert_called_once()
         self.assertEqual(resumed["generator_fingerprint"]["macos154"], after)
         self.assertEqual(resumed["counters"]["generator_rechecks"], 0)
@@ -442,7 +439,7 @@ class PrepareRestoredBuildTest(unittest.TestCase):
         self.deps({"obj/generator-reader.o": ["gen/output.js"]})
         self.write(self.out / ".ninja_log", "# ninja log v5\n0\t1\t1\tgen/output.js\t1\n")
         with self.native_context(), mock.patch.object(mac154, "manifest_digest", return_value="f" * 64):
-            changed = prepare.prepare(self.work, "macos", "arm64")
+            changed = self.prepare(self.work, "macos", "arm64")
         self.assertEqual(changed["counters"]["generator_rechecks"], 1)
         self.assertFalse(generated.exists())
         self.assertFalse(reader.exists())
@@ -551,6 +548,7 @@ class PrepareRestoredBuildTest(unittest.TestCase):
         self.fixture("macos", "x64", donor_arch="arm64")
         output = io.StringIO()
         with mock.patch.object(prepare, "host_identity", return_value=("macos", "x64")), \
+                mock.patch.object(prepare, "prepare", partial(prepare.prepare, repo=self.fixture_repo)), \
                 mock.patch.object(prepare.subprocess, "run") as run, redirect_stdout(output):
             code = prepare.main(["--phase", "inspect", "--platform", "macos", "--arch", "x64", "--workdir", str(self.work)])
         self.assertEqual(code, 0)
@@ -561,7 +559,7 @@ class PrepareRestoredBuildTest(unittest.TestCase):
     def test_inspect_writes_uploadable_native_probe_report(self):
         receipt = self.fixture()
         with self.native_context():
-            result = prepare.prepare(self.work, "macos", "arm64", phase="inspect")
+            result = self.prepare(self.work, "macos", "arm64", phase="inspect")
         report = json.loads((self.work / "upstream-cache-preparation.json").read_text())
         self.assertEqual(report, result)
         self.assertEqual(report["source_identity"], receipt["identity"])
@@ -571,7 +569,7 @@ class PrepareRestoredBuildTest(unittest.TestCase):
     def test_finish_failure_overwrites_stale_report_with_exact_probe_output(self):
         self.fixture()
         with self.native_context():
-            prepare.prepare(self.work, "macos", "arm64")
+            self.prepare(self.work, "macos", "arm64")
         marker = (self.src / prepare.MARKER).read_bytes()
         obj = self.object("a.o")
         def run(command, **kwargs):
@@ -581,7 +579,7 @@ class PrepareRestoredBuildTest(unittest.TestCase):
                 if failed else "native tool"))
         with self.native_context(), mock.patch.object(prepare.subprocess, "run", side_effect=run):
             with self.assertRaisesRegex(ValueError, r"bindgen \(--version exited -6\)"):
-                prepare.prepare(self.work, "macos", "arm64")
+                self.prepare(self.work, "macos", "arm64")
         report = json.loads((self.work / "upstream-cache-preparation.json").read_text())
         pending = json.loads((self.src / prepare.INSPECTION).read_text())
         self.assertFalse(report["ready_for_gn"])
@@ -597,7 +595,7 @@ class PrepareRestoredBuildTest(unittest.TestCase):
         self.fixture()
         with self.native_context(), mock.patch.object(prepare, "environment_identity", side_effect=ValueError("SDK missing")):
             with self.assertRaisesRegex(ValueError, "SDK missing"):
-                prepare.prepare(self.work, "macos", "arm64")
+                self.prepare(self.work, "macos", "arm64")
         report = json.loads((self.work / "upstream-cache-preparation.json").read_text())
         self.assertFalse(report["ready_for_gn"])
         self.assertTrue(report["tools"]["bindgen"]["native"])
@@ -609,7 +607,7 @@ class PrepareRestoredBuildTest(unittest.TestCase):
         self.fixture()
         for failure in ("receipt", "marker", "generator"):
             with self.subTest(failure=failure), self.native_context():
-                prepare.prepare(self.work, "macos", "arm64")
+                self.prepare(self.work, "macos", "arm64")
                 if failure == "receipt":
                     context = mock.patch.object(prepare, "verify_restored", side_effect=ValueError("receipt rejected"))
                     operation = "verify_restored"
@@ -620,7 +618,7 @@ class PrepareRestoredBuildTest(unittest.TestCase):
                     context = mock.patch.object(prepare, "generator_fingerprint", side_effect=OSError("generator unreadable"))
                     operation = "generator_fingerprint"
                 with context, self.assertRaises((ValueError, OSError)):
-                    prepare.prepare(self.work, "macos", "arm64")
+                    self.prepare(self.work, "macos", "arm64")
                 report = json.loads((self.work / "upstream-cache-preparation.json").read_text())
                 self.assertFalse(report["ready_for_gn"])
                 self.assertEqual(report["operation"], operation)
@@ -649,7 +647,7 @@ class PrepareRestoredBuildTest(unittest.TestCase):
                     return mock.Mock(returncode=0, stdout="native")
                 with self.native_context(), mock.patch.dict(os.environ, inherited, clear=True), \
                         mock.patch.object(prepare.subprocess, "run", side_effect=run):
-                    result = prepare.prepare(self.work, "macos", "arm64", phase="inspect")
+                    result = self.prepare(self.work, "macos", "arm64", phase="inspect")
                     self.assertEqual(dict(os.environ), inherited)
                 self.assertTrue(result["native_tools"])
                 self.assertFalse(result["needs_invalidation"])
@@ -663,7 +661,7 @@ class PrepareRestoredBuildTest(unittest.TestCase):
         (self.work / "upstream-cache-preparation.json").symlink_to(target)
         with self.native_context():
             with self.assertRaisesRegex(ValueError, "unsafe"):
-                prepare.prepare(self.work, "macos", "arm64", phase="inspect")
+                self.prepare(self.work, "macos", "arm64", phase="inspect")
         self.assertEqual(target.read_text(), "keep")
 
     def test_windows_is_not_executed_on_a_posix_host(self):
@@ -671,7 +669,7 @@ class PrepareRestoredBuildTest(unittest.TestCase):
         with mock.patch.object(prepare, "host_identity", return_value=("linux", "x64")), \
                 mock.patch.object(prepare.subprocess, "run") as run:
             with self.assertRaisesRegex(ValueError, "native windows x64"):
-                prepare.prepare(self.work, "windows", "x64", phase="inspect", repo=self.fixture_repo)
+                self.prepare(self.work, "windows", "x64", phase="inspect", repo=self.fixture_repo)
         run.assert_not_called()
         report = json.loads((self.work / "upstream-cache-preparation.json").read_text())
         self.assertFalse(report["ready_for_gn"])
@@ -722,9 +720,9 @@ class PrepareRestoredBuildTest(unittest.TestCase):
             obj, self.src / "include/a.h", self.src / restore.MARKER,
             *(self.out / name for name in prepare.METADATA))}
         with self.native_context("windows", "x64"):
-            inspection = prepare.prepare(self.work, "windows", "arm64", phase="inspect", repo=self.fixture_repo)
-            result = prepare.prepare(self.work, "windows", "arm64", repo=self.fixture_repo)
-            resumed = prepare.prepare(self.work, "windows", "arm64", repo=self.fixture_repo)
+            inspection = self.prepare(self.work, "windows", "arm64", phase="inspect", repo=self.fixture_repo)
+            result = self.prepare(self.work, "windows", "arm64", repo=self.fixture_repo)
+            resumed = self.prepare(self.work, "windows", "arm64", repo=self.fixture_repo)
         for data in (inspection, result, resumed):
             self.assertEqual(data["host"], {"platform": "windows", "arch": "x64"})
             self.assertEqual(data["arch"], "arm64")
@@ -744,11 +742,11 @@ class PrepareRestoredBuildTest(unittest.TestCase):
         self.fixture("windows", "arm64", donor_arch="arm64", host_arch="x64")
         obj = self.object("target.obj")
         with self.native_context("windows", "x64"), mock.patch.object(prepare.subprocess, "run") as run:
-            inspection = prepare.prepare(self.work, "windows", "arm64", phase="inspect", repo=self.fixture_repo)
+            inspection = self.prepare(self.work, "windows", "arm64", phase="inspect", repo=self.fixture_repo)
             self.assertTrue(inspection["host_mismatch"])
             self.assertTrue(inspection["needs_invalidation"])
             with self.assertRaisesRegex(ValueError, "cannot execute on the native host"):
-                prepare.prepare(self.work, "windows", "arm64", repo=self.fixture_repo)
+                self.prepare(self.work, "windows", "arm64", repo=self.fixture_repo)
             run.assert_not_called()
         self.assertTrue(obj.exists())
         self.assertFalse((self.src / prepare.MARKER).exists())
@@ -768,7 +766,7 @@ class PrepareRestoredBuildTest(unittest.TestCase):
                             path.unlink()
                         with self.native_context("windows", "x64"):
                             with self.assertRaisesRegex(ValueError, "required toolchain"):
-                                prepare.prepare(self.work, "windows", "arm64", repo=self.fixture_repo)
+                                self.prepare(self.work, "windows", "arm64", repo=self.fixture_repo)
                         self.assertTrue(obj.exists())
                         self.assertFalse((self.src / prepare.MARKER).exists())
                         report = json.loads((self.work / "upstream-cache-preparation.json").read_text())
@@ -780,12 +778,12 @@ class PrepareRestoredBuildTest(unittest.TestCase):
         obj = self.object("target.obj")
         self.deps({"obj/target.obj": ["../../include/a.h"]})
         with self.native_context("windows", "x64"):
-            prepare.prepare(self.work, "windows", "arm64", phase="inspect", repo=self.fixture_repo)
+            self.prepare(self.work, "windows", "arm64", phase="inspect", repo=self.fixture_repo)
             path = self.src / prepare.RUST / "lib/rustlib/aarch64-pc-windows-msvc/lib/libstd-test.rlib"
             path.write_bytes(b"changed target library")
-            inspection = prepare.prepare(self.work, "windows", "arm64", phase="inspect", repo=self.fixture_repo)
+            inspection = self.prepare(self.work, "windows", "arm64", phase="inspect", repo=self.fixture_repo)
             self.assertTrue(inspection["needs_invalidation"])
-            result = prepare.prepare(self.work, "windows", "arm64", repo=self.fixture_repo)
+            result = self.prepare(self.work, "windows", "arm64", repo=self.fixture_repo)
         self.assertEqual(result["counters"]["tool_swap_invalidations"], 1)
         self.assertFalse(obj.exists())
 
@@ -794,13 +792,13 @@ class PrepareRestoredBuildTest(unittest.TestCase):
         self.write(self.out / "args.gn", 'target_cpu = "x64"\n')
         with self.native_context("windows", "x64"), mock.patch.object(prepare.subprocess, "run") as run:
             with self.assertRaisesRegex(ValueError, "target_cpu does not match"):
-                prepare.prepare(self.work, "windows", "arm64", repo=self.fixture_repo)
+                self.prepare(self.work, "windows", "arm64", repo=self.fixture_repo)
             run.assert_not_called()
 
     def test_windows_native_probe_uses_only_mocked_version_commands(self):
         self.fixture("windows", "x64")
         with self.native_context("windows", "x64"):
-            result = prepare.prepare(self.work, "windows", "x64", repo=self.fixture_repo)
+            result = self.prepare(self.work, "windows", "x64", repo=self.fixture_repo)
         self.assertTrue(result["native_tools"])
 
     def test_host_tool_failure_is_not_claimed_compatible(self):
@@ -823,15 +821,15 @@ class PrepareRestoredBuildTest(unittest.TestCase):
         self.object("external.o")
         self.deps({"obj/internal.o": ["../../include/a.h"], "obj/external.o": ["/unknown-sdk/header"]})
         with self.native_context():
-            prepare.prepare(self.work, "macos", "arm64")
+            self.prepare(self.work, "macos", "arm64")
             external = self.object("external.o")
             product = self.write(self.out / "Chromium.app/Contents/MacOS/Chromium", "new product")
-            result = prepare.prepare(self.work, "macos", "arm64")
+            result = self.prepare(self.work, "macos", "arm64")
             self.assertEqual(result["dependencies"]["removed_outputs"], 0)
             self.assertTrue(external.exists())
             with mock.patch.object(prepare, "environment_identity", return_value=dict(
                     result["environment"], environment={"ImageVersion": "2", "SDKROOT": "/sdk/27"})):
-                result = prepare.prepare(self.work, "macos", "arm64")
+                result = self.prepare(self.work, "macos", "arm64")
         self.assertFalse(external.exists())
         self.assertTrue(internal.exists())
         self.assertTrue(product.exists())
@@ -847,11 +845,11 @@ class PrepareRestoredBuildTest(unittest.TestCase):
         self.binary(host_binary, "macos", "arm64")
         sdk = self.write(self.out / "sdk/platform/lib.a", "SDK library")
         with self.native_context("macos", "x64"):
-            prepare.prepare(self.work, "macos", "x64", phase="inspect")
+            self.prepare(self.work, "macos", "x64", phase="inspect")
             for name, relative in prepare.tool_paths("macos", "x64").items():
                 if name != "gn":
                     self.binary(self.src / relative, "macos", "x64")
-            result = prepare.prepare(self.work, "macos", "x64")
+            result = self.prepare(self.work, "macos", "x64")
             self.assertGreaterEqual(result["counters"]["toolchain_invalidated_outputs"], 3)
             self.assertFalse(obj.exists())
             self.assertFalse(archive.exists())
@@ -860,7 +858,7 @@ class PrepareRestoredBuildTest(unittest.TestCase):
             self.assertTrue(sdk.exists())
             self.binary(self.out / "gn", "macos", "x64")
             obj = self.object("internal.o")
-            result = prepare.prepare(self.work, "macos", "x64")
+            result = self.prepare(self.work, "macos", "x64")
         self.assertTrue(obj.exists())
         self.assertEqual(result["counters"]["toolchain_invalidated_outputs"], 0)
 
@@ -869,23 +867,23 @@ class PrepareRestoredBuildTest(unittest.TestCase):
         obj = self.object("a.o")
         self.deps({"obj/a.o": ["../../include/a.h"]})
         with self.native_context():
-            prepare.prepare(self.work, "macos", "arm64", phase="inspect")
+            self.prepare(self.work, "macos", "arm64", phase="inspect")
             compiler = self.src / prepare.CLANG / "bin/clang"
             with compiler.open("ab") as stream:
                 stream.write(b"new tool payload")
-            again = prepare.prepare(self.work, "macos", "arm64", phase="inspect")
+            again = self.prepare(self.work, "macos", "arm64", phase="inspect")
             self.assertTrue(again["needs_invalidation"])
-            prepare.prepare(self.work, "macos", "arm64")
+            self.prepare(self.work, "macos", "arm64")
         self.assertFalse(obj.exists())
 
     def test_runtime_toolchain_content_change_not_just_version_invalidates(self):
         self.fixture()
         with self.native_context():
-            prepare.prepare(self.work, "macos", "arm64")
+            self.prepare(self.work, "macos", "arm64")
             obj = self.object("a.o")
             self.deps({"obj/a.o": ["../../include/a.h"]})
             self.write(self.src / prepare.CLANG / "lib/libclang.dylib", "changed runtime")
-            result = prepare.prepare(self.work, "macos", "arm64")
+            result = self.prepare(self.work, "macos", "arm64")
         self.assertFalse(obj.exists())
         self.assertEqual(result["counters"]["tool_swap_invalidations"], 1)
 
@@ -1042,7 +1040,7 @@ class PrepareRestoredBuildTest(unittest.TestCase):
         target = self.write(self.work / "keep", "keep")
         (self.src / prepare.MARKER).symlink_to(target)
         with self.assertRaisesRegex(ValueError, "unsafe"):
-            prepare.prepare(self.work, "macos", "arm64")
+            self.prepare(self.work, "macos", "arm64")
         self.assertEqual(target.read_text(), "keep")
 
     def sysroot(self, cpu, version="one"):
@@ -1595,8 +1593,8 @@ class PrepareRestoredBuildTest(unittest.TestCase):
                 self.out = self.src / "out/Default"
                 self.fixture(platform, arch)
                 with self.native_context(platform, arch), mock.patch.object(prepare, "linux_sysroot_identity") as identity:
-                    prepare.prepare(self.work, platform, arch, phase="inspect", repo=self.fixture_repo)
-                    result = prepare.prepare(self.work, platform, arch, repo=self.fixture_repo)
+                    self.prepare(self.work, platform, arch, phase="inspect", repo=self.fixture_repo)
+                    result = self.prepare(self.work, platform, arch, repo=self.fixture_repo)
                 identity.assert_not_called()
                 self.assertNotIn("sysroot_identity", result)
                 self.assertNotIn("sysroot_invalidations", result["counters"])
@@ -1917,7 +1915,7 @@ class PrepareRestoredBuildTest(unittest.TestCase):
         self.fixture()
         sdk = self.macos_sdk()
         with self.macos_environment_context(sdk):
-            previous = prepare.prepare(self.work, "macos", "arm64")
+            previous = self.prepare(self.work, "macos", "arm64")
             internal = self.object("internal.o")
             external = self.object("sdk.o")
             reader = self.object("generated.o")
@@ -1931,8 +1929,8 @@ class PrepareRestoredBuildTest(unittest.TestCase):
                 info = sdk.stat()
                 os.utime(sdk, ns=(info.st_atime_ns, info.st_mtime_ns + 1_000_000_000))
                 with mock.patch.dict(os.environ, {"ImageVersion": image, "GITHUB_JOB": image}):
-                    prepare.prepare(self.work, "macos", "arm64", phase="inspect")
-                    result = prepare.prepare(self.work, "macos", "arm64")
+                    self.prepare(self.work, "macos", "arm64", phase="inspect")
+                    result = self.prepare(self.work, "macos", "arm64")
                 for counter in ("environment_rechecks", "tool_swap_invalidations", "generator_rechecks",
                                 "toolchain_invalidated_outputs", "first_finish"):
                     self.assertEqual(result["counters"][counter], 0)
@@ -1987,7 +1985,7 @@ class PrepareRestoredBuildTest(unittest.TestCase):
         }
         preserved = {"absolute.o", "internal-sdk-link.o", "known.o", "known-absolute.o", "sdkroot.o", "source.o"}
         with self.macos_environment_context(sdk), mock.patch.dict(os.environ, {"SDKROOT": str(roots)}):
-            prepare.prepare(self.work, "macos", "arm64")
+            self.prepare(self.work, "macos", "arm64")
             for drift in ("image", "root-stat"):
                 with self.subTest(drift=drift):
                     for name in records:
@@ -1997,7 +1995,7 @@ class PrepareRestoredBuildTest(unittest.TestCase):
                         info = sdk.stat()
                         os.utime(sdk, ns=(info.st_atime_ns, info.st_mtime_ns + 1_000_000_000))
                     with mock.patch.dict(os.environ, {"ImageVersion": "v2"}):
-                        result = prepare.prepare(self.work, "macos", "arm64")
+                        result = self.prepare(self.work, "macos", "arm64")
                     self.assertEqual(result["counters"]["environment_rechecks"], 0)
                     self.assertEqual(result["counters"]["sdk_drift_external_rechecks"], 1)
                     self.assertEqual(result["dependencies"]["removed_outputs"], len(records) - len(preserved))
@@ -2015,14 +2013,14 @@ class PrepareRestoredBuildTest(unittest.TestCase):
         link.parent.mkdir(parents=True)
         link.symlink_to(sdk, target_is_directory=True)
         with self.macos_environment_context(sdk):
-            prepare.prepare(self.work, "macos", "arm64")
+            self.prepare(self.work, "macos", "arm64")
             other = self.write(self.work / "different-sdk/usr/include/header.h", "different")
             link.unlink()
             link.symlink_to(other.parents[2], target_is_directory=True)
             output = self.object("retargeted.o")
             self.deps({"obj/retargeted.o": ["sdk/xcode_links/MacOSX26.0.sdk/usr/include/header.h"]})
             with mock.patch.dict(os.environ, {"ImageVersion": "v2"}):
-                result = prepare.prepare(self.work, "macos", "arm64")
+                result = self.prepare(self.work, "macos", "arm64")
         self.assertFalse(output.exists())
         self.assertEqual(result["dependencies"]["input_reason_outputs"], {"omitted_external_input": 1})
 
@@ -2040,7 +2038,7 @@ class PrepareRestoredBuildTest(unittest.TestCase):
                 (self.src / prepare.MARKER).unlink(missing_ok=True)
                 link.unlink(missing_ok=True)
                 link.symlink_to(other.parents[2] if state == "retargeted-in" else sdk, target_is_directory=True)
-                previous = prepare.prepare(self.work, "macos", "arm64")
+                previous = self.prepare(self.work, "macos", "arm64")
                 if state == "legacy":
                     previous.pop("sdk_dependency_roots")
                     self.write(self.src / prepare.MARKER, json.dumps(previous))
@@ -2052,7 +2050,7 @@ class PrepareRestoredBuildTest(unittest.TestCase):
                 self.deps({"obj/aliased.o": ["sdk/xcode_links/MacOSX26.0.sdk/usr/include/header.h"],
                            "obj/canonical.o": [str(sdk / "usr/include/header.h")]})
                 with mock.patch.dict(os.environ, {"ImageVersion": "v2"}):
-                    result = prepare.prepare(self.work, "macos", "arm64")
+                    result = self.prepare(self.work, "macos", "arm64")
                 self.assertFalse(output.exists())
                 self.assertTrue(canonical.exists())
                 self.assertEqual(result["dependencies"]["removed_outputs"], 1)
@@ -2068,7 +2066,7 @@ class PrepareRestoredBuildTest(unittest.TestCase):
         link.parent.mkdir(parents=True)
         link.symlink_to(sdk, target_is_directory=True)
         with self.macos_environment_context(sdk):
-            previous = prepare.prepare(self.work, "macos", "arm64")
+            previous = self.prepare(self.work, "macos", "arm64")
             self.assertEqual(previous["sdk_dependency_roots"][name], str(sdk))
             relocated = self.work / "relocated"
             relocated.mkdir()
@@ -2078,7 +2076,7 @@ class PrepareRestoredBuildTest(unittest.TestCase):
             output = self.object("sdk.o")
             self.deps({"obj/sdk.o": ["sdk/xcode_links/MacOSX26.0.sdk/usr/include/header.h"]})
             with mock.patch.dict(os.environ, {"ImageVersion": "v2"}):
-                result = prepare.prepare(self.work, "macos", "arm64")
+                result = self.prepare(self.work, "macos", "arm64")
             self.assertTrue(output.exists())
             self.assertEqual(result["dependencies"]["removed_outputs"], 0)
             self.assertEqual(result["counters"]["sdk_drift_external_rechecks"], 1)
@@ -2095,7 +2093,7 @@ class PrepareRestoredBuildTest(unittest.TestCase):
                    "  depfile = $out.d\n  deps = gcc\n"
                    f"build obj/cpath.o: cc {source}\n")
         with self.macos_environment_context(sdk), mock.patch.dict(os.environ, {"CPATH": str(header.parent)}):
-            previous = prepare.prepare(self.work, "macos", "arm64")
+            previous = self.prepare(self.work, "macos", "arm64")
             run([ninja, "-C", str(self.out)], check=True, capture_output=True, text=True)
             obj = self.out / "obj/cpath.o"
             original = obj.read_bytes()
@@ -2106,14 +2104,14 @@ class PrepareRestoredBuildTest(unittest.TestCase):
             before = run([ninja, "-C", str(self.out), "-n"], check=True, capture_output=True, text=True)
             self.assertIn("no work to do", before.stdout)
             with mock.patch.dict(os.environ, {"ImageVersion": "v2"}):
-                result = prepare.prepare(self.work, "macos", "arm64")
+                result = self.prepare(self.work, "macos", "arm64")
                 self.assertEqual(previous["environment"]["sdks"], result["environment"]["sdks"])
                 self.assertFalse(obj.exists(), "Image drift must not exempt an unhashed CPATH dependency")
                 planned = run([ninja, "-C", str(self.out), "-n"], check=True, capture_output=True, text=True)
                 self.assertNotIn("no work to do", planned.stdout)
                 run([ninja, "-C", str(self.out)], check=True, capture_output=True, text=True)
                 self.assertNotEqual(original, obj.read_bytes())
-                resumed = prepare.prepare(self.work, "macos", "arm64")
+                resumed = self.prepare(self.work, "macos", "arm64")
                 self.assertEqual(resumed["dependencies"]["removed_outputs"], 0)
                 self.assertEqual(resumed["counters"]["sdk_drift_external_rechecks"], 0)
                 self.assertTrue(obj.exists())
@@ -2127,7 +2125,7 @@ class PrepareRestoredBuildTest(unittest.TestCase):
         with self.macos_environment_context(sdk):
             for drift in (False, True):
                 with self.subTest(drift=drift):
-                    previous = prepare.prepare(self.work, "macos", "arm64")
+                    previous = self.prepare(self.work, "macos", "arm64")
                     for entry in previous["environment"]["sdks"]:
                         entry.pop("content")
                     self.write(self.src / prepare.MARKER, json.dumps(previous))
@@ -2139,7 +2137,7 @@ class PrepareRestoredBuildTest(unittest.TestCase):
                         info = sdk.stat()
                         os.utime(sdk, ns=(info.st_atime_ns, info.st_mtime_ns + 1_000_000_000))
                     with mock.patch.dict(os.environ, {"ImageVersion": "v2" if drift else "v1"}):
-                        result = prepare.prepare(self.work, "macos", "arm64")
+                        result = self.prepare(self.work, "macos", "arm64")
                         self.assertEqual(result["counters"]["environment_rechecks"], 1)
                         self.assertEqual(result["dependencies"]["removed_outputs"], 1)
                         self.assertFalse(external.exists())
@@ -2148,7 +2146,7 @@ class PrepareRestoredBuildTest(unittest.TestCase):
                         self.assertTrue(all(prepare.validated_sdk_content(entry["content"])
                                             for entry in result["environment"]["sdks"]))
                         self.object("sdk.o")
-                        resumed = prepare.prepare(self.work, "macos", "arm64")
+                        resumed = self.prepare(self.work, "macos", "arm64")
                     self.assertEqual(resumed["counters"]["environment_rechecks"], 0)
                     self.assertEqual(resumed["dependencies"]["removed_outputs"], 0)
                     self.assertTrue(external.exists())
@@ -2165,7 +2163,7 @@ class PrepareRestoredBuildTest(unittest.TestCase):
                 sdk = self.macos_sdk()
                 generator = self.write(self.src / prepare.generator_paths("macos", "arm64")["go"], "generator")
                 with self.macos_environment_context(sdk):
-                    before = prepare.prepare(self.work, "macos", "arm64")
+                    before = self.prepare(self.work, "macos", "arm64")
                     external = self.object("sdk.o")
                     internal = self.object("internal.o")
                     reader = self.object("generated.o")
@@ -2185,7 +2183,7 @@ class PrepareRestoredBuildTest(unittest.TestCase):
                         self.write(path, content[:-1] + bytes([content[-1] ^ 1]))
                         os.utime(path, ns=(info.st_atime_ns, info.st_mtime_ns))
                     with mock.patch.dict(os.environ, {"ImageVersion": "v2"}):
-                        result = prepare.prepare(self.work, "macos", "arm64")
+                        result = self.prepare(self.work, "macos", "arm64")
                 sdk_changed = change not in ("tool", "generator")
                 self.assertFalse(external.exists())
                 self.assertEqual(internal.exists(), change != "tool")
@@ -2292,7 +2290,7 @@ class PrepareRestoredBuildTest(unittest.TestCase):
         with self.macos_environment_context(sdk):
             for _ in range(2):
                 output = self.object("sdk.o")
-                result = prepare.prepare(self.work, "macos", "arm64")
+                result = self.prepare(self.work, "macos", "arm64")
                 self.assertTrue(result["ready_for_gn"])
                 self.assertFalse(result["environment"]["sdks"][0]["content"]["complete"])
                 self.assertEqual(result["counters"]["environment_rechecks"], 1)

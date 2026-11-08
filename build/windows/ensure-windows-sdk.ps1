@@ -20,7 +20,7 @@ switch (([version]$ChromiumVersion).Major) {
     $InstallerUrl = "https://download.microsoft.com/download/f4b30f2a-4fc3-430e-9b03-c842b5f5f9f1/KIT_BUNDLE_WINDOWSSDK_MEDIACREATION/winsdksetup.exe"
     $InstallerSha256 = "6fa0fa27db77a909f5ecb35183cb26a969a6775936780936fe239e4f9c66b458"
   }
-  { $_ -in @(153, 154, 155) } {
+  { $_ -in @(153, 154, 155, 156) } {
     $SdkVersion = "10.0.28000.0"
     $SdkRelease = "10.0.28000.2705"
     $InstallerUrl = "https://download.microsoft.com/download/38ab8f6d-3676-4860-ae84-3361308b9d7f/KIT_BUNDLE_WINDOWSSDK_MEDIACREATION/winsdksetup.exe"

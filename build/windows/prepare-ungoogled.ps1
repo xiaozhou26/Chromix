@@ -388,7 +388,7 @@ $resumeChromixPatchIsClean = $false
 if (Test-Path (Join-Path $Src ".chromix-layer-in-progress")) {
   $interruptedLayer = (Get-Content (Join-Path $Src ".chromix-layer-in-progress") -Raw).Trim()
   if ($interruptedLayer -eq "chromix") {
-    if ($Revisions.ChromiumVersion -in @("154.0.8037.97", "155.0.8059.39") -and
+    if ($Revisions.ChromiumVersion -in @("154.0.8037.97", "155.0.8059.39", "156.0.8078.79") -and
         -not (Test-Marker ".chromix-patch-selection" $patchSetKey)) {
       throw "interrupted Chromium $($Revisions.ChromiumVersion) stack has missing or mismatched selection identity; restore clean source"
     }

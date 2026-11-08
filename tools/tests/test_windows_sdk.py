@@ -12,6 +12,8 @@ REPO = Path(__file__).resolve().parents[2]
 HELPER = REPO / 'build/windows/ensure-windows-sdk.ps1'
 SDK_VERSION = '10.0.28000.0'
 INSTALLERS = {
+    '156.0.8078.79': ('10.0.28000.0', '38ab8f6d-3676-4860-ae84-3361308b9d7f',
+                     'b534d37a1f3140c8be1298ed88855b8cbddc35d2626c4d0afd39f186a4b578e3'),
     '155.0.8059.39': ('10.0.28000.0', '38ab8f6d-3676-4860-ae84-3361308b9d7f',
                      'b534d37a1f3140c8be1298ed88855b8cbddc35d2626c4d0afd39f186a4b578e3'),
     '154.0.8037.57': ('10.0.28000.0', '38ab8f6d-3676-4860-ae84-3361308b9d7f',
@@ -164,6 +166,13 @@ class WindowsSdkSourceTest(unittest.TestCase):
         self.assertEqual(source.count('Remove-Item'), 1)
         self.assertIn('Remove-Item -LiteralPath $staging -Recurse -Force', source)
 
+    def test_156_uses_reviewed_28000_mapping_without_admitting_157(self):
+        source = HELPER.read_text()
+        mapping = source.split('{ $_ -in @(153, 154, 155, 156) } {', 1)[1].split('\n  }', 1)[0]
+        self.assertIn('$SdkVersion = "10.0.28000.0"', mapping)
+        self.assertIn(INSTALLERS['156.0.8078.79'][2], mapping)
+        self.assertIn('default { throw "No Windows SDK mapping', source)
+
     def test_prerequisites_document_current_sdk(self):
         for name in ('BUILDING.md', 'README.md', 'readme_cn.md', 'build/windows/build.ps1'):
             self.assertIn(SDK_VERSION, (REPO / name).read_text(encoding='utf-8'))
@@ -294,7 +303,8 @@ Write-Output "SDK_ROOT=$env:WINDOWSSDKDIR"
         wrapper.write_text('$Arch = $env:ARCH\n$Root = $env:DOWNLOAD\n'
                            '$Revisions = @{ ChromiumVersion = $env:CHROMIUM }\n'
                            + function + '\nInstall-WindowsSdk\n')
-        for arch, chromium in (('x64', '155.0.8059.39'), ('x64', '154.0.8037.57'), ('arm64', '154.0.8037.57'),
+        for arch, chromium in (('x64', '156.0.8078.79'), ('arm64', '156.0.8078.79'),
+                               ('x64', '155.0.8059.39'), ('x64', '154.0.8037.57'), ('arm64', '154.0.8037.57'),
                                ('x64', '153.0.8010.36'), ('arm64', '152.0.7977.82')):
             with self.subTest(arch=arch, chromium=chromium):
                 version, _, digest = INSTALLERS[chromium]
@@ -310,7 +320,7 @@ Write-Output "SDK_ROOT=$env:WINDOWSSDKDIR"
                 self.calls.unlink()
 
     def test_unknown_version_and_invalid_arch_fail_before_download(self):
-        for version in ('156.0.1.0', '151.0.1.0', '153', 'invalid'):
+        for version in ('157.0.1.0', '151.0.1.0', '153', 'invalid'):
             self.assert_failure(self.invoke(True, CHROMIUM=version), 'Chromium')
         self.assert_failure(self.invoke(True, ARCH='x86'), 'ValidateSet')
         self.assertEqual(self.events(), [])

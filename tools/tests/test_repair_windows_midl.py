@@ -1111,7 +1111,8 @@ class WindowsMidlPrepareTest(unittest.TestCase):
         with self.support.native_context("macos", "arm64"), \
                 mock.patch.object(prepare, "repair_windows_midl") as apply:
             for phase in ("inspect", "finish", "finish"):
-                result = prepare.prepare(self.work, "macos", "arm64", phase=phase)
+                result = prepare.prepare(self.work, "macos", "arm64", phase=phase,
+                                         repo=self.support.fixture_repo)
                 self.assertNotIn("windows_midl", result)
             apply.assert_not_called()
         self.assertEqual(script.read_bytes(), b"unknown posix MIDL script")
