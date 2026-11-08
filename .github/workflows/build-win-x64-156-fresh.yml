@@ -154,7 +154,7 @@ jobs:
       if: ${{ always() }}
       uses: actions/upload-artifact@v4
       with:
-        name: fingerprint-win-arm64-${{ github.job }}-attempt-${{ github.run_attempt }}
+        name: fingerprint-win-x64-${{ github.job }}-attempt-${{ github.run_attempt }}
         path: C:\c\chromix\fingerprint-diagnostics\
         if-no-files-found: ignore
         retention-days: 7
@@ -266,7 +266,7 @@ jobs:
       if: ${{ always() }}
       uses: actions/upload-artifact@v4
       with:
-        name: fingerprint-win-arm64-${{ github.job }}-attempt-${{ github.run_attempt }}
+        name: fingerprint-win-x64-${{ github.job }}-attempt-${{ github.run_attempt }}
         path: C:\c\chromix\fingerprint-diagnostics\
         if-no-files-found: ignore
         retention-days: 7
@@ -378,7 +378,7 @@ jobs:
       if: ${{ always() }}
       uses: actions/upload-artifact@v4
       with:
-        name: fingerprint-win-arm64-${{ github.job }}-attempt-${{ github.run_attempt }}
+        name: fingerprint-win-x64-${{ github.job }}-attempt-${{ github.run_attempt }}
         path: C:\c\chromix\fingerprint-diagnostics\
         if-no-files-found: ignore
         retention-days: 7
@@ -490,7 +490,7 @@ jobs:
       if: ${{ always() }}
       uses: actions/upload-artifact@v4
       with:
-        name: fingerprint-win-arm64-${{ github.job }}-attempt-${{ github.run_attempt }}
+        name: fingerprint-win-x64-${{ github.job }}-attempt-${{ github.run_attempt }}
         path: C:\c\chromix\fingerprint-diagnostics\
         if-no-files-found: ignore
         retention-days: 7
@@ -602,7 +602,7 @@ jobs:
       if: ${{ always() }}
       uses: actions/upload-artifact@v4
       with:
-        name: fingerprint-win-arm64-${{ github.job }}-attempt-${{ github.run_attempt }}
+        name: fingerprint-win-x64-${{ github.job }}-attempt-${{ github.run_attempt }}
         path: C:\c\chromix\fingerprint-diagnostics\
         if-no-files-found: ignore
         retention-days: 7
@@ -714,7 +714,7 @@ jobs:
       if: ${{ always() }}
       uses: actions/upload-artifact@v4
       with:
-        name: fingerprint-win-arm64-${{ github.job }}-attempt-${{ github.run_attempt }}
+        name: fingerprint-win-x64-${{ github.job }}-attempt-${{ github.run_attempt }}
         path: C:\c\chromix\fingerprint-diagnostics\
         if-no-files-found: ignore
         retention-days: 7
@@ -826,7 +826,7 @@ jobs:
       if: ${{ always() }}
       uses: actions/upload-artifact@v4
       with:
-        name: fingerprint-win-arm64-${{ github.job }}-attempt-${{ github.run_attempt }}
+        name: fingerprint-win-x64-${{ github.job }}-attempt-${{ github.run_attempt }}
         path: C:\c\chromix\fingerprint-diagnostics\
         if-no-files-found: ignore
         retention-days: 7
@@ -938,7 +938,7 @@ jobs:
       if: ${{ always() }}
       uses: actions/upload-artifact@v4
       with:
-        name: fingerprint-win-arm64-${{ github.job }}-attempt-${{ github.run_attempt }}
+        name: fingerprint-win-x64-${{ github.job }}-attempt-${{ github.run_attempt }}
         path: C:\c\chromix\fingerprint-diagnostics\
         if-no-files-found: ignore
         retention-days: 7
@@ -1050,7 +1050,7 @@ jobs:
       if: ${{ always() }}
       uses: actions/upload-artifact@v4
       with:
-        name: fingerprint-win-arm64-${{ github.job }}-attempt-${{ github.run_attempt }}
+        name: fingerprint-win-x64-${{ github.job }}-attempt-${{ github.run_attempt }}
         path: C:\c\chromix\fingerprint-diagnostics\
         if-no-files-found: ignore
         retention-days: 7
@@ -1162,7 +1162,7 @@ jobs:
       if: ${{ always() }}
       uses: actions/upload-artifact@v4
       with:
-        name: fingerprint-win-arm64-${{ github.job }}-attempt-${{ github.run_attempt }}
+        name: fingerprint-win-x64-${{ github.job }}-attempt-${{ github.run_attempt }}
         path: C:\c\chromix\fingerprint-diagnostics\
         if-no-files-found: ignore
         retention-days: 7
@@ -1274,7 +1274,7 @@ jobs:
       if: ${{ always() }}
       uses: actions/upload-artifact@v4
       with:
-        name: fingerprint-win-arm64-${{ github.job }}-attempt-${{ github.run_attempt }}
+        name: fingerprint-win-x64-${{ github.job }}-attempt-${{ github.run_attempt }}
         path: C:\c\chromix\fingerprint-diagnostics\
         if-no-files-found: ignore
         retention-days: 7
@@ -1386,7 +1386,7 @@ jobs:
       if: ${{ always() }}
       uses: actions/upload-artifact@v4
       with:
-        name: fingerprint-win-arm64-${{ github.job }}-attempt-${{ github.run_attempt }}
+        name: fingerprint-win-x64-${{ github.job }}-attempt-${{ github.run_attempt }}
         path: C:\c\chromix\fingerprint-diagnostics\
         if-no-files-found: ignore
         retention-days: 7

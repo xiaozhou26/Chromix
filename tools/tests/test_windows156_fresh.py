@@ -201,6 +201,8 @@ def test_fresh_workflow_is_explicit_preserves_output_and_keeps_native_acceptance
         assert "$env:UPLOAD_PARTS -ne 'true' -or $env:STAGE_OUTCOME -ne 'success'" in snapshot["run"]
         assert "No complete snapshot volume set" in snapshot["run"]
         assert "steps.stage.outputs.snapshot_safe == 'true'" in snapshot["if"]
+        diagnostics = next(step for step in job["steps"] if step.get("name") == "Upload fingerprint diagnostics")
+        assert f"fingerprint-win-{arch}-" in diagnostics["with"]["name"]
     if arch == "arm64":
         native = workflow["jobs"]["verify-arm64"]
         assert native["runs-on"] == "windows-11-arm"
