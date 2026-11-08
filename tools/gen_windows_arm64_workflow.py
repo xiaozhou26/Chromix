@@ -264,6 +264,8 @@ if ($LASTEXITCODE -ne 0) {{ throw 'Fixed donor metadata/helper review failed; no
 python tools/download_windows_snapshot.py --manifest "$env:RUNNER_TEMP\\windows156-origin.json" --destination C:\\restore --report "$env:RUNNER_TEMP\\windows156-download.json"
 if ($LASTEXITCODE -ne 0) {{ throw 'Fixed donor archive authentication failed' }}
 ''' + fresh_extract() + f'''
+build/windows/ensure-windows-sdk.ps1 -Arch {arch} -ChromiumVersion 156.0.8078.79 -DownloadDir C:\\c -Install
+if ($LASTEXITCODE -ne 0) {{ throw 'Pinned runtime source SDK provisioning failed' }}
 python tools/windows156_preflight_resume.py --phase verify --arch {arch} --repo "$env:GITHUB_WORKSPACE" --workdir C:\\c\\chromix --origin "$env:RUNNER_TEMP\\windows156-origin.json" --download "$env:RUNNER_TEMP\\windows156-download.json" --report "$env:RUNNER_TEMP\\windows156-preflight-source.json"
 if ($LASTEXITCODE -ne 0) {{ throw 'Unchanged source/GN/PGO verification failed; no cold fallback' }}
 $evidence = 'C:\\c\\chromix\\fingerprint-diagnostics\\preflight-resume'

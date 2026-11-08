@@ -126,6 +126,7 @@ def test_precompile_phase_does_not_invent_compile_logs(tmp_path, content):
 @pytest.mark.parametrize("name,data", [
     (".ninja_log", b""), (".ninja_log", b"corrupt"), (".ninja_log", b"# ninja log v5\n0\t1\t1\tfoo.obj\tabc\n"),
     (".ninja_deps", b""), (".ninja_deps", b"# ninjadeps\n\x04\0\0\0bad"),
+    (".ninja_deps", b"# ninjadeps\r\n\x04\0\0\0"),
     ("keep.obj", b"compiled object"), ("chrome.exe", b"compiled browser"),
 ])
 def test_bad_or_compiled_logs_never_take_missing_log_exception(tmp_path, name, data):
@@ -303,6 +304,7 @@ def prepared(tmp_path, monkeypatch):
     monkeypatch.setattr(recovery.files, "_tracked", mock.Mock(return_value={}))
     monkeypatch.setattr(recovery.patches, "_load", mock.Mock(return_value=({"identity": "same"}, [], {})))
     monkeypatch.setattr(recovery, "gn_contract", mock.Mock())
+    monkeypatch.setattr(recovery, "runtime_contract", mock.Mock(return_value={}))
     monkeypatch.setattr(recovery.verify_patch_stack, "verify", mock.Mock(return_value=json.loads(payload)))
     monkeypatch.setattr(recovery.fresh, "probe", mock.Mock())
     import repair_windows_midl
@@ -375,3 +377,175 @@ def test_donor_data_checkout_retains_authenticated_windows_representation(tmp_pa
     assert (previous / "same.tq").read_bytes() == b"source\r\n"
     assert (previous / "helper.py").read_bytes() == b"old helper\n"
     assert not (previous / ".git").exists()
+
+
+def pe_dll(arch, payload=b'fixture'):
+    import struct
+    data = bytearray(512)
+    data[:2] = b'MZ'
+    struct.pack_into('<I', data, 60, 64)
+    data[64:68] = b'PE\0\0'
+    struct.pack_into('<HH', data, 68, {'x64': 0x8664, 'arm64': 0xAA64}[arch], 1)
+    struct.pack_into('<HHH', data, 84, 112, 0x2002, 0x20B)
+    return bytes(data) + payload
+
+
+def deployed_fixture(tmp_path, monkeypatch, arch):
+    import types
+    audit = json.loads(gzip.decompress((ROOT / 'tools/tests/fixtures/windows156_runtime_deploy.json.gz').read_bytes()))
+    src = tmp_path / 'src'
+    out = src / 'out/Chromix'
+    out.mkdir(parents=True)
+    for name, item in audit['files'].items():
+        assert hashlib.sha256(item['text'].encode()).hexdigest() == recovery.DEPLOY_SCRIPTS[name]
+        path = src / name
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(item['text'])
+    windows, sdk, vs = (tmp_path / name for name in ('Windows', 'Windows Kits/10', 'VS2022'))
+    monkeypatch.setattr(recovery, 'HOST_WINDOWS', windows)
+    monkeypatch.setattr(recovery, 'HOST_SDK', sdk)
+    monkeypatch.setattr(recovery, 'HOST_VS', vs)
+    redist = vs / 'VC/Redist/MSVC/14.44.35112'
+    (vs / 'VC/Redist/MSVC/14.9.99999').mkdir(parents=True)
+    for cpu in ('x64', 'arm64'):
+        runtime = windows / 'System32' if cpu == 'x64' else redist / 'arm64/Microsoft.VC143.CRT'
+        sources = [runtime / name for name in recovery.VC_RUNTIME]
+        if cpu == 'x64':
+            sources.append(runtime / 'vcruntime140_1.dll')
+        sources += [sdk / 'Debuggers' / cpu / name for name in ('dbgcore.dll', 'dbghelp.dll', 'symsrv.dll')]
+        sources.append(vs / 'DIA SDK/bin' / ('amd64' if cpu == 'x64' else cpu) / 'msdia140.dll')
+        for path in sources:
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_bytes(pe_dll(cpu, path.name.encode()))
+    # Execute only the pinned fixture's actual deployment implementation, with host discovery stubbed.
+    module = types.ModuleType('reviewed_runtime_deploy')
+    module.__file__ = str(src / 'build/vs_toolchain.py')
+    with mock.patch.dict(sys.modules, {'gn_helpers': types.SimpleNamespace(ToGNString=lambda value: value)}):
+        exec(compile(audit['files']['build/vs_toolchain.py']['text'], 'pinned-vs-toolchain', 'exec'), module.__dict__)
+    module.SetEnvironmentAndGetRuntimeDllDirs = lambda: [str(windows / 'System32'), str(windows / 'SysWOW64'), 'Arm64Unused']
+    module.SetEnvironmentAndGetSDKDir = lambda: str(sdk)
+    module.FindVCRedistRoot = lambda: str(redist)
+    module.GetVisualStudioVersion = lambda: '2022'
+    with mock.patch.dict(recovery.os.environ, {'GYP_MSVS_OVERRIDE_PATH': str(vs)}):
+        module.CopyDlls(str(out), 'Release', arch)
+    env = dict(SYSTEMROOT=str(windows),
+               INCLUDE=';'.join(str(path) for path in (vs / 'VC/Tools/MSVC/14.44.35207/include',
+                       sdk / 'Include/10.0.28000.0/ucrt', sdk / 'Include/10.0.28000.0/um')),
+               PATH=';'.join((str(windows / 'System32'), str(windows / 'SysWOW64'), 'Arm64Unused', 'python')))
+    for cpu in (('x86', 'x64', 'arm64') if arch == 'arm64' else ('x86', 'x64')):
+        (out / ('environment.' + cpu)).write_text(''.join(key + '=' + value + '\0' for key, value in env.items()) + '\0')
+    (out / 'gn.exe').write_bytes(b'GN bootstrap')
+    (out / 'build.ninja').write_text('GN generated')
+    return src, out, windows, sdk, vs
+
+
+@pytest.mark.parametrize('arch', ['x64', 'arm64'])
+def test_real_pinned_release_deployment_is_verified_read_only(tmp_path, monkeypatch, arch):
+    src, out, windows, sdk, vs = deployed_fixture(tmp_path, monkeypatch, arch)
+    before = recovery.output_identity(out)
+    runtimes = recovery.runtime_contract(src, out, arch)
+    recovery.precompile_logs(out, runtimes=runtimes)
+    assert recovery.output_identity(out) == before
+    assert len(runtimes) == (9 if arch == 'x64' else 17)
+    assert runtimes['dbgcore.dll']['source'] == str(sdk / 'Debuggers' / arch / 'dbgcore.dll')
+    assert runtimes['msdia140.dll']['source'] == str(vs / 'DIA SDK/bin' / ('amd64' if arch == 'x64' else arch) / 'msdia140.dll')
+    assert all(item['arch'] == ('x64' if path.startswith('win_clang_x64/') else arch) for path, item in runtimes.items())
+    if arch == 'arm64':
+        assert '14.44.35112/arm64/Microsoft.VC143.CRT' in runtimes['vcruntime140.dll']['source']
+        assert runtimes['win_clang_x64/vcruntime140_1.dll']['source'] == str(windows / 'System32/vcruntime140_1.dll')
+    assert not any('ucrt' in path for path in runtimes)
+
+
+@pytest.mark.parametrize('change', ['unknown', 'ucrt', 'debug-ucrt', 'wrong-bytes', 'wrong-pe', 'source-wrong-pe',
+                                    'nested', 'host-root', 'directory', 'missing-source', 'sdk-dia', 'script',
+                                    'environment', 'compiled', 'bad-log', 'host-log', 'nested-gn',
+                                    'symlink', 'hardlink', 'source-symlink', 'parent-symlink'])
+def test_runtime_contract_rejects_unproved_deployment(tmp_path, monkeypatch, change):
+    src, out, windows, sdk, vs = deployed_fixture(tmp_path, monkeypatch, 'arm64')
+    destination = out / 'dbgcore.dll'
+    source = sdk / 'Debuggers/arm64/dbgcore.dll'
+    if change in ('unknown', 'ucrt', 'debug-ucrt', 'nested', 'host-root', 'compiled', 'bad-log', 'host-log', 'nested-gn'):
+        name = {'unknown': 'unknown.dll', 'ucrt': 'ucrtbase.dll', 'debug-ucrt': 'ucrtbased.dll',
+                'nested': 'obj/dbgcore.dll', 'host-root': 'vcruntime140_1.dll', 'compiled': 'obj/chrome.obj',
+                'bad-log': '.ninja_log', 'host-log': 'win_clang_x64/.ninja_log', 'nested-gn': 'obj/gn.exe'}[change]
+        target = out / name
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_bytes(pe_dll('arm64'))
+    elif change == 'wrong-bytes':
+        destination.write_bytes(pe_dll('arm64', b'wrong'))
+    elif change in ('wrong-pe', 'source-wrong-pe'):
+        destination.write_bytes(pe_dll('x64'))
+        if change == 'source-wrong-pe':
+            source.write_bytes(destination.read_bytes())
+    elif change == 'directory':
+        destination.unlink()
+        destination.mkdir()
+    elif change in ('missing-source', 'sdk-dia'):
+        target = source if change == 'missing-source' else vs / 'DIA SDK/bin/arm64/msdia140.dll'
+        target.unlink()
+        if change == 'sdk-dia':
+            (sdk / 'Debuggers/arm64/msdia140.dll').write_bytes((out / 'msdia140.dll').read_bytes())
+    elif change == 'script':
+        (src / 'build/vs_toolchain.py').write_text('changed deploy scope')
+    elif change == 'environment':
+        path = out / 'environment.arm64'
+        path.write_text(path.read_text().replace('14.44.35207', '14.99.12345'))
+    elif change in ('symlink', 'hardlink'):
+        destination.unlink()
+        if change == 'symlink':
+            destination.symlink_to(source)
+        else:
+            recovery.os.link(source, destination)
+    elif change == 'source-symlink':
+        source.unlink()
+        source.symlink_to(destination)
+    elif change == 'parent-symlink':
+        parent = source.parent
+        moved = parent.with_name('moved')
+        parent.rename(moved)
+        parent.symlink_to(moved, target_is_directory=True)
+    with pytest.raises((ValueError, RuntimeError)):
+        runtimes = recovery.runtime_contract(src, out, 'arm64')
+        recovery.precompile_logs(out, runtimes=runtimes)
+
+
+def test_full_output_identity_rejects_nonbinary_mutation(prepared):
+    repo, previous, work, arch = prepared
+    def mutate(*args):
+        (work / 'src/out/Chromix/late.ninja').write_text('unverified graph')
+    recovery.fresh.probe.side_effect = mutate
+    with pytest.raises(ValueError, match='full precompile output identity'):
+        recovery.verify_source(*prepared)
+
+
+def test_fixed_main_base_preserves_parallel_linux_changes():
+    assert recovery.MAIN_BASE == '7913e47c701d9f0034ba93349771c755bc4655f3'
+    assert 'tools/linux_restored_generators.py' not in recovery.RECOVERY_FILES
+
+
+@pytest.mark.parametrize('arch', ['x64', 'arm64'])
+def test_optional_debugger_runtime_requires_both_sides_absent(tmp_path, monkeypatch, arch):
+    src, out, windows, sdk, vs = deployed_fixture(tmp_path, monkeypatch, arch)
+    for name in ('dbgcore.dll', 'symsrv.dll', 'msdia140.dll'):
+        (out / name).unlink()
+        source = sdk / 'Debuggers' / arch / name if name != 'msdia140.dll' else vs / 'DIA SDK/bin' / ('amd64' if arch == 'x64' else arch) / name
+        source.unlink()
+    runtimes = recovery.runtime_contract(src, out, arch)
+    assert 'dbgcore.dll' not in runtimes
+    recovery.precompile_logs(out, runtimes=runtimes)
+    (out / 'dbgcore.dll').write_bytes(pe_dll(arch))
+    with pytest.raises(ValueError, match='source missing'):
+        recovery.runtime_contract(src, out, arch)
+
+
+@pytest.mark.parametrize('arch', ['x64', 'arm64'])
+def test_recovery_provisions_only_host_sdk_before_runtime_verification(arch):
+    workflow = generator.preflight_workflow(arch)
+    step = next(step for step in workflow['jobs']['build-1']['steps']
+                if step.get('name') == 'Restore exact reviewed precompile donor')
+    script = step['run']
+    assert script.index('7z.exe x') < script.index('ensure-windows-sdk.ps1') < script.index('--phase verify')
+    assert f'-Arch {arch} -ChromiumVersion 156.0.8078.79 -DownloadDir C:\\c -Install' in script
+    assert 'copy_dlls' not in script
+    if arch == 'arm64':
+        assert workflow['jobs']['verify-arm64'] == generator.fresh_workflow(arch)['jobs']['verify-arm64']

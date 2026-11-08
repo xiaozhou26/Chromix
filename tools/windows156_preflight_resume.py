@@ -10,6 +10,7 @@ import os
 from pathlib import Path
 import re
 import subprocess
+import struct
 import sys
 import tempfile
 import zipfile
@@ -24,7 +25,7 @@ from verify_windows_snapshot_source import _inventory
 
 REPOSITORY = "xiaozhou26/Chromix"
 DONOR_SHA = "2e2a85fdeb42f37a7528a7d1ced247deab337452"
-MAIN_BASE = "3dfe10e164966f9d8f99099849c4f2aa1ed9138c"
+MAIN_BASE = "7913e47c701d9f0034ba93349771c755bc4655f3"
 OLD_HELPER_SHA256 = "2e04eae3fcdc88c37e7e8a7f1471e7576a2d5059ba0f2f13333b83fc91425c26"
 REVIEWED_HELPER_SHA256 = frozenset({
     "15cfd59bdef43439ae248f8867910ce04cabcd66d1830025da6f1c4ef6f323fd",
@@ -57,6 +58,7 @@ RECOVERY_FILES = frozenset({
     "tools/tests/test_windows_metagen_bindings.py",
     "tools/tests/fixtures/windows156_metagen.json.gz",
     "tools/tests/fixtures/windows156_preflight_source.json.gz",
+    "tools/tests/fixtures/windows156_runtime_deploy.json.gz",
     HELPER,
     *[f".github/workflows/build-win-{arch}-156-{mode}.yml"
       for arch in DONORS for mode in ("fresh", "preflight-resume")],
@@ -184,20 +186,156 @@ def old_checkout(git: str, repo: Path, destination: Path) -> None:
                 target.chmod(int(old[relative][0], 8) & 0o777)
 
 
-def precompile_logs(out: Path) -> None:
+DEPLOY_SCRIPTS = {
+    "build/vs_toolchain.py": "706738d45b3559ad09fcd42a74bb75feb9317d4abcf7d7058a9a261d139a67dd",
+    "build/toolchain/win/setup_toolchain.py": "d44e8a20670fb92b794809e66cd874aafb48521731ec32e13684ef689fca18f1",
+    "build/toolchain/win/BUILD.gn": "12a8045bd8f35669afe499ac9b58924dd2de3c00ea5973ce912a62b45dbe0507",
+    "build/config/win/visual_studio_version.gni": "7d096a03d6d860046523b52cb7cc33fa788c2feb33fef9f6abdcd169fd25fcb3",
+    "build/toolchain/win/win_toolchain_data.gni": "51f4425cac2d1b334f8e7b72f199b7674f9d1318430073c16843c2aba91007e3",
+}
+HOST_WINDOWS = Path("C:/Windows")
+HOST_SDK = Path("C:/Program Files (x86)/Windows Kits/10")
+HOST_VS = Path("C:/Program Files/Microsoft Visual Studio/2022/Enterprise")
+VC_RUNTIME = ("msvcp140.dll", "msvcp140_atomic_wait.dll", "vccorlib140.dll", "vcruntime140.dll")
+
+
+def environment_contract(out: Path, arch: str) -> None:
+    """Read GN's donor environment blocks as data, never as executable settings."""
+    for cpu in (("x86", "x64", "arm64") if arch == "arm64" else ("x86", "x64")):
+        text = files._file(out, "environment." + cpu).read_text(encoding="utf-8")
+        if not text.endswith("\0\0"):
+            raise ValueError("incomplete GN environment block")
+        env = {}
+        for entry in text[:-2].split("\0"):
+            key, separator, value = entry.partition("=")
+            if not separator or key.upper() in env:
+                raise ValueError("ambiguous GN environment block")
+            env[key.upper()] = value
+        def normalized(value):
+            return value.replace("\\", "/").rstrip("/").casefold()
+        if normalized(env.get("SYSTEMROOT", "")) != normalized(str(HOST_WINDOWS)):
+            raise ValueError("donor Windows runtime root mismatch")
+        includes = {normalized(value) for value in env.get("INCLUDE", "").split(";") if value}
+        required = {normalized(str(HOST_VS / "VC/Tools/MSVC/14.44.35207/include")),
+                    normalized(str(HOST_SDK / "Include/10.0.28000.0/ucrt")),
+                    normalized(str(HOST_SDK / "Include/10.0.28000.0/um"))}
+        if not required <= includes:
+            raise ValueError("donor SDK/Visual Studio source roots mismatch")
+        runtime_dirs = [normalized(str(HOST_WINDOWS / "System32")),
+                        normalized(str(HOST_WINDOWS / "SysWOW64")), "arm64unused"]
+        if [normalized(value) for value in env.get("PATH", "").split(";")[:3]] != runtime_dirs:
+            raise ValueError("donor GN runtime search directory mismatch")
+
+
+def dll_identity(path: Path, arch: str) -> str:
+    files._safe(path)
+    with path.open("rb") as stream:
+        dos = stream.read(64)
+        if len(dos) != 64 or dos[:2] != b"MZ":
+            raise ValueError("runtime requires a PE DLL: " + str(path))
+        offset = struct.unpack_from("<I", dos, 60)[0]
+        if offset < 64 or offset + 26 > path.stat().st_size:
+            raise ValueError("runtime PE header offset mismatch: " + str(path))
+        stream.seek(offset)
+        header = stream.read(26)
+        machine, sections = struct.unpack_from("<HH", header, 4)
+        optional_size, flags, magic = struct.unpack_from("<HHH", header, 20)
+        if (header[:4] != b"PE\0\0" or machine != {"x64": 0x8664, "arm64": 0xAA64}[arch]
+                or magic != 0x20B or flags & 0x2002 != 0x2002 or not 1 <= sections <= 96
+                or optional_size < 112 or offset + 24 + optional_size + sections * 40 > path.stat().st_size):
+            raise ValueError("runtime PE architecture/DLL mismatch: " + str(path))
+    return fresh.file_digest(path)
+
+
+def runtime_contract(src: Path, out: Path, arch: str) -> dict:
+    """Reproduce only Release CopyDlls' source selection without running donor scripts."""
+    if arch not in DONORS:
+        raise ValueError("unsupported runtime target")
+    for name, digest in DEPLOY_SCRIPTS.items():
+        if fresh.file_digest(files._file(src, name)) != digest:
+            raise ValueError("pre-Ninja deployment script identity mismatch: " + name)
+    environment_contract(out, arch)
+    redist = None
+    if arch == "arm64":
+        root = files._safe(HOST_VS / "VC/Redist/MSVC", directory=True)
+        versions = []
+        for path in root.glob("14.*"):
+            files._safe(path, directory=True)
+            if not re.fullmatch(r"14\.[0-9]+\.[0-9]+", path.name):
+                raise ValueError("unsupported MSVC runtime version directory")
+            versions.append(path)
+        if not versions:
+            raise ValueError("ARM64 MSVC runtime source directory missing")
+        redist = max(versions, key=lambda path: tuple(map(int, path.name.split("."))))
+    result = {}
+    destinations = [("", arch)] + ([("win_clang_x64/", "x64")] if arch == "arm64" else [])
+    for prefix, cpu in destinations:
+        runtime = HOST_WINDOWS / "System32" if cpu == "x64" else redist / "arm64/Microsoft.VC143.CRT"
+        sources = {name: (runtime / name, False) for name in VC_RUNTIME}
+        if cpu == "x64":
+            sources["vcruntime140_1.dll"] = (runtime / "vcruntime140_1.dll", False)
+        for name in ("dbghelp.dll", "dbgcore.dll", "symsrv.dll"):
+            sources[name] = (HOST_SDK / "Debuggers" / cpu / name, name != "dbghelp.dll")
+        sources["msdia140.dll"] = (HOST_VS / "DIA SDK/bin" / ("amd64" if cpu == "x64" else cpu) / "msdia140.dll", True)
+        for name, (source, optional) in sources.items():
+            destination = files._file(out, prefix + name, missing=True)
+            files._safe(source, missing=True)
+            if not source.exists():
+                if optional and not destination.exists():
+                    continue
+                raise ValueError("runtime deployment source missing: " + str(source))
+            if not destination.exists():
+                raise ValueError("pre-Ninja deployed runtime missing: " + str(destination))
+            source_state = files._fingerprint(source)
+            digest = dll_identity(source, cpu)
+            deployed_digest = dll_identity(destination, cpu)
+            if deployed_digest != digest:
+                raise ValueError(f"runtime source/deployed SHA256 mismatch: {destination}; "
+                                 f"source={source}; source_sha256={digest}; deployed_sha256={deployed_digest}")
+            if files._fingerprint(source) != source_state:
+                raise ValueError("runtime source changed concurrently")
+            result[prefix + name] = dict(source=str(source), sha256=digest, arch=cpu)
+    return result
+
+
+def precompile_logs(out: Path, *, runtimes: dict | None = None) -> None:
     # Only these fixed post-GN/pre-Ninja donors may have no Chromium Ninja logs.
     for name, header in ((".ninja_log", b"# ninja log v5\n"),
                          (".ninja_deps", b"# ninjadeps\n\x04\x00\x00\x00")):
         path = files._file(out, name, missing=True)
-        if path.exists() and path.read_bytes().replace(b"\r\n", b"\n") != header:
-            raise ValueError("invalid or compiled Ninja state in precompile donor: " + name)
+        if path.exists():
+            data = path.read_bytes()
+            if name == ".ninja_log":
+                data = data.replace(b"\r\n", b"\n")
+            if data != header:
+                raise ValueError("invalid or compiled Ninja state in precompile donor: " + name)
     for path in out.rglob("*"):
+        relative = path.relative_to(out).as_posix()
         if path.is_dir():
             files._safe(path, directory=True)
         else:
             files._safe(path)
-            if path.suffix.lower() in (".obj", ".o", ".dll", ".exe", ".lib", ".pdb", ".tlb") and path.name != "gn.exe":
+            if relative in (runtimes or {}):
+                item = runtimes[relative]
+                if dll_identity(path, item["arch"]) != item["sha256"]:
+                    raise ValueError("verified runtime changed concurrently")
+                continue
+            if (path.name in (".ninja_log", ".ninja_deps") and relative != path.name
+                    or path.suffix.lower() in (".obj", ".o", ".dll", ".exe", ".lib", ".pdb", ".tlb")
+                    and relative != "gn.exe"):
                 raise ValueError("compiled output contradicts precompile donor: " + str(path))
+
+
+def output_identity(out: Path) -> dict:
+    result = {}
+    for directory, dirs, names in os.walk(out, followlinks=False):
+        for name in dirs:
+            path = files._safe(Path(directory) / name, directory=True)
+            result[path.relative_to(out).as_posix() + "/"] = files._stat(path.stat())
+        for name in names:
+            path = Path(directory) / name
+            result[path.relative_to(out).as_posix()] = files._fingerprint(path)
+    return result
 
 
 def gn_contract(repo: Path, work: Path, arch: str, core: Path, tooling: Path) -> None:
@@ -276,7 +414,10 @@ def verify_source(repo: Path, previous: Path, work: Path, arch: str) -> dict:
     for name in ("out/Chromix/build.ninja", "out/Chromix/gn.exe"):
         if files._file(src, name).stat().st_size == 0:
             raise ValueError("precompile GN output is empty")
-    precompile_logs(src / "out/Chromix")
+    out = src / "out/Chromix"
+    output_before = output_identity(out)
+    runtimes = runtime_contract(src, out, arch)
+    precompile_logs(out, runtimes=runtimes)
     pgo = "chrome/build/pgo_profiles/" + fresh.PROFILES[arch]
     files._file(src, pgo)
     files._file(src, pgo + ".chromix-sha256")
@@ -291,13 +432,15 @@ def verify_source(repo: Path, previous: Path, work: Path, arch: str) -> dict:
     proof = verify_patch_stack.verify(src, repo, core=core, tooling=tooling, platform="windows")
     source_receipt(work, arch, proof)
     fresh.probe(src, arch)
+    if runtime_contract(src, out, arch) != runtimes or output_identity(out) != output_before:
+        raise ValueError("full precompile output identity changed during verification")
     files._unchanged(src, protected)
     for root, head, tree, state in tool_states:
         if files._tree(git, root, head) != (head, tree):
             raise ValueError("tooling Git identity changed concurrently")
         files._unchanged(root, state)
     return dict(schema_version=1, status="verified", phase="post-gn-precompile", arch=arch,
-                previous_sha=DONOR_SHA, preparation_key=key, source=proof, changed_source_files=[])
+                previous_sha=DONOR_SHA, preparation_key=key, source=proof, runtimes=runtimes, changed_source_files=[])
 
 
 def consumer(arch: str) -> str:
