@@ -1,0 +1,221 @@
+{
+  "schema_version": 1,
+  "kind": "chromium156-root-compatibility",
+  "chromium_version": "156.0.8078.79",
+  "chromium_commit": "a21ce95c24ce3964416f09ae1862f53f319eb4d0",
+  "core_tag_object": "e651fea1fae8170d56b93272fed126483def1c4c",
+  "core_commit": "28a211ab4ab6b83d919966a4f58a6df23cf4fb29",
+  "base_commit": "bf3221bcfa08b652ff62a44f52ccce393ef1d351",
+  "base_series_sha256": "71613faf45339ae3debd3dcf8afb95101989c4e6537d14dc7b0cebd1766f5863",
+  "base_patch_count": 224,
+  "platform_commits": {
+    "windows": "8492884eb30fdd9417ea7816aa92def805c97c74",
+    "macos": "31f01756a43d55b2c4211e73ca329bfab4ebfcb2",
+    "linux": "6f0aa178c2394fc0a177edc0fd64e41f402a0418"
+  },
+  "architectures": [
+    "x64",
+    "arm64"
+  ],
+  "overrides": [
+    {
+      "original": "patches/0020-third_party-blink-renderer-modules-canvas-canvas2d-base_rendering_context_2d-cc.patch",
+      "original_sha256": "84f2d3139cb9adfc70d2c073395fb939b5d59c2f22d5c46450e2586ccceba708",
+      "path": "patches/chromium156/0020-third_party-blink-renderer-modules-canvas-canvas2d-base_rendering_context_2d-cc.patch",
+      "sha256": "6954fdf7157c9d88f956075424f746e8b6bf05793ead620d5942180427bb85e1"
+    },
+    {
+      "original": "patches/0024-third_party-blink-renderer-modules-peerconnection-peer_connection_dependency_factory-cc.patch",
+      "original_sha256": "311671ff1e2a73fd7106cd790c35269e49039301791c818a9a8748946cc2324a",
+      "path": "patches/chromium156/0024-third_party-blink-renderer-modules-peerconnection-peer_connection_dependency_factory-cc.patch",
+      "sha256": "2939611ab275ebce3b5838746f64d39be52de5907249ed15ae9254075f61b361"
+    },
+    {
+      "original": "patches/0031-third_party-blink-renderer-platform-graphics-image_data_buffer-cc.patch",
+      "original_sha256": "8b86c52d9df1ba45db00a09b293070be90d9dbc7463244c8ddf525017d265b7f",
+      "path": "patches/chromium156/0031-third_party-blink-renderer-platform-graphics-image_data_buffer-cc.patch",
+      "sha256": "4f6d2c1d7286d226361af69443810c2cf539a42b622dc4a8bec3910dbf065fd5"
+    },
+    {
+      "original": "patches/0044-third_party-blink-renderer-modules-peerconnection-rtc_peer_connection-cc.patch",
+      "original_sha256": "7303736192ad27af857315a8cd60e440da23f26b323389bf04c9ceaf3e6ac240",
+      "path": "patches/chromium156/0044-third_party-blink-renderer-modules-peerconnection-rtc_peer_connection-cc.patch",
+      "sha256": "3986358a5341aaefc02bb79935362bc2e5135f6e44ae8caf230a8d7206fe29ad"
+    },
+    {
+      "original": "patches/0049-third_party-blink-renderer-modules-plugins-dom_plugin_array-cc.patch",
+      "original_sha256": "4a454a46e7541c1526607206f492ee4b6f7f9db55ea5ba7e9f5899d213b915f3",
+      "path": "patches/chromium156/0049-third_party-blink-renderer-modules-plugins-dom_plugin_array-cc.patch",
+      "sha256": "3799f3cf3e8c143da3675789b3431e6ba6151d58be9c2d348b95b3ffcb4969f0"
+    },
+    {
+      "original": "patches/0060-third_party-blink-renderer-modules-media_capabilities-media_capabilities-cc.patch",
+      "original_sha256": "e050effa3a2cc8e84809bf5184b6c18417718cb3f9f09a1aa63dadaaf14514bb",
+      "path": "patches/chromium156/0060-third_party-blink-renderer-modules-media_capabilities-media_capabilities-cc.patch",
+      "sha256": "f03940003568f0568c5b81b9fe94f4fce02209b55e6b7492bd7d8589927c5f28"
+    },
+    {
+      "original": "patches/0061-third_party-blink-renderer-modules-media_capabilities-media_capabilities-h.patch",
+      "original_sha256": "59fe7e3903d37f1ac92bf5deeb7e22af87938494d02f8e6b89f6671340e5bf9c",
+      "path": "patches/chromium156/0061-third_party-blink-renderer-modules-media_capabilities-media_capabilities-h.patch",
+      "sha256": "a939e7968448ee4179589a1653d921b38a6968026d8c150519a5575cf117ada9"
+    },
+    {
+      "original": "patches/0074-third_party-blink-renderer-core-html-canvas-html_canvas_element-cc.patch",
+      "original_sha256": "1f027e86221793d79b06e68c91b34011ed3ae51fb63bfd365ffa09a595b519a8",
+      "path": "patches/chromium156/0074-third_party-blink-renderer-core-html-canvas-html_canvas_element-cc.patch",
+      "sha256": "a19fd534370daa387b3018863966c30c7b5755b7751cdfbcad4f62955e546adc"
+    },
+    {
+      "original": "patches/0077-third_party-blink-renderer-modules-canvas-canvas2d-base_rendering_context_2d-h.patch",
+      "original_sha256": "4479b87f37067cecbbe29135af9c80e500bf1e5d068763fec99c5bab033878d5",
+      "path": "patches/chromium156/0077-third_party-blink-renderer-modules-canvas-canvas2d-base_rendering_context_2d-h.patch",
+      "sha256": "a1ba372a26a99ac6ad36654f2f304375893fbf08058822dc29f5131c051cdc51"
+    },
+    {
+      "original": "patches/0082-third_party-blink-renderer-modules-webgl-webgl_rendering_context_base-cc.patch",
+      "original_sha256": "78da0f157e275f5c219e71b160db13a09c60aad0731b7f857d39c89bc9b0e2a4",
+      "path": "patches/chromium156/0082-third_party-blink-renderer-modules-webgl-webgl_rendering_context_base-cc.patch",
+      "sha256": "785ca10a8d8eda8847a4183af0ed97d059b3212cbd22804329a4f96b91088212"
+    },
+    {
+      "original": "patches/0111-global-privacy-control.patch",
+      "original_sha256": "98af6f9657ebe1c92f2bbd170fa038d97389b6126a2962db50bf16129ab13b79",
+      "path": "patches/chromium156/0111-global-privacy-control.patch",
+      "sha256": "0a7ef68eef8a51ebfbfb84ffd7775e56a43b8694feb7052b562ce3397e936040"
+    },
+    {
+      "original": "patches/0124-third_party-blink-renderer-platform-image-encoders-image_encoder-cc.patch",
+      "original_sha256": "80549956ea96cd315045a2bdda8a6167b51c6a3e681d490604aa740e0bd54513",
+      "path": "patches/chromium156/0124-third_party-blink-renderer-platform-image-encoders-image_encoder-cc.patch",
+      "sha256": "d3d16b5fc59b9ae0941737e051d9b5ed0205fea6f141b006a326e184f459c5b9"
+    },
+    {
+      "original": "patches/0140-webrtc-ip-stats.patch",
+      "original_sha256": "b8a7b27673a70cdaeab689b304d22efeee7735dec73b1ca1023c759fa734f82f",
+      "path": "patches/chromium156/0140-webrtc-ip-stats.patch",
+      "sha256": "732a2dc744819b78e0efd477fbe39b864372a241e85541cb0adcc080c5e7cb2f"
+    },
+    {
+      "original": "patches/0141-webrtc-ip-offer-promises.patch",
+      "original_sha256": "7e3a5160d0f788c5ca2fcdcad2b323ba592278c0f02bda34096496c455e68f26",
+      "path": "patches/chromium156/0141-webrtc-ip-offer-promises.patch",
+      "sha256": "b17b8272eb14f05c4b724b05ffcb653eab86a449726bc3a5720f8451cebecd24"
+    },
+    {
+      "original": "patches/0142-webrtc-ip-offer-callbacks.patch",
+      "original_sha256": "9753eba611a55e2ead0f6e31c7e0014c2a7e9b3a9374281e3800804016832b2f",
+      "path": "patches/chromium156/0142-webrtc-ip-offer-callbacks.patch",
+      "sha256": "2e7e1b69abee62c36b4e4104e5d9a6a068e84e50f1c334a6da58ad470052f5cd"
+    },
+    {
+      "original": "patches/0150-canvas-mailbox-readback-geometry.patch",
+      "original_sha256": "af1568a2b75ff288bde5bb8526c902d60ef9a521c0f636b3a07abfcb942cb913",
+      "path": "patches/chromium156/0150-canvas-mailbox-readback-geometry.patch",
+      "sha256": "9419f201bcfa87729d8f9a2c04ae308a9eac2e5533bc5256cc1f8af79ba3d658"
+    },
+    {
+      "original": "patches/0152-devtools-font-provenance-implementation.patch",
+      "original_sha256": "09ba768fcc600e5575f3ced0d4f779533441fec79a3000332b6b5919f631dfd9",
+      "path": "patches/chromium156/0152-devtools-font-provenance-implementation.patch",
+      "sha256": "2daae85e7a9e3ed0957661f493313752518fd5f2a8bdfbcba3dbfd798c690c4f"
+    },
+    {
+      "original": "patches/0160-canvas-shared-backend-policy.patch",
+      "original_sha256": "fed44ff89761f06b260d2b62f72886d26ba7029b7fe972cd5f55c9b60243ef69",
+      "path": "patches/chromium156/0160-canvas-shared-backend-policy.patch",
+      "sha256": "448fede880c3acbce793f088fec662d3e07e70761e6e9a221874bf1b1ba3c3e8"
+    },
+    {
+      "original": "patches/0167-pdf-backend-capability.patch",
+      "original_sha256": "7d2ca45084a5a9b206a6d5e1a7a1e13d53999f1e9786ded9ff5ff657fa09379a",
+      "path": "patches/chromium156/0167-pdf-backend-capability.patch",
+      "sha256": "fa05702f631f2bcdfe5783b0d0c8163a755ade728cc81d8e438f0e52575d476d"
+    },
+    {
+      "original": "patches/0177-audio-graph-isolation.patch",
+      "original_sha256": "8afa9f8ee0b8b9f5895183279e99eaf661735fd78052c93143e8da1557918bfc",
+      "path": "patches/chromium156/0177-audio-graph-isolation.patch",
+      "sha256": "0a79069deaeda83a20945f393a156c66de1b73ee54ae261f6c8661132bffd068"
+    },
+    {
+      "original": "patches/0184-webrtc-codec-negotiation-policy.patch",
+      "original_sha256": "40420a008ece2d3106712dbe5a40f18634271436a3fb0ef86cf65ae69c31b6e3",
+      "path": "patches/chromium156/0184-webrtc-codec-negotiation-policy.patch",
+      "sha256": "75d6bf97156721ff1d1c19a09a00eea5b4504fbb9a9c3ed9ef45a4b77695d6d1"
+    },
+    {
+      "original": "patches/0209-display-native-screen-regressions.patch",
+      "original_sha256": "fb94be385764e9bc6836033744596be85805d44ac9132a113e770da27c723aa1",
+      "path": "patches/chromium156/0209-display-native-screen-regressions.patch",
+      "sha256": "c297fd47ee14feb5cdd69d428a5518a7da74e5718dfcdfbeda7be24330d54a7f"
+    },
+    {
+      "original": "patches/0222-canvas-readback-shared-noise.patch",
+      "original_sha256": "b86ce9d384d17b0ba0d0d0ca4b9dec8b5b2341afccf821c269735cf301a8fd09",
+      "path": "patches/chromium156/0222-canvas-readback-shared-noise.patch",
+      "sha256": "3260831685393468941ba4fb8869ac7ec9441c8ef4033c6c80ee360ddc8a0045"
+    }
+  ],
+  "additions": {
+    "windows": [
+      {
+        "path": "patches/chromium156-additions/0225-managed-profile-controller-link.patch",
+        "sha256": "350b333232d5865d9dff93a32b1e7b9c2e16a0c1fd31479809a0fd9106db700a"
+      },
+      {
+        "path": "patches/chromium156-additions/0227-opaque-png-export-consistency.patch",
+        "sha256": "4c048a50930c3541a3bb9e4442ad7f18e94c04ebccf86c0cfbfc286b15a70751"
+      },
+      {
+        "path": "patches/chromium156-additions/0228-timezone-default-declaration.patch",
+        "sha256": "c750f8888d986d6fbbaea16f3ca37d1543625a1281f5bd1562563d496f0daf7d"
+      },
+      {
+        "path": "patches/chromium156-additions/0229-timezone-default-implementation.patch",
+        "sha256": "3d6dd6aa4d02ff005886f27e3312c083d5385511d3303b0184a520ca3e3f3006"
+      },
+      {
+        "path": "patches/chromium156-additions/0230-blink-default-timezone-api.patch",
+        "sha256": "0495c11554fc2dd6b2e1b0e2d058ee2e9995ba6f8ccec64c149b6fe62ebcbd43"
+      },
+      {
+        "path": "patches/chromium156-additions/0231-blink-default-timezone-bridge.patch",
+        "sha256": "00274260ba64724d5cae1222ff981dd45c177bad07a9ad7fbd675c7b08426836"
+      },
+      {
+        "path": "patches/chromium156-additions/0232-renderer-launch-timezone-install.patch",
+        "sha256": "345ef39c9cc6d987f59c44f3f4a46099391d6c629058f10c1151e02a654796a7"
+      },
+      {
+        "path": "patches/chromium156-additions/0233-renderer-timezone-webstring-api.patch",
+        "sha256": "7f7f691f2d744715e0d48a25dab5ff1e8ac793122657beacd0f99a3e7e8ba908"
+      }
+    ],
+    "macos": [
+      {
+        "path": "patches/chromium156-additions/0225-managed-profile-controller-link.patch",
+        "sha256": "350b333232d5865d9dff93a32b1e7b9c2e16a0c1fd31479809a0fd9106db700a"
+      },
+      {
+        "path": "patches/chromium156-additions/0227-opaque-png-export-consistency.patch",
+        "sha256": "4c048a50930c3541a3bb9e4442ad7f18e94c04ebccf86c0cfbfc286b15a70751"
+      }
+    ],
+    "linux": [
+      {
+        "path": "patches/chromium156-additions/0225-managed-profile-controller-link.patch",
+        "sha256": "350b333232d5865d9dff93a32b1e7b9c2e16a0c1fd31479809a0fd9106db700a"
+      },
+      {
+        "path": "patches/chromium156-additions/0227-opaque-png-export-consistency.patch",
+        "sha256": "4c048a50930c3541a3bb9e4442ad7f18e94c04ebccf86c0cfbfc286b15a70751"
+      }
+    ]
+  },
+  "fixture": {
+    "path": "tools/tests/fixtures/chromium156_patch_sources.json.gz",
+    "sha256": "0e9fa0669ed514b2a593206b803fd920b11cba677d5ccd0fb7017840b16504a2"
+  },
+  "qualification": "Source-subset forward and reverse replay only; not compilation, runtime or production patch selector integration."
+}

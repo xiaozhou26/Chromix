@@ -1,0 +1,100 @@
+diff --git a/third_party/blink/renderer/platform/peerconnection/video_codec_factory.cc b/third_party/blink/renderer/platform/peerconnection/video_codec_factory.cc
+--- a/third_party/blink/renderer/platform/peerconnection/video_codec_factory.cc
++++ b/third_party/blink/renderer/platform/peerconnection/video_codec_factory.cc
+@@ -4,6 +4,7 @@
+ 
+ #include "third_party/blink/renderer/platform/peerconnection/video_codec_factory.h"
+ 
++#include <algorithm>
+ #include <memory>
+ #include <optional>
+ #include <string>
+@@ -15,6 +16,7 @@
+ #include "base/memory/scoped_refptr.h"
+ #include "base/strings/string_util.h"
+ #include "build/build_config.h"
++#include "media/base/supported_types.h"
+ #include "media/mojo/clients/mojo_video_encoder_metrics_provider.h"
+ #include "media/video/gpu_video_accelerator_factories.h"
+ #include "third_party/blink/public/platform/platform.h"
+@@ -47,6 +49,20 @@
+ 
+ namespace {
+ 
++bool UxrRtcFormatAllowed(const webrtc::SdpVideoFormat& format) {
++  const auto profile = WebRTCFormatToCodecProfile(format);
++  return !profile || media::IsUxrVideoCodecAllowed(
++                         media::VideoCodecProfileToVideoCodec(*profile));
++}
++
++std::vector<webrtc::SdpVideoFormat> FilterUxrRtcFormats(
++    std::vector<webrtc::SdpVideoFormat> formats) {
++  std::erase_if(formats, [](const webrtc::SdpVideoFormat& format) {
++    return !UxrRtcFormatAllowed(format);
++  });
++  return formats;
++}
++
+ template <typename Factory>
+ bool IsFormatSupported(const Factory* factory,
+                        const webrtc::SdpVideoFormat& format) {
+@@ -112,6 +128,8 @@
+   std::unique_ptr<webrtc::VideoEncoder> Create(
+       const webrtc::Environment& env,
+       const webrtc::SdpVideoFormat& format) override {
++    if (!UxrRtcFormatAllowed(format))
++      return nullptr;
+     if (!WebRTCFormatToCodecProfile(format)) {
+       LOG(ERROR) << "Unsupported SDP format: " << format.name;
+       return nullptr;
+@@ -158,16 +176,18 @@
+   std::vector<webrtc::SdpVideoFormat> GetSupportedFormats() const override {
+     std::vector<webrtc::SdpVideoFormat> software_formats =
+         software_encoder_factory_.GetSupportedFormats();
+-    return hardware_encoder_factory_
++    return FilterUxrRtcFormats(hardware_encoder_factory_
+                ? MergeFormats(software_formats,
+                               hardware_encoder_factory_->GetSupportedFormats())
+-               : software_formats;
++               : software_formats);
+   }
+ 
+   webrtc::VideoEncoderFactory::CodecSupport QueryCodecSupport(
+       const webrtc::SdpVideoFormat& format,
+       std::optional<std::string> scalability_mode,
+       std::optional<webrtc::Resolution> resolution) const override {
++    if (!UxrRtcFormatAllowed(format))
++      return {};
+     webrtc::VideoEncoderFactory::CodecSupport codec_support =
+         hardware_encoder_factory_
+             ? hardware_encoder_factory_->QueryCodecSupport(
+@@ -199,6 +219,8 @@
+   std::unique_ptr<webrtc::VideoDecoder> Create(
+       const webrtc::Environment& env,
+       const webrtc::SdpVideoFormat& format) override {
++    if (!UxrRtcFormatAllowed(format))
++      return nullptr;
+     std::unique_ptr<webrtc::VideoDecoder> software_decoder =
+         CreateDecoder(&software_decoder_factory_, env, format);
+ 
+@@ -217,16 +239,18 @@
+   std::vector<webrtc::SdpVideoFormat> GetSupportedFormats() const override {
+     std::vector<webrtc::SdpVideoFormat> software_formats =
+         software_decoder_factory_.GetSupportedFormats();
+-    return hardware_decoder_factory_
++    return FilterUxrRtcFormats(hardware_decoder_factory_
+                ? MergeFormats(software_formats,
+                               hardware_decoder_factory_->GetSupportedFormats())
+-               : software_formats;
++               : software_formats);
+   }
+ 
+   webrtc::VideoDecoderFactory::CodecSupport QueryCodecSupport(
+       const webrtc::SdpVideoFormat& format,
+       bool reference_scaling,
+       std::optional<webrtc::Resolution> resolution) const override {
++    if (!UxrRtcFormatAllowed(format))
++      return {};
+     webrtc::VideoDecoderFactory::CodecSupport codec_support =
+         hardware_decoder_factory_
+             ? hardware_decoder_factory_->QueryCodecSupport(

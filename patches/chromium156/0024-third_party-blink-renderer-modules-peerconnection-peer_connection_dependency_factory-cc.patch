@@ -1,0 +1,32 @@
+diff --git a/third_party/blink/renderer/modules/peerconnection/peer_connection_dependency_factory.cc b/third_party/blink/renderer/modules/peerconnection/peer_connection_dependency_factory.cc
+--- a/third_party/blink/renderer/modules/peerconnection/peer_connection_dependency_factory.cc
++++ b/third_party/blink/renderer/modules/peerconnection/peer_connection_dependency_factory.cc
+@@ -36,6 +36,7 @@
+ #include "base/trace_event/trace_event.h"
+ #include "base/types/pass_key.h"
+ #include "base/unguessable_token.h"
++#include "base/uxr_config.h"
+ #include "build/build_config.h"
+ #include "components/webrtc/thread_wrapper.h"
+ #include "media/base/media_permission.h"
+@@ -1119,6 +1120,20 @@
+     }
+   }
+ 
++  // Restrict the browser policy; never turn disabled transports back on.
++  const std::string uxr_policy =
++      base::UxrConfig::GetInstance().Get("uxr-webrtc-policy");
++  if (uxr_policy == "disable_non_proxied_udp") {
++    port_config.enable_multiple_routes = false;
++    port_config.enable_nonproxied_udp = false;
++    port_config.enable_default_local_candidate = false;
++  } else if (uxr_policy == "default_public_interface_only") {
++    port_config.enable_multiple_routes = false;
++    port_config.enable_default_local_candidate = false;
++  } else if (uxr_policy == "default_public_and_private_interfaces") {
++    port_config.enable_multiple_routes = false;
++  }
++
+   std::unique_ptr<webrtc::NetworkManager> network_manager;
+   if (port_config.enable_multiple_routes) {
+     network_manager = std::make_unique<FilteringNetworkManager>(

@@ -1,0 +1,2191 @@
+{
+  "schema_version": 1,
+  "mode": "root224",
+  "qualification": "Exact source subset; core sections touching targets only. Platform overlays, domain substitution, compilation and runtime not verified. Failed targets block later patches to avoid false compatibility claims.",
+  "core_sections": [
+    {
+      "patch": "core/ungoogled-chromium/fix-building-without-safebrowsing.patch",
+      "target": "chrome/browser/enterprise/BUILD.gn",
+      "status": "applied",
+      "stderr": "",
+      "section_sha256": "28013a06fcc149c286fc863fee852e1ba32aca4d374fd910fff3229d97414783"
+    },
+    {
+      "patch": "core/ungoogled-chromium/remove-unused-preferences-fields.patch",
+      "target": "chrome/browser/enterprise/BUILD.gn",
+      "status": "applied",
+      "stderr": "",
+      "section_sha256": "62eb959ad17796573f7be128dfa2d1dd163599cb9737bef8271de0307c31fc2b"
+    },
+    {
+      "patch": "extra/inox-patchset/0006-modify-default-prefs.patch",
+      "target": "components/content_settings/core/browser/cookie_settings.cc",
+      "status": "applied",
+      "stderr": "",
+      "section_sha256": "bb276d56c0de2937ab3772be589322d14a720fd1c5ba56d201de0c2b9357bef2"
+    },
+    {
+      "patch": "extra/iridium-browser/browser-disable-profile-auto-import-on-first-run.patch",
+      "target": "chrome/browser/chrome_browser_main.cc",
+      "status": "applied",
+      "stderr": "",
+      "section_sha256": "dde709cc11c0544982a22a2c8bf9a04c01ec4bf11bca5f684bb6e170547aab23"
+    },
+    {
+      "patch": "extra/bromite/fingerprinting-flags-client-rects-and-measuretext.patch",
+      "target": "content/browser/renderer_host/render_process_host_impl.cc",
+      "status": "applied",
+      "stderr": "",
+      "section_sha256": "af0a50efffb2108855ca2879fbd07767efee35fb5e33559e466d25fe1623ce50"
+    },
+    {
+      "patch": "extra/bromite/fingerprinting-flags-client-rects-and-measuretext.patch",
+      "target": "third_party/blink/renderer/core/dom/element.cc",
+      "status": "applied",
+      "stderr": "",
+      "section_sha256": "a2ea3f09896f568752272b5de8bcb02e827fb656de687daafe51e59be3aa960d"
+    },
+    {
+      "patch": "extra/bromite/fingerprinting-flags-client-rects-and-measuretext.patch",
+      "target": "third_party/blink/renderer/core/html/canvas/text_metrics.cc",
+      "status": "applied",
+      "stderr": "",
+      "section_sha256": "0ffc452e23a73086f738f83e5632b5f5fc784f2563d5e82f2ea48ebdb8805eb4"
+    },
+    {
+      "patch": "extra/bromite/fingerprinting-flags-client-rects-and-measuretext.patch",
+      "target": "third_party/blink/renderer/core/html/canvas/text_metrics.h",
+      "status": "applied",
+      "stderr": "",
+      "section_sha256": "143698d5d5da6a9c359fb247f59fc2e8e00da5977642e413a42c8b1710dc1a5e"
+    },
+    {
+      "patch": "extra/bromite/fingerprinting-flags-client-rects-and-measuretext.patch",
+      "target": "third_party/blink/renderer/modules/canvas/canvas2d/base_rendering_context_2d.cc",
+      "status": "applied",
+      "stderr": "",
+      "section_sha256": "644df3391f02884283f1343a3e2814844648388e7aeb9ec2bbf8e68ee634e5e0"
+    },
+    {
+      "patch": "extra/bromite/fingerprinting-flags-client-rects-and-measuretext.patch",
+      "target": "third_party/blink/renderer/platform/BUILD.gn",
+      "status": "applied",
+      "stderr": "",
+      "section_sha256": "72ca460660a103047323f520c53b54e9911efd27ad683d421b9a61492310b51d"
+    },
+    {
+      "patch": "extra/bromite/fingerprinting-flags-client-rects-and-measuretext.patch",
+      "target": "third_party/blink/renderer/platform/graphics/image_data_buffer.cc",
+      "status": "applied",
+      "stderr": "",
+      "section_sha256": "089d72766d7bfecc0a633b80a06ed9e1dad43b8ad62294ff08bb2b8f710090dc"
+    },
+    {
+      "patch": "extra/bromite/fingerprinting-flags-client-rects-and-measuretext.patch",
+      "target": "third_party/blink/renderer/platform/runtime_enabled_features.json5",
+      "status": "applied",
+      "stderr": "",
+      "section_sha256": "e80575e44bd19be38ae8b1e558490aa20336be80f2b8d808bafaa1ad9e63caf5"
+    },
+    {
+      "patch": "extra/bromite/flag-fingerprinting-canvas-image-data-noise.patch",
+      "target": "content/browser/renderer_host/render_process_host_impl.cc",
+      "status": "applied",
+      "stderr": "",
+      "section_sha256": "29cd45c17e80792941ab698c05366337d979abc41daec799236a8d64f9fd2953"
+    },
+    {
+      "patch": "extra/bromite/flag-fingerprinting-canvas-image-data-noise.patch",
+      "target": "third_party/blink/renderer/modules/canvas/canvas2d/base_rendering_context_2d.cc",
+      "status": "applied",
+      "stderr": "",
+      "section_sha256": "9d6e127f126a53cb78e01712f71ff017d23665fef043221638e08b10b2bda5f8"
+    },
+    {
+      "patch": "extra/bromite/flag-fingerprinting-canvas-image-data-noise.patch",
+      "target": "third_party/blink/renderer/platform/BUILD.gn",
+      "status": "applied",
+      "stderr": "",
+      "section_sha256": "400e3a4ffe3e1c30273fdafa523110ed702a7f1439a406259049ff44cfceaab4"
+    },
+    {
+      "patch": "extra/bromite/flag-fingerprinting-canvas-image-data-noise.patch",
+      "target": "third_party/blink/renderer/platform/image-encoders/image_encoder.cc",
+      "status": "applied",
+      "stderr": "",
+      "section_sha256": "ccff9cc9e0c6cc55e815475ba415ce759eacb6575399bbae16d6815c17aa8de5"
+    },
+    {
+      "patch": "extra/bromite/flag-fingerprinting-canvas-image-data-noise.patch",
+      "target": "third_party/blink/renderer/platform/runtime_enabled_features.json5",
+      "status": "applied",
+      "stderr": "",
+      "section_sha256": "08b49a72ea6cecda5bfa7f756cc089e9da6c5d0dc86277e423377c4e11c3ebf9"
+    },
+    {
+      "patch": "extra/ungoogled-chromium/add-components-ungoogled.patch",
+      "target": "components/ungoogled/BUILD.gn",
+      "status": "applied",
+      "stderr": "",
+      "section_sha256": "c834aa9f3b1889caaccb2e325bab0aa1ac49eaf07ab85cf30a28992096aaf75f"
+    },
+    {
+      "patch": "extra/ungoogled-chromium/first-run-page.patch",
+      "target": "chrome/browser/chrome_browser_main.cc",
+      "status": "applied",
+      "stderr": "",
+      "section_sha256": "aee16c9c54305753911b43840eaaad8b9fed23f5bb05d91fe3c9702bc7a86a50"
+    },
+    {
+      "patch": "extra/ungoogled-chromium/add-flag-to-reduce-system-info.patch",
+      "target": "components/embedder_support/user_agent_utils.cc",
+      "status": "applied",
+      "stderr": "",
+      "section_sha256": "b77d3b4b1baee249b9a4775295eeb00792e7f3a2cc07293c3e93edcfd7a535dc"
+    },
+    {
+      "patch": "extra/ungoogled-chromium/add-flag-to-reduce-system-info.patch",
+      "target": "third_party/blink/renderer/core/execution_context/navigator_base.cc",
+      "status": "applied",
+      "stderr": "",
+      "section_sha256": "650633c2cde12faa0a912410ac9d6556dca93500adeb9cb4d52c40636101c3b9"
+    },
+    {
+      "patch": "extra/ungoogled-chromium/add-flag-to-spoof-webgl-renderer-info.patch",
+      "target": "third_party/blink/renderer/modules/webgl/webgl_rendering_context_base.cc",
+      "status": "applied",
+      "stderr": "",
+      "section_sha256": "26a8aa358877a6649dd53dd481ff10e485d4089f8e410f5ac84291faf4d11897"
+    },
+    {
+      "patch": "extra/ungoogled-chromium/add-flag-for-disabling-jit.patch",
+      "target": "content/browser/renderer_host/render_process_host_impl.cc",
+      "status": "applied",
+      "stderr": "",
+      "section_sha256": "ffa5a6c74f6667bae0d55ba72c2d7ffde64b5eb73f6963a5016db97310cdfe96"
+    }
+  ],
+  "patches": [
+    {
+      "base_patch": "patches/0001-base-BUILD-gn.patch",
+      "selected_patch": "patches/0001-base-BUILD-gn.patch",
+      "sha256": "ece0c2c9de957f62dc51fed105894ff8cbeec3515c196a8fe4f42bbaad9c507d",
+      "target": "base/BUILD.gn",
+      "status": "applied",
+      "dry_run_returncode": 0,
+      "stderr": ""
+    },
+    {
+      "base_patch": "patches/0002-base-uxr_config-cc.patch",
+      "selected_patch": "patches/0002-base-uxr_config-cc.patch",
+      "sha256": "3af589d8f9bd04215730a8001c01175a6ebda29c7b133aad40850df2c80c5e2d",
+      "target": "base/uxr_config.cc",
+      "status": "applied",
+      "dry_run_returncode": 0,
+      "stderr": ""
+    },
+    {
+      "base_patch": "patches/0003-base-uxr_config-h.patch",
+      "selected_patch": "patches/0003-base-uxr_config-h.patch",
+      "sha256": "b0e4423aa3c65947e74718e293e0fd98f4a3c2625c7e48ff393998fdf9d745d1",
+      "target": "base/uxr_config.h",
+      "status": "applied",
+      "dry_run_returncode": 0,
+      "stderr": ""
+    },
+    {
+      "base_patch": "patches/0004-components-embedder_support-user_agent_utils-cc.patch",
+      "selected_patch": "patches/0004-components-embedder_support-user_agent_utils-cc.patch",
+      "sha256": "ceae3ac82abf8806d681ba219f2c414ff2a594fdebd5739ddc3f8478eac318c3",
+      "target": "components/embedder_support/user_agent_utils.cc",
+      "status": "applied",
+      "dry_run_returncode": 0,
+      "stderr": ""
+    },
+    {
+      "base_patch": "patches/0005-content-browser-renderer_host-render_process_host_impl-cc.patch",
+      "selected_patch": "patches/0005-content-browser-renderer_host-render_process_host_impl-cc.patch",
+      "sha256": "874031b6ec48d0ad2385ff0fe10db36f1f0132a4608d604e4d85fd19e291ff47",
+      "target": "content/browser/renderer_host/render_process_host_impl.cc",
+      "status": "applied",
+      "dry_run_returncode": 0,
+      "stderr": ""
+    },
+    {
+      "base_patch": "patches/0006-content-common-renderer-mojom.patch",
+      "selected_patch": "patches/0006-content-common-renderer-mojom.patch",
+      "sha256": "07d1b5c3df614582cfdfc04ca2115c7da90dad8e0359d187cdfc4922a50a5208",
+      "target": "content/common/renderer.mojom",
+      "status": "applied",
+      "dry_run_returncode": 0,
+      "stderr": ""
+    },
+    {
+      "base_patch": "patches/0007-content-renderer-render_thread_impl-cc.patch",
+      "selected_patch": "patches/0007-content-renderer-render_thread_impl-cc.patch",
+      "sha256": "ed7424df86074d5be5ace0821b9cc974e4eb2bbc8f925250ff04a16b595b4d09",
+      "target": "content/renderer/render_thread_impl.cc",
+      "status": "applied",
+      "dry_run_returncode": 0,
+      "stderr": ""
+    },
+    {
+      "base_patch": "patches/0008-content-renderer-render_thread_impl-h.patch",
+      "selected_patch": "patches/0008-content-renderer-render_thread_impl-h.patch",
+      "sha256": "9f25b219091353b04db38e9363ba62045a8f1cb812adf62cb5fe2b5b9250c82f",
+      "target": "content/renderer/render_thread_impl.h",
+      "status": "applied",
+      "dry_run_returncode": 0,
+      "stderr": ""
+    },
+    {
+      "base_patch": "patches/0009-content-renderer-renderer_main-cc.patch",
+      "selected_patch": "patches/0009-content-renderer-renderer_main-cc.patch",
+      "sha256": "182b54e3451cbb4295d1a5493ff49df5ca092d03e376433d33eaab9d53fdcde4",
+      "target": "content/renderer/renderer_main.cc",
+      "status": "applied",
+      "dry_run_returncode": 0,
+      "stderr": ""
+    },
+    {
+      "base_patch": "patches/0010-third_party-blink-renderer-core-dom-element-cc.patch",
+      "selected_patch": "patches/0010-third_party-blink-renderer-core-dom-element-cc.patch",
+      "sha256": "0f1863f1e5cc97049dc660cff8458a675101e48c4cca7f49fa8979725c946037",
+      "target": "third_party/blink/renderer/core/dom/element.cc",
+      "status": "applied",
+      "dry_run_returncode": 0,
+      "stderr": ""
+    },
+    {
+      "base_patch": "patches/0011-third_party-blink-renderer-core-execution_context-navigator_base-cc.patch",
+      "selected_patch": "patches/0011-third_party-blink-renderer-core-execution_context-navigator_base-cc.patch",
+      "sha256": "d4e59a56f4369a2094510c7ef82cfedb2d5a1e76b902fd12b79c63e841500715",
+      "target": "third_party/blink/renderer/core/execution_context/navigator_base.cc",
+      "status": "applied",
+      "dry_run_returncode": 0,
+      "stderr": ""
+    },
+    {
+      "base_patch": "patches/0012-third_party-blink-renderer-core-frame-local_dom_window-cc.patch",
+      "selected_patch": "patches/0012-third_party-blink-renderer-core-frame-local_dom_window-cc.patch",
+      "sha256": "818bef89830ded6a99bd392c2a51da1ff334fffb62d048cc12bf91ec7181d788",
+      "target": "third_party/blink/renderer/core/frame/local_dom_window.cc",
+      "status": "applied",
+      "dry_run_returncode": 0,
+      "stderr": ""
+    },
+    {
+      "base_patch": "patches/0013-third_party-blink-renderer-core-frame-navigator-cc.patch",
+      "selected_patch": "patches/0013-third_party-blink-renderer-core-frame-navigator-cc.patch",
+      "sha256": "04973984764f5bf6c5fcd375e9478c7be4221058516ec34062625cac0d2eff17",
+      "target": "third_party/blink/renderer/core/frame/navigator.cc",
+      "status": "applied",
+      "dry_run_returncode": 0,
+      "stderr": ""
+    },
+    {
+      "base_patch": "patches/0014-third_party-blink-renderer-core-frame-navigator_concurrent_hardware-cc.patch",
+      "selected_patch": "patches/0014-third_party-blink-renderer-core-frame-navigator_concurrent_hardware-cc.patch",
+      "sha256": "45b93e386106ce9b3e0cf747a92ac6bd65774c7257e6d385f24da9e9190e4fac",
+      "target": "third_party/blink/renderer/core/frame/navigator_concurrent_hardware.cc",
+      "status": "applied",
+      "dry_run_returncode": 0,
+      "stderr": ""
+    },
+    {
+      "base_patch": "patches/0015-third_party-blink-renderer-core-frame-navigator_device_memory-cc.patch",
+      "selected_patch": "patches/0015-third_party-blink-renderer-core-frame-navigator_device_memory-cc.patch",
+      "sha256": "a84af59674e77e4db806c0de79e06e5b41956d59ca19db7012ad5d1630337bcd",
+      "target": "third_party/blink/renderer/core/frame/navigator_device_memory.cc",
+      "status": "applied",
+      "dry_run_returncode": 0,
+      "stderr": ""
+    },
+    {
+      "base_patch": "patches/0016-third_party-blink-renderer-core-frame-navigator_id-cc.patch",
+      "selected_patch": "patches/0016-third_party-blink-renderer-core-frame-navigator_id-cc.patch",
+      "sha256": "d1c8de5acaf179cde1befce8a20b4e44552154941e15f96dae9674e607132db6",
+      "target": "third_party/blink/renderer/core/frame/navigator_id.cc",
+      "status": "applied",
+      "dry_run_returncode": 0,
+      "stderr": ""
+    },
+    {
+      "base_patch": "patches/0017-third_party-blink-renderer-core-frame-navigator_language-cc.patch",
+      "selected_patch": "patches/0017-third_party-blink-renderer-core-frame-navigator_language-cc.patch",
+      "sha256": "6cd7e8791a590e2f2f255e94cb4e416487ee183e808d0260f0b0b5541bd94a54",
+      "target": "third_party/blink/renderer/core/frame/navigator_language.cc",
+      "status": "applied",
+      "dry_run_returncode": 0,
+      "stderr": ""
+    },
+    {
+      "base_patch": "patches/0018-third_party-blink-renderer-core-frame-screen-cc.patch",
+      "selected_patch": "patches/0018-third_party-blink-renderer-core-frame-screen-cc.patch",
+      "sha256": "3664b50ec355fa9415ed6384f99d9f1107d97c109e494c41adcf322140fef7dc",
+      "target": "third_party/blink/renderer/core/frame/screen.cc",
+      "status": "applied",
+      "dry_run_returncode": 0,
+      "stderr": ""
+    },
+    {
+      "base_patch": "patches/0019-third_party-blink-renderer-core-timezone-timezone_controller-cc.patch",
+      "selected_patch": "patches/0019-third_party-blink-renderer-core-timezone-timezone_controller-cc.patch",
+      "sha256": "5ce5bcca5cc6e17625712ee9d3989f705bec2eebd9932d3f3b0976250116586e",
+      "target": "third_party/blink/renderer/core/timezone/timezone_controller.cc",
+      "status": "applied",
+      "dry_run_returncode": 0,
+      "stderr": ""
+    },
+    {
+      "base_patch": "patches/0020-third_party-blink-renderer-modules-canvas-canvas2d-base_rendering_context_2d-cc.patch",
+      "selected_patch": "patches/0020-third_party-blink-renderer-modules-canvas-canvas2d-base_rendering_context_2d-cc.patch",
+      "sha256": "84f2d3139cb9adfc70d2c073395fb939b5d59c2f22d5c46450e2586ccceba708",
+      "target": "third_party/blink/renderer/modules/canvas/canvas2d/base_rendering_context_2d.cc",
+      "status": "conflict",
+      "dry_run_returncode": 1,
+      "stderr": "error: patch failed: third_party/blink/renderer/modules/canvas/canvas2d/base_rendering_context_2d.cc:519\nerror: third_party/blink/renderer/modules/canvas/canvas2d/base_rendering_context_2d.cc: patch does not apply\n"
+    },
+    {
+      "base_patch": "patches/0021-third_party-blink-renderer-modules-keyboard-keyboard_layout-cc.patch",
+      "selected_patch": "patches/0021-third_party-blink-renderer-modules-keyboard-keyboard_layout-cc.patch",
+      "sha256": "cf00bf340f15469788b6918420f6d4d9b25ebdf9d36d8e128759bfda9f3bb91d",
+      "target": "third_party/blink/renderer/modules/keyboard/keyboard_layout.cc",
+      "status": "applied",
+      "dry_run_returncode": 0,
+      "stderr": ""
+    },
+    {
+      "base_patch": "patches/0022-third_party-blink-renderer-modules-mediastream-media_devices-cc.patch",
+      "selected_patch": "patches/0022-third_party-blink-renderer-modules-mediastream-media_devices-cc.patch",
+      "sha256": "600e3daf6cd1e60727cfd564e25a235bee039343b11e8af011633ffa89286517",
+      "target": "third_party/blink/renderer/modules/mediastream/media_devices.cc",
+      "status": "applied",
+      "dry_run_returncode": 0,
+      "stderr": ""
+    },
+    {
+      "base_patch": "patches/0023-third_party-blink-renderer-modules-netinfo-network_information-cc.patch",
+      "selected_patch": "patches/0023-third_party-blink-renderer-modules-netinfo-network_information-cc.patch",
+      "sha256": "fdc578d700a8c41fe00fca1528f830a46cf0c4f7d60112a1445cec135e69f22e",
+      "target": "third_party/blink/renderer/modules/netinfo/network_information.cc",
+      "status": "applied",
+      "dry_run_returncode": 0,
+      "stderr": ""
+    },
+    {
+      "base_patch": "patches/0024-third_party-blink-renderer-modules-peerconnection-peer_connection_dependency_factory-cc.patch",
+      "selected_patch": "patches/0024-third_party-blink-renderer-modules-peerconnection-peer_connection_dependency_factory-cc.patch",
+      "sha256": "311671ff1e2a73fd7106cd790c35269e49039301791c818a9a8748946cc2324a",
+      "target": "third_party/blink/renderer/modules/peerconnection/peer_connection_dependency_factory.cc",
+      "status": "conflict",
+      "dry_run_returncode": 1,
+      "stderr": "error: patch failed: third_party/blink/renderer/modules/peerconnection/peer_connection_dependency_factory.cc:27\nerror: third_party/blink/renderer/modules/peerconnection/peer_connection_dependency_factory.cc: patch does not apply\n"
+    },
+    {
+      "base_patch": "patches/0025-third_party-blink-renderer-modules-speech-speech_synthesis-cc.patch",
+      "selected_patch": "patches/0025-third_party-blink-renderer-modules-speech-speech_synthesis-cc.patch",
+      "sha256": "0c1964ec2960df0add8404f175e9b23333aad6aa1882408d5d107cccfd0f41bb",
+      "target": "third_party/blink/renderer/modules/speech/speech_synthesis.cc",
+      "status": "applied",
+      "dry_run_returncode": 0,
+      "stderr": ""
+    },
+    {
+      "base_patch": "patches/0026-third_party-blink-renderer-modules-webaudio-audio_buffer-cc.patch",
+      "selected_patch": "patches/0026-third_party-blink-renderer-modules-webaudio-audio_buffer-cc.patch",
+      "sha256": "ce1e7e72ffff04bf08773b1d06df40a1f949cdd6f17cd041f830a45c0938306d",
+      "target": "third_party/blink/renderer/modules/webaudio/audio_buffer.cc",
+      "status": "applied",
+      "dry_run_returncode": 0,
+      "stderr": ""
+    },
+    {
+      "base_patch": "patches/0027-third_party-blink-renderer-modules-webaudio-audio_buffer-h.patch",
+      "selected_patch": "patches/0027-third_party-blink-renderer-modules-webaudio-audio_buffer-h.patch",
+      "sha256": "b3f6261cdcb79b5030e68aeaad93f2498eb2826c9d3e671d44fc2e9708c79e52",
+      "target": "third_party/blink/renderer/modules/webaudio/audio_buffer.h",
+      "status": "applied",
+      "dry_run_returncode": 0,
+      "stderr": ""
+    },
+    {
+      "base_patch": "patches/0028-third_party-blink-renderer-modules-webaudio-realtime_analyser-cc.patch",
+      "selected_patch": "patches/0028-third_party-blink-renderer-modules-webaudio-realtime_analyser-cc.patch",
+      "sha256": "fa57b8005cb72f1b640e4cca7b374d2d8c2be6bab3a634b7dfab875aa48df895",
+      "target": "third_party/blink/renderer/modules/webaudio/realtime_analyser.cc",
+      "status": "applied",
+      "dry_run_returncode": 0,
+      "stderr": ""
+    },
+    {
+      "base_patch": "patches/0029-third_party-blink-renderer-modules-webgl-webgl_rendering_context_base-cc.patch",
+      "selected_patch": "patches/0029-third_party-blink-renderer-modules-webgl-webgl_rendering_context_base-cc.patch",
+      "sha256": "3a2d7128a50c1462c737df8b8e6b7fe566d20cfd42f2be2f7ad7d5dbc17cf813",
+      "target": "third_party/blink/renderer/modules/webgl/webgl_rendering_context_base.cc",
+      "status": "applied",
+      "dry_run_returncode": 0,
+      "stderr": ""
+    },
+    {
+      "base_patch": "patches/0030-third_party-blink-renderer-modules-webgpu-gpu_adapter_info-cc.patch",
+      "selected_patch": "patches/0030-third_party-blink-renderer-modules-webgpu-gpu_adapter_info-cc.patch",
+      "sha256": "eb3ed113b6d63f8e835ef49342ef602936d07d4b307a64561128c445df29251c",
+      "target": "third_party/blink/renderer/modules/webgpu/gpu_adapter_info.cc",
+      "status": "applied",
+      "dry_run_returncode": 0,
+      "stderr": ""
+    },
+    {
+      "base_patch": "patches/0031-third_party-blink-renderer-platform-graphics-image_data_buffer-cc.patch",
+      "selected_patch": "patches/0031-third_party-blink-renderer-platform-graphics-image_data_buffer-cc.patch",
+      "sha256": "8b86c52d9df1ba45db00a09b293070be90d9dbc7463244c8ddf525017d265b7f",
+      "target": "third_party/blink/renderer/platform/graphics/image_data_buffer.cc",
+      "status": "conflict",
+      "dry_run_returncode": 1,
+      "stderr": "error: patch failed: third_party/blink/renderer/platform/graphics/image_data_buffer.cc:34\nerror: third_party/blink/renderer/platform/graphics/image_data_buffer.cc: patch does not apply\n"
+    },
+    {
+      "base_patch": "patches/0032-third_party-blink-renderer-core-input-pointer_event_manager-cc.patch",
+      "selected_patch": "patches/0032-third_party-blink-renderer-core-input-pointer_event_manager-cc.patch",
+      "sha256": "9ef76388405f1e0fda04a3c1739bd433fae4a0f3e9c0315ae89734fb5ea6c6e9",
+      "target": "third_party/blink/renderer/core/input/pointer_event_manager.cc",
+      "status": "applied",
+      "dry_run_returncode": 0,
+      "stderr": ""
+    },
+    {
+      "base_patch": "patches/0033-third_party-blink-renderer-core-html-canvas-text_metrics-cc.patch",
+      "selected_patch": "patches/0033-third_party-blink-renderer-core-html-canvas-text_metrics-cc.patch",
+      "sha256": "dbb6ebe2581de310d90014c9da08f09039a81fb281862c7487ba24602897d1f0",
+      "target": "third_party/blink/renderer/core/html/canvas/text_metrics.cc",
+      "status": "applied",
+      "dry_run_returncode": 0,
+      "stderr": ""
+    },
+    {
+      "base_patch": "patches/0034-third_party-blink-renderer-modules-quota-storage_manager-cc.patch",
+      "selected_patch": "patches/0034-third_party-blink-renderer-modules-quota-storage_manager-cc.patch",
+      "sha256": "31f9b575c57beb2c7b2bcc2c181c6913c271e6df46b52c949ab8c648020dad6e",
+      "target": "third_party/blink/renderer/modules/quota/storage_manager.cc",
+      "status": "applied",
+      "dry_run_returncode": 0,
+      "stderr": ""
+    },
+    {
+      "base_patch": "patches/0035-webgl2-getparameter-version-normalize.patch",
+      "selected_patch": "patches/0035-webgl2-getparameter-version-normalize.patch",
+      "sha256": "2d17f086ae6775659afa5b863dfd3dc9e0199701563a4b72032f43908ed6f072",
+      "target": "third_party/blink/renderer/modules/webgl/webgl2_rendering_context_base.cc",
+      "status": "applied",
+      "dry_run_returncode": 0,
+      "stderr": ""
+    },
+    {
+      "base_patch": "patches/0036-chrome-app-chrome_main-fingerprint-normalize.patch",
+      "selected_patch": "patches/0036-chrome-app-chrome_main-fingerprint-normalize.patch",
+      "sha256": "692c20d3ade411474ea5fef6b6b672c0dfcba4cc995501c8b2e783bbc4009646",
+      "target": "chrome/app/chrome_main.cc",
+      "status": "applied",
+      "dry_run_returncode": 0,
+      "stderr": ""
+    },
+    {
+      "base_patch": "patches/0037-third_party-blink-renderer-core-frame-local_dom_window-cc.patch",
+      "selected_patch": "patches/0037-third_party-blink-renderer-core-frame-local_dom_window-cc.patch",
+      "sha256": "a035af33d9ee0982a2a4655910242e676df52ad09abee4616f7818a4f6a446fd",
+      "target": "third_party/blink/renderer/core/frame/local_dom_window.cc",
+      "status": "applied",
+      "dry_run_returncode": 0,
+      "stderr": ""
+    },
+    {
+      "base_patch": "patches/0038-third_party-blink-renderer-modules-credentialmanagement-public_key_credential-cc.patch",
+      "selected_patch": "patches/0038-third_party-blink-renderer-modules-credentialmanagement-public_key_credential-cc.patch",
+      "sha256": "1a88b224287ff2e02b2b4639fcddbda6f21d245eec9605687f7afaa4776f39b9",
+      "target": "third_party/blink/renderer/modules/credentialmanagement/public_key_credential.cc",
+      "status": "applied",
+      "dry_run_returncode": 0,
+      "stderr": ""
+    },
+    {
+      "base_patch": "patches/0039-third_party-blink-renderer-modules-buckets-storage_bucket-cc.patch",
+      "selected_patch": "patches/0039-third_party-blink-renderer-modules-buckets-storage_bucket-cc.patch",
+      "sha256": "aa03e4e5fb01e93d53d052e83c8142e6e83024e2fbf73048407156b0b73782a9",
+      "target": "third_party/blink/renderer/modules/buckets/storage_bucket.cc",
+      "status": "applied",
+      "dry_run_returncode": 0,
+      "stderr": ""
+    },
+    {
+      "base_patch": "patches/0040-third_party-blink-renderer-modules-mediarecorder-media_recorder-cc.patch",
+      "selected_patch": "patches/0040-third_party-blink-renderer-modules-mediarecorder-media_recorder-cc.patch",
+      "sha256": "f10bab3165637b214f86753c49c904806955a8a6760bae29ef6e285365d8fce1",
+      "target": "third_party/blink/renderer/modules/mediarecorder/media_recorder.cc",
+      "status": "applied",
+      "dry_run_returncode": 0,
+      "stderr": ""
+    },
+    {
+      "base_patch": "patches/0041-third_party-blink-renderer-modules-webgpu-gpu_adapter-cc.patch",
+      "selected_patch": "patches/0041-third_party-blink-renderer-modules-webgpu-gpu_adapter-cc.patch",
+      "sha256": "ad929e252a898e3525f561d03291d9eddb8ba04b6540aa2335c4ad307aad7653",
+      "target": "third_party/blink/renderer/modules/webgpu/gpu_adapter.cc",
+      "status": "applied",
+      "dry_run_returncode": 0,
+      "stderr": ""
+    },
+    {
+      "base_patch": "patches/0042-third_party-blink-renderer-modules-webgpu-gpu_supported_limits-cc.patch",
+      "selected_patch": "patches/0042-third_party-blink-renderer-modules-webgpu-gpu_supported_limits-cc.patch",
+      "sha256": "a32ced20da1a5c58613c0685882bb2c501fb8c739ddcbf12590ce1b4e584d70e",
+      "target": "third_party/blink/renderer/modules/webgpu/gpu_supported_limits.cc",
+      "status": "applied",
+      "dry_run_returncode": 0,
+      "stderr": ""
+    },
+    {
+      "base_patch": "patches/0043-third_party-blink-renderer-platform-peerconnection-rtc_ice_candidate_platform-cc.patch",
+      "selected_patch": "patches/0043-third_party-blink-renderer-platform-peerconnection-rtc_ice_candidate_platform-cc.patch",
+      "sha256": "c04c5000236b4d99d29c392c07b4cb931c217796621f06aa696b4200dbbbda66",
+      "target": "third_party/blink/renderer/platform/peerconnection/rtc_ice_candidate_platform.cc",
+      "status": "applied",
+      "dry_run_returncode": 0,
+      "stderr": ""
+    },
+    {
+      "base_patch": "patches/0044-third_party-blink-renderer-modules-peerconnection-rtc_peer_connection-cc.patch",
+      "selected_patch": "patches/0044-third_party-blink-renderer-modules-peerconnection-rtc_peer_connection-cc.patch",
+      "sha256": "7303736192ad27af857315a8cd60e440da23f26b323389bf04c9ceaf3e6ac240",
+      "target": "third_party/blink/renderer/modules/peerconnection/rtc_peer_connection.cc",
+      "status": "conflict",
+      "dry_run_returncode": 1,
+      "stderr": "error: patch failed: third_party/blink/renderer/modules/peerconnection/rtc_peer_connection.cc:47\nerror: third_party/blink/renderer/modules/peerconnection/rtc_peer_connection.cc: patch does not apply\n"
+    },
+    {
+      "base_patch": "patches/0045-third_party-blink-renderer-core-timing-performance_resource_timing-cc.patch",
+      "selected_patch": "patches/0045-third_party-blink-renderer-core-timing-performance_resource_timing-cc.patch",
+      "sha256": "7d2a2dcee8c8ecc3c3db47dbb7467663434980c11744c6afc15de0a47e000ccc",
+      "target": "third_party/blink/renderer/core/timing/performance_resource_timing.cc",
+      "status": "applied",
+      "dry_run_returncode": 0,
+      "stderr": ""
+    },
+    {
+      "base_patch": "patches/0046-content-browser-devtools-protocol-input_handler-cc.patch",
+      "selected_patch": "patches/0046-content-browser-devtools-protocol-input_handler-cc.patch",
+      "sha256": "2c12983938340b735b9f2971cbd33bb496b09acc705b74152c15fae9a5705d87",
+      "target": "content/browser/devtools/protocol/input_handler.cc",
+      "status": "applied",
+      "dry_run_returncode": 0,
+      "stderr": ""
+    },
+    {
+      "base_patch": "patches/0047-third_party-blink-renderer-platform-fonts-font_cache-cc.patch",
+      "selected_patch": "patches/0047-third_party-blink-renderer-platform-fonts-font_cache-cc.patch",
+      "sha256": "e98e4b20c3829aa570dfa40a1c9c0c9924148673d6e01cc3cf3b750a5c7061a3",
+      "target": "third_party/blink/renderer/platform/fonts/font_cache.cc",
+      "status": "applied",
+      "dry_run_returncode": 0,
+      "stderr": ""
+    },
+    {
+      "base_patch": "patches/0048-chrome-browser-component_updater-widevine_cdm_component_installer-cc.patch",
+      "selected_patch": "patches/0048-chrome-browser-component_updater-widevine_cdm_component_installer-cc.patch",
+      "sha256": "fd4c0727868e7b14a5dfc54422cc762a2e0251525eff0e9c4cb343f809528ce7",
+      "target": "chrome/browser/component_updater/widevine_cdm_component_installer.cc",
+      "status": "applied",
+      "dry_run_returncode": 0,
+      "stderr": ""
+    },
+    {
+      "base_patch": "patches/0049-third_party-blink-renderer-modules-plugins-dom_plugin_array-cc.patch",
+      "selected_patch": "patches/0049-third_party-blink-renderer-modules-plugins-dom_plugin_array-cc.patch",
+      "sha256": "4a454a46e7541c1526607206f492ee4b6f7f9db55ea5ba7e9f5899d213b915f3",
+      "target": "third_party/blink/renderer/modules/plugins/dom_plugin_array.cc",
+      "status": "conflict",
+      "dry_run_returncode": 1,
+      "stderr": "error: patch failed: third_party/blink/renderer/modules/plugins/dom_plugin_array.cc:20\nerror: third_party/blink/renderer/modules/plugins/dom_plugin_array.cc: patch does not apply\n"
+    },
+    {
+      "base_patch": "patches/0050-third_party-blink-renderer-modules-notifications-notification-cc.patch",
+      "selected_patch": "patches/0050-third_party-blink-renderer-modules-notifications-notification-cc.patch",
+      "sha256": "cbfb56b36e45d148319ac54dba1f78f2e74b52efb52a8125da22d07b106b561f",
+      "target": "third_party/blink/renderer/modules/notifications/notification.cc",
+      "status": "applied",
+      "dry_run_returncode": 0,
+      "stderr": ""
+    },
+    {
+      "base_patch": "patches/0051-third_party-blink-renderer-modules-permissions-permissions-cc.patch",
+      "selected_patch": "patches/0051-third_party-blink-renderer-modules-permissions-permissions-cc.patch",
+      "sha256": "458f6067fbcc75d6ddd5f7fd92d01201c16fa5b7e1701f102228e017c782df44",
+      "target": "third_party/blink/renderer/modules/permissions/permissions.cc",
+      "status": "applied",
+      "dry_run_returncode": 0,
+      "stderr": ""
+    },
+    {
+      "base_patch": "patches/0052-third_party-blink-renderer-core-css-media_values-cc.patch",
+      "selected_patch": "patches/0052-third_party-blink-renderer-core-css-media_values-cc.patch",
+      "sha256": "823b66bb12ceab33b1471e97be3b453fb99727d32a927df02384f8ab692464fa",
+      "target": "third_party/blink/renderer/core/css/media_values.cc",
+      "status": "applied",
+      "dry_run_returncode": 0,
+      "stderr": ""
+    },
+    {
+      "base_patch": "patches/0053-third_party-blink-renderer-modules-webaudio-base_audio_context-h.patch",
+      "selected_patch": "patches/0053-third_party-blink-renderer-modules-webaudio-base_audio_context-h.patch",
+      "sha256": "30842ae3d4b0d7ca487ae294328bfc55913c3bd84e84c097b0bde664c52542f5",
+      "target": "third_party/blink/renderer/modules/webaudio/base_audio_context.h",
+      "status": "applied",
+      "dry_run_returncode": 0,
+      "stderr": ""
+    },
+    {
+      "base_patch": "patches/0054-third_party-blink-renderer-core-timing-memory_info-h.patch",
+      "selected_patch": "patches/0054-third_party-blink-renderer-core-timing-memory_info-h.patch",
+      "sha256": "df909f9e6f0f49c4067cc6bf83daca23538f6a167bf70c482a4c2050b392a47b",
+      "target": "third_party/blink/renderer/core/timing/memory_info.h",
+      "status": "applied",
+      "dry_run_returncode": 0,
+      "stderr": ""
+    },
+    {
+      "base_patch": "patches/0055-third_party-blink-renderer-modules-screen_orientation-screen_orientation-cc.patch",
+      "selected_patch": "patches/0055-third_party-blink-renderer-modules-screen_orientation-screen_orientation-cc.patch",
+      "sha256": "acb0341eaa73dd11101607c2c3fa70227b6fa5e4ac3a49dca5aec7b8a2ea200a",
+      "target": "third_party/blink/renderer/modules/screen_orientation/screen_orientation.cc",
+      "status": "applied",
+      "dry_run_returncode": 0,
+      "stderr": ""
+    },
+    {
+      "base_patch": "patches/0056-third_party-blink-renderer-core-frame-screen-cc.patch",
+      "selected_patch": "patches/0056-third_party-blink-renderer-core-frame-screen-cc.patch",
+      "sha256": "53f26a4c0630382010e161a1bf0d33cbe872aaac6bdd6179d601d0392be06a93",
+      "target": "third_party/blink/renderer/core/frame/screen.cc",
+      "status": "applied",
+      "dry_run_returncode": 0,
+      "stderr": ""
+    },
+    {
+      "base_patch": "patches/0057-content-browser-devtools-protocol-network_handler-cc.patch",
+      "selected_patch": "patches/0057-content-browser-devtools-protocol-network_handler-cc.patch",
+      "sha256": "4634c05ef2703a40429cd651fc17e407548899198b186c8470e5be32aae964ba",
+      "target": "content/browser/devtools/protocol/network_handler.cc",
+      "status": "applied",
+      "dry_run_returncode": 0,
+      "stderr": ""
+    },
+    {
+      "base_patch": "patches/0058-third_party-blink-renderer-modules-screen_details-screen_detailed-cc.patch",
+      "selected_patch": "patches/0058-third_party-blink-renderer-modules-screen_details-screen_detailed-cc.patch",
+      "sha256": "12dbcf63b862768c170ba7975d538149f01ff76cf14c09cb74dd02a8e7406649",
+      "target": "third_party/blink/renderer/modules/screen_details/screen_detailed.cc",
+      "status": "applied",
+      "dry_run_returncode": 0,
+      "stderr": ""
+    },
+    {
+      "base_patch": "patches/0059-third_party-blink-renderer-core-geolocation-geolocation-cc.patch",
+      "selected_patch": "patches/0059-third_party-blink-renderer-core-geolocation-geolocation-cc.patch",
+      "sha256": "c9598e23180fadb154175475c2518cd4c0e05c4e29313c1a6f4e989074de8eee",
+      "target": "third_party/blink/renderer/core/geolocation/geolocation.cc",
+      "status": "applied",
+      "dry_run_returncode": 0,
+      "stderr": ""
+    },
+    {
+      "base_patch": "patches/0060-third_party-blink-renderer-modules-media_capabilities-media_capabilities-cc.patch",
+      "selected_patch": "patches/0060-third_party-blink-renderer-modules-media_capabilities-media_capabilities-cc.patch",
+      "sha256": "e050effa3a2cc8e84809bf5184b6c18417718cb3f9f09a1aa63dadaaf14514bb",
+      "target": "third_party/blink/renderer/modules/media_capabilities/media_capabilities.cc",
+      "status": "conflict",
+      "dry_run_returncode": 1,
+      "stderr": "error: patch failed: third_party/blink/renderer/modules/media_capabilities/media_capabilities.cc:13\nerror: third_party/blink/renderer/modules/media_capabilities/media_capabilities.cc: patch does not apply\n"
+    },
+    {
+      "base_patch": "patches/0061-third_party-blink-renderer-modules-media_capabilities-media_capabilities-h.patch",
+      "selected_patch": "patches/0061-third_party-blink-renderer-modules-media_capabilities-media_capabilities-h.patch",
+      "sha256": "59fe7e3903d37f1ac92bf5deeb7e22af87938494d02f8e6b89f6671340e5bf9c",
+      "target": "third_party/blink/renderer/modules/media_capabilities/media_capabilities.h",
+      "status": "conflict",
+      "dry_run_returncode": 1,
+      "stderr": "error: patch failed: third_party/blink/renderer/modules/media_capabilities/media_capabilities.h:83\nerror: third_party/blink/renderer/modules/media_capabilities/media_capabilities.h: patch does not apply\n"
+    },
+    {
+      "base_patch": "patches/0062-content-browser-renderer_host-render_process_host_impl-cc.patch",
+      "selected_patch": "patches/0062-content-browser-renderer_host-render_process_host_impl-cc.patch",
+      "sha256": "8c6246c716ab266d89680fc75b957f807f0d10c851a4130066d26014b52d2e9c",
+      "target": "content/browser/renderer_host/render_process_host_impl.cc",
+      "status": "applied",
+      "dry_run_returncode": 0,
+      "stderr": ""
+    },
+    {
+      "base_patch": "patches/0063-v8-src-flags-flag-definitions-h.patch",
+      "selected_patch": "patches/0063-v8-src-flags-flag-definitions-h.patch",
+      "sha256": "0a3e5631b7b7f5a0fbb17dc50274af331eb3de8e7af1ff09d6c5bc827f20f135",
+      "target": "v8/src/flags/flag-definitions.h",
+      "status": "applied",
+      "dry_run_returncode": 0,
+      "stderr": ""
+    },
+    {
+      "base_patch": "patches/0064-v8-src-inspector-v8-runtime-agent-impl-cc.patch",
+      "selected_patch": "patches/0064-v8-src-inspector-v8-runtime-agent-impl-cc.patch",
+      "sha256": "4705a8b679153787d8a90d49936915d69d837f2c6e3979f2cc4703f3f900b770",
+      "target": "v8/src/inspector/v8-runtime-agent-impl.cc",
+      "status": "applied",
+      "dry_run_returncode": 0,
+      "stderr": ""
+    },
+    {
+      "base_patch": "patches/0065-v8-src-inspector-v8-runtime-agent-impl-h.patch",
+      "selected_patch": "patches/0065-v8-src-inspector-v8-runtime-agent-impl-h.patch",
+      "sha256": "c4240bfe54e24b3fd24411e9e4ebc6df2baf837bd8a2b917717914be2ca321f9",
+      "target": "v8/src/inspector/v8-runtime-agent-impl.h",
+      "status": "applied",
+      "dry_run_returncode": 0,
+      "stderr": ""
+    },
+    {
+      "base_patch": "patches/0066-content-browser-renderer_host-render_process_host_impl-cc.patch",
+      "selected_patch": "patches/0066-content-browser-renderer_host-render_process_host_impl-cc.patch",
+      "sha256": "de1d1aac83365d6ebdcf391b44d8d5f92a61cfbaa350aef880265dd4c51e2522",
+      "target": "content/browser/renderer_host/render_process_host_impl.cc",
+      "status": "applied",
+      "dry_run_returncode": 0,
+      "stderr": ""
+    },
+    {
+      "base_patch": "patches/0067-third_party-blink-renderer-platform-BUILD-gn.patch",
+      "selected_patch": "patches/0067-third_party-blink-renderer-platform-BUILD-gn.patch",
+      "sha256": "26c3cc834f7082c1adb2984d20a638437137603c4ad02d172e4a630ef87073c6",
+      "target": "third_party/blink/renderer/platform/BUILD.gn",
+      "status": "applied",
+      "dry_run_returncode": 0,
+      "stderr": ""
+    },
+    {
+      "base_patch": "patches/0068-third_party-blink-renderer-platform-canvas_bridge-BUILD-gn.patch",
+      "selected_patch": "patches/0068-third_party-blink-renderer-platform-canvas_bridge-BUILD-gn.patch",
+      "sha256": "fab6d976320cec89f489cd7693aadaf05d2ddea564705d6455679d276e73ba18",
+      "target": "third_party/blink/renderer/platform/canvas_bridge/BUILD.gn",
+      "status": "applied",
+      "dry_run_returncode": 0,
+      "stderr": ""
+    },
+    {
+      "base_patch": "patches/0069-third_party-blink-renderer-platform-canvas_bridge-canvas_bridge_client-cc.patch",
+      "selected_patch": "patches/0069-third_party-blink-renderer-platform-canvas_bridge-canvas_bridge_client-cc.patch",
+      "sha256": "1acddccf0a394a5d4be9f614a4080f7678f08086e033b491791b5a685276f10e",
+      "target": "third_party/blink/renderer/platform/canvas_bridge/canvas_bridge_client.cc",
+      "status": "applied",
+      "dry_run_returncode": 0,
+      "stderr": ""
+    },
+    {
+      "base_patch": "patches/0070-third_party-blink-renderer-platform-canvas_bridge-canvas_bridge_client-h.patch",
+      "selected_patch": "patches/0070-third_party-blink-renderer-platform-canvas_bridge-canvas_bridge_client-h.patch",
+      "sha256": "8887cba678dc7ceb26a9d4168865422f172d6bb9c4f5d60e9d8fb35f3af143ce",
+      "target": "third_party/blink/renderer/platform/canvas_bridge/canvas_bridge_client.h",
+      "status": "applied",
+      "dry_run_returncode": 0,
+      "stderr": ""
+    },
+    {
+      "base_patch": "patches/0071-third_party-blink-renderer-platform-canvas_bridge-canvas_bridge_codec-cc.patch",
+      "selected_patch": "patches/0071-third_party-blink-renderer-platform-canvas_bridge-canvas_bridge_codec-cc.patch",
+      "sha256": "9f626e2cada0580ba0f279f21474e33f28ed0a09ad350c2db3fb0a0077cf7788",
+      "target": "third_party/blink/renderer/platform/canvas_bridge/canvas_bridge_codec.cc",
+      "status": "applied",
+      "dry_run_returncode": 0,
+      "stderr": ""
+    },
+    {
+      "base_patch": "patches/0072-third_party-blink-renderer-platform-canvas_bridge-canvas_bridge_codec-h.patch",
+      "selected_patch": "patches/0072-third_party-blink-renderer-platform-canvas_bridge-canvas_bridge_codec-h.patch",
+      "sha256": "e5dae7b196a81ff196edd62fb09b6c287415efb66740ed06dc6fa9cec389782e",
+      "target": "third_party/blink/renderer/platform/canvas_bridge/canvas_bridge_codec.h",
+      "status": "applied",
+      "dry_run_returncode": 0,
+      "stderr": ""
+    },
+    {
+      "base_patch": "patches/0073-third_party-blink-renderer-core-html-canvas-canvas_rendering_context-h.patch",
+      "selected_patch": "patches/0073-third_party-blink-renderer-core-html-canvas-canvas_rendering_context-h.patch",
+      "sha256": "507cfc81932cd5f45aef6ef7096b62e684090165bd615561e3da31118519f6f3",
+      "target": "third_party/blink/renderer/core/html/canvas/canvas_rendering_context.h",
+      "status": "applied",
+      "dry_run_returncode": 0,
+      "stderr": ""
+    },
+    {
+      "base_patch": "patches/0074-third_party-blink-renderer-core-html-canvas-html_canvas_element-cc.patch",
+      "selected_patch": "patches/0074-third_party-blink-renderer-core-html-canvas-html_canvas_element-cc.patch",
+      "sha256": "1f027e86221793d79b06e68c91b34011ed3ae51fb63bfd365ffa09a595b519a8",
+      "target": "third_party/blink/renderer/core/html/canvas/html_canvas_element.cc",
+      "status": "conflict",
+      "dry_run_returncode": 1,
+      "stderr": "error: patch failed: third_party/blink/renderer/core/html/canvas/html_canvas_element.cc:32\nerror: third_party/blink/renderer/core/html/canvas/html_canvas_element.cc: patch does not apply\n"
+    },
+    {
+      "base_patch": "patches/0075-third_party-blink-renderer-core-html-canvas-text_metrics-h.patch",
+      "selected_patch": "patches/0075-third_party-blink-renderer-core-html-canvas-text_metrics-h.patch",
+      "sha256": "79317bb7adc28fe86bdc871fe75f0692c8ece46f7e4bbe48af2f4630c223a09e",
+      "target": "third_party/blink/renderer/core/html/canvas/text_metrics.h",
+      "status": "applied",
+      "dry_run_returncode": 0,
+      "stderr": ""
+    },
+    {
+      "base_patch": "patches/0076-third_party-blink-renderer-modules-canvas-canvas2d-base_rendering_context_2d-cc.patch",
+      "selected_patch": "patches/0076-third_party-blink-renderer-modules-canvas-canvas2d-base_rendering_context_2d-cc.patch",
+      "sha256": "f18f6e5e22be6541eef925774ac2055443f2c836627de7ac25b2fdfb7c3d9a3d",
+      "target": "third_party/blink/renderer/modules/canvas/canvas2d/base_rendering_context_2d.cc",
+      "status": "blocked_by_predecessor",
+      "dry_run_returncode": 1,
+      "stderr": "error: patch failed: third_party/blink/renderer/modules/canvas/canvas2d/base_rendering_context_2d.cc:14\nerror: third_party/blink/renderer/modules/canvas/canvas2d/base_rendering_context_2d.cc: patch does not apply\n"
+    },
+    {
+      "base_patch": "patches/0077-third_party-blink-renderer-modules-canvas-canvas2d-base_rendering_context_2d-h.patch",
+      "selected_patch": "patches/0077-third_party-blink-renderer-modules-canvas-canvas2d-base_rendering_context_2d-h.patch",
+      "sha256": "4479b87f37067cecbbe29135af9c80e500bf1e5d068763fec99c5bab033878d5",
+      "target": "third_party/blink/renderer/modules/canvas/canvas2d/base_rendering_context_2d.h",
+      "status": "conflict",
+      "dry_run_returncode": 1,
+      "stderr": "error: patch failed: third_party/blink/renderer/modules/canvas/canvas2d/base_rendering_context_2d.h:316\nerror: third_party/blink/renderer/modules/canvas/canvas2d/base_rendering_context_2d.h: patch does not apply\n"
+    },
+    {
+      "base_patch": "patches/0078-third_party-blink-renderer-modules-canvas-canvas2d-canvas_2d_recorder_context-cc.patch",
+      "selected_patch": "patches/0078-third_party-blink-renderer-modules-canvas-canvas2d-canvas_2d_recorder_context-cc.patch",
+      "sha256": "6135ae8235cbdf4038fffeed516655a667110cd05a704c94128245da12d8c0a3",
+      "target": "third_party/blink/renderer/modules/canvas/canvas2d/canvas_2d_recorder_context.cc",
+      "status": "applied",
+      "dry_run_returncode": 0,
+      "stderr": ""
+    },
+    {
+      "base_patch": "patches/0079-third_party-blink-renderer-modules-canvas-canvas2d-canvas_path-cc.patch",
+      "selected_patch": "patches/0079-third_party-blink-renderer-modules-canvas-canvas2d-canvas_path-cc.patch",
+      "sha256": "9754842c6f6da28520ad17683ff022e334b39e0d98679387fda56141af0e5ad2",
+      "target": "third_party/blink/renderer/modules/canvas/canvas2d/canvas_path.cc",
+      "status": "applied",
+      "dry_run_returncode": 0,
+      "stderr": ""
+    },
+    {
+      "base_patch": "patches/0080-third_party-blink-renderer-modules-canvas-canvas2d-canvas_path-h.patch",
+      "selected_patch": "patches/0080-third_party-blink-renderer-modules-canvas-canvas2d-canvas_path-h.patch",
+      "sha256": "5782132543076795438b8cbc6cdd08256912384c47cfa8f73b393cb70b7fb1a8",
+      "target": "third_party/blink/renderer/modules/canvas/canvas2d/canvas_path.h",
+      "status": "applied",
+      "dry_run_returncode": 0,
+      "stderr": ""
+    },
+    {
+      "base_patch": "patches/0081-third_party-blink-renderer-modules-webgl-webgl_object-h.patch",
+      "selected_patch": "patches/0081-third_party-blink-renderer-modules-webgl-webgl_object-h.patch",
+      "sha256": "6eaa38a54723d0a1fb0c6572ddce2c01ae218e2282704b2cea270a60b296fd08",
+      "target": "third_party/blink/renderer/modules/webgl/webgl_object.h",
+      "status": "applied",
+      "dry_run_returncode": 0,
+      "stderr": ""
+    },
+    {
+      "base_patch": "patches/0082-third_party-blink-renderer-modules-webgl-webgl_rendering_context_base-cc.patch",
+      "selected_patch": "patches/0082-third_party-blink-renderer-modules-webgl-webgl_rendering_context_base-cc.patch",
+      "sha256": "78da0f157e275f5c219e71b160db13a09c60aad0731b7f857d39c89bc9b0e2a4",
+      "target": "third_party/blink/renderer/modules/webgl/webgl_rendering_context_base.cc",
+      "status": "conflict",
+      "dry_run_returncode": 1,
+      "stderr": "error: patch failed: third_party/blink/renderer/modules/webgl/webgl_rendering_context_base.cc:3692\nerror: third_party/blink/renderer/modules/webgl/webgl_rendering_context_base.cc: patch does not apply\n"
+    },
+    {
+      "base_patch": "patches/0083-third_party-blink-renderer-modules-webgl-webgl_rendering_context_base-h.patch",
+      "selected_patch": "patches/0083-third_party-blink-renderer-modules-webgl-webgl_rendering_context_base-h.patch",
+      "sha256": "e78ee0849e9a7c32de3ef3f16251f153a5c2797cf7afa7aaa9a8ca5e5b788e78",
+      "target": "third_party/blink/renderer/modules/webgl/webgl_rendering_context_base.h",
+      "status": "applied",
+      "dry_run_returncode": 0,
+      "stderr": ""
+    },
+    {
+      "base_patch": "patches/0084-third_party-blink-renderer-modules-webgl-webgl_uniform_location-h.patch",
+      "selected_patch": "patches/0084-third_party-blink-renderer-modules-webgl-webgl_uniform_location-h.patch",
+      "sha256": "dce166ca681b9721b6cad59b30aa9cedb2f309d8afd22a0b71f90074c1d75782",
+      "target": "third_party/blink/renderer/modules/webgl/webgl_uniform_location.h",
+      "status": "applied",
+      "dry_run_returncode": 0,
+      "stderr": ""
+    },
+    {
+      "base_patch": "patches/0085-third_party-blink-renderer-modules-peerconnection-peer_connection_dependency_factory-cc.patch",
+      "selected_patch": "patches/0085-third_party-blink-renderer-modules-peerconnection-peer_connection_dependency_factory-cc.patch",
+      "sha256": "bcac06bcd8546ee4b8f446d6b2844c46d7e1e26cab9b182cf9d3e7a3258eb91a",
+      "target": "third_party/blink/renderer/modules/peerconnection/peer_connection_dependency_factory.cc",
+      "status": "blocked_by_predecessor",
+      "dry_run_returncode": 1,
+      "stderr": "error: patch failed: third_party/blink/renderer/modules/peerconnection/peer_connection_dependency_factory.cc:1139\nerror: third_party/blink/renderer/modules/peerconnection/peer_connection_dependency_factory.cc: patch does not apply\n"
+    },
+    {
+      "base_patch": "patches/0086-third_party-webrtc-p2p-base-port-h.patch",
+      "selected_patch": "patches/0086-third_party-webrtc-p2p-base-port-h.patch",
+      "sha256": "b10d30077bdd66f60928e221bed5970ea9aff5d9b8ac514c7b9dc2ba26b76a86",
+      "target": "third_party/webrtc/p2p/base/port.h",
+      "status": "applied",
+      "dry_run_returncode": 0,
+      "stderr": ""
+    },
+    {
+      "base_patch": "patches/0087-third_party-webrtc-p2p-base-port-cc.patch",
+      "selected_patch": "patches/0087-third_party-webrtc-p2p-base-port-cc.patch",
+      "sha256": "1b575038297514b6f102c1cb6b8dd62160ddec9482b1a59caca958b34360c9ad",
+      "target": "third_party/webrtc/p2p/base/port.cc",
+      "status": "applied",
+      "dry_run_returncode": 0,
+      "stderr": ""
+    },
+    {
+      "base_patch": "patches/0088-third_party-webrtc-p2p-base-stun_port-cc.patch",
+      "selected_patch": "patches/0088-third_party-webrtc-p2p-base-stun_port-cc.patch",
+      "sha256": "e1506c617ef8b82dd9851502fbacc64189aae9c78a3342e598fca3cecc7d6fbc",
+      "target": "third_party/webrtc/p2p/base/stun_port.cc",
+      "status": "applied",
+      "dry_run_returncode": 0,
+      "stderr": ""
+    },
+    {
+      "base_patch": "patches/0089-tools-metrics-BUILD-gn.patch",
+      "selected_patch": "patches/0089-tools-metrics-BUILD-gn.patch",
+      "sha256": "b15f667b6786bd05649c4abab1f5380b96ddf93a743c499d8c6fcde5f9e33d74",
+      "target": "tools/metrics/BUILD.gn",
+      "status": "applied",
+      "dry_run_returncode": 0,
+      "stderr": ""
+    },
+    {
+      "base_patch": "patches/0090-components-ungoogled-persona-profile.patch",
+      "selected_patch": "patches/0090-components-ungoogled-persona-profile.patch",
+      "sha256": "9d9ff5815c11c6859bbdbd3cb1da144b38a46ec9a6d8a3bf6c28b6ab5dee1689",
+      "target": "components/ungoogled/BUILD.gn",
+      "status": "applied",
+      "dry_run_returncode": 0,
+      "stderr": ""
+    },
+    {
+      "base_patch": "patches/0091-components-ungoogled-persona-profile-h.patch",
+      "selected_patch": "patches/0091-components-ungoogled-persona-profile-h.patch",
+      "sha256": "6ca58082046b8e26205e026817d3c3733436386940699f331186f1322dbcd148",
+      "target": "components/ungoogled/persona_profile.h",
+      "status": "applied",
+      "dry_run_returncode": 0,
+      "stderr": ""
+    },
+    {
+      "base_patch": "patches/0092-components-ungoogled-persona-profile-cc.patch",
+      "selected_patch": "patches/0092-components-ungoogled-persona-profile-cc.patch",
+      "sha256": "682f2e0d01a545284e0a1bf78e96fbd14ae8fcce442c5b7e21f055ee4be9c940",
+      "target": "components/ungoogled/persona_profile.cc",
+      "status": "applied",
+      "dry_run_returncode": 0,
+      "stderr": ""
+    },
+    {
+      "base_patch": "patches/0093-webgl1-persona-complete.patch",
+      "selected_patch": "patches/0093-webgl1-persona-complete.patch",
+      "sha256": "05399ca58b7254785566098e1a6594071ca63a2d4963f28a070f722c6a91f086",
+      "target": "third_party/blink/renderer/modules/webgl/webgl_rendering_context_base.cc",
+      "status": "blocked_by_predecessor",
+      "dry_run_returncode": 1,
+      "stderr": "error: patch failed: third_party/blink/renderer/modules/webgl/webgl_rendering_context_base.cc:27\nerror: third_party/blink/renderer/modules/webgl/webgl_rendering_context_base.cc: patch does not apply\n"
+    },
+    {
+      "base_patch": "patches/0094-webgl2-persona-complete.patch",
+      "selected_patch": "patches/0094-webgl2-persona-complete.patch",
+      "sha256": "961b0b0834f909a9a1152b1c4e2f93e5b9cfc3069de212330c0fcedfb009e10e",
+      "target": "third_party/blink/renderer/modules/webgl/webgl2_rendering_context_base.cc",
+      "status": "applied",
+      "dry_run_returncode": 0,
+      "stderr": ""
+    },
+    {
+      "base_patch": "patches/0095-webgl-precision-extensions.patch",
+      "selected_patch": "patches/0095-webgl-precision-extensions.patch",
+      "sha256": "148bea69ffc756b0cd6c8c33ca8d89e33950edc0653de09878b0d5757f89dcb4",
+      "target": "third_party/blink/renderer/modules/webgl/webgl_rendering_context_base.cc",
+      "status": "blocked_by_predecessor",
+      "dry_run_returncode": 0,
+      "stderr": ""
+    },
+    {
+      "base_patch": "patches/0096-webgl-bridge-policy-h.patch",
+      "selected_patch": "patches/0096-webgl-bridge-policy-h.patch",
+      "sha256": "b4961afdf9fbe6f96bc378669ed02d9e95251b532e4b0069f6bdd2e92e6dda8e",
+      "target": "third_party/blink/renderer/modules/webgl/webgl_rendering_context_base.h",
+      "status": "applied",
+      "dry_run_returncode": 0,
+      "stderr": ""
+    },
+    {
+      "base_patch": "patches/0097-webgl-bridge-policy-cc.patch",
+      "selected_patch": "patches/0097-webgl-bridge-policy-cc.patch",
+      "sha256": "603df17bf57ae1415c946f866ca8477f68c4d5927178cbb32295f4660683cbc1",
+      "target": "third_party/blink/renderer/modules/webgl/webgl_rendering_context_base.cc",
+      "status": "blocked_by_predecessor",
+      "dry_run_returncode": 1,
+      "stderr": "error: patch failed: third_party/blink/renderer/modules/webgl/webgl_rendering_context_base.cc:3127\nerror: third_party/blink/renderer/modules/webgl/webgl_rendering_context_base.cc: patch does not apply\n"
+    },
+    {
+      "base_patch": "patches/0098-third_party-blink-renderer-modules-BUILD-gn.patch",
+      "selected_patch": "patches/0098-third_party-blink-renderer-modules-BUILD-gn.patch",
+      "sha256": "eccbede6ea18bc19f86a82fe3c7ea345739c264554071c1b490ae00c2c1f4678",
+      "target": "third_party/blink/renderer/modules/BUILD.gn",
+      "status": "applied",
+      "dry_run_returncode": 0,
+      "stderr": ""
+    },
+    {
+      "base_patch": "patches/0099-webgl-bridge-lifecycle-cc.patch",
+      "selected_patch": "patches/0099-webgl-bridge-lifecycle-cc.patch",
+      "sha256": "c4055bc41b661fca6170a3b1b823c845e84d4f0caeabe267fb862ae285284374",
+      "target": "third_party/blink/renderer/modules/webgl/webgl_rendering_context_base.cc",
+      "status": "blocked_by_predecessor",
+      "dry_run_returncode": 1,
+      "stderr": "error: patch failed: third_party/blink/renderer/modules/webgl/webgl_rendering_context_base.cc:275\nerror: third_party/blink/renderer/modules/webgl/webgl_rendering_context_base.cc: patch does not apply\n"
+    },
+    {
+      "base_patch": "patches/0100-webgl-readback-noise.patch",
+      "selected_patch": "patches/0100-webgl-readback-noise.patch",
+      "sha256": "2ae3c59783f71297c854daca107b8e9eff27dfa619767c83ee86d43518251265",
+      "target": "third_party/blink/renderer/modules/webgl/webgl_rendering_context_base.cc",
+      "status": "blocked_by_predecessor",
+      "dry_run_returncode": 1,
+      "stderr": "error: patch failed: third_party/blink/renderer/modules/webgl/webgl_rendering_context_base.cc:50\nerror: third_party/blink/renderer/modules/webgl/webgl_rendering_context_base.cc: patch does not apply\n"
+    },
+    {
+      "base_patch": "patches/0101-webgl-gpu_fingerprint-cc.patch",
+      "selected_patch": "patches/0101-webgl-gpu_fingerprint-cc.patch",
+      "sha256": "03978b671e4f6cda5c6065953029a138fe2b6a139a8272e552322aca304a7022",
+      "target": "third_party/blink/renderer/modules/webgl/gpu_fingerprint.cc",
+      "status": "applied",
+      "dry_run_returncode": 0,
+      "stderr": ""
+    },
+    {
+      "base_patch": "patches/0102-webgl-gpu_fingerprint-h.patch",
+      "selected_patch": "patches/0102-webgl-gpu_fingerprint-h.patch",
+      "sha256": "46e9350b4aded51bc5b9da18af1badbdf34dc4d02bbc2908d40224aa2f85e8e2",
+      "target": "third_party/blink/renderer/modules/webgl/gpu_fingerprint.h",
+      "status": "applied",
+      "dry_run_returncode": 0,
+      "stderr": ""
+    },
+    {
+      "base_patch": "patches/0103-webgl-gpu_info-cc.patch",
+      "selected_patch": "patches/0103-webgl-gpu_info-cc.patch",
+      "sha256": "b68967221071055e4083fdf28a87619721400c582b444e3d9873f6ba46b468b4",
+      "target": "third_party/blink/renderer/modules/webgl/gpu_info.cc",
+      "status": "applied",
+      "dry_run_returncode": 0,
+      "stderr": ""
+    },
+    {
+      "base_patch": "patches/0104-webgl-gpu_info-h.patch",
+      "selected_patch": "patches/0104-webgl-gpu_info-h.patch",
+      "sha256": "55921b3d873bc2384135e5949aed398089d7ea2a45dd08fb4019ff28dcda2f5d",
+      "target": "third_party/blink/renderer/modules/webgl/gpu_info.h",
+      "status": "applied",
+      "dry_run_returncode": 0,
+      "stderr": ""
+    },
+    {
+      "base_patch": "patches/0105-components-ungoogled-farble_seed.patch",
+      "selected_patch": "patches/0105-components-ungoogled-farble_seed.patch",
+      "sha256": "8070c6a45ca838d66ced4d7fd7e189583d7ee61acc6393fba4080b981ea88ebb",
+      "target": "components/ungoogled/farble_seed.cc",
+      "status": "applied",
+      "dry_run_returncode": 0,
+      "stderr": ""
+    },
+    {
+      "base_patch": "patches/0106-components-ungoogled-farble_seed.patch",
+      "selected_patch": "patches/0106-components-ungoogled-farble_seed.patch",
+      "sha256": "73153a9dfbcacaf1e43d29c5c281271dc6c6486e528625f5b6dd09b2156e39cf",
+      "target": "components/ungoogled/farble_seed.h",
+      "status": "applied",
+      "dry_run_returncode": 0,
+      "stderr": ""
+    },
+    {
+      "base_patch": "patches/0107-components-ungoogled-fingerprint_data.patch",
+      "selected_patch": "patches/0107-components-ungoogled-fingerprint_data.patch",
+      "sha256": "e98bf1dbf4fb92a2a031d4af85fc0b6fd6453e85c5b4fb57ed5c002194df3acd",
+      "target": "components/ungoogled/fingerprint_data.h",
+      "status": "applied",
+      "dry_run_returncode": 0,
+      "stderr": ""
+    },
+    {
+      "base_patch": "patches/0108-webgl-gpu-fingerprint-integration.patch",
+      "selected_patch": "patches/0108-webgl-gpu-fingerprint-integration.patch",
+      "sha256": "3aac86fa2225daf8e7e4cb42232782c592168f815f50689eabd73b687e208397",
+      "target": "third_party/blink/renderer/modules/webgl/webgl_rendering_context_base.cc",
+      "status": "blocked_by_predecessor",
+      "dry_run_returncode": 1,
+      "stderr": "error: patch failed: third_party/blink/renderer/modules/webgl/webgl_rendering_context_base.cc:4564\nerror: third_party/blink/renderer/modules/webgl/webgl_rendering_context_base.cc: patch does not apply\n"
+    },
+    {
+      "base_patch": "patches/0109-webgl-BUILD-gpu-files.patch",
+      "selected_patch": "patches/0109-webgl-BUILD-gpu-files.patch",
+      "sha256": "f285134b918a7cc2e83dc255048aac454417f9bfd38ae2e58fe77507e300d34f",
+      "target": "third_party/blink/renderer/modules/webgl/BUILD.gn",
+      "status": "applied",
+      "dry_run_returncode": 0,
+      "stderr": ""
+    },
+    {
+      "base_patch": "patches/0110-webgl-query-hot-path.patch",
+      "selected_patch": "patches/0110-webgl-query-hot-path.patch",
+      "sha256": "03bf637afe5bab501b818c670de4e404c46e0a9eb284f331d319c47fba60c33d",
+      "target": "third_party/blink/renderer/modules/webgl/webgl_rendering_context_base.cc",
+      "status": "blocked_by_predecessor",
+      "dry_run_returncode": 1,
+      "stderr": "error: patch failed: third_party/blink/renderer/modules/webgl/webgl_rendering_context_base.cc:4566\nerror: third_party/blink/renderer/modules/webgl/webgl_rendering_context_base.cc: patch does not apply\n"
+    },
+    {
+      "base_patch": "patches/0111-global-privacy-control.patch",
+      "selected_patch": "patches/0111-global-privacy-control.patch",
+      "sha256": "98af6f9657ebe1c92f2bbd170fa038d97389b6126a2962db50bf16129ab13b79",
+      "target": "third_party/blink/renderer/modules/global_privacy_control/navigator_global_privacy_control.cc",
+      "status": "conflict",
+      "dry_run_returncode": 1,
+      "stderr": "error: patch failed: third_party/blink/renderer/modules/global_privacy_control/navigator_global_privacy_control.cc:17\nerror: third_party/blink/renderer/modules/global_privacy_control/navigator_global_privacy_control.cc: patch does not apply\n"
+    },
+    {
+      "base_patch": "patches/0112-layout-theme-system-fonts.patch",
+      "selected_patch": "patches/0112-layout-theme-system-fonts.patch",
+      "sha256": "07bb338e3b50426b9d096b0de06500f4a40bdac4ae0edac8e5e0434d4f962eaa",
+      "target": "third_party/blink/renderer/core/layout/layout_theme_font_provider_default.cc",
+      "status": "applied",
+      "dry_run_returncode": 0,
+      "stderr": ""
+    },
+    {
+      "base_patch": "patches/0113-webgl-translated-source.patch",
+      "selected_patch": "patches/0113-webgl-translated-source.patch",
+      "sha256": "818a38dcc50c8a14a2e592262925fcf0a4ebc61f07ab8caab921e443660b5304",
+      "target": "third_party/blink/renderer/modules/webgl/webgl_debug_shaders.cc",
+      "status": "applied",
+      "dry_run_returncode": 0,
+      "stderr": ""
+    },
+    {
+      "base_patch": "patches/0114-webgpu-preferred-canvas-format.patch",
+      "selected_patch": "patches/0114-webgpu-preferred-canvas-format.patch",
+      "sha256": "448bf0f0438ba83279056a4a5db9b5083ac6a7452fca992a333e8755724a01a3",
+      "target": "third_party/blink/renderer/modules/webgpu/gpu.cc",
+      "status": "applied",
+      "dry_run_returncode": 0,
+      "stderr": ""
+    },
+    {
+      "base_patch": "patches/0115-battery-persona.patch",
+      "selected_patch": "patches/0115-battery-persona.patch",
+      "sha256": "ca7cb1d9ecf0f296e348d243bdf195b89e4214518b8770cfb3e05fe24b2b85b4",
+      "target": "third_party/blink/renderer/modules/battery/battery_manager.cc",
+      "status": "applied",
+      "dry_run_returncode": 0,
+      "stderr": ""
+    },
+    {
+      "base_patch": "patches/0116-audio-persona.patch",
+      "selected_patch": "patches/0116-audio-persona.patch",
+      "sha256": "1d2934baad0d6d8cb327a0fedae131e9e00402c7750aae0f21c61aff101ac24a",
+      "target": "third_party/blink/renderer/modules/webaudio/audio_context.cc",
+      "status": "applied",
+      "dry_run_returncode": 0,
+      "stderr": ""
+    },
+    {
+      "base_patch": "patches/0117-realtime-persona.patch",
+      "selected_patch": "patches/0117-realtime-persona.patch",
+      "sha256": "1a1406a5b1798c5004b554c25136cb65092d158081a5a604c326e0a40b6e28f0",
+      "target": "third_party/blink/renderer/modules/webaudio/realtime_audio_destination_handler.cc",
+      "status": "applied",
+      "dry_run_returncode": 0,
+      "stderr": ""
+    },
+    {
+      "base_patch": "patches/0118-font-fallback-persona.patch",
+      "selected_patch": "patches/0118-font-fallback-persona.patch",
+      "sha256": "682433dc136855cc1ed3626311494bbcd77d46ecdf7db5c173e41b73263339d0",
+      "target": "third_party/blink/renderer/platform/fonts/font_cache.cc",
+      "status": "applied",
+      "dry_run_returncode": 0,
+      "stderr": ""
+    },
+    {
+      "base_patch": "patches/0119-time-clamper-persona.patch",
+      "selected_patch": "patches/0119-time-clamper-persona.patch",
+      "sha256": "fb8199dc85e5e4cbe3cb583bdcb186b338f766d4cd3397a16a911d8c5411ebc5",
+      "target": "third_party/blink/renderer/core/timing/time_clamper.cc",
+      "status": "applied",
+      "dry_run_returncode": 0,
+      "stderr": ""
+    },
+    {
+      "base_patch": "patches/0120-media-devices-persona.patch",
+      "selected_patch": "patches/0120-media-devices-persona.patch",
+      "sha256": "6ada9a1ab6ace435d648f6158aae3132602746f665720cc25fb1bc4127c1ea2b",
+      "target": "third_party/blink/renderer/modules/mediastream/media_devices.cc",
+      "status": "applied",
+      "dry_run_returncode": 0,
+      "stderr": ""
+    },
+    {
+      "base_patch": "patches/0121-third_party-blink-renderer-platform-graphics-image_data_buffer-h.patch",
+      "selected_patch": "patches/0121-third_party-blink-renderer-platform-graphics-image_data_buffer-h.patch",
+      "sha256": "e265c02eb9135e9510a8c3986325b1e3d49a87ee2c91a4561d4410d79ae897af",
+      "target": "third_party/blink/renderer/platform/graphics/image_data_buffer.h",
+      "status": "applied",
+      "dry_run_returncode": 0,
+      "stderr": ""
+    },
+    {
+      "base_patch": "patches/0122-third_party-blink-renderer-core-html-canvas-canvas_async_blob_creator-h.patch",
+      "selected_patch": "patches/0122-third_party-blink-renderer-core-html-canvas-canvas_async_blob_creator-h.patch",
+      "sha256": "38df5f2189bbfcbc8ad2c4aa648c9dbee9e1d98eebc28ec2c25a4f6b3082f35d",
+      "target": "third_party/blink/renderer/core/html/canvas/canvas_async_blob_creator.h",
+      "status": "applied",
+      "dry_run_returncode": 0,
+      "stderr": ""
+    },
+    {
+      "base_patch": "patches/0123-third_party-blink-renderer-core-html-canvas-canvas_async_blob_creator-cc.patch",
+      "selected_patch": "patches/0123-third_party-blink-renderer-core-html-canvas-canvas_async_blob_creator-cc.patch",
+      "sha256": "ba0c9e73ac757dfb4e74c3a36779894e885e4de8ca7c4acaf38e6025177c04d2",
+      "target": "third_party/blink/renderer/core/html/canvas/canvas_async_blob_creator.cc",
+      "status": "applied",
+      "dry_run_returncode": 0,
+      "stderr": ""
+    },
+    {
+      "base_patch": "patches/0124-third_party-blink-renderer-platform-image-encoders-image_encoder-cc.patch",
+      "selected_patch": "patches/0124-third_party-blink-renderer-platform-image-encoders-image_encoder-cc.patch",
+      "sha256": "80549956ea96cd315045a2bdda8a6167b51c6a3e681d490604aa740e0bd54513",
+      "target": "third_party/blink/renderer/platform/image-encoders/image_encoder.cc",
+      "status": "conflict",
+      "dry_run_returncode": 1,
+      "stderr": "error: patch failed: third_party/blink/renderer/platform/image-encoders/image_encoder.cc:46\nerror: third_party/blink/renderer/platform/image-encoders/image_encoder.cc: patch does not apply\n"
+    },
+    {
+      "base_patch": "patches/0125-display-emulation-backend.patch",
+      "selected_patch": "patches/0125-display-emulation-backend.patch",
+      "sha256": "b94b134b5fd4d83bf33472de9e86dfc63445b9fb4fef898f0e37032da9ce11d4",
+      "target": "third_party/blink/renderer/core/frame/screen_metrics_emulator.cc",
+      "status": "applied",
+      "dry_run_returncode": 0,
+      "stderr": ""
+    },
+    {
+      "base_patch": "patches/0126-display-widget-initialization.patch",
+      "selected_patch": "patches/0126-display-widget-initialization.patch",
+      "sha256": "2e9e71bb24a6c0a1046dc93b9dd7b2a610930d0c059c03f581ca0c79e92c2686",
+      "target": "third_party/blink/renderer/core/frame/web_frame_widget_impl.cc",
+      "status": "applied",
+      "dry_run_returncode": 0,
+      "stderr": ""
+    },
+    {
+      "base_patch": "patches/0127-display-widget-state.patch",
+      "selected_patch": "patches/0127-display-widget-state.patch",
+      "sha256": "6d0ef69f69098f29e57c7956eeb30c7917df7d02f0e46558d5d0eccce6b36867",
+      "target": "third_party/blink/renderer/core/frame/web_frame_widget_impl.h",
+      "status": "applied",
+      "dry_run_returncode": 0,
+      "stderr": ""
+    },
+    {
+      "base_patch": "patches/0128-display-oopif-initialization.patch",
+      "selected_patch": "patches/0128-display-oopif-initialization.patch",
+      "sha256": "cf09ba9c4b42a45c355c8031948c0fe0826bd74191698ceb280943ed51af8452",
+      "target": "third_party/blink/renderer/core/frame/web_remote_frame_impl.cc",
+      "status": "applied",
+      "dry_run_returncode": 0,
+      "stderr": ""
+    },
+    {
+      "base_patch": "patches/0129-storage-quota-backend.patch",
+      "selected_patch": "patches/0129-storage-quota-backend.patch",
+      "sha256": "3cc7c291455bc3d520e578a4431c624882c9c116fb60ebea1e67781ddffc83d6",
+      "target": "storage/browser/quota/quota_manager_impl.cc",
+      "status": "applied",
+      "dry_run_returncode": 0,
+      "stderr": ""
+    },
+    {
+      "base_patch": "patches/0130-third-party-cookie-opt-in.patch",
+      "selected_patch": "patches/0130-third-party-cookie-opt-in.patch",
+      "sha256": "1e5690ae53f30af8a37dd44698cbc2361f433fa238c36ad55961862caa4e6f56",
+      "target": "components/content_settings/core/browser/cookie_settings.cc",
+      "status": "applied",
+      "dry_run_returncode": 0,
+      "stderr": ""
+    },
+    {
+      "base_patch": "patches/0131-fake-shadow-root-feature.patch",
+      "selected_patch": "patches/0131-fake-shadow-root-feature.patch",
+      "sha256": "228aba3a4c2b57d0f88407467180abf3c8a433e3aa6f0630492741cc0ea248cb",
+      "target": "third_party/blink/renderer/platform/runtime_enabled_features.json5",
+      "status": "applied",
+      "dry_run_returncode": 0,
+      "stderr": ""
+    },
+    {
+      "base_patch": "patches/0132-fake-shadow-root-bindings.patch",
+      "selected_patch": "patches/0132-fake-shadow-root-bindings.patch",
+      "sha256": "0abff7b0f6af843d9b24f13aa609b5227f013b700e10a4978a3d2f3c5d990395",
+      "target": "third_party/blink/renderer/core/dom/element.idl",
+      "status": "applied",
+      "dry_run_returncode": 0,
+      "stderr": ""
+    },
+    {
+      "base_patch": "patches/0133-fake-shadow-root-declaration.patch",
+      "selected_patch": "patches/0133-fake-shadow-root-declaration.patch",
+      "sha256": "b52f8782ceb79e0b98852d3af3aa233f1ad953cd17f6c925d2433a652547d8f4",
+      "target": "third_party/blink/renderer/core/dom/element.h",
+      "status": "applied",
+      "dry_run_returncode": 0,
+      "stderr": ""
+    },
+    {
+      "base_patch": "patches/0134-fake-shadow-root-access.patch",
+      "selected_patch": "patches/0134-fake-shadow-root-access.patch",
+      "sha256": "5f5a3316d4a753bc899cedb060d16482bf91bc1accf00a2a36764e47f11957bd",
+      "target": "third_party/blink/renderer/core/dom/element.cc",
+      "status": "applied",
+      "dry_run_returncode": 0,
+      "stderr": ""
+    },
+    {
+      "base_patch": "patches/0135-windows-font-metrics-declaration.patch",
+      "selected_patch": "patches/0135-windows-font-metrics-declaration.patch",
+      "sha256": "40f8ca025735cc602aa373ce948241e3d7049f3eeba2c4da3a8bce0fa2cb48e6",
+      "target": "third_party/blink/renderer/platform/fonts/skia/skia_text_metrics.h",
+      "status": "applied",
+      "dry_run_returncode": 0,
+      "stderr": ""
+    },
+    {
+      "base_patch": "patches/0136-windows-font-metrics-tables.patch",
+      "selected_patch": "patches/0136-windows-font-metrics-tables.patch",
+      "sha256": "255c1ea3f1649293e097003d4e272dd2b113e9aef9ec182ca047ff3088900a4b",
+      "target": "third_party/blink/renderer/platform/fonts/skia/skia_text_metrics.cc",
+      "status": "applied",
+      "dry_run_returncode": 0,
+      "stderr": ""
+    },
+    {
+      "base_patch": "patches/0137-windows-font-metrics-rounding.patch",
+      "selected_patch": "patches/0137-windows-font-metrics-rounding.patch",
+      "sha256": "07436e3f5359c622a92b600d52952d029a612c7c81b87873cda76eafa89c45b1",
+      "target": "third_party/blink/renderer/platform/fonts/font_metrics.cc",
+      "status": "applied",
+      "dry_run_returncode": 0,
+      "stderr": ""
+    },
+    {
+      "base_patch": "patches/0138-windows-font-metrics-layout.patch",
+      "selected_patch": "patches/0138-windows-font-metrics-layout.patch",
+      "sha256": "3de1c57d7607b78ccceaee59fbe309c07da07819f720348684f68a7ffad1656e",
+      "target": "third_party/blink/renderer/platform/fonts/simple_font_data.cc",
+      "status": "applied",
+      "dry_run_returncode": 0,
+      "stderr": ""
+    },
+    {
+      "base_patch": "patches/0139-webrtc-ip-presentation.patch",
+      "selected_patch": "patches/0139-webrtc-ip-presentation.patch",
+      "sha256": "8464a188b67d4972d4b2c18b7a24f940cb12182f9a2c1b57e15b862eab76cc75",
+      "target": "third_party/blink/renderer/platform/peerconnection/fingerprint_ip.h",
+      "status": "applied",
+      "dry_run_returncode": 0,
+      "stderr": ""
+    },
+    {
+      "base_patch": "patches/0140-webrtc-ip-stats.patch",
+      "selected_patch": "patches/0140-webrtc-ip-stats.patch",
+      "sha256": "b8a7b27673a70cdaeab689b304d22efeee7735dec73b1ca1023c759fa734f82f",
+      "target": "third_party/blink/renderer/modules/peerconnection/rtc_stats_report.cc",
+      "status": "conflict",
+      "dry_run_returncode": 1,
+      "stderr": "error: patch failed: third_party/blink/renderer/modules/peerconnection/rtc_stats_report.cc:3\nerror: third_party/blink/renderer/modules/peerconnection/rtc_stats_report.cc: patch does not apply\n"
+    },
+    {
+      "base_patch": "patches/0141-webrtc-ip-offer-promises.patch",
+      "selected_patch": "patches/0141-webrtc-ip-offer-promises.patch",
+      "sha256": "7e3a5160d0f788c5ca2fcdcad2b323ba592278c0f02bda34096496c455e68f26",
+      "target": "third_party/blink/renderer/modules/peerconnection/rtc_session_description_request_promise_impl.cc",
+      "status": "conflict",
+      "dry_run_returncode": 1,
+      "stderr": "error: patch failed: third_party/blink/renderer/modules/peerconnection/rtc_session_description_request_promise_impl.cc:11\nerror: third_party/blink/renderer/modules/peerconnection/rtc_session_description_request_promise_impl.cc: patch does not apply\n"
+    },
+    {
+      "base_patch": "patches/0142-webrtc-ip-offer-callbacks.patch",
+      "selected_patch": "patches/0142-webrtc-ip-offer-callbacks.patch",
+      "sha256": "9753eba611a55e2ead0f6e31c7e0014c2a7e9b3a9374281e3800804016832b2f",
+      "target": "third_party/blink/renderer/modules/peerconnection/rtc_session_description_request_impl.cc",
+      "status": "conflict",
+      "dry_run_returncode": 1,
+      "stderr": "error: patch failed: third_party/blink/renderer/modules/peerconnection/rtc_session_description_request_impl.cc:37\nerror: third_party/blink/renderer/modules/peerconnection/rtc_session_description_request_impl.cc: patch does not apply\n"
+    },
+    {
+      "base_patch": "patches/0143-webrtc-ip-build.patch",
+      "selected_patch": "patches/0143-webrtc-ip-build.patch",
+      "sha256": "752db40a93cd18a5ec3bbccf35dfff9216681008f3afe5de6c60727568987303",
+      "target": "third_party/blink/renderer/platform/BUILD.gn",
+      "status": "applied",
+      "dry_run_returncode": 0,
+      "stderr": ""
+    },
+    {
+      "base_patch": "patches/0144-webrtc-auto-startup.patch",
+      "selected_patch": "patches/0144-webrtc-auto-startup.patch",
+      "sha256": "8b3940c0d87f14d3d9c157b8bb2328e9b00a086a33f99074a8a42f1af795f9cb",
+      "target": "chrome/browser/chrome_browser_main.cc",
+      "status": "applied",
+      "dry_run_returncode": 0,
+      "stderr": ""
+    },
+    {
+      "base_patch": "patches/0145-webrtc-local-sdp-roundtrip.patch",
+      "selected_patch": "patches/0145-webrtc-local-sdp-roundtrip.patch",
+      "sha256": "18174e9b14f896c29d42a3a84e4f022a7a08b0754a51453974e602dfd2ccea9e",
+      "target": "third_party/blink/renderer/modules/peerconnection/rtc_peer_connection.h",
+      "status": "applied",
+      "dry_run_returncode": 0,
+      "stderr": ""
+    },
+    {
+      "base_patch": "patches/0146-canvas-text-noise-policy.patch",
+      "selected_patch": "patches/0146-canvas-text-noise-policy.patch",
+      "sha256": "c9d423336591b000dd6d9a0dfec2d33745caeb2a7d7e33edb58338bf2a83d3ba",
+      "target": "third_party/blink/renderer/modules/canvas/canvas2d/base_rendering_context_2d.cc",
+      "status": "blocked_by_predecessor",
+      "dry_run_returncode": 1,
+      "stderr": "error: patch failed: third_party/blink/renderer/modules/canvas/canvas2d/base_rendering_context_2d.cc:1396\nerror: third_party/blink/renderer/modules/canvas/canvas2d/base_rendering_context_2d.cc: patch does not apply\n"
+    },
+    {
+      "base_patch": "patches/0147-webgl-context-backend-identity.patch",
+      "selected_patch": "patches/0147-webgl-context-backend-identity.patch",
+      "sha256": "2f84b030367feac787ea12cacd11062249774926ec4e4549c435204c1a4199b2",
+      "target": "third_party/blink/renderer/modules/webgl/webgl_rendering_context_base.cc",
+      "status": "blocked_by_predecessor",
+      "dry_run_returncode": 1,
+      "stderr": "error: patch failed: third_party/blink/renderer/modules/webgl/webgl_rendering_context_base.cc:4566\nerror: third_party/blink/renderer/modules/webgl/webgl_rendering_context_base.cc: patch does not apply\n"
+    },
+    {
+      "base_patch": "patches/0148-webgpu-native-adapter-identity.patch",
+      "selected_patch": "patches/0148-webgpu-native-adapter-identity.patch",
+      "sha256": "053310606ef198883d9251d838f4cfa59a53fd7a5bffafbc5ec29b199c534c9d",
+      "target": "third_party/blink/renderer/modules/webgpu/gpu_adapter_info.cc",
+      "status": "applied",
+      "dry_run_returncode": 0,
+      "stderr": ""
+    },
+    {
+      "base_patch": "patches/0149-canvas-opaque-image-data-upload.patch",
+      "selected_patch": "patches/0149-canvas-opaque-image-data-upload.patch",
+      "sha256": "c1f76135e662408f5e070bef43e745eaf28af00c74d8c895aee6a16f4e29fec6",
+      "target": "third_party/blink/renderer/modules/canvas/canvas2d/base_rendering_context_2d.cc",
+      "status": "blocked_by_predecessor",
+      "dry_run_returncode": 1,
+      "stderr": "error: patch failed: third_party/blink/renderer/modules/canvas/canvas2d/base_rendering_context_2d.cc:7\nerror: third_party/blink/renderer/modules/canvas/canvas2d/base_rendering_context_2d.cc: patch does not apply\n"
+    },
+    {
+      "base_patch": "patches/0150-canvas-mailbox-readback-geometry.patch",
+      "selected_patch": "patches/0150-canvas-mailbox-readback-geometry.patch",
+      "sha256": "af1568a2b75ff288bde5bb8526c902d60ef9a521c0f636b3a07abfcb942cb913",
+      "target": "third_party/blink/renderer/platform/graphics/mailbox_texture_backing.cc",
+      "status": "conflict",
+      "dry_run_returncode": 1,
+      "stderr": "error: patch failed: third_party/blink/renderer/platform/graphics/mailbox_texture_backing.cc:88\nerror: third_party/blink/renderer/platform/graphics/mailbox_texture_backing.cc: patch does not apply\n"
+    },
+    {
+      "base_patch": "patches/0151-devtools-font-provenance-declaration.patch",
+      "selected_patch": "patches/0151-devtools-font-provenance-declaration.patch",
+      "sha256": "4203eeede191d50b9a06974f9c4ce7d786c5f561b952afa59c205796ed8783e3",
+      "target": "third_party/blink/renderer/core/inspector/inspector_css_agent.h",
+      "status": "applied",
+      "dry_run_returncode": 0,
+      "stderr": ""
+    },
+    {
+      "base_patch": "patches/0152-devtools-font-provenance-implementation.patch",
+      "selected_patch": "patches/0152-devtools-font-provenance-implementation.patch",
+      "sha256": "09ba768fcc600e5575f3ced0d4f779533441fec79a3000332b6b5919f631dfd9",
+      "target": "third_party/blink/renderer/core/inspector/inspector_css_agent.cc",
+      "status": "conflict",
+      "dry_run_returncode": 1,
+      "stderr": "error: patch failed: third_party/blink/renderer/core/inspector/inspector_css_agent.cc:25\nerror: third_party/blink/renderer/core/inspector/inspector_css_agent.cc: patch does not apply\n"
+    },
+    {
+      "base_patch": "patches/0153-devtools-font-provenance-protocol.patch",
+      "selected_patch": "patches/0153-devtools-font-provenance-protocol.patch",
+      "sha256": "e628550b98173b0d29174ba99cfa4afe26c522dd50e6452bd243770ec2ad9b6b",
+      "target": "third_party/blink/public/devtools_protocol/domains/CSS.pdl",
+      "status": "applied",
+      "dry_run_returncode": 0,
+      "stderr": ""
+    },
+    {
+      "base_patch": "patches/0154-socks5-auth-declaration.patch",
+      "selected_patch": "patches/0154-socks5-auth-declaration.patch",
+      "sha256": "3d4cb5d7958c654fe59657ebc4a50dde5454c7d4c55b7d95e86ba8ad5e9fb865",
+      "target": "net/socket/socks5_client_socket.h",
+      "status": "applied",
+      "dry_run_returncode": 0,
+      "stderr": ""
+    },
+    {
+      "base_patch": "patches/0155-socks5-auth-handshake.patch",
+      "selected_patch": "patches/0155-socks5-auth-handshake.patch",
+      "sha256": "fc97fd9615ae5a70de6388e2640fb53adc97aacd9a445d8cce0fddce6847d95e",
+      "target": "net/socket/socks5_client_socket.cc",
+      "status": "applied",
+      "dry_run_returncode": 0,
+      "stderr": ""
+    },
+    {
+      "base_patch": "patches/0156-socks5-auth-network-service.patch",
+      "selected_patch": "patches/0156-socks5-auth-network-service.patch",
+      "sha256": "30abfb871cfef419bfeec3e6d865bc204c4096f46c71a438f0520234edef3011",
+      "target": "net/socket/socks_connect_job.cc",
+      "status": "applied",
+      "dry_run_returncode": 0,
+      "stderr": ""
+    },
+    {
+      "base_patch": "patches/0157-socks5-auth-native-tests.patch",
+      "selected_patch": "patches/0157-socks5-auth-native-tests.patch",
+      "sha256": "1fc93ce730030f387b7881ea2264644371d70c50def9ed0ac307bdf6a185597c",
+      "target": "net/socket/socks5_client_socket_unittest.cc",
+      "status": "applied",
+      "dry_run_returncode": 0,
+      "stderr": ""
+    },
+    {
+      "base_patch": "patches/0158-gpu-backend-policy-declaration.patch",
+      "selected_patch": "patches/0158-gpu-backend-policy-declaration.patch",
+      "sha256": "32f3481ecfcf62d7c5654e9b408bb94fa69fb55d6ae69ad52ebe7ccc1d765b94",
+      "target": "base/uxr_config.h",
+      "status": "applied",
+      "dry_run_returncode": 0,
+      "stderr": ""
+    },
+    {
+      "base_patch": "patches/0159-gpu-backend-policy-snapshot.patch",
+      "selected_patch": "patches/0159-gpu-backend-policy-snapshot.patch",
+      "sha256": "d1446dde51b3afa5f33e092a2c2b82012bada71e7b1d73159ad1449bc0a4f491",
+      "target": "base/uxr_config.cc",
+      "status": "applied",
+      "dry_run_returncode": 0,
+      "stderr": ""
+    },
+    {
+      "base_patch": "patches/0160-canvas-shared-backend-policy.patch",
+      "selected_patch": "patches/0160-canvas-shared-backend-policy.patch",
+      "sha256": "fed44ff89761f06b260d2b62f72886d26ba7029b7fe972cd5f55c9b60243ef69",
+      "target": "third_party/blink/renderer/modules/canvas/canvas2d/base_rendering_context_2d.cc",
+      "status": "blocked_by_predecessor",
+      "dry_run_returncode": 1,
+      "stderr": "error: patch failed: third_party/blink/renderer/modules/canvas/canvas2d/base_rendering_context_2d.cc:691\nerror: third_party/blink/renderer/modules/canvas/canvas2d/base_rendering_context_2d.cc: patch does not apply\n"
+    },
+    {
+      "base_patch": "patches/0161-canvas-export-backend-policy.patch",
+      "selected_patch": "patches/0161-canvas-export-backend-policy.patch",
+      "sha256": "b581c054fcbef76f5973ec32cadee3d6660382a05a37aeda4eb79d748ba058df",
+      "target": "third_party/blink/renderer/platform/graphics/image_data_buffer.cc",
+      "status": "blocked_by_predecessor",
+      "dry_run_returncode": 1,
+      "stderr": "error: patch failed: third_party/blink/renderer/platform/graphics/image_data_buffer.cc:58\nerror: third_party/blink/renderer/platform/graphics/image_data_buffer.cc: patch does not apply\n"
+    },
+    {
+      "base_patch": "patches/0162-canvas-bridge-backend-policy.patch",
+      "selected_patch": "patches/0162-canvas-bridge-backend-policy.patch",
+      "sha256": "964ebe7228bd0304346a3be57aa060bbf433a964678993dfb1020649defd8054",
+      "target": "third_party/blink/renderer/platform/canvas_bridge/canvas_bridge_client.cc",
+      "status": "applied",
+      "dry_run_returncode": 0,
+      "stderr": ""
+    },
+    {
+      "base_patch": "patches/0163-webgl-shared-backend-policy.patch",
+      "selected_patch": "patches/0163-webgl-shared-backend-policy.patch",
+      "sha256": "f2120deab05be58b920b9191bb6c79b2ab96c3bdbd0c8921cedba8a30472a389",
+      "target": "components/ungoogled/persona_profile.cc",
+      "status": "applied",
+      "dry_run_returncode": 0,
+      "stderr": ""
+    },
+    {
+      "base_patch": "patches/0164-webgpu-device-backend-policy.patch",
+      "selected_patch": "patches/0164-webgpu-device-backend-policy.patch",
+      "sha256": "e9a48705903f8b26c9a9c6deb4ad4fd40e2a6e59e65b0c28c5cf61be070883c7",
+      "target": "third_party/blink/renderer/modules/webgpu/gpu_adapter.cc",
+      "status": "applied",
+      "dry_run_returncode": 0,
+      "stderr": ""
+    },
+    {
+      "base_patch": "patches/0165-canvas-lazy-opaque-readback.patch",
+      "selected_patch": "patches/0165-canvas-lazy-opaque-readback.patch",
+      "sha256": "0abe15824152def979db3bb71d61d03fbbdbeb072a77318f8f47773b990baaa8",
+      "target": "third_party/blink/renderer/modules/canvas/canvas2d/base_rendering_context_2d.cc",
+      "status": "blocked_by_predecessor",
+      "dry_run_returncode": 1,
+      "stderr": "error: patch failed: third_party/blink/renderer/modules/canvas/canvas2d/base_rendering_context_2d.cc:7\nerror: third_party/blink/renderer/modules/canvas/canvas2d/base_rendering_context_2d.cc: patch does not apply\n"
+    },
+    {
+      "base_patch": "patches/0166-webauthn-backend-capability.patch",
+      "selected_patch": "patches/0166-webauthn-backend-capability.patch",
+      "sha256": "11a2d0dbf7bbb97b105e6dc41f34533945b5633273df0f1916013833b122056e",
+      "target": "third_party/blink/renderer/modules/credentialmanagement/public_key_credential.cc",
+      "status": "applied",
+      "dry_run_returncode": 0,
+      "stderr": ""
+    },
+    {
+      "base_patch": "patches/0167-pdf-backend-capability.patch",
+      "selected_patch": "patches/0167-pdf-backend-capability.patch",
+      "sha256": "7d2ca45084a5a9b206a6d5e1a7a1e13d53999f1e9786ded9ff5ff657fa09379a",
+      "target": "third_party/blink/renderer/modules/plugins/dom_plugin_array.cc",
+      "status": "blocked_by_predecessor",
+      "dry_run_returncode": 1,
+      "stderr": "error: patch failed: third_party/blink/renderer/modules/plugins/dom_plugin_array.cc:136\nerror: third_party/blink/renderer/modules/plugins/dom_plugin_array.cc: patch does not apply\n"
+    },
+    {
+      "base_patch": "patches/0168-speech-backend-inventory.patch",
+      "selected_patch": "patches/0168-speech-backend-inventory.patch",
+      "sha256": "7577c3e1534b075acfcd7777ac698b7e5d05a17dc19e2efef59f1cdc328f5993",
+      "target": "third_party/blink/renderer/modules/speech/speech_synthesis.cc",
+      "status": "applied",
+      "dry_run_returncode": 0,
+      "stderr": ""
+    },
+    {
+      "base_patch": "patches/0169-keyboard-backend-layout.patch",
+      "selected_patch": "patches/0169-keyboard-backend-layout.patch",
+      "sha256": "3b89dcde0f81f385386d758ef2d0ec2b028f187294467c7d450b6fc9ec9f3866",
+      "target": "third_party/blink/renderer/modules/keyboard/keyboard_layout.cc",
+      "status": "applied",
+      "dry_run_returncode": 0,
+      "stderr": ""
+    },
+    {
+      "base_patch": "patches/0170-css-effective-preferences.patch",
+      "selected_patch": "patches/0170-css-effective-preferences.patch",
+      "sha256": "7b53c265b61e3f1fe741cc735c96d4a35829c7e110a9bf420c822e6ad326c9e8",
+      "target": "third_party/blink/renderer/core/exported/web_view_impl.cc",
+      "status": "applied",
+      "dry_run_returncode": 0,
+      "stderr": ""
+    },
+    {
+      "base_patch": "patches/0171-css-native-media-queries.patch",
+      "selected_patch": "patches/0171-css-native-media-queries.patch",
+      "sha256": "39de04981e8d2d72709daf09cec0e261fec979cd7bf4d9429abb4d79b838ca87",
+      "target": "third_party/blink/renderer/core/css/media_values.cc",
+      "status": "applied",
+      "dry_run_returncode": 0,
+      "stderr": ""
+    },
+    {
+      "base_patch": "patches/0172-clock-policy-declaration.patch",
+      "selected_patch": "patches/0172-clock-policy-declaration.patch",
+      "sha256": "3375ac29215f5556bdafd833d342a23234047816773ff219b55046eb984324ca",
+      "target": "base/uxr_config.h",
+      "status": "applied",
+      "dry_run_returncode": 0,
+      "stderr": ""
+    },
+    {
+      "base_patch": "patches/0173-input-and-clock-policy.patch",
+      "selected_patch": "patches/0173-input-and-clock-policy.patch",
+      "sha256": "3286b7843058d61265b8886a0d2c552d88fc8be584960bb0aa5930d3cff7313d",
+      "target": "base/uxr_config.cc",
+      "status": "applied",
+      "dry_run_returncode": 0,
+      "stderr": ""
+    },
+    {
+      "base_patch": "patches/0174-v8-clock-quantization.patch",
+      "selected_patch": "patches/0174-v8-clock-quantization.patch",
+      "sha256": "d9985bf40d5a046c9c0985facf41306dcfc547d2a78d568db72c9e301e42b54b",
+      "target": "gin/v8_platform.cc",
+      "status": "applied",
+      "dry_run_returncode": 0,
+      "stderr": ""
+    },
+    {
+      "base_patch": "patches/0175-blink-clock-quantization.patch",
+      "selected_patch": "patches/0175-blink-clock-quantization.patch",
+      "sha256": "f83b09efcb1d8b9f940beb8d4e448d385e0d7ae318431ba3e79e8a857d153006",
+      "target": "third_party/blink/renderer/core/timing/time_clamper.cc",
+      "status": "applied",
+      "dry_run_returncode": 0,
+      "stderr": ""
+    },
+    {
+      "base_patch": "patches/0176-launch-input-clock-aliases.patch",
+      "selected_patch": "patches/0176-launch-input-clock-aliases.patch",
+      "sha256": "07c713d6b126a19e61aaf501257afc6efdfce32e3cdba5cf0b491be2846fc138",
+      "target": "chrome/app/chrome_main.cc",
+      "status": "applied",
+      "dry_run_returncode": 0,
+      "stderr": ""
+    },
+    {
+      "base_patch": "patches/0177-audio-graph-isolation.patch",
+      "selected_patch": "patches/0177-audio-graph-isolation.patch",
+      "sha256": "8afa9f8ee0b8b9f5895183279e99eaf661735fd78052c93143e8da1557918bfc",
+      "target": "third_party/blink/renderer/modules/webaudio/audio_handler.cc",
+      "status": "conflict",
+      "dry_run_returncode": 1,
+      "stderr": "error: patch failed: third_party/blink/renderer/modules/webaudio/audio_handler.cc:22\nerror: third_party/blink/renderer/modules/webaudio/audio_handler.cc: patch does not apply\n"
+    },
+    {
+      "base_patch": "patches/0178-shared-codec-policy-declaration.patch",
+      "selected_patch": "patches/0178-shared-codec-policy-declaration.patch",
+      "sha256": "ce1f5659cac948f8462c761b7b6add6ca907375571664a0dd649d8cda3606f25",
+      "target": "media/base/supported_types.h",
+      "status": "applied",
+      "dry_run_returncode": 0,
+      "stderr": ""
+    },
+    {
+      "base_patch": "patches/0179-shared-codec-capabilities.patch",
+      "selected_patch": "patches/0179-shared-codec-capabilities.patch",
+      "sha256": "17c323a92e97fed8f023e70e8dd6f81ea3e69d73807a426b6e911933b27819ec",
+      "target": "media/base/supported_types.cc",
+      "status": "applied",
+      "dry_run_returncode": 0,
+      "stderr": ""
+    },
+    {
+      "base_patch": "patches/0180-decoder-selection-policy.patch",
+      "selected_patch": "patches/0180-decoder-selection-policy.patch",
+      "sha256": "6249f02f2a3faf0b3ebdf3c2133359833ec6258e1ff44fd1b9c62c421ddb5350",
+      "target": "media/filters/decoder_selector.cc",
+      "status": "applied",
+      "dry_run_returncode": 0,
+      "stderr": ""
+    },
+    {
+      "base_patch": "patches/0181-webcodecs-encoder-policy.patch",
+      "selected_patch": "patches/0181-webcodecs-encoder-policy.patch",
+      "sha256": "b4d2072cd94e91e75bd6bc76a351102599636393e385badbb82cc2e9c5598cbc",
+      "target": "third_party/blink/renderer/modules/webcodecs/video_encoder.cc",
+      "status": "applied",
+      "dry_run_returncode": 0,
+      "stderr": ""
+    },
+    {
+      "base_patch": "patches/0182-mediarecorder-codec-policy.patch",
+      "selected_patch": "patches/0182-mediarecorder-codec-policy.patch",
+      "sha256": "46be432629788905aa3a700b8b8ee31a5741ce52217f70cdc8d264bf39f9a19f",
+      "target": "third_party/blink/renderer/modules/mediarecorder/media_recorder_handler.cc",
+      "status": "applied",
+      "dry_run_returncode": 0,
+      "stderr": ""
+    },
+    {
+      "base_patch": "patches/0183-mediarecorder-allowed-codec-selection.patch",
+      "selected_patch": "patches/0183-mediarecorder-allowed-codec-selection.patch",
+      "sha256": "f190fca2f1e2152120b7b8f7baff19ad9b53d47897d5adc784497f9714e8a9d6",
+      "target": "third_party/blink/renderer/modules/mediarecorder/video_track_recorder.cc",
+      "status": "applied",
+      "dry_run_returncode": 0,
+      "stderr": ""
+    },
+    {
+      "base_patch": "patches/0184-webrtc-codec-negotiation-policy.patch",
+      "selected_patch": "patches/0184-webrtc-codec-negotiation-policy.patch",
+      "sha256": "40420a008ece2d3106712dbe5a40f18634271436a3fb0ef86cf65ae69c31b6e3",
+      "target": "third_party/blink/renderer/platform/peerconnection/video_codec_factory.cc",
+      "status": "conflict",
+      "dry_run_returncode": 1,
+      "stderr": "error: patch failed: third_party/blink/renderer/platform/peerconnection/video_codec_factory.cc:3\nerror: third_party/blink/renderer/platform/peerconnection/video_codec_factory.cc: patch does not apply\n"
+    },
+    {
+      "base_patch": "patches/0185-media-capabilities-native-codec-policy.patch",
+      "selected_patch": "patches/0185-media-capabilities-native-codec-policy.patch",
+      "sha256": "4af6b383d56ab8e77898f800f4ff49be4056dcbe519f8d4a4fedd206f7fe74c0",
+      "target": "third_party/blink/renderer/modules/media_capabilities/media_capabilities.cc",
+      "status": "blocked_by_predecessor",
+      "dry_run_returncode": 1,
+      "stderr": "error: patch failed: third_party/blink/renderer/modules/media_capabilities/media_capabilities.cc:142\nerror: third_party/blink/renderer/modules/media_capabilities/media_capabilities.cc: patch does not apply\n"
+    },
+    {
+      "base_patch": "patches/0186-restricted-font-pool-declaration.patch",
+      "selected_patch": "patches/0186-restricted-font-pool-declaration.patch",
+      "sha256": "4aa0dd12bbb52f393dc50d6981d6cb022873945acbed88c75a4be37b37df7fbe",
+      "target": "third_party/blink/renderer/platform/fonts/font_cache.h",
+      "status": "applied",
+      "dry_run_returncode": 0,
+      "stderr": ""
+    },
+    {
+      "base_patch": "patches/0187-restricted-font-resolution-and-fallback.patch",
+      "selected_patch": "patches/0187-restricted-font-resolution-and-fallback.patch",
+      "sha256": "8fae05587064190809186a89b0fc9b57d71705ee7b145e84dca5c9d260f79f03",
+      "target": "third_party/blink/renderer/platform/fonts/font_cache.cc",
+      "status": "applied",
+      "dry_run_returncode": 0,
+      "stderr": ""
+    },
+    {
+      "base_patch": "patches/0188-restricted-font-last-resort-skia.patch",
+      "selected_patch": "patches/0188-restricted-font-last-resort-skia.patch",
+      "sha256": "5b6f05be99be7e9450db218f8f1329e4bb665eb1816eefacc7b0dab47ad17811",
+      "target": "third_party/blink/renderer/platform/fonts/skia/font_cache_skia.cc",
+      "status": "applied",
+      "dry_run_returncode": 0,
+      "stderr": ""
+    },
+    {
+      "base_patch": "patches/0189-restricted-font-last-resort-mac.patch",
+      "selected_patch": "patches/0189-restricted-font-last-resort-mac.patch",
+      "sha256": "b81e65eed9bac2304f77ac67749b3a17faa82d6174f46cb900bfea06e9959430",
+      "target": "third_party/blink/renderer/platform/fonts/mac/font_cache_mac.mm",
+      "status": "applied",
+      "dry_run_returncode": 0,
+      "stderr": ""
+    },
+    {
+      "base_patch": "patches/0190-restricted-local-font-enumeration.patch",
+      "selected_patch": "patches/0190-restricted-local-font-enumeration.patch",
+      "sha256": "0d1d72ebc003643c0bdcab0dbae7f8ca3d9dd3cbda7e202c4d34ef476ee4dfa6",
+      "target": "third_party/blink/renderer/modules/font_access/font_access.cc",
+      "status": "applied",
+      "dry_run_returncode": 0,
+      "stderr": ""
+    },
+    {
+      "base_patch": "patches/0191-snapshot-utf8-font-families.patch",
+      "selected_patch": "patches/0191-snapshot-utf8-font-families.patch",
+      "sha256": "5135e40905d1044778c139fff67158587d99491aed697dc9562e11baf2ae58d7",
+      "target": "content/browser/renderer_host/render_process_host_impl.cc",
+      "status": "applied",
+      "dry_run_returncode": 0,
+      "stderr": ""
+    },
+    {
+      "base_patch": "patches/0192-display-frame-properties.patch",
+      "selected_patch": "patches/0192-display-frame-properties.patch",
+      "sha256": "0343f03c359d4dd332165b9d6f08f73b2cac2d42e88bf6b3172efac1a4da392d",
+      "target": "third_party/blink/public/common/frame/frame_visual_properties.h",
+      "status": "applied",
+      "dry_run_returncode": 0,
+      "stderr": ""
+    },
+    {
+      "base_patch": "patches/0193-display-frame-mojo.patch",
+      "selected_patch": "patches/0193-display-frame-mojo.patch",
+      "sha256": "35df3b1c21dcab8dd0d3b5cd421d19e582d38c2a74a1d6ac6b0787e84f5f8e72",
+      "target": "third_party/blink/public/mojom/frame/frame_visual_properties.mojom",
+      "status": "applied",
+      "dry_run_returncode": 0,
+      "stderr": ""
+    },
+    {
+      "base_patch": "patches/0194-display-frame-traits-header.patch",
+      "selected_patch": "patches/0194-display-frame-traits-header.patch",
+      "sha256": "af88ee82e448d6d41e5ab75af29e46f6b7bb3d82e58004f19f429408a287067f",
+      "target": "third_party/blink/public/common/frame/frame_visual_properties_mojom_traits.h",
+      "status": "applied",
+      "dry_run_returncode": 0,
+      "stderr": ""
+    },
+    {
+      "base_patch": "patches/0195-display-frame-traits-read.patch",
+      "selected_patch": "patches/0195-display-frame-traits-read.patch",
+      "sha256": "caddb0b8030a145f829f6b465d9444252eb5adde18fd4d2928c5d087e42ad097",
+      "target": "third_party/blink/common/frame/frame_visual_properties_mojom_traits.cc",
+      "status": "applied",
+      "dry_run_returncode": 0,
+      "stderr": ""
+    },
+    {
+      "base_patch": "patches/0196-display-widget-properties.patch",
+      "selected_patch": "patches/0196-display-widget-properties.patch",
+      "sha256": "2bbaa467e4ad1ec750d2a76e33017a3c0131968bc0059aee816df028e4cf0744",
+      "target": "third_party/blink/public/common/widget/visual_properties.h",
+      "status": "applied",
+      "dry_run_returncode": 0,
+      "stderr": ""
+    },
+    {
+      "base_patch": "patches/0197-display-widget-mojo.patch",
+      "selected_patch": "patches/0197-display-widget-mojo.patch",
+      "sha256": "c209138ee8a6325845b90cf6ad7b52aa7975c8af2b18c3948aedf33604e89034",
+      "target": "third_party/blink/public/mojom/widget/visual_properties.mojom",
+      "status": "applied",
+      "dry_run_returncode": 0,
+      "stderr": ""
+    },
+    {
+      "base_patch": "patches/0198-display-widget-traits-header.patch",
+      "selected_patch": "patches/0198-display-widget-traits-header.patch",
+      "sha256": "b722b5e6022f408246a757ae7256b74b48f49816817871facbbe20fda28866b7",
+      "target": "third_party/blink/public/common/widget/visual_properties_mojom_traits.h",
+      "status": "applied",
+      "dry_run_returncode": 0,
+      "stderr": ""
+    },
+    {
+      "base_patch": "patches/0199-display-widget-traits-read.patch",
+      "selected_patch": "patches/0199-display-widget-traits-read.patch",
+      "sha256": "87529a0e6d9726786854132362716e4568ce4c8d8bd0ba6394d9ff8970d32d53",
+      "target": "third_party/blink/common/widget/visual_properties_mojom_traits.cc",
+      "status": "applied",
+      "dry_run_returncode": 0,
+      "stderr": ""
+    },
+    {
+      "base_patch": "patches/0200-display-widget-properties-equality.patch",
+      "selected_patch": "patches/0200-display-widget-properties-equality.patch",
+      "sha256": "a2889bac2f8ae7bf29fbcb3b60afd955871dc16ba26728847941b9df1d1fb0df",
+      "target": "third_party/blink/common/widget/visual_properties.cc",
+      "status": "applied",
+      "dry_run_returncode": 0,
+      "stderr": ""
+    },
+    {
+      "base_patch": "patches/0201-display-remote-frame-header.patch",
+      "selected_patch": "patches/0201-display-remote-frame-header.patch",
+      "sha256": "8b71f61a18fe3d3c0523011adfa87cde07fa2e0d19cdcf4d8cc1a735b80657c2",
+      "target": "third_party/blink/renderer/core/frame/remote_frame.h",
+      "status": "applied",
+      "dry_run_returncode": 0,
+      "stderr": ""
+    },
+    {
+      "base_patch": "patches/0202-display-remote-frame-propagation.patch",
+      "selected_patch": "patches/0202-display-remote-frame-propagation.patch",
+      "sha256": "32200d2f82c72d1f2f6bd1c3855c76a61e7ed3337d795a76276c8e156cf149d4",
+      "target": "third_party/blink/renderer/core/frame/remote_frame.cc",
+      "status": "applied",
+      "dry_run_returncode": 0,
+      "stderr": ""
+    },
+    {
+      "base_patch": "patches/0203-display-browser-widget-header.patch",
+      "selected_patch": "patches/0203-display-browser-widget-header.patch",
+      "sha256": "182c90a6ed9699ce549544f51d3ff7a7214062c2f5a0246e0ef9e8b6a86c0f36",
+      "target": "content/browser/renderer_host/render_widget_host_impl.h",
+      "status": "applied",
+      "dry_run_returncode": 0,
+      "stderr": ""
+    },
+    {
+      "base_patch": "patches/0204-display-browser-widget-propagation.patch",
+      "selected_patch": "patches/0204-display-browser-widget-propagation.patch",
+      "sha256": "e8230e14eb4342cf469bcba762e338a599c78513b38c3e2121b26e771b340a48",
+      "target": "content/browser/renderer_host/render_widget_host_impl.cc",
+      "status": "applied",
+      "dry_run_returncode": 0,
+      "stderr": ""
+    },
+    {
+      "base_patch": "patches/0205-display-frame-connector-propagation.patch",
+      "selected_patch": "patches/0205-display-frame-connector-propagation.patch",
+      "sha256": "c4c7026ab182b6fa91adc9bed90babed43978af9c00e6f4d1dc006d7ed2802d5",
+      "target": "content/browser/renderer_host/cross_process_frame_connector.cc",
+      "status": "applied",
+      "dry_run_returncode": 0,
+      "stderr": ""
+    },
+    {
+      "base_patch": "patches/0206-display-widget-emulated-screen-state.patch",
+      "selected_patch": "patches/0206-display-widget-emulated-screen-state.patch",
+      "sha256": "5e2cdb9e7838cf98d74400ad280404bdac8a816334f275c46bf27686d0f47ea6",
+      "target": "third_party/blink/renderer/core/frame/web_frame_widget_impl.h",
+      "status": "applied",
+      "dry_run_returncode": 0,
+      "stderr": ""
+    },
+    {
+      "base_patch": "patches/0207-display-widget-native-scale.patch",
+      "selected_patch": "patches/0207-display-widget-native-scale.patch",
+      "sha256": "0d6befc725c4424e4bc33028de33847d1936ba00ba09ba949cb79a3865fa1383",
+      "target": "third_party/blink/renderer/core/frame/web_frame_widget_impl.cc",
+      "status": "applied",
+      "dry_run_returncode": 0,
+      "stderr": ""
+    },
+    {
+      "base_patch": "patches/0208-display-remote-initial-screen.patch",
+      "selected_patch": "patches/0208-display-remote-initial-screen.patch",
+      "sha256": "a50b52c2b22096c47aaa07f7cd6d142071e70a05f4bbbc17358ad321a2fa1af9",
+      "target": "third_party/blink/renderer/core/frame/web_remote_frame_impl.cc",
+      "status": "applied",
+      "dry_run_returncode": 0,
+      "stderr": ""
+    },
+    {
+      "base_patch": "patches/0209-display-native-screen-regressions.patch",
+      "selected_patch": "patches/0209-display-native-screen-regressions.patch",
+      "sha256": "fb94be385764e9bc6836033744596be85805d44ac9132a113e770da27c723aa1",
+      "target": "third_party/blink/renderer/core/frame/web_frame_widget_test.cc",
+      "status": "conflict",
+      "dry_run_returncode": 1,
+      "stderr": "error: patch failed: third_party/blink/renderer/core/frame/web_frame_widget_test.cc:91\nerror: third_party/blink/renderer/core/frame/web_frame_widget_test.cc: patch does not apply\n"
+    },
+    {
+      "base_patch": "patches/0210-display-widget-orientation-dispatch.patch",
+      "selected_patch": "patches/0210-display-widget-orientation-dispatch.patch",
+      "sha256": "95e3de540ef71768650b89ec202fec34311c82d4e468c46106d384961e43b54d",
+      "target": "third_party/blink/renderer/platform/widget/widget_base.cc",
+      "status": "applied",
+      "dry_run_returncode": 0,
+      "stderr": ""
+    },
+    {
+      "base_patch": "patches/0211-display-testing-orientation-refresh.patch",
+      "selected_patch": "patches/0211-display-testing-orientation-refresh.patch",
+      "sha256": "7eb7180a82608acd68488deba3d278040fac385e9b1b1ac5f84094b557fa4d55",
+      "target": "third_party/blink/renderer/core/exported/web_view_impl.cc",
+      "status": "applied",
+      "dry_run_returncode": 0,
+      "stderr": ""
+    },
+    {
+      "base_patch": "patches/0212-display-orientation-local-root.patch",
+      "selected_patch": "patches/0212-display-orientation-local-root.patch",
+      "sha256": "fe673d77075e499d00af3eebe7305941c5099a20e99061903f441cf3409390b9",
+      "target": "third_party/blink/renderer/modules/screen_orientation/screen_orientation_controller.cc",
+      "status": "applied",
+      "dry_run_returncode": 0,
+      "stderr": ""
+    },
+    {
+      "base_patch": "patches/0213-display-emulator-reentry.patch",
+      "selected_patch": "patches/0213-display-emulator-reentry.patch",
+      "sha256": "a79fa0dfc43d96d644f471cd1d4ed1f5e0976c599281879522163e866f8a0492",
+      "target": "third_party/blink/renderer/core/frame/screen_metrics_emulator.cc",
+      "status": "applied",
+      "dry_run_returncode": 0,
+      "stderr": ""
+    },
+    {
+      "base_patch": "patches/0214-animation-clock-quantization.patch",
+      "selected_patch": "patches/0214-animation-clock-quantization.patch",
+      "sha256": "c73e00852ee41f01478fe5bb07fdfa32abc32c97e64f894de6cea63d2e8b0968",
+      "target": "third_party/blink/renderer/core/animation/animation_clock.cc",
+      "status": "applied",
+      "dry_run_returncode": 0,
+      "stderr": ""
+    },
+    {
+      "base_patch": "patches/0215-document-timeline-clock-origin.patch",
+      "selected_patch": "patches/0215-document-timeline-clock-origin.patch",
+      "sha256": "f0f735178f8fbeb988fb972809a076bea1f1514ceaa0baace3b0f42fc71830d6",
+      "target": "third_party/blink/renderer/core/animation/document_timeline.cc",
+      "status": "applied",
+      "dry_run_returncode": 0,
+      "stderr": ""
+    },
+    {
+      "base_patch": "patches/0216-display-native-emulated-regressions.patch",
+      "selected_patch": "patches/0216-display-native-emulated-regressions.patch",
+      "sha256": "8eb4ec197f5badbd8faac09d3b8e57d48abac2c404125b2e8886c70a48098368",
+      "target": "third_party/blink/renderer/core/frame/web_frame_widget_test.cc",
+      "status": "blocked_by_predecessor",
+      "dry_run_returncode": 1,
+      "stderr": "error: patch failed: third_party/blink/renderer/core/frame/web_frame_widget_test.cc:618\nerror: third_party/blink/renderer/core/frame/web_frame_widget_test.cc: patch does not apply\n"
+    },
+    {
+      "base_patch": "patches/0217-pixel-noise-helper-build.patch",
+      "selected_patch": "patches/0217-pixel-noise-helper-build.patch",
+      "sha256": "35f78f673b4368db48a5d16af3a5e8f6944ff5876ca4fce158578c425801ce12",
+      "target": "base/BUILD.gn",
+      "status": "applied",
+      "dry_run_returncode": 0,
+      "stderr": ""
+    },
+    {
+      "base_patch": "patches/0218-pixel-noise-policy-declaration.patch",
+      "selected_patch": "patches/0218-pixel-noise-policy-declaration.patch",
+      "sha256": "0b802b7918d2a2d52bd4b4c43fb94f9e480225614bf2e35bcad9ae72cf1f138d",
+      "target": "base/uxr_config.h",
+      "status": "applied",
+      "dry_run_returncode": 0,
+      "stderr": ""
+    },
+    {
+      "base_patch": "patches/0219-pixel-noise-policy-snapshot.patch",
+      "selected_patch": "patches/0219-pixel-noise-policy-snapshot.patch",
+      "sha256": "7420a82d443b3def5466100ee0f93203fb40609ce0f6ec5df3f955933072f5cc",
+      "target": "base/uxr_config.cc",
+      "status": "applied",
+      "dry_run_returncode": 0,
+      "stderr": ""
+    },
+    {
+      "base_patch": "patches/0220-pixel-noise-launch-alias.patch",
+      "selected_patch": "patches/0220-pixel-noise-launch-alias.patch",
+      "sha256": "663c85e57102a46ca29857c1d849cbe28925707452b5d63854da891c5a1df107",
+      "target": "chrome/app/chrome_main.cc",
+      "status": "applied",
+      "dry_run_returncode": 0,
+      "stderr": ""
+    },
+    {
+      "base_patch": "patches/0221-pixel-noise-shared-helper.patch",
+      "selected_patch": "patches/0221-pixel-noise-shared-helper.patch",
+      "sha256": "79dedc11a302c0f297407ba7720952a47e2d5293b9b67f4825770b57ba6b9cd7",
+      "target": "base/uxr_pixel_noise.h",
+      "status": "applied",
+      "dry_run_returncode": 0,
+      "stderr": ""
+    },
+    {
+      "base_patch": "patches/0222-canvas-readback-shared-noise.patch",
+      "selected_patch": "patches/0222-canvas-readback-shared-noise.patch",
+      "sha256": "b86ce9d384d17b0ba0d0d0ca4b9dec8b5b2341afccf821c269735cf301a8fd09",
+      "target": "third_party/blink/renderer/modules/canvas/canvas2d/base_rendering_context_2d.cc",
+      "status": "blocked_by_predecessor",
+      "dry_run_returncode": 1,
+      "stderr": "error: patch failed: third_party/blink/renderer/modules/canvas/canvas2d/base_rendering_context_2d.cc:6\nerror: third_party/blink/renderer/modules/canvas/canvas2d/base_rendering_context_2d.cc: patch does not apply\n"
+    },
+    {
+      "base_patch": "patches/0223-canvas-export-shared-noise.patch",
+      "selected_patch": "patches/0223-canvas-export-shared-noise.patch",
+      "sha256": "5871f21512afe6e7f3708e53c966e5038dacf49a4ef612c751257997a02f273e",
+      "target": "third_party/blink/renderer/platform/graphics/image_data_buffer.cc",
+      "status": "blocked_by_predecessor",
+      "dry_run_returncode": 1,
+      "stderr": "error: patch failed: third_party/blink/renderer/platform/graphics/image_data_buffer.cc:36\nerror: third_party/blink/renderer/platform/graphics/image_data_buffer.cc: patch does not apply\n"
+    },
+    {
+      "base_patch": "patches/0224-webgl-seeded-readback-noise.patch",
+      "selected_patch": "patches/0224-webgl-seeded-readback-noise.patch",
+      "sha256": "93ab543cff78bc0008aeb93bd48287d7988fa1f247a2e9f1684b2cac5ef303ee",
+      "target": "third_party/blink/renderer/modules/webgl/webgl_rendering_context_base.cc",
+      "status": "blocked_by_predecessor",
+      "dry_run_returncode": 1,
+      "stderr": "error: patch failed: third_party/blink/renderer/modules/webgl/webgl_rendering_context_base.cc:31\nerror: third_party/blink/renderer/modules/webgl/webgl_rendering_context_base.cc: patch does not apply\n"
+    }
+  ],
+  "counts": {
+    "applied": 183,
+    "conflict": 20,
+    "blocked_by_predecessor": 21
+  }
+}

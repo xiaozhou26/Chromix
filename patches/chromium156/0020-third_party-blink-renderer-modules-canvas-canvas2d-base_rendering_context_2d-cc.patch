@@ -1,0 +1,94 @@
+diff --git a/third_party/blink/renderer/modules/canvas/canvas2d/base_rendering_context_2d.cc b/third_party/blink/renderer/modules/canvas/canvas2d/base_rendering_context_2d.cc
+--- a/third_party/blink/renderer/modules/canvas/canvas2d/base_rendering_context_2d.cc
++++ b/third_party/blink/renderer/modules/canvas/canvas2d/base_rendering_context_2d.cc
+@@ -3,6 +3,9 @@
+ // found in the LICENSE file.
+ 
+ #include "third_party/blink/renderer/modules/canvas/canvas2d/base_rendering_context_2d.h"
++
++#include "base/strings/string_number_conversions.h"
++#include "base/uxr_config.h"
+ 
+ #include <cmath>
+ #include <cstdint>
+@@ -110,6 +113,7 @@
+ #include "third_party/blink/renderer/platform/wtf/text/wtf_string.h"
+ #include "ui/gfx/geometry/skia_conversions.h"
+ #include "ui/gfx/geometry/vector2d_f.h"
++#include "ui/gfx/skia_span_util.h"
+ 
+ // Including "base/time/time.h" triggers a bug in IWYU.
+ // https://github.com/include-what-you-use/include-what-you-use/issues/1122
+@@ -564,8 +568,71 @@
+           snapshot->PaintImageForCurrentFrame().GetSkImageInfo().bounds();
+       DCHECK(!bounds.intersect(SkIRect::MakeXYWH(sx, sy, sw, sh)));
+     }
+-    if (read_pixels_successful && RuntimeEnabledFeatures::FingerprintingCanvasImageDataNoiseEnabled()) {
++    const auto& noise_config = base::UxrConfig::GetInstance();
++    const auto noise_seed_text = noise_config.Get("uxr-canvas-seed");
++    uint64_t noise_seed = 0u;
++    const bool persona_noise =
++        !noise_seed_text.empty() &&
++        noise_seed_text.find_first_not_of("0123456789") == std::string::npos &&
++        base::StringToUint64(noise_seed_text, &noise_seed) && noise_seed != 0u;
++    if (read_pixels_successful &&
++        noise_config.Get("uxr-synthetic-device-tests") == "true" &&
++        !noise_config.Has("uxr-disable-fingerprint-noise") && !persona_noise &&
++        RuntimeEnabledFeatures::FingerprintingCanvasImageDataNoiseEnabled()) {
+       StaticBitmapImage::ShuffleSubchannelColorData(image_data_pixmap.addr(), image_data_pixmap.info());
++    }
++  }
++
++  const auto& ph_config = base::UxrConfig::GetInstance();
++  const auto ph_seed_text = ph_config.Get("uxr-canvas-seed");
++  uint64_t ph_seed64 = 0u;
++  if (!ph_config.Has("uxr-disable-fingerprint-noise") && !ph_seed_text.empty() &&
++      ph_config.Get("uxr-synthetic-device-tests") == "true" &&
++      ph_seed_text.find_first_not_of("0123456789") == std::string::npos &&
++      base::StringToUint64(ph_seed_text, &ph_seed64) && ph_seed64 != 0u) {
++    // SplitMix64's finalizer folds high bits without changing legacy 32-bit seeds.
++    uint64_t high = ph_seed64 >> 32;
++    high = (high ^ (high >> 30)) * 0xbf58476d1ce4e5b9ULL;
++    high = (high ^ (high >> 27)) * 0x94d049bb133111ebULL;
++    high ^= high >> 31;
++    const uint32_t ph_seed = static_cast<uint32_t>(ph_seed64) ^
++                             static_cast<uint32_t>(high) ^
++                             static_cast<uint32_t>(high >> 32);
++    const SkPixmap ph_pm = image_data->GetSkPixmap();
++    const SkColorType ph_ct = ph_pm.colorType();
++    if (ph_pm.addr() && (ph_ct == kRGBA_8888_SkColorType ||
++                         ph_ct == kBGRA_8888_SkColorType)) {
++      auto ph_pixels = gfx::SkPixmapToWritableSpan(ph_pm);
++      if (!ph_pixels.empty()) {
++        for (int ph_y = 0; ph_y < ph_pm.height(); ++ph_y) {
++          auto ph_row = ph_pixels.subspan(
++              static_cast<size_t>(ph_y) * ph_pm.rowBytes(),
++              ph_pm.info().minRowBytes());
++          for (int ph_x = 0; ph_x < ph_pm.width(); ++ph_x) {
++            auto ph_pixel = ph_row.subspan(static_cast<size_t>(ph_x) * 4, size_t{4});
++            if (ph_pixel[3] == 0)
++              continue;
++            const uint32_t ax =
++                static_cast<uint32_t>(sx) + static_cast<uint32_t>(ph_x);
++            const uint32_t ay =
++                static_cast<uint32_t>(sy) + static_cast<uint32_t>(ph_y);
++            for (uint32_t ch = 0; ch < 3; ++ch) {
++              const size_t index = ph_ct == kBGRA_8888_SkColorType ? 2 - ch : ch;
++              const uint32_t v = ph_pixel[index];
++              uint32_t z = ph_seed ^ (ax * 374761393u) ^ (ay * 668265263u) ^
++                           (ch * 0x9e3779b9u) ^ (v * 2654435761u);
++              z ^= z >> 16;
++              z *= 0x85ebca6bu;
++              z ^= z >> 13;
++              z *= 0xc2b2ae35u;
++              z ^= z >> 16;
++              const int nv = static_cast<int>(v) + ((z & 1u) ? 1 : -1);
++              ph_pixel[index] =
++                  static_cast<uint8_t>(nv < 0 ? 0 : (nv > 255 ? 255 : nv));
++            }
++          }
++        }
++      }
+     }
+   }
+ 

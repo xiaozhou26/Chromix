@@ -1,0 +1,67 @@
+diff --git a/third_party/blink/renderer/platform/graphics/mailbox_texture_backing.cc b/third_party/blink/renderer/platform/graphics/mailbox_texture_backing.cc
+--- a/third_party/blink/renderer/platform/graphics/mailbox_texture_backing.cc
++++ b/third_party/blink/renderer/platform/graphics/mailbox_texture_backing.cc
+@@ -3,6 +3,10 @@
+ // found in the LICENSE file.
+ 
+ #include "third_party/blink/renderer/platform/graphics/mailbox_texture_backing.h"
++
++#include <algorithm>
++#include <cstdint>
++#include <limits>
+ 
+ #include "cc/paint/texture_backing.h"
+ #include "components/viz/common/gpu/raster_context_provider.h"
+@@ -11,6 +15,7 @@
+ #include "third_party/blink/renderer/platform/graphics/skia/skia_utils.h"
+ #include "third_party/blink/renderer/platform/graphics/web_graphics_context_3d_provider_wrapper.h"
+ #include "third_party/skia/include/core/SkImage.h"
++#include "third_party/skia/include/core/SkPixmap.h"
+ #include "ui/gfx/geometry/skia_conversions.h"
+ 
+ namespace blink {
+@@ -88,10 +93,41 @@
+                                        int src_x,
+                                        int src_y) {
+   DCHECK_CALLED_ON_VALID_THREAD(thread_checker_);
++  if (!dst_pixels || dst_info.isEmpty() || sk_image_info_.isEmpty() ||
++      dst_info.bytesPerPixel() == 0 ||
++      !dst_info.validRowBytes(dst_row_bytes) ||
++      dst_row_bytes > std::numeric_limits<GLuint>::max() ||
++      SkImageInfo::ByteSizeOverflowed(dst_info.computeByteSize(dst_row_bytes))) {
++    return false;
++  }
++  // RasterInterface is not SkImage::readPixels: clip before the GPU request,
++  // offset the destination, and retain the caller's stride. Negative source
++  // coordinates must never turn into a full-size read at a different origin.
++  const int64_t left = std::max<int64_t>(0, src_x);
++  const int64_t top = std::max<int64_t>(0, src_y);
++  const int64_t right = std::min<int64_t>(
++      sk_image_info_.width(), static_cast<int64_t>(src_x) + dst_info.width());
++  const int64_t bottom = std::min<int64_t>(
++      sk_image_info_.height(), static_cast<int64_t>(src_y) + dst_info.height());
++  if (left >= right || top >= bottom)
++    return false;
++  // All differences fit the validated destination dimensions after clipping.
++  SkPixmap destination(dst_info, dst_pixels, dst_row_bytes);
++  SkPixmap clipped;
++  if (!destination.extractSubset(
++          &clipped,
++          SkIRect::MakeXYWH(static_cast<int>(left - src_x),
++                           static_cast<int>(top - src_y),
++                           static_cast<int>(right - left),
++                           static_cast<int>(bottom - top)))) {
++    return false;
++  }
+   gpu::raster::RasterInterface* ri = context_provider_->RasterInterface();
+-  return ri->ReadbackImagePixels(GetMailbox(), shared_image_->size(), dst_info,
+-                                 static_cast<GLuint>(dst_row_bytes), src_x,
+-                                 src_y, /*plane_index=*/0, dst_pixels);
++  return ri->ReadbackImagePixels(
++      GetMailbox(), shared_image_->size(), clipped.info(),
++      static_cast<GLuint>(dst_row_bytes),
++      static_cast<int>(left), static_cast<int>(top), /*plane_index=*/0,
++      clipped.writable_addr());
+ }
+ 
+ }  // namespace blink

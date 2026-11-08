@@ -1,0 +1,12 @@
+diff --git a/content/renderer/render_thread_impl.cc b/content/renderer/render_thread_impl.cc
+--- a/content/renderer/render_thread_impl.cc
++++ b/content/renderer/render_thread_impl.cc
+@@ -860,7 +860,7 @@
+   CHECK(snapshot.SetAll(config, schema_version)) << snapshot.ValidationError();
+   const std::string timezone = snapshot.Get("uxr-timezone");
+   if (!timezone.empty()) {
+-    CHECK(blink::SetRendererDefaultTimeZone(blink::WebString::FromUTF8(timezone)))
++    CHECK(blink::SetRendererDefaultTimeZone(blink::WebString::FromUtf8(timezone)))
+         << "Invalid launch timezone: " << timezone;
+   }
+ }

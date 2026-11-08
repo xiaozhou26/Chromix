@@ -1,0 +1,24 @@
+diff --git a/third_party/blink/renderer/modules/global_privacy_control/navigator_global_privacy_control.cc b/third_party/blink/renderer/modules/global_privacy_control/navigator_global_privacy_control.cc
+--- a/third_party/blink/renderer/modules/global_privacy_control/navigator_global_privacy_control.cc
++++ b/third_party/blink/renderer/modules/global_privacy_control/navigator_global_privacy_control.cc
+@@ -4,6 +4,7 @@
+ 
+ #include "third_party/blink/renderer/modules/global_privacy_control/navigator_global_privacy_control.h"
+ 
++#include "base/uxr_config.h"
+ #include "third_party/blink/public/common/global_privacy_control/global_privacy_control_util.h"
+ #include "third_party/blink/renderer/core/execution_context/navigator_base.h"
+ #include "third_party/blink/renderer/core/frame/local_dom_window.h"
+@@ -16,6 +17,12 @@
+ namespace NavigatorGlobalPrivacyControl {
+ 
+ bool globalPrivacyControl(NavigatorBase& navigator) {
++  const std::string value =
++      base::UxrConfig::GetInstance().Get("uxr-global-privacy-control");
++  if (value == "true" || value == "1")
++    return true;
++  if (value == "false" || value == "0")
++    return false;
+   if (navigator.DomWindow()) {
+     return IsGlobalPrivacyControlFeatureAndSettingEnabled(
+         navigator.DomWindow()->GetFrame()->GetPage()->GetRendererPreferences());

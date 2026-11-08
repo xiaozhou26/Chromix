@@ -1,0 +1,17 @@
+diff --git a/third_party/blink/renderer/core/html/canvas/canvas_async_blob_creator.cc b/third_party/blink/renderer/core/html/canvas/canvas_async_blob_creator.cc
+--- a/third_party/blink/renderer/core/html/canvas/canvas_async_blob_creator.cc
++++ b/third_party/blink/renderer/core/html/canvas/canvas_async_blob_creator.cc
+@@ -190,8 +190,11 @@
+             skia_image_->imageInfo().colorInfo(), image_->GetHdrMetadata());
+     // It is more efficient to do alpha un-multiplication inside the decoder.
+     // https://crbug.com/557350372
+-    if (target_color_info.makeAlphaType(skia_image_->imageInfo().alphaType()) !=
+-        skia_image_->imageInfo().colorInfo()) {
++    // Normalize opaque PNGs to match the synchronous export's wire format.
++    if ((mime_type_ == kMimeTypePng &&
++         skia_image_->imageInfo().alphaType() == kOpaque_SkAlphaType) ||
++        target_color_info.makeAlphaType(skia_image_->imageInfo().alphaType()) !=
++            skia_image_->imageInfo().colorInfo()) {
+       SkBitmap bitmap;
+       if (bitmap.tryAllocPixels(SkImageInfo::Make(skia_image_->dimensions(),
+                                                   target_color_info)) &&

@@ -1,0 +1,127 @@
+diff --git a/third_party/blink/renderer/platform/graphics/image_data_buffer.cc b/third_party/blink/renderer/platform/graphics/image_data_buffer.cc
+--- a/third_party/blink/renderer/platform/graphics/image_data_buffer.cc
++++ b/third_party/blink/renderer/platform/graphics/image_data_buffer.cc
+@@ -35,6 +35,8 @@
+ #include "base/compiler_specific.h"
+ #include "base/logging.h"
+ #include "base/memory/ptr_util.h"
++#include "base/strings/string_number_conversions.h"
++#include "base/uxr_config.h"
+ #include "third_party/blink/renderer/platform/image-encoders/image_encoder_utils.h"
+ #include "third_party/blink/renderer/platform/runtime_enabled_features.h"
+ #include "third_party/blink/renderer/platform/wtf/text/base64.h"
+@@ -45,6 +47,81 @@
+ #include "ui/gfx/skia_span_util.h"
+ 
+ namespace blink {
++
++namespace {
++bool UxrCopyAndNoiseEncodeBuffer(SkPixmap& pm, sk_sp<SkImage>& retained_image) {
++  if (!pm.addr() || pm.info().isEmpty() ||
++      !pm.info().validRowBytes(pm.rowBytes()) ||
++      SkImageInfo::ByteSizeOverflowed(pm.computeByteSize())) {
++    return false;
++  }
++  const auto& config = base::UxrConfig::GetInstance();
++  const auto seed_text = config.Get("uxr-canvas-seed");
++  uint64_t seed64 = 0u;
++  const SkColorType ct = pm.colorType();
++  const bool apply_noise =
++      config.Get("uxr-synthetic-device-tests") == "true" &&
++      !config.Has("uxr-disable-fingerprint-noise") && !seed_text.empty() &&
++      seed_text.find_first_not_of("0123456789") == std::string::npos &&
++      base::StringToUint64(seed_text, &seed64) && seed64 != 0u &&
++      (ct == kRGBA_8888_SkColorType || ct == kBGRA_8888_SkColorType);
++  // SplitMix64's finalizer folds high bits without changing legacy 32-bit seeds.
++  uint64_t high = seed64 >> 32;
++  high = (high ^ (high >> 30)) * 0xbf58476d1ce4e5b9ULL;
++  high = (high ^ (high >> 27)) * 0x94d049bb133111ebULL;
++  high ^= high >> 31;
++  const uint32_t seed = static_cast<uint32_t>(seed64) ^
++                        static_cast<uint32_t>(high) ^
++                        static_cast<uint32_t>(high >> 32);
++  const bool normalize_alpha = pm.info().alphaType() != kUnpremul_SkAlphaType;
++  // Disabled noise must preserve the native pixmap/encoder alpha path.
++  if (!apply_noise)
++    return true;
++  auto data = gfx::MakeSkDataFromSpanWithCopy(gfx::SkPixmapToSpan(pm));
++  if (!data)
++    return false;
++  const SkImageInfo info =
++      normalize_alpha ? pm.info().makeAlphaType(kUnpremul_SkAlphaType) : pm.info();
++  SkPixmap copy(info, data->writable_data(), pm.rowBytes());
++  if (normalize_alpha &&
++      !pm.readPixels(info, copy.writable_addr(), copy.rowBytes())) {
++    return false;
++  }
++  auto pixels = gfx::SkPixmapToWritableSpan(copy);
++  for (int y = 0; apply_noise && y < copy.height(); ++y) {
++    auto row = pixels.subspan(static_cast<size_t>(y) * copy.rowBytes(),
++                              copy.info().minRowBytes());
++    for (int x = 0; x < copy.width(); ++x) {
++      auto pixel = row.subspan(static_cast<size_t>(x) * 4, size_t{4});
++      if (pixel[3] == 0)
++        continue;
++      for (uint32_t ch = 0; ch < 3; ++ch) {
++        const size_t index = ct == kBGRA_8888_SkColorType ? 2 - ch : ch;
++        const uint32_t v = pixel[index];
++        uint32_t z = seed ^ (static_cast<uint32_t>(x) * 374761393u) ^
++                     (static_cast<uint32_t>(y) * 668265263u) ^
++                     (ch * 0x9e3779b9u) ^ (v * 2654435761u);
++        z ^= z >> 16;
++        z *= 0x85ebca6bu;
++        z ^= z >> 13;
++        z *= 0xc2b2ae35u;
++        z ^= z >> 16;
++        const int nv = static_cast<int>(v) + ((z & 1u) ? 1 : -1);
++        pixel[index] =
++            static_cast<uint8_t>(nv < 0 ? 0 : (nv > 255 ? 255 : nv));
++      }
++    }
++  }
++  auto image = SkImages::RasterFromData(copy.info(), std::move(data),
++                                       copy.rowBytes());
++  if (!image)
++    return false;
++  // RasterFromData retains the private pixel storage backing the pixmap.
++  retained_image = std::move(image);
++  pm = copy;
++  return true;
++}
++}  // namespace
+ 
+ ImageDataBuffer::ImageDataBuffer(scoped_refptr<StaticBitmapImage> image) {
+   if (!image)
+@@ -83,6 +160,8 @@
+       return;
+ 
+     sk_sp<SkData> data = SkData::MakeUninitialized(size);
++    if (!data)
++      return;
+     pixmap_ = {info, data->writable_data(), info.minRowBytes()};
+     if (!paint_image.readPixels(info, pixmap_.writable_addr(), rowBytes, 0,
+                                 0)) {
+@@ -97,6 +176,11 @@
+       return;
+     MSAN_CHECK_MEM_IS_INITIALIZED(pixmap_.addr(), pixmap_.computeByteSize());
+   }
++  if (!retained_image_ ||
++      !UxrCopyAndNoiseEncodeBuffer(pixmap_, retained_image_)) {
++    pixmap_.reset();
++    return;
++  }
+   is_valid_ = true;
+ }
+ 
+@@ -104,6 +188,11 @@
+     : pixmap_(pixmap),
+       is_valid_(pixmap_.addr() &&
+                 !gfx::Size(pixmap.width(), pixmap.height()).IsEmpty()) {
++  if (is_valid_ && !UxrCopyAndNoiseEncodeBuffer(pixmap_, retained_image_)) {
++    pixmap_.reset();
++    is_valid_ = false;
++    return;
++  }
+   // Any color space or alpha conversion should have been performed by the
+   // caller higher up in the stack (e.g. in CanvasAsyncBlobCreator).
+   if (ImageEncoderUtils::GetColorInfoForEncoder(pixmap_.info().colorInfo(),

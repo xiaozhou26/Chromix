@@ -1,0 +1,183 @@
+diff --git a/third_party/blink/renderer/core/inspector/inspector_css_agent.cc b/third_party/blink/renderer/core/inspector/inspector_css_agent.cc
+--- a/third_party/blink/renderer/core/inspector/inspector_css_agent.cc
++++ b/third_party/blink/renderer/core/inspector/inspector_css_agent.cc
+@@ -25,10 +25,15 @@
+ 
+ #include "third_party/blink/renderer/core/inspector/inspector_css_agent.h"
+ 
++#include <algorithm>
+ #include <optional>
+ #include <utility>
++#include <vector>
+ 
+ #include "base/check_deref.h"
++#include "base/containers/span.h"
++#include "base/numerics/byte_conversions.h"
++#include "base/strings/string_number_conversions.h"
+ #include "third_party/blink/public/common/dom/dom_node_id.h"
+ #include "third_party/blink/public/common/metrics/document_update_reason.h"
+ #include "third_party/blink/renderer/core/animation/animation_utils.h"
+@@ -158,6 +163,7 @@
+ #include "third_party/blink/renderer/core/svg/svg_element.h"
+ #include "third_party/blink/renderer/core/view_transition/view_transition.h"
+ #include "third_party/blink/renderer/platform/bindings/exception_state.h"
++#include "third_party/blink/renderer/platform/crypto.h"
+ #include "third_party/blink/renderer/platform/fonts/font.h"
+ #include "third_party/blink/renderer/platform/fonts/font_custom_platform_data.h"
+ #include "third_party/blink/renderer/platform/fonts/shaping/shape_result_view.h"
+@@ -173,6 +179,7 @@
+ #include "third_party/blink/renderer/platform/wtf/text/format.h"
+ #include "third_party/blink/renderer/platform/wtf/text/strcat.h"
+ #include "third_party/blink/renderer/platform/wtf/text/string_concatenate.h"
++#include "third_party/skia/include/core/SkTypeface.h"
+ 
+ namespace blink {
+ 
+@@ -260,9 +267,65 @@
+   return uniq_rules;
+ }
+ 
++// Canonical SFNT table content, independent of file/TTC directory offsets.
++// Exclude DSIG (container signature) and zero head.checkSumAdjustment, which
++// changes when a collection face is repacked. All rendering tables are retained.
++String ComputePlatformFontTableHash(const SkTypeface& typeface) {
++  const int count = typeface.countTables();
++  if (count <= 0 || count > 512) {
++    return String();
++  }
++  std::vector<SkFontTableTag> tags(count);
++  if (typeface.readTableTags(SkSpan<SkFontTableTag>(tags.data(), tags.size())) !=
++      count) {
++    return String();
++  }
++  std::sort(tags.begin(), tags.end());
++  if (std::adjacent_find(tags.begin(), tags.end()) != tags.end()) {
++    return String();
++  }
++  Digestor digest(kHashAlgorithmSha256);
++  constexpr char kPrefix[] = "chromix-font-tables-v1";
++  if (!digest.Update(base::as_byte_span(kPrefix))) {
++    return String();
++  }
++  size_t total = 0;
++  for (SkFontTableTag tag : tags) {
++    if (tag == SkSetFourByteTag('D', 'S', 'I', 'G')) {
++      continue;
++    }
++    const size_t size = typeface.getTableSize(tag);
++    if (!size || size > 64 * 1024 * 1024 ||
++        total > 128 * 1024 * 1024 - size) {
++      return String();
++    }
++    total += size;
++    std::vector<uint8_t> bytes(size);
++    if (typeface.getTableData(tag, 0, size, bytes.data()) != size) {
++      return String();
++    }
++    if (tag == SkSetFourByteTag('h', 'e', 'a', 'd')) {
++      if (size < 12) {
++        return String();
++      }
++      std::fill(bytes.begin() + 8, bytes.begin() + 12, 0);
++    }
++    const auto encoded_tag = base::U32ToBigEndian(tag);
++    const auto encoded_size = base::U64ToBigEndian(size);
++    if (!digest.Update(encoded_tag) || !digest.Update(encoded_size) ||
++        !digest.Update(bytes)) {
++      return String();
++    }
++  }
++  DigestValue result;
++  return digest.Finish(result)
++             ? String::FromUtf8(base::HexEncodeLower(result))
++             : String();
++}
++
+ void CollectPlatformFontsFromRunFontDataList(
+     const HeapVector<ShapeResult::RunFontData>& run_font_data_list,
+-    HashMap<std::pair<int, String>, std::pair<int, String>>* font_stats) {
++    HashMap<std::pair<int, String>, InspectorPlatformFontUsage>* font_stats) {
+   for (const auto& run_font_data : run_font_data_list) {
+     const auto* simple_font_data = run_font_data.font_data_.Get();
+     String family_name = simple_font_data->PlatformData().FontFamilyName();
+@@ -273,14 +336,24 @@
+     if (postscript_name.IsNull()) {
+       postscript_name = "";
+     }
+-    auto font_key = std::make_pair(simple_font_data->IsCustomFont() ? 1 : 0,
+-                                   postscript_name);
++    // Do not merge unrelated font files just because their names coincide.
++    // Hash a typeface only once per collection, not once for each glyph run.
++    auto font_key = std::make_pair(
++        simple_font_data->IsCustomFont() ? 1 : 0,
++        String::Number(simple_font_data->PlatformData().UniqueID()));
+     auto font_stats_it = font_stats->find(font_key);
+     if (font_stats_it == font_stats->end()) {
+-      font_stats->insert(
+-          font_key, std::make_pair(run_font_data.glyph_count_, family_name));
++      InspectorPlatformFontUsage usage;
++      usage.glyph_count = run_font_data.glyph_count_;
++      usage.family_name = family_name;
++      usage.postscript_name = postscript_name;
++      auto typeface = simple_font_data->PlatformData().TypefaceSp();
++      if (typeface) {
++        usage.table_hash = ComputePlatformFontTableHash(*typeface);
++      }
++      font_stats->insert(font_key, std::move(usage));
+     } else {
+-      font_stats_it->value.first += run_font_data.glyph_count_;
++      font_stats_it->value.glyph_count += run_font_data.glyph_count_;
+     }
+   }
+ }
+@@ -2757,7 +2830,7 @@
+ 
+ void InspectorCSSAgent::CollectPlatformFontsForLayoutObject(
+     LayoutObject* layout_object,
+-    HashMap<std::pair<int, String>, std::pair<int, String>>* font_stats,
++    HashMap<std::pair<int, String>, InspectorPlatformFontUsage>* font_stats,
+     unsigned descendants_depth) {
+   if (!layout_object->IsText()) {
+     if (!descendants_depth)
+@@ -2809,9 +2882,9 @@
+   if (!response.IsSuccess())
+     return response;
+ 
+-  // Key: {isCustomFont, postscript_name}
+-  // Value: {glyph_count (which accumulates), family_name}
+-  HashMap<std::pair<int, String>, std::pair<int, String>> font_stats;
++  // Key: {isCustomFont, native typeface id}
++  // Value: actual shaped-run font metadata and canonical table digest.
++  HashMap<std::pair<int, String>, InspectorPlatformFontUsage> font_stats;
+   LayoutObject* root = node->GetLayoutObject();
+   if (root) {
+     // Iterate upto two layers deep.
+@@ -2821,16 +2894,18 @@
+   *platform_fonts =
+       std::make_unique<protocol::Array<protocol::CSS::PlatformFontUsage>>();
+   for (auto& font : font_stats) {
+-    std::pair<int, String>& font_description = font.key;
+-    std::pair<int, String>& font_value = font.value;
+-    bool is_custom_font = font_description.first == 1;
+-    (*platform_fonts)
+-        ->emplace_back(protocol::CSS::PlatformFontUsage::create()
+-                           .setFamilyName(font_value.second)
+-                           .setPostScriptName(font_description.second)
+-                           .setIsCustomFont(is_custom_font)
+-                           .setGlyphCount(font_value.first)
+-                           .build());
++    const auto& value = font.value;
++    auto usage = protocol::CSS::PlatformFontUsage::create()
++                     .setFamilyName(value.family_name)
++                     .setPostScriptName(value.postscript_name)
++                     .setIsCustomFont(font.key.first == 1)
++                     .setGlyphCount(value.glyph_count)
++                     .build();
++    if (!value.table_hash.empty()) {
++      usage->setFontTableHash(value.table_hash);
++      usage->setFontTableHashAlgorithm("chromix-font-tables-v1-sha256");
++    }
++    (*platform_fonts)->emplace_back(std::move(usage));
+   }
+   return protocol::Response::Success();
+ }
