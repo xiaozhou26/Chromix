@@ -1,0 +1,38 @@
+name: build-mac156-arm64-stage8-resume
+run-name: macOS156 ARM64 exact stage8 continuation (logical 9..16)
+
+on:
+  workflow_dispatch:
+    inputs:
+      compile_jobs:
+        description: 'Ninja jobs; latest stage8 donor and unchanged source/GN/PGO are fixed'
+        type: string
+        default: auto
+
+permissions:
+  actions: read
+  contents: read
+
+concurrency:
+  group: mac156-arm64-stage8-resume-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  resume:
+    name: macOS156 ARM64 (read-only stage8 admission, logical 9..16)
+    uses: ./.github/workflows/build-posix-github.yml
+    with:
+      platform: macos
+      arch: arm64
+      runner: macos-26
+      artifact: chromix-mac156-arm64-stage8-resume
+      max-stages: 8
+      build_profile: fast
+      compile_jobs: ${{ inputs.compile_jobs || 'auto' }}
+      resume_migration: mac156-arm64-stage8
+      resume_run_id: '42455180503'
+      resume_tree_stage: '8'
+      resume_attempt: '1'
+      resume_artifact_ids: '13675184448'
+      use_upstream_cache: true
+    secrets: inherit

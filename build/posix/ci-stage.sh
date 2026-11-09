@@ -80,7 +80,16 @@ remaining_min() {
   echo "$left"
 }
 
+unchanged_check() {
+  if [ "${CHROMIX_UNCHANGED_RESUME:-}" = mac156-arm64-stage8 ]; then
+    python3 "$REPO/tools/validate_macos156_arm64_stage8_checkpoint.py" --mode check \
+      --repo "$REPO" --workdir "$WORK" --stage "$STAGE_INDEX" --phase "$1" ||
+      die "unchanged mac156 continuation identity failed"
+  fi
+}
+
 handoff() {
+  unchanged_check after
   log "stage $STAGE_INDEX: $*; snapshotting unfinished work"
   mkdir -p "$SNAPSHOT_DIR"
   bash "$REPO/build/posix/ci-parts.sh" "$WORK" "$SNAPSHOT_DIR"
@@ -102,6 +111,13 @@ fi
 if [ -n "$FROM_SNAPSHOT" ] && [ -d "$FROM_SNAPSHOT" ]; then
   bash "$REPO/build/posix/restore-snapshot.sh" "$FROM_SNAPSHOT" "$WORK" ||
     die "POSIX build snapshot restore failed"
+fi
+
+if [ "${CHROMIX_UNCHANGED_RESUME:-}" = mac156-arm64-stage8 ]; then
+  [ "$PLATFORM:$ARCH:$MAX_STAGES" = macos:arm64:8 ] || die "invalid unchanged continuation target"
+  unchanged_check before
+elif [ -e "$WORK/fingerprint-diagnostics/mac156-arm64-stage8-resume.json" ]; then
+  die "unchanged mac156 receipt requires the dedicated continuation mode"
 fi
 
 # Cache opt-in is mandatory in CI; helper APIs still report optional misses.
@@ -217,16 +233,21 @@ fi
 
 # Guard the external process, not a sourced function: child errexit stays enabled.
 RC=0
-if "$TIMEOUT" -k 7m -s SIGTERM "${NINJA_BUDGET}m" \
-    env CHROMIX_SKIP_DEPS=1 CHROMIX_WORKDIR="$WORK" \
-      "$BUILD_SCRIPT" "$WORK" "$ARCH"; then
+BUILD_COMMAND=(env CHROMIX_SKIP_DEPS=1 CHROMIX_WORKDIR="$WORK" "$BUILD_SCRIPT" "$WORK" "$ARCH")
+if [ "${CHROMIX_UNCHANGED_RESUME:-}" = mac156-arm64-stage8 ]; then
+  BUILD_COMMAND=(python3 "$REPO/tools/validate_macos156_arm64_stage8_checkpoint.py"
+    --mode compile --repo "$REPO" --workdir "$WORK" --stage "$STAGE_INDEX")
+fi
+if "$TIMEOUT" -k 7m -s SIGTERM "${NINJA_BUDGET}m" "${BUILD_COMMAND[@]}"; then
   :
 else
   RC=$?
 fi
 if [ "$RC" -eq 124 ]; then
   handoff "deadline reached after ${NINJA_BUDGET}m"
-elif [ "$RC" -ne 0 ]; then
+fi
+unchanged_check after
+if [ "$RC" -ne 0 ]; then
   die "build script failed at stage $STAGE_INDEX (exit $RC)"
 fi
 
