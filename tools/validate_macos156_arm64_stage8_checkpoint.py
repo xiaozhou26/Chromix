@@ -319,23 +319,52 @@ def admit(work, donor, repo, origin, download_report):
     return result
 
 
-def continuation(repo, work, stage, phase):
+def continuation_identity():
+    return dict(status="verified", operation="unchanged-mac156-arm64-stage8-continuation", repository=REPOSITORY,
+                run_id=RUN, attempt=ATTEMPT, stage=STAGE, job_id=JOB, head_sha=SHA, tree=TREE,
+                artifact_id=ARTIFACT, artifact_digest=DIGEST, artifact_size=SIZE, version=VERSION, platform="macos", arch="arm64",
+                preparation_key=KEY, source_identity=SOURCE_IDENTITY, producer_log_sha256=JOB_LOG_HASH,
+                continuation_stages="1..8 after donor stage8 (logical 9..16)", changed_files=[])
+
+
+def previous_handoff(work, prefix, stage, base, expected, state):
+    directory = work / "fingerprint-diagnostics"
+    pattern = re.compile(re.escape(f"{prefix}-s{stage - 1}-after-attempt-") + r"([1-9][0-9]*)\.json")
+    # Source attestations share the prefix, but are not handoff receipts.
+    previous = [(path, pattern.fullmatch(path.name)) for path in directory.iterdir()]
+    previous = [(path, match) for path, match in previous if match]
+    require(len(previous) == 1, "exact previous continuation handoff required")
+    path, match = previous[0]
+    attempt = os.environ.get("CHROMIX_PREVIOUS_ATTEMPT", "")
+    consumer = os.environ.get("GITHUB_RUN_ATTEMPT", "")
+    require(re.fullmatch(r"[1-9][0-9]*", attempt) and re.fullmatch(r"[1-9][0-9]*", consumer)
+            and match[1] == attempt and int(attempt) <= int(consumer),
+            "exact previous producer attempt required")
+    handoff = json.loads(read(directory, path.name))
+    identity = dict(expected, continuation_run=os.environ.get("GITHUB_RUN_ID"),
+                    continuation_attempt=attempt, continuation_stage=stage - 1,
+                    logical_stage=base + stage - 1, phase="after", state=state)
+    require(all(handoff.get(key) == value for key, value in identity.items()),
+            "previous continuation state/provenance mismatch")
+    return handoff
+
+
+def continuation(repo, work, stage, phase, *, receipt_name=RECEIPT,
+                 prefix="mac156-arm64-stage8-continuation", expected=None, manifest=None, base=STAGE):
     require(phase in ("before", "after"), "invalid continuation phase")
     require(re.fullmatch(r"[1-9][0-9]*", os.environ.get("GITHUB_RUN_ID", "")), "continuation run ID required")
+    require(re.fullmatch(r"[1-9][0-9]*", os.environ.get("GITHUB_RUN_ATTEMPT", "")), "continuation attempt required")
     require(1 <= stage <= 8, "continuation stage must be 1..8")
     require(os.environ.get("CHROMIX_BUILD_PROFILE") == "fast"
             and os.environ.get("CHROMIX_USE_UPSTREAM_CACHE") == "1",
             "continuation requires fast profile and mandatory restored cache")
-    receipt = json.loads(read(work, RECEIPT))
-    expected = dict(status="verified", operation="unchanged-mac156-arm64-stage8-continuation", repository=REPOSITORY,
-                    run_id=RUN, attempt=ATTEMPT, stage=STAGE, job_id=JOB, head_sha=SHA, tree=TREE,
-                    artifact_id=ARTIFACT, artifact_digest=DIGEST, artifact_size=SIZE, version=VERSION, platform="macos", arch="arm64",
-                    preparation_key=KEY, source_identity=SOURCE_IDENTITY, producer_log_sha256=JOB_LOG_HASH,
-                    continuation_stages="1..8 after donor stage8 (logical 9..16)", changed_files=[])
+    receipt = json.loads(read(work, receipt_name))
+    expected = continuation_identity() if expected is None else expected
+    manifest = expected_manifest() if manifest is None else manifest
     require(all(receipt.get(key) == value for key, value in expected.items()),
             "missing or changed arm64-stage8 continuation provenance")
     require(receipt.get("continuation_run") == os.environ.get("GITHUB_RUN_ID")
-            and receipt.get("provenance", {}).get("manifest") == expected_manifest(),
+            and receipt.get("provenance", {}).get("manifest") == manifest,
             "continuation run/donor isolation mismatch")
     require(recipes(repo) == receipt.get("recipes"), "admitted build recipes changed")
     state = source_state(repo, work)
@@ -346,17 +375,11 @@ def continuation(repo, work, stage, phase):
     if stage == 1 and phase == "before":
         require(state == receipt.get("state"), "initial Ninja state changed before continuation")
     if phase == "before" and stage > 1:
-        previous = list((work / "fingerprint-diagnostics").glob(
-            f"mac156-arm64-stage8-continuation-s{stage - 1}-after-attempt-*.json"))
-        require(len(previous) == 1, "exact previous continuation handoff required")
-        handoff = json.loads(previous[0].read_bytes())
-        require(handoff.get("continuation_run") == os.environ.get("GITHUB_RUN_ID")
-                and handoff.get("logical_stage") == STAGE + stage - 1
-                and handoff.get("state") == state, "previous continuation state mismatch")
+        previous_handoff(work, prefix, stage, base, expected, state)
     output = work / "fingerprint-diagnostics" / (
-        f"mac156-arm64-stage8-continuation-s{stage}-{phase}-attempt-{os.environ.get('GITHUB_RUN_ATTEMPT', 'local')}.json")
+        f"{prefix}-s{stage}-{phase}-attempt-{os.environ['GITHUB_RUN_ATTEMPT']}.json")
     live_source(repo, work, output.with_name(output.stem + "-source.json"))
-    result = dict(expected, continuation_stage=stage, logical_stage=STAGE + stage, phase=phase,
+    result = dict(expected, continuation_stage=stage, logical_stage=base + stage, phase=phase,
                   continuation_run=os.environ.get("GITHUB_RUN_ID"),
                   continuation_attempt=os.environ.get("GITHUB_RUN_ATTEMPT"), state=state)
     output.write_bytes(arp._json(result))
@@ -580,15 +603,20 @@ def frozen_ninja(ninja, work, jobs, env):
                               cwd=work / "src", env=env, check=False).returncode
 
 
-def compile_tree(repo, work, stage):
-    receipt = json.loads(read(work, RECEIPT))
-    require(receipt.get("continuation_run") == os.environ.get("GITHUB_RUN_ID"), "unadmitted compile")
+def compile_tree(repo, work, stage, *, receipt_name=RECEIPT,
+                 prefix="mac156-arm64-stage8-continuation", base=STAGE, expected=None):
+    expected = continuation_identity() if expected is None else expected
+    receipt = json.loads(read(work, receipt_name))
+    require(all(receipt.get(key) == value for key, value in expected.items())
+            and receipt.get("continuation_run") == os.environ.get("GITHUB_RUN_ID"), "unadmitted compile")
     require(stage is not None and 1 <= stage <= 8, "compile stage required")
-    before = json.loads(read(work, f"fingerprint-diagnostics/mac156-arm64-stage8-continuation-s{stage}"
+    before = json.loads(read(work, f"fingerprint-diagnostics/{prefix}-s{stage}"
                             f"-before-attempt-{os.environ.get('GITHUB_RUN_ATTEMPT', 'local')}.json"))
-    require(before.get("operation") == "unchanged-mac156-arm64-stage8-continuation"
+    require(all(before.get(key) == value for key, value in expected.items())
             and before.get("continuation_run") == os.environ.get("GITHUB_RUN_ID")
-            and before.get("logical_stage") == STAGE + stage
+            and before.get("continuation_stage") == stage and before.get("phase") == "before"
+            and before.get("logical_stage") == base + stage
+            and before.get("continuation_attempt") == os.environ.get("GITHUB_RUN_ATTEMPT")
             and before.get("state") == source_state(repo, work), "compile requires same-attempt read-only gate")
     ninja = Path(shutil.which("ninja") or "missing").resolve()
     require(restore_ninja.host_identity() == ("macos", "arm64")

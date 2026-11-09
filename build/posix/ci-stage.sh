@@ -83,6 +83,7 @@ remaining_min() {
 UNCHANGED_HELPER=""
 case "${CHROMIX_UNCHANGED_RESUME:-}" in
   "") ;;
+  mac156-arm64-stage1) UNCHANGED_HELPER="$REPO/tools/validate_macos156_arm64_stage1_checkpoint.py" ;;
   mac156-arm64-stage8) UNCHANGED_HELPER="$REPO/tools/validate_macos156_arm64_stage8_checkpoint.py" ;;
   mac156-x64-stage8) UNCHANGED_HELPER="$REPO/tools/validate_macos156_x64_stage8_checkpoint.py" ;;
   *) die "unknown unchanged continuation mode" ;;
@@ -121,13 +122,15 @@ if [ -n "$FROM_SNAPSHOT" ] && [ -d "$FROM_SNAPSHOT" ]; then
     die "POSIX build snapshot restore failed"
 fi
 
-if [ "${CHROMIX_UNCHANGED_RESUME:-}" = mac156-arm64-stage8 ]; then
+if [ "${CHROMIX_UNCHANGED_RESUME:-}" = mac156-arm64-stage8 ] ||
+   [ "${CHROMIX_UNCHANGED_RESUME:-}" = mac156-arm64-stage1 ]; then
   [ "$PLATFORM:$ARCH:$MAX_STAGES" = macos:arm64:8 ] || die "invalid unchanged continuation target"
   unchanged_check before
 elif [ "${CHROMIX_UNCHANGED_RESUME:-}" = mac156-x64-stage8 ]; then
   [ "$PLATFORM:$ARCH:$MAX_STAGES" = macos:x64:8 ] || die "invalid unchanged continuation target"
   unchanged_check before
-elif [ -e "$WORK/fingerprint-diagnostics/mac156-arm64-stage8-resume.json" ] ||
+elif [ -e "$WORK/fingerprint-diagnostics/mac156-arm64-stage1-resume.json" ] ||
+     [ -e "$WORK/fingerprint-diagnostics/mac156-arm64-stage8-resume.json" ] ||
      [ -e "$WORK/fingerprint-diagnostics/mac156-x64-stage8-resume.json" ]; then
   die "unchanged mac156 receipt requires the dedicated continuation mode"
 fi

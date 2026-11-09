@@ -13,7 +13,7 @@ import sys
 
 try:
     from .validate_macos156_arm64_stage8_checkpoint import (
-        require, sha, identity_hash, read, recipe_bytes, output_inventory, frozen_ninja)
+        require, sha, identity_hash, read, recipe_bytes, output_inventory, frozen_ninja, previous_handoff)
     from . import apply_restored_patches as arp
     from . import migrate_restored_snapshot as migration
     from . import validate_posix_snapshot as snapshot
@@ -21,7 +21,7 @@ try:
     from . import restore_ninja, macos_runtime, macos_restored_generators
 except ImportError:
     from validate_macos156_arm64_stage8_checkpoint import (
-        require, sha, identity_hash, read, recipe_bytes, output_inventory, frozen_ninja)
+        require, sha, identity_hash, read, recipe_bytes, output_inventory, frozen_ninja, previous_handoff)
     import apply_restored_patches as arp
     import migrate_restored_snapshot as migration
     import validate_posix_snapshot as snapshot
@@ -289,6 +289,7 @@ def admit(work, donor, repo, origin, download_report):
 def continuation(repo, work, stage, phase):
     require(phase in ("before", "after"), "invalid continuation phase")
     require(re.fullmatch(r"[1-9][0-9]*", os.environ.get("GITHUB_RUN_ID", "")), "continuation run ID required")
+    require(re.fullmatch(r"[1-9][0-9]*", os.environ.get("GITHUB_RUN_ATTEMPT", "")), "continuation attempt required")
     require(1 <= stage <= 8, "continuation stage must be 1..8")
     require(os.environ.get("CHROMIX_BUILD_PROFILE") == "fast"
             and os.environ.get("CHROMIX_USE_UPSTREAM_CACHE") == "1",
@@ -313,13 +314,7 @@ def continuation(repo, work, stage, phase):
     if stage == 1 and phase == "before":
         require(state == receipt.get("state"), "initial Ninja state changed before continuation")
     if phase == "before" and stage > 1:
-        previous = list((work / "fingerprint-diagnostics").glob(
-            f"mac156-x64-stage8-continuation-s{stage - 1}-after-attempt-*.json"))
-        require(len(previous) == 1, "exact previous continuation handoff required")
-        handoff = json.loads(previous[0].read_bytes())
-        require(handoff.get("continuation_run") == os.environ.get("GITHUB_RUN_ID")
-                and handoff.get("logical_stage") == STAGE + stage - 1
-                and handoff.get("state") == state, "previous continuation state mismatch")
+        previous_handoff(work, "mac156-x64-stage8-continuation", stage, STAGE, expected, state)
     output = work / "fingerprint-diagnostics" / (
         f"mac156-x64-stage8-continuation-s{stage}-{phase}-attempt-{os.environ.get('GITHUB_RUN_ATTEMPT', 'local')}.json")
     live_source(repo, work, output.with_name(output.stem + "-source.json"))

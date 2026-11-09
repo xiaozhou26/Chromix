@@ -283,7 +283,12 @@ def run_step(stage: int) -> str:
 """
     ).replace("__STAGE__", str(stage)).replace("__RESTORE_ARGS__", restore_args)
 
-DOWNLOAD_STEP = """      - name: Download tree from previous stage
+DOWNLOAD_STEP = """      - name: Record exact mac156 handoff producer attempt
+        if: inputs.resume_migration == 'mac156-arm64-stage1' || inputs.resume_migration == 'mac156-arm64-stage8' || inputs.resume_migration == 'mac156-x64-stage8'
+        env:
+          PRODUCER_ATTEMPT: ${{ needs.posix-%(prev)d.outputs.snapshot_attempt }}
+        run: echo "CHROMIX_PREVIOUS_ATTEMPT=$PRODUCER_ATTEMPT" >> "$GITHUB_ENV"
+      - name: Download tree from previous stage
         if: success()
         uses: actions/download-artifact@v4
         with:
@@ -328,7 +333,10 @@ RESUME_STEPS = """      - name: Validate selected POSIX checkpoint
                [ "$RECOVERY_BRANCH" = build/linux155-arm64-stage4-recovery ]; then
             RECOVERY_BRANCH=build/chromium155-donors-20261011
           fi
-          if [ '${{ inputs.resume_migration }}' = mac156-arm64-stage8 ]; then
+          if [ '${{ inputs.resume_migration }}' = mac156-arm64-stage1 ]; then
+            python3 tools/validate_macos156_arm64_stage1_checkpoint.py --mode metadata \\
+              --report "${RUNNER_TEMP}/chromix-logs/snapshot-origin.json"
+          elif [ '${{ inputs.resume_migration }}' = mac156-arm64-stage8 ]; then
             python3 tools/validate_macos156_arm64_stage8_checkpoint.py --mode metadata \\
               --report "${RUNNER_TEMP}/chromix-logs/snapshot-origin.json"
           elif [ '${{ inputs.resume_migration }}' = mac156-x64-stage8 ]; then
@@ -376,7 +384,12 @@ RESUME_STEPS = """      - name: Validate selected POSIX checkpoint
           WORK="${RUNNER_TEMP}/chromix-build"
           test ! -e "$WORK/src"
           bash build/posix/restore-snapshot.sh "$RESTORE" "$WORK"
-          if [ '${{ inputs.resume_migration }}' = mac156-arm64-stage8 ]; then
+          if [ '${{ inputs.resume_migration }}' = mac156-arm64-stage1 ]; then
+            python3 tools/validate_macos156_arm64_stage1_checkpoint.py --mode admit --workdir "$WORK" \\
+              --previous-repo "$GITHUB_WORKSPACE/.chromix-previous-repo" --repo "$GITHUB_WORKSPACE" \\
+              --origin "${RUNNER_TEMP}/chromix-logs/snapshot-origin.json" \\
+              --download-report "${RUNNER_TEMP}/chromix-logs/snapshot-download.json"
+          elif [ '${{ inputs.resume_migration }}' = mac156-arm64-stage8 ]; then
             python3 tools/validate_macos156_arm64_stage8_checkpoint.py --mode admit --workdir "$WORK" \\
               --previous-repo "$GITHUB_WORKSPACE/.chromix-previous-repo" --repo "$GITHUB_WORKSPACE" \\
               --origin "${RUNNER_TEMP}/chromix-logs/snapshot-origin.json" \\
@@ -408,7 +421,7 @@ RUNTIME_FAILURE = """      - name: Upload failed macOS runtime bundle
           name: ${{ inputs.artifact }}-failed-runtime-s%(stage)d-attempt-${{ github.run_attempt }}
           path: |
             ${{ runner.temp }}/chromix-build/dist/${{ inputs.artifact }}.zip
-            ${{ runner.temp }}/chromix-build/dist/${{ inputs.resume_migration == 'mac156-arm64-stage8' && 'chromix-mac-arm64' || inputs.artifact }}.zip
+            ${{ runner.temp }}/chromix-build/dist/${{ (inputs.resume_migration == 'mac156-arm64-stage8' || inputs.resume_migration == 'mac156-arm64-stage1') && 'chromix-mac-arm64' || inputs.artifact }}.zip
             ${{ runner.temp }}/chromix-build/dist/${{ inputs.resume_migration == 'mac156-x64-stage8' && 'chromix-mac-x64' || inputs.artifact }}.zip
             ${{ runner.temp }}/chromix-build/dist/SHA256SUMS
             ${{ runner.temp }}/chromix-build/runtime-smoke-stage-%(stage)d/
@@ -540,7 +553,7 @@ FINAL_UPLOADS = """      - name: Upload final bundle
           name: ${{ inputs.artifact }}
           path: |
             ${{ runner.temp }}/chromix-build/dist/${{ inputs.artifact }}.zip
-            ${{ runner.temp }}/chromix-build/dist/${{ inputs.resume_migration == 'mac156-arm64-stage8' && 'chromix-mac-arm64' || inputs.artifact }}.zip
+            ${{ runner.temp }}/chromix-build/dist/${{ (inputs.resume_migration == 'mac156-arm64-stage8' || inputs.resume_migration == 'mac156-arm64-stage1') && 'chromix-mac-arm64' || inputs.artifact }}.zip
             ${{ runner.temp }}/chromix-build/dist/${{ inputs.resume_migration == 'mac156-x64-stage8' && 'chromix-mac-x64' || inputs.artifact }}.zip
             ${{ runner.temp }}/chromix-build/dist/SHA256SUMS
           if-no-files-found: error
@@ -628,7 +641,17 @@ def job(stage: int) -> str:
                  '        id: snapshot_origin\n'
                  '        run: echo "attempt=$GITHUB_RUN_ATTEMPT" >> "$GITHUB_OUTPUT"\n')
     if stage == 1:
-        parts.append("""      - name: Require exact mac156 ARM64 stage8 continuation inputs
+        parts.append("""      - name: Require exact mac156 ARM64 stage1 continuation inputs
+        if: inputs.resume_migration == 'mac156-arm64-stage1'
+        run: |
+          set -euo pipefail
+          test '${{ github.repository }}:${{ github.event_name }}:${{ github.ref }}' = xiaozhou26/Chromix:workflow_dispatch:refs/heads/main
+          test '${{ inputs.platform }}:${{ inputs.arch }}:${{ inputs.runner }}' = macos:arm64:macos-26
+          test '${{ inputs.artifact }}' = chromix-mac156-arm64-stage1-resume
+          test '${{ inputs.max-stages }}' = 8
+          test '${{ inputs.build_profile }}:${{ inputs.use_upstream_cache }}' = fast:true
+          test '${{ inputs.resume_run_id }}:${{ inputs.resume_tree_stage }}:${{ inputs.resume_attempt }}:${{ inputs.resume_artifact_ids }}' = 42652225672:1:1:13706643929,13707496932
+      - name: Require exact mac156 ARM64 stage8 continuation inputs
         if: inputs.resume_migration == 'mac156-arm64-stage8'
         run: |
           set -euo pipefail
@@ -651,7 +674,7 @@ def job(stage: int) -> str:
           test '${{ inputs.build_profile }}:${{ inputs.use_upstream_cache }}' = fast:true
           test '${{ inputs.resume_run_id }}:${{ inputs.resume_tree_stage }}:${{ inputs.resume_attempt }}:${{ inputs.resume_artifact_ids }}' = 42455177686:8:2:13701073762
       - name: Require exact Linux156 recovery inputs
-        if: inputs.resume_migration != '' && inputs.resume_migration != 'mac156-arm64-stage8' && inputs.resume_migration != 'mac156-x64-stage8'
+        if: inputs.resume_migration != '' && inputs.resume_migration != 'mac156-arm64-stage8' && inputs.resume_migration != 'mac156-x64-stage8' && inputs.resume_migration != 'mac156-arm64-stage1'
         run: |
           set -euo pipefail
           test '${{ inputs.resume_migration }}' = linux156-ts
@@ -666,7 +689,10 @@ def job(stage: int) -> str:
           esac
 
 """)
-    parts.append("""      - name: Enable fixed unchanged mac156 continuation
+    parts.append("""      - name: Enable fixed unchanged mac156 stage1 continuation
+        if: inputs.resume_migration == 'mac156-arm64-stage1'
+        run: echo 'CHROMIX_UNCHANGED_RESUME=mac156-arm64-stage1' >> "$GITHUB_ENV"
+      - name: Enable fixed unchanged mac156 continuation
         if: inputs.resume_migration == 'mac156-arm64-stage8'
         run: echo 'CHROMIX_UNCHANGED_RESUME=mac156-arm64-stage8' >> "$GITHUB_ENV"
       - name: Enable fixed unchanged mac156 Intel continuation

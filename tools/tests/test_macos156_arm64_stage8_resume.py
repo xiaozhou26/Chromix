@@ -21,7 +21,7 @@ FIXTURE = json.loads(gzip.decompress(
     (ROOT / 'tools/tests/fixtures/macos156_arm64_stage8_receipts.json.gz').read_bytes()))
 GN_FIXTURE = json.loads(gzip.decompress(
     (ROOT / 'tools/tests/fixtures/macos156_donor_gn_graph.json.gz').read_bytes()))
-ENV = {'GITHUB_RUN_ID': '999999', 'GITHUB_RUN_ATTEMPT': '1',
+ENV = {'GITHUB_RUN_ID': '999999', 'GITHUB_RUN_ATTEMPT': '1', 'CHROMIX_PREVIOUS_ATTEMPT': '1',
        'CHROMIX_BUILD_PROFILE': 'fast', 'CHROMIX_USE_UPSTREAM_CACHE': '1', 'CHROMIX_JOBS': '3'}
 
 

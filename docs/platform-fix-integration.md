@@ -21,7 +21,58 @@
 
 本机 macOS 不提供 Linux `renameat2`，相关 Linux 原子发布测试需在 Linux 上执行。新的上游缓存和版本适配在独立分支进行，逐平台完成完整云端编译及原生验收后再更新发布资产。
 
-## macOS156 ARM64 固定 stage8 只读续编
+## macOS156 ARM64 最新 stage1 handoff 修复（2026-11-10）
+
+本次基于 GitHub API 确认的 main `d885c638aa3188c59162c376b38939c57a1f2076`。
+最新有效检查点是 run `42652225672`、attempt `1`、stage `1`、成功 job
+`129281322673`，source `9ea3a9272fcadc189dbaa312f3055ba641af8e88`。
+失败 stage2 job `129416651381` 不产生可替代的新检查点。
+
+真实 stage1/stage2 小 diagnostics 中的 admission 与 after 收据逐字节一致：
+`after-attempt-1.json` SHA-256 为
+`e369c5b0af2b0d40cf22378d823f9c1c60a4a7519f4ae0af42b1016be1f0dd51`。
+`ci-stage.sh` 原本已在 snapshot 前调用 `unchanged_check after`；失败根因是
+`after-attempt-*.json` 同时匹配此收据和 `after-attempt-1-source.json`，不是 stamping
+遗漏或 timestamp 错误。Intel 对应代码有同一问题，现共用完整匹配数字 attempt 的
+receipt selector；仍只允许唯一前一 stage handoff，并逐字段核对原 run/job/attempt/
+SHA/tree/artifact/arch/version/prepare key/source identity 和当前 run/stage/phase/state。
+producer attempt 来自 `needs.posix-N.outputs.snapshot_attempt`，允许同 run 中成功的
+attempt1 供失败 jobs 重跑的 attempt2 消费，不允许未来 attempt、错 stage/run/arch、
+重复收据或缺失 handoff。源码 sidecar 仍生成并随 snapshot 保存。
+
+新 main 专用入口为 `.github/workflows/build-mac156-arm64-stage1-resume.yml`，
+固定下载两卷，不回退 run `42455180503`：
+
+| part / artifact ID | ZIP bytes | SHA-256 |
+| --- | --- | --- |
+| 1 / `13706643929` | `9663676674` | `cfa9f53ec44bb36a10f87c3ea20fd9188ebfd4f7e6214371598942b64ea06220` |
+| 2 / `13707496932` | `90201676` | `c3ed0fb825bc4ab569ccbcf7d38b920b7269a42e85ee7d9bc3b1abfa73e41480` |
+
+artifact 名称前缀为 `chromix-mac156-arm64-stage8-resume-tree-s1-attempt-1-part`。
+producer log 固定 `819347` bytes / SHA-256
+`e2f8019ec9e37b0121d561e7e0ffb3c5ba8bb0d3173ae9bff3f752a8cf8ce133`；
+packed volumes 为 `9663676416`、`90201530` bytes，总计 `9753877946`。
+准入保留旧 stage8 admission 和 stage1 after/source 收据，不改写历史 run 身份；
+新 receipt 绑定最新 stage1 的完整 manifest 和状态，local stages 1–8 对应 logical
+10–17。沿用已验证的 isolated Ninja/APFS clone/sandbox/protect-original-out 路径，
+不修改源码补丁、GN、PGO、准备标记或恢复 timestamp 校验，不引入 cold fallback。
+
+新增测试使用真实 diagnostics/log 夹具，并实际执行 ci-stage、Ninja 1.13.2 编译、
+after/source stamping、tar/zstd 打包、事务 restore 和跨 attempt stage2 重入；
+另测最新 stage1 admission 到新链 stage2，以及 ARM64/Intel 完整拒绝矩阵。
+本地验证不替代 9.75 GB donor 的完整下载/原生 Chromium 编译与最终 runtime gates。
+此分支仅本地提交，由父任务整合验证；不 push、不 dispatch，也不停止运行中的 Intel。
+
+验证记录位于 `/tmp/chromix-mac156-handoff-evidence/`。真实 GitHub metadata admission、
+generator 字节一致、186 个 workflow bash 片段和 `git diff --check` 均通过。
+Windows workflow/recovery 回归为 100 passed、244 skipped；Intel 原生编译测试在
+ARM64 主机跳过。扩展 POSIX 回归发现的 Linux stage env 合同变化已改为仅 mac156
+启用的独立 producer-attempt export step，Linux 原 stage 步骤保持不变。
+其余两项旧 Mac workflow 断言及 BSD sed 的 `checksum_wrong_name` 夹具失败，均在
+未修改的 `d885c638` 对照 worktree 复现；另一次 fingerprint 夹具 1 秒超时重跑通过。
+不为这些无关失败修改断言或平台构建逻辑。
+
+## macOS156 ARM64 固定 stage8 只读续编（历史来源）
 
 2026-11-09 已通过 GitHub API 核查 `origin/main` 为
 `e52742b38cf832538f85ac2e423fd315f9486d21`。专用入口
