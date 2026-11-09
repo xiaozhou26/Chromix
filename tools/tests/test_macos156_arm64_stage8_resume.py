@@ -533,6 +533,79 @@ class RealNinjaTest(unittest.TestCase):
             self.run_frozen()
         self.assertTrue(any(p.read_text() for p in (self.work / 'fingerprint-diagnostics').rglob('*.stderr')))
 
+    def test_real_donor_response_rule_reproduces_and_isolates_dryrun_mutation(self):
+        fixture = json.loads(gzip.decompress(
+            (ROOT / 'tools/tests/fixtures/macos156_preflight_state.json.gz').read_bytes()))
+        self.assertEqual(fixture['cloud_before']['state'], fixture['cloud_after']['state'])
+        self.assertEqual(fixture['isolated_full_source_clone']['entries'], 952203)
+        self.assertEqual(fixture['isolated_full_source_difference']['original_changed'], {})
+        self.assertEqual(len(fixture['isolated_full_source_difference']['scratch_changed']), 95)
+        actual = fixture['actual_local_difference']
+        self.assertEqual(actual['state_before'], actual['state_after'])
+        self.assertEqual(len(actual['changed']), 94)
+        self.assertTrue(all(v['before'][:2] == v['after'][:2] and v['before'][4:] == v['after'][4:]
+                            for v in actual['changed'].values()))
+        # The production rule is verbatim; only its target/input names are reduced.
+        (self.out / 'input.o').write_bytes(b'known existing object')
+        (self.out / 'build.ninja').write_text(fixture['donor_alink_rule'] +
+            '\nbuild new/lib.a: alink input.o\nbuild chrome: phony new/lib.a\n')
+        original = arm.output_inventory(self.work / 'src')
+        raw = subprocess.run([str(self.ninja), '-C', str(self.out), '-n', 'chrome'], capture_output=True)
+        self.assertEqual(raw.returncode, 0)
+        self.assertTrue((self.out / 'new').is_dir())
+        self.assertNotEqual(original, arm.output_inventory(self.work / 'src'))
+        # The existing response file must also survive the isolated preflight byte-for-byte.
+        rsp = self.out / 'new/lib.a.rsp'
+        rsp.write_bytes(b'original response bytes')
+        original = arm.output_inventory(self.work / 'src')
+        diagnostics = self.work / 'fingerprint-diagnostics/isolated'
+        diagnostics.mkdir()
+        with arm.preflight_source(self.work, diagnostics) as (scratch, sandbox):
+            self.assertEqual((scratch / 'out/Default/input.o').read_bytes(), b'known existing object')
+            result = subprocess.run([*sandbox, str(self.ninja), '-C', str(scratch / 'out/Default'),
+                                     '-n', 'chrome'], capture_output=True)
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertFalse((scratch / 'out/Default/new/lib.a.rsp').exists())
+        self.assertEqual(original, arm.output_inventory(self.work / 'src'))
+        self.assertEqual(rsp.read_bytes(), b'original response bytes')
+        report = json.loads((diagnostics / 'preflight-state-difference.json').read_text())
+        self.assertEqual(report['original_changed'], {})
+        self.assertIn('out/Default/new/lib.a.rsp', report['scratch_changed'])
+
+    def test_scratch_keeps_relative_inputs_and_blocks_external_or_original_writes(self):
+        shared = self.work / 'tooling'
+        shared.mkdir()
+        (shared / 'header.h').write_text('shared input')
+        (self.out / 'build.ninja').write_text(
+            'rule action\n  command = echo built\n  rspfile = outside/args.rsp\n'
+            '  rspfile_content = $in\nbuild result: action ../../../tooling/header.h\n'
+            'build chrome: phony result\n')
+        (self.out / 'outside').symlink_to(shared, target_is_directory=True)
+        diagnostics = self.work / 'fingerprint-diagnostics/isolated'
+        diagnostics.mkdir()
+        original = arm.output_inventory(self.work / 'src')
+        with arm.preflight_source(self.work, diagnostics) as (scratch, sandbox):
+            self.assertTrue((scratch / 'out/Default/../../../tooling/header.h').is_file())
+            blocked = subprocess.run([*sandbox, str(self.ninja), '-C', str(scratch / 'out/Default'),
+                                      '-n', 'chrome'], capture_output=True)
+            self.assertNotEqual(blocked.returncode, 0)
+            self.assertFalse((shared / 'args.rsp').exists())
+            blocked = subprocess.run([*sandbox, '/usr/bin/touch', str(self.out / 'forbidden')], capture_output=True)
+            self.assertNotEqual(blocked.returncode, 0)
+        self.assertEqual(original, arm.output_inventory(self.work / 'src'))
+
+    def test_response_preflight_passes_then_real_compile_and_object_reuse(self):
+        path = self.out / 'build.ninja'
+        path.write_text(path.read_text().replace('command = cc -c sample.c -o sample.o',
+            'command = cc @sample.rsp -o sample.o\n  rspfile = sample.rsp\n  rspfile_content = -c sample.c'))
+        self.assertEqual(self.run_frozen(), 0)
+        self.assertTrue((self.out / 'sample.o').is_file())
+        obj = arm.output_inventory(self.out)['sample.o']
+        self.assertEqual(self.run_frozen(), 0)
+        self.assertEqual(obj, arm.output_inventory(self.out)['sample.o'])
+        for report in (self.work / 'fingerprint-diagnostics').rglob('preflight-state-difference.json'):
+            self.assertEqual(json.loads(report.read_text())['original_changed'], {})
+
     def test_dynamic_dependency_and_compile_failure_fail_closed(self):
         sample_graph(self.out, extra='dyndep = future.dd\n')
         with self.assertRaisesRegex(ValueError, 'dynamic Ninja'):

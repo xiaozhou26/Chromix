@@ -198,3 +198,63 @@ header、probe、完整图 proof 摘要以及 donor `src/tools/gn/src/gn/ninja_b
 `/tmp/chromix-mac156-actual-probes/proof.json`。Python 编译、`git diff --check`
 通过，AST 比对确认仅原 `frozen_ninja` 函数发生变化，其余原验证函数及身份常量
 保持一致。
+
+
+### Ninja dry-run 原 out 写入隔离（run42640658112）
+
+本次基线通过 API 核查为 `59e69b31ac737e981d4aef61b17a31e16f79b094`，独立
+worktree `/tmp/chromix-mac156-preflight-state-fix`。实际诊断 artifact `13686994871`
+为 3732475 bytes，SHA-256
+`3d68e1ca43e916cd599bbec73825c69af09faf9b01c814b60ff433dcd0820268`，已下载校验。
+四次 probe 返回码均为 0，stderr 全空；云端 before/after graph、build.ninja、
+.ninja_log、.ninja_deps hash 全部相同。此前未保存全库存差异，不能声称已知云端
+每个变化路径，也不能据此猜测日志重整。
+
+已将认证原 donor ZIP 全量解包至 `/tmp/chromix-mac156-full-donor`，用完整图、
+30,266,486-byte .ninja_log、505,783,580-byte .ninja_deps、真实源码和对象，
+对云端真实计划里的 `obj/ui/views/debug/libviews_debug.a` 执行 Ninja 1.13.2
+`-n -v`：返回 0、stderr 为空，94 个目录 mtime/ctime 改变，文件集合/模式/大小/
+inode 和三项 Ninja 文件 bytes hash 均不变。精确 before/after 数据保存在
+`/tmp/chromix-mac156-preflight-reproduction/target-difference.json`，并收入测试夹具。
+这提供实际可复现的失败机制，不将它冒称为云端未记录的完整差异清单。
+
+官方 Ninja v1.13.2 `src/build.cc` 的 `Builder::StartEdge` 在 dry_run 下仍执行
+MakeDirs 和 rspfile WriteFile；FinishCommand 随后删除 rspfile，导致目录 metadata
+变化，甚至可能覆盖并删除已有 rspfile。OpenBuildLog/OpenDepsLog 的写入和重整
+则由 `!dry_run` 阻止。`keepdepfile`/`keeprsp` 不会阻止上述写入，不能作为修复。
+原 out 的严格不变断言保持，不恢复/伪造 timestamps，不删除原 logs，也不跳过预检。
+
+现在把完整 src（包含全部 graph、log/deps、源码、已有对象、symlink、mtime）复制为
+work 下与 src 同层的私有 clone。常规文件使用 macOS clonefile 独立 copy-on-write
+inode；目录和链接显式复制，核对完整 inventory、mode/size/纳秒 mtime/link，禁止
+hardlink、稀疏占位和“只有图而所有输入缺失”的检查。相同目录层级保留 `../../`
+源码及 `../../../tooling`、爬到文件系统根的外部输入语义。clone 失败直接拒绝。
+
+所有 Ninja probes 在 clone 上执行，macOS sandbox-exec 只允许写入该 clone，
+即使图输出经绝对路径或 symlink 指向原 src/out/外部目录也会被阻断。既有 GN
+生产链证明、dry-run regeneration 拒绝和 warning/未知图拒绝全部保留。
+预检退出记录 original_changed 与 scratch_changed 的逐路径六字段 before/after
+差异；original 必须完全为空。只在批准后回到原图和原 cwd 执行真实编译，不发布
+scratch 对象或日志；clone 无论成功失败都清理。
+
+新真实 Ninja 测试复用原 donor alink/rsp 规则，覆盖目录创建、已有 rsp bytes 被
+覆盖删除的复现与隔离、relative tooling 输入、sandbox 拒绝外部/原路径写入，
+以及 rsp C 编译成功和已有对象复用；此前危险 GN/phony/validation guards 继续运行。
+完整 chrome 本地 dry-run 因缺少 donor Xcode_26.6 的绝对 gperf 输入而 fail closed，
+未伪造 SDK 或 missing 文件；因此不声称本机完成完整 chrome/原生验收。
+
+最终在完整 952,203-entry donor src 的逐文件 clonefile + sandbox 上实测同一真实
+archive 子目标：dry-run 返回 0、stderr 空，scratch 中 95 项目录 metadata 变化，
+**原 src（包含 out）全库存 0 差异**。完整报告在
+`/tmp/chromix-mac156-preflight-reproduction/isolated-files/preflight-state-difference.json`，
+clone 记录和精确差异也已收入 `macos156_preflight_state.json.gz`。其中 94 项是 out
+子目录，另 1 项是 out/Default 根目录；都仅发生于 scratch，不回写原树。
+旧的目录级 `cp -cRp` 大树尝试未通过，最终实现没有保留该路径，使用仅常规文件
+clonefile 与显式目录/symlink 复制，完整实例已通过。
+针对性组合回归为 136 passed、17 skipped、269 subtests passed；专用测试 31 项
+通过。原函数 AST 对比仅 frozen_ninja 改变，既有 regeneration_proof、source_state、
+native_state、compile_tree 身份检查及所有常量保持不变。未 push、未 dispatch。
+
+对照原 donor 与隔离 clone 的同目标 dry-run，去除唯一不同的 Entering directory
+行后，2,275 条命令逐字节完全一致，命令次序也相同；已把数量与 hash 收入夹具。
+这验证 clone 未因相对路径错位或遗漏已有对象而把全部输入误判为 missing。

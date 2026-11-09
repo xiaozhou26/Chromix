@@ -13,6 +13,9 @@ from pathlib import Path
 import subprocess
 import sys
 import tempfile
+from contextlib import contextmanager
+import stat
+import ctypes
 
 try:
     from . import apply_restored_patches as arp
@@ -465,6 +468,61 @@ def regeneration_proof(out, graphs, wrapper, inspect):
     return forbidden, proof
 
 
+def inventory_difference(before, after):
+    fields = ("mode", "size", "mtime_ns", "ctime_ns", "inode", "symlink")
+    return {name: {"before": before.get(name), "after": after.get(name),
+                   "fields": [field for i, field in enumerate(fields)
+                              if name not in before or name not in after or before[name][i] != after[name][i]]}
+            for name in sorted(before.keys() | after.keys()) if before.get(name) != after.get(name)}
+
+
+@contextmanager
+def preflight_source(work, diagnostics):
+    src = (work / "src").resolve()
+    require(sys.platform == "darwin" and Path("/usr/bin/sandbox-exec").is_file(),
+            "isolated mac156 preflight requires macOS sandbox-exec")
+    before = output_inventory(src)
+    # A sibling preserves every ../ input, including paths climbing to the volume root.
+    with tempfile.TemporaryDirectory(prefix=".mac156-preflight-", dir=work) as temporary:
+        scratch = Path(temporary).resolve()
+        libc = ctypes.CDLL(None, use_errno=True)
+        clonefile = libc.clonefile
+        clonefile.argtypes = (ctypes.c_char_p, ctypes.c_char_p, ctypes.c_int)
+        clonefile.restype = ctypes.c_int
+
+        def clone_file(source, destination):
+            require(stat.S_ISREG(os.lstat(source).st_mode), "preflight clone requires regular files")
+            if clonefile(os.fsencode(source), os.fsencode(destination), 0):
+                raise OSError(ctypes.get_errno(), "preflight clonefile failed", source)
+            shutil.copystat(source, destination, follow_symlinks=False)
+            return destination
+
+        shutil.copytree(src, scratch, symlinks=True, dirs_exist_ok=True, copy_function=clone_file)
+        copied = output_inventory(scratch)
+        require(set(before) == set(copied), "preflight clone inventory differs from complete source")
+        for name, entry in before.items():
+            clone = copied[name]
+            require(entry[:3] == clone[:3] and entry[5] == clone[5],
+                    "preflight clone changed size/mode/mtime/link: " + name)
+            if stat.S_ISREG(entry[0]):
+                require(entry[4] != clone[4], "preflight clone must not hardlink original files: " + name)
+        # APFS clonefile creates independent copy-on-write files; no hardlinks or sparse placeholders.
+        policy = diagnostics / "preflight.sb"
+        policy.write_text('(version 1)\n(allow default)\n(deny file-write*)\n'
+                          '(allow file-write* (subpath ' + json.dumps(str(scratch)) + '))\n')
+        (diagnostics / "clone.json").write_bytes(arp._json({
+            "method": "clonefile regular files; copied directories/symlinks", "source": str(src), "scratch": str(scratch),
+            "entries": len(before), "relative_depth_preserved": True}))
+        try:
+            yield scratch, ["/usr/bin/sandbox-exec", "-f", str(policy)]
+        finally:
+            scratch_diff = inventory_difference(copied, output_inventory(scratch))
+            source_diff = inventory_difference(before, output_inventory(src))
+            (diagnostics / "preflight-state-difference.json").write_bytes(arp._json({
+                "original_changed": source_diff, "scratch_changed": scratch_diff}))
+            require(not source_diff, "Ninja preflight modified original source/output; see state-difference report")
+
+
 def frozen_ninja(ninja, work, jobs, env):
     """Load the original graph through a non-generated entry, without touching out."""
     out = work / "src/out/Default"
@@ -476,10 +534,11 @@ def frozen_ninja(ninja, work, jobs, env):
                 "dynamic Ninja dependencies cannot use frozen-graph continuation")
     inventory = output_inventory(out)
     diagnostics = Path(tempfile.mkdtemp(prefix="mac156-ninja-probes-", dir=work / "fingerprint-diagnostics"))
-    with tempfile.TemporaryDirectory(prefix="entry-", dir=diagnostics) as temporary:
+    with preflight_source(work, diagnostics) as (scratch, sandbox), \
+            tempfile.TemporaryDirectory(prefix="entry-", dir=diagnostics) as temporary:
         wrapper = Path(temporary) / "entry.ninja"
         wrapper.write_text("include build.ninja\n")
-        command = [str(ninja), "-C", str(out), "-f", str(wrapper)]
+        command = [*sandbox, str(ninja), "-C", str(scratch / "out/Default"), "-f", str(wrapper)]
 
         probe_index = 0
 
@@ -487,7 +546,7 @@ def frozen_ninja(ninja, work, jobs, env):
             nonlocal probe_index
             probe_index += 1
             prefix = diagnostics / f"probe-{probe_index:03d}"
-            result = subprocess.run([*command, *arguments], cwd=work / "src", env=probe_env,
+            result = subprocess.run([*command, *arguments], cwd=scratch, env=probe_env,
                                     capture_output=True, text=True, check=False, timeout=180)
             prefix.with_suffix(".stdout").write_text(result.stdout)
             prefix.with_suffix(".stderr").write_text(result.stderr)
@@ -496,7 +555,8 @@ def frozen_ninja(ninja, work, jobs, env):
             require(not result.stderr, f"Ninja graph inspection produced warnings; see {prefix}")
             return result.stdout
 
-        forbidden, proof = regeneration_proof(out, graphs, wrapper, inspect)
+        forbidden, proof = regeneration_proof(scratch / "out/Default",
+                                               sorted((scratch / "out/Default").rglob("*.ninja")), wrapper, inspect)
         (diagnostics / "regeneration-proof.json").write_bytes(arp._json(proof))
         # Unlike -t commands, the dry-run plan includes validation and log dependencies.
         plan_env = dict(env, NINJA_STATUS="CHROMIX_FROZEN_PLAN ")
@@ -509,10 +569,15 @@ def frozen_ninja(ninja, work, jobs, env):
                 require(line.startswith("ninja: Entering directory ") or line == "ninja: no work to do.",
                         "unrecognized or multiline frozen Ninja command")
         require(not forbidden.intersection(planned), "GN/manifest regeneration in compile plan is forbidden")
-        require(output_inventory(out) == inventory, "Ninja preflight modified existing output state")
-        # -f changes only the manifest entry point; the original graph, cwd and commands remain intact.
-        return subprocess.run([*command, "-j", jobs, "chrome"], cwd=work / "src",
-                              env=env, check=False).returncode
+    difference = inventory_difference(inventory, output_inventory(out))
+    (diagnostics / "original-out-difference.json").write_bytes(arp._json(difference))
+    require(not difference, "Ninja preflight modified existing output state")
+    with tempfile.TemporaryDirectory(prefix="compile-entry-", dir=diagnostics) as temporary:
+        wrapper = Path(temporary) / "entry.ninja"
+        wrapper.write_text("include build.ninja\n")
+        # Only the approved original graph is compiled; scratch objects/logs are never published.
+        return subprocess.run([str(ninja), "-C", str(out), "-f", str(wrapper), "-j", jobs, "chrome"],
+                              cwd=work / "src", env=env, check=False).returncode
 
 
 def compile_tree(repo, work, stage):
