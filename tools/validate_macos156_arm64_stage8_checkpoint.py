@@ -393,49 +393,116 @@ def native_state(repo, work):
             "Ninja dependency format changed")
 
 
+def regeneration_proof(out, graphs, wrapper, inspect):
+    """Trace protected files through phony inputs to executable producer edges."""
+    out = out.resolve()
+    protected = {path.resolve() for path in graphs}
+    protected.update((out / name).resolve() for name in ("args.gn", "build.ninja.stamp", "build.ninja.d"))
+    targets = {}
+    for line in inspect(["-t", "targets", "all"]).splitlines():
+        name, separator, rule = line.rpartition(": ")
+        require(separator and name and rule and name not in targets, "invalid Ninja target inventory")
+        require((out / name).resolve() != wrapper, "private Ninja entry must not have a generating edge")
+        targets[name] = rule
+    require(targets, "empty Ninja target inventory")
+    roots = sorted(name for name in targets if (out / name).resolve() in protected)
+    pending, visited, producers = list(roots), {}, {}
+    while pending:
+        batch = sorted(set(pending) - visited.keys())
+        pending = []
+        if not batch:
+            break
+        # -n prevents RUN_AFTER_LOGS query from opening/recompacting the donor logs for writing.
+        text = inspect(["-n", "-t", "query", *batch])
+        blocks, current, section = {}, None, None
+        for line in text.splitlines():
+            if not line.startswith(" "):
+                require(line.endswith(":") and line[:-1] in batch and line[:-1] not in blocks,
+                        "unknown Ninja query node")
+                current = blocks[line[:-1]] = {"rule": None, "inputs": []}
+                section = None
+            elif line.startswith("  input: "):
+                require(current is not None and current["rule"] is None, "duplicate Ninja input edge")
+                current["rule"] = line.removeprefix("  input: ")
+                section = "inputs"
+            elif line in ("  validations:", "  outputs:", "  validation for:"):
+                require(current is not None, "Ninja query section without node")
+                section = "inputs" if line == "  validations:" else "outputs"
+            elif line.startswith("    "):
+                require(current is not None and section is not None, "unknown Ninja query dependency")
+                if section == "inputs":
+                    name = line[4:]
+                    for prefix in ("|| ", "| "):
+                        if name.startswith(prefix):
+                            name = name[len(prefix):]
+                            break
+                    require(name, "empty Ninja dependency")
+                    current["inputs"].append(name)
+            else:
+                raise ValueError("unknown Ninja query format")
+        require(set(blocks) == set(batch), "incomplete Ninja producer graph query")
+        for name, node in blocks.items():
+            require(node["rule"] == targets.get(name), "Ninja producer rule disagrees with inventory")
+            visited[name] = node
+            if node["rule"] not in (None, "phony"):
+                producers[name] = node["rule"]
+            pending.extend(node["inputs"])
+        require(len(visited) <= 10000, "protected Ninja producer graph is unexpectedly large")
+    forbidden = set()
+    for name in sorted(producers):
+        lines = inspect(["-t", "commands", "-s", name]).splitlines()
+        require(len(lines) == 1 and lines[0].strip(), "executable Ninja producer has no identifiable command")
+        forbidden.add(lines[0])
+    produced_paths = {(out / name).resolve() for name in roots}
+    proof = {"protected": sorted(str(path.relative_to(out)) for path in protected),
+             "roots": roots, "nodes": visited, "producers": producers,
+             "commands": sorted(forbidden),
+             "unproduced": sorted(str(path.relative_to(out)) for path in protected
+                                   if path not in produced_paths)}
+    # Empty commands are justified only by a complete leaf/phony producer closure.
+    require(forbidden or all(node["rule"] in (None, "phony") for node in visited.values()),
+            "unproved empty regeneration command set")
+    return forbidden, proof
+
+
 def frozen_ninja(ninja, work, jobs, env):
     """Load the original graph through a non-generated entry, without touching out."""
     out = work / "src/out/Default"
     graphs = sorted(out.rglob("*.ninja"))
-    protected = {path.resolve() for path in graphs} | {(out / "args.gn").resolve()}
     for path in graphs:
         raw = read(out, path.relative_to(out).as_posix())
         # A dry run cannot attest to dependencies introduced by future commands.
         require(not re.search(rb"(?m)^\s*dyndep\s*=", raw),
                 "dynamic Ninja dependencies cannot use frozen-graph continuation")
     inventory = output_inventory(out)
-    with tempfile.TemporaryDirectory(prefix="mac156-frozen-", dir=work / "fingerprint-diagnostics") as temporary:
+    diagnostics = Path(tempfile.mkdtemp(prefix="mac156-ninja-probes-", dir=work / "fingerprint-diagnostics"))
+    with tempfile.TemporaryDirectory(prefix="entry-", dir=diagnostics) as temporary:
         wrapper = Path(temporary) / "entry.ninja"
         wrapper.write_text("include build.ninja\n")
         command = [str(ninja), "-C", str(out), "-f", str(wrapper)]
 
-        def inspect(arguments):
-            result = subprocess.run([*command, *arguments], cwd=work / "src", env=env,
-                                    capture_output=True, text=True, check=True, timeout=180)
-            require(not result.stderr, "Ninja graph inspection produced warnings")
+        probe_index = 0
+
+        def inspect(arguments, probe_env=env):
+            nonlocal probe_index
+            probe_index += 1
+            prefix = diagnostics / f"probe-{probe_index:03d}"
+            result = subprocess.run([*command, *arguments], cwd=work / "src", env=probe_env,
+                                    capture_output=True, text=True, check=False, timeout=180)
+            prefix.with_suffix(".stdout").write_text(result.stdout)
+            prefix.with_suffix(".stderr").write_text(result.stderr)
+            prefix.with_suffix(".json").write_bytes(arp._json({"arguments": arguments, "returncode": result.returncode}))
+            require(result.returncode == 0, f"Ninja probe failed; see {prefix}")
+            require(not result.stderr, f"Ninja graph inspection produced warnings; see {prefix}")
             return result.stdout
 
-        # RUN_AFTER_LOAD tools execute before OpenBuildLog/RebuildManifest in 1.13.2.
-        targets = inspect(["-t", "targets", "all"])
-        generated_manifests = []
-        for line in targets.splitlines():
-            name, separator, rule = line.rpartition(": ")
-            require(separator and name and rule, "invalid Ninja target inventory")
-            path = (out / name).resolve()
-            require(path != wrapper, "private Ninja entry must not have a generating edge")
-            if path in protected:
-                generated_manifests.append(name)
-        require("build.ninja" in generated_manifests, "authenticated GN regeneration edge missing")
-        regeneration = inspect(["-t", "commands", "-s", *generated_manifests])
-        forbidden = {line for line in regeneration.splitlines() if line}
-        require(forbidden, "GN regeneration commands must be identifiable")
+        forbidden, proof = regeneration_proof(out, graphs, wrapper, inspect)
+        (diagnostics / "regeneration-proof.json").write_bytes(arp._json(proof))
         # Unlike -t commands, the dry-run plan includes validation and log dependencies.
         plan_env = dict(env, NINJA_STATUS="CHROMIX_FROZEN_PLAN ")
-        plan = subprocess.run([*command, "-n", "-v", "-j", jobs, "chrome"], cwd=work / "src",
-                              env=plan_env, capture_output=True, text=True, check=True, timeout=180)
-        require(not plan.stderr, "frozen Ninja dry run produced warnings")
+        plan = inspect(["-n", "-v", "-j", jobs, "chrome"], plan_env)
         planned = []
-        for line in plan.stdout.splitlines():
+        for line in plan.splitlines():
             if line.startswith("CHROMIX_FROZEN_PLAN "):
                 planned.append(line.removeprefix("CHROMIX_FROZEN_PLAN "))
             else:

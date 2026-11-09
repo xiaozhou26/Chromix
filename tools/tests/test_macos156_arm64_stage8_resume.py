@@ -19,6 +19,8 @@ from tools import validate_macos156_arm64_stage8_checkpoint as arm
 ROOT = Path(__file__).resolve().parents[2]
 FIXTURE = json.loads(gzip.decompress(
     (ROOT / 'tools/tests/fixtures/macos156_arm64_stage8_receipts.json.gz').read_bytes()))
+GN_FIXTURE = json.loads(gzip.decompress(
+    (ROOT / 'tools/tests/fixtures/macos156_donor_gn_graph.json.gz').read_bytes()))
 ENV = {'GITHUB_RUN_ID': '999999', 'GITHUB_RUN_ATTEMPT': '1',
        'CHROMIX_BUILD_PROFILE': 'fast', 'CHROMIX_USE_UPSTREAM_CACHE': '1', 'CHROMIX_JOBS': '3'}
 
@@ -363,7 +365,8 @@ class RealNinjaTest(unittest.TestCase):
         obj = arm.output_inventory(self.out)['sample.o']
         self.assertEqual(self.run_frozen(), 0)
         self.assertEqual(obj, arm.output_inventory(self.out)['sample.o'])
-        self.assertEqual(list((self.work / 'fingerprint-diagnostics').iterdir()), [])
+        self.assertFalse(list((self.work / 'fingerprint-diagnostics').rglob('entry.ninja')))
+        self.assertTrue(list((self.work / 'fingerprint-diagnostics').rglob('regeneration-proof.json')))
 
     def test_explicit_implicit_order_only_and_validation_regeneration_rejected(self):
         for dependency in (' build.ninja', ' | build.ninja', ' || build.ninja', ' |@ build.ninja'):
@@ -416,6 +419,119 @@ class RealNinjaTest(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, 'regeneration.*forbidden'):
             self.run_frozen()
         self.assertEqual(original, arm.output_inventory(self.out))
+
+    def load_real_gn(self):
+        for name, text in GN_FIXTURE['generated_files'].items():
+            path = self.work / 'src' / name
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_text(text)
+        # Match the real donor self-invocation path without running GN on the restored graph.
+        path = self.out / 'build.ninja'
+        path.write_text(path.read_text().replace('../../../gn ', './gn '))
+        (self.out / 'gn').write_text('#!/bin/sh\ntouch REGENERATED\nexit 23\n')
+        (self.out / 'gn').chmod(0o755)
+
+    def test_exact_donor_generated_phony_stamp_header_and_real_c_build(self):
+        self.load_real_gn()
+        self.assertTrue((self.out / 'build.ninja').read_text().startswith(GN_FIXTURE['donor_header']))
+        self.assertEqual(GN_FIXTURE['donor_gn_version'], '2578 (510ec7992c30)')
+        self.assertEqual(arm.sha(GN_FIXTURE['gn_writer_source'].encode()), GN_FIXTURE['gn_writer_sha256'])
+        self.assertEqual(GN_FIXTURE['actual_probes']['direct.txt'], '')
+        command = './gn --root=../.. -q --fail-on-unused-args --regeneration gen .'
+        self.assertEqual(GN_FIXTURE['actual_probes']['transitive.txt'].strip(), command)
+        original = arm.output_inventory(self.out)
+        self.assertEqual(self.run_frozen(), 0)
+        self.assertTrue(list(self.out.rglob('*.o')))
+        self.assertFalse((self.out / 'REGENERATED').exists())
+        proof = json.loads(next((self.work / 'fingerprint-diagnostics').rglob('regeneration-proof.json')).read_text())
+        self.assertEqual(proof['commands'], [command])
+        self.assertEqual(proof['nodes'], GN_FIXTURE['actual_proof']['nodes'])
+        self.assertEqual(proof['producers'], GN_FIXTURE['actual_proof']['producers'])
+        self.assertIn('args.gn', proof['unproduced'])
+        for name in ('build.ninja', 'toolchain.ninja', 'build.ninja.stamp'):
+            self.assertEqual(original[name], arm.output_inventory(self.out)[name])
+        obj = {k: v for k, v in arm.output_inventory(self.out).items() if k.endswith('.o')}
+        self.assertEqual(self.run_frozen(), 0)
+        self.assertEqual(obj, {k: v for k, v in arm.output_inventory(self.out).items() if k.endswith('.o')})
+
+    def test_real_gn_indirect_stamp_generation_cannot_enter_compile_plan(self):
+        for dependency in ('build.ninja', 'build.ninja.stamp'):
+            with self.subTest(dependency=dependency):
+                self.load_real_gn()
+                path = self.out / 'build.ninja'
+                path.write_text(path.read_text().replace('build chrome: phony phony/chrome',
+                                                        'build chrome: phony phony/chrome |@ ' + dependency))
+                (self.out / 'build.ninja.stamp').unlink()
+                original = arm.output_inventory(self.out)
+                with self.assertRaisesRegex(ValueError, 'regeneration.*forbidden'):
+                    self.run_frozen()
+                self.assertEqual(original, arm.output_inventory(self.out))
+                self.assertFalse((self.out / 'REGENERATED').exists())
+
+    def test_real_gn_no_producer_requires_complete_graph_proof(self):
+        self.load_real_gn()
+        path = self.out / 'build.ninja'
+        text = path.read_text()
+        # Model an externally generated frozen graph using the actual GN output as the base.
+        text = text.replace(GN_FIXTURE['donor_header'], 'ninja_required_version = 1.7.2\n\n')
+        path.write_text(text)
+        self.assertEqual(self.run_frozen(), 0)
+        proof = json.loads(next((self.work / 'fingerprint-diagnostics').rglob('regeneration-proof.json')).read_text())
+        self.assertEqual(proof['commands'], [])
+        self.assertEqual(proof['nodes'], {})
+        self.assertIn('build.ninja', proof['unproduced'])
+        self.assertIn('build.ninja.stamp', proof['unproduced'])
+        self.assertIn('args.gn', proof['unproduced'])
+
+    def test_phony_only_empty_closure_is_proved_not_assumed(self):
+        self.load_real_gn()
+        path = self.out / 'build.ninja'
+        path.write_text(path.read_text().replace('build build.ninja.stamp: gn',
+                                                'build build.ninja.stamp: phony'))
+        self.assertEqual(self.run_frozen(), 0)
+        proof = json.loads(next((self.work / 'fingerprint-diagnostics').rglob('regeneration-proof.json')).read_text())
+        self.assertEqual(proof['commands'], [])
+        self.assertEqual(proof['nodes']['build.ninja.stamp']['rule'], 'phony')
+
+    def test_phony_validation_producer_is_traced_and_blocked(self):
+        self.load_real_gn()
+        path = self.out / 'build.ninja'
+        text = path.read_text().replace('build build.ninja: phony build.ninja.stamp',
+                                       'build build.ninja: phony |@ bridge')
+        text += '\nbuild bridge: phony build.ninja.stamp\n'
+        text = text.replace('build chrome: phony phony/chrome',
+                            'build chrome: phony phony/chrome |@ build.ninja')
+        path.write_text(text)
+        (self.out / 'build.ninja.stamp').unlink()
+        with self.assertRaisesRegex(ValueError, 'regeneration.*forbidden'):
+            self.run_frozen()
+        self.assertFalse((self.out / 'REGENERATED').exists())
+
+    def test_unknown_or_incomplete_query_cannot_justify_empty_commands(self):
+        for query in ('build.ninja:\n  unknown: future-format\n',
+                      'other.ninja:\n  outputs:\n', ''):
+            def inspect(args):
+                if args == ['-t', 'targets', 'all']:
+                    return 'build.ninja: phony\n'
+                return query
+            with self.subTest(query=query), self.assertRaises(ValueError):
+                arm.regeneration_proof(self.out, [self.out / 'build.ninja'], self.work / 'entry.ninja', inspect)
+
+    def test_empty_nonphony_command_and_warnings_are_rejected_with_diagnostics(self):
+        self.load_real_gn()
+        path = self.out / 'build.ninja'
+        path.write_text(path.read_text().replace('command = ./gn --root=../.. -q --fail-on-unused-args --regeneration gen .',
+                                                 'command = $unknown_command'))
+        original = arm.output_inventory(self.out)
+        with self.assertRaisesRegex(ValueError, 'no identifiable command'):
+            self.run_frozen()
+        self.assertEqual(original, arm.output_inventory(self.out))
+        self.assertTrue(list((self.work / 'fingerprint-diagnostics').rglob('*.stdout')))
+        self.load_real_gn()
+        (self.out / '.ninja_log').write_text('bad header\n')
+        with self.assertRaisesRegex(ValueError, 'warnings'):
+            self.run_frozen()
+        self.assertTrue(any(p.read_text() for p in (self.work / 'fingerprint-diagnostics').rglob('*.stderr')))
 
     def test_dynamic_dependency_and_compile_failure_fail_closed(self):
         sample_graph(self.out, extra='dyndep = future.dd\n')

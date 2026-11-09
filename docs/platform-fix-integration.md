@@ -138,3 +138,63 @@ checkpoint、旧 Mac checkpoint、Ninja 合同组合复跑为 126 passed、17 sk
 `COPYFILE_DISABLE=1 TMPDIR=/private/tmp /tmp/chromix-156-venv/bin/python`。
 AST 对比确认只有原 `compile_tree` 调用路径改变，所有原身份常量以及 source_state、
 SDK/core/recipe 准入函数保持一致。未 push、未 dispatch。
+
+
+### 真实 GN156 phony/stamp 图修正（run42632751681）
+
+基线 main 已通过 API 核实为 `4d75297d480b22dcb09da08ecbab6af693ad6833`，
+本次使用独立 `/tmp/chromix-mac156-gn-graph-fix` worktree，不覆盖此前工作区。
+新 run 小诊断 artifact `13683691524`，557936 bytes，SHA-256
+`ea20ec99843f2992cc1dcc935b205b2f3aaaf32b1379281966940e495de6c962`
+已经下载核验；其中没有保存 Ninja probe stdout/stderr，不能靠它推断实际图。
+
+这次完整下载并校验原 donor artifact `13675184448` 的 9643478210 bytes ZIP，
+SHA-256 仍为 `b943ead7eaf8ba1f3b458763fdd42c381f5b9e440ad352448283971181d6da56`。
+从其中单卷提取了 13,463 个未经改写的 Ninja 图文件及 GN/stamp/args/log/deps。
+全部图 hash `3f8de07349384af93596270af54e4cd3fa707179ddd55265c8b6393495226fd7`
+和三项原 Ninja 文件 hash 均与新 run 的 source 准入收据一致。完整 archive 保留于
+`/tmp/chromix-mac156-exact-donor-13675184448.zip`，提取的只读图在
+`/tmp/chromix-mac156-donor-graph`。
+
+真实结构不是“没有 GN 生成器”：`build.ninja` 的生产边为
+`phony build.ninja.stamp`，`build.ninja.stamp` 的生产边为 `gn`，实际命令是
+`./gn --root=../.. -q --fail-on-unused-args --regeneration gen .`；
+`args.gn` 不在 producer target inventory 中，是预先存在的配置输入。
+对完整 donor 图实际执行 `ninja -t commands -s build.ninja` 得到空 stdout、空 stderr，
+而传递 `commands build.ninja` 得到上述 GN 命令。完整 inventory 有 311,011 targets。
+这解释了上一次“必须有直接命令”的错误假设，而不是 source verify 失败。
+
+helper 现在从所有受保护 `.ninja`、`args.gn`、`build.ninja.stamp`、`build.ninja.d`
+开始，以 `targets all` 识别 producer roots，再用只读 `-n -t query` 遍历 phony、
+普通/implicit/order-only inputs 和 validations，直到真实 executable producers。
+`-n` 防止 query 的 RUN_AFTER_LOGS 路径写入或 recompact 原日志。
+每个非 phony producer 必须能返回非空单行命令；只有 inventory 证明无 producer，
+或完整闭包全是 leaf/phony 时，空命令集才有合法图证明。未知格式、缺失节点、
+rule 与 inventory 不一致、warning 和动态图继续拒绝；不再把空 stdout 当作证明。
+实际 dry-run 仍阻断 GN 及受保护文件的所有间接生成命令，私有 `-f` 入口继续禁止
+自动 regeneration，源码/GN/PGO/已有 out 对象不变。
+
+每次 probe 的参数、返回码、stdout/stderr 和 `regeneration-proof.json` 现在写到
+现有 fingerprint-diagnostics 上传目录；失败也保留诊断，临时入口仍清除。
+新 proof 已在完整原 donor 的 13,463 个图上通过，确认唯一 producer 为 stamp 的
+`gn` 命令，整个 out 库存前后相同。
+
+测试夹具 `tools/tests/fixtures/macos156_donor_gn_graph.json.gz` 保存真实 donor
+header、probe、完整图 proof 摘要以及 donor `src/tools/gn/src/gn/ninja_build_writer.cc`
+源码。另用从同一 archive 提取的 GN 二进制（SHA-256
+`a3d593a9aa898634f8d6b04a6a929af2e65ccb876a5f4b4185366db24eff2de1`，
+版本 `2578 (510ec7992c30)`）实际生成最小 C 构建图，保存输入和原始生成文件。
+真实 Ninja 测试覆盖 phony 无直接命令、无 producer、phony-only、间接 stamp/validation
+危险分支、未知图/空 executable command/warning 拒绝及已编译对象复用。
+无 producer 变体明确由真实生成图移除生成边构造，不冒称 donor 本身没有生成边。
+
+完整 Chromium 源码和对象未全量解包；全 donor 图生产链证明与真实 GN 小构建已验证，
+完整 chrome dry-run/compile、SDK 原生 runtime 仍需父任务最终调度，不能视为已通过。
+本次不修改 workflow、旧恢复工具、source/SDK/core 验证链或 runtime gate，不 push/dispatch。
+
+最终针对性组合回归：133 passed、17 skipped、269 subtests passed，日志
+`/tmp/chromix-mac156-gn-graph-final-tests.log`。最终 helper 在完整 donor 图再次验证
+生产链 proof 通过，out 全库存未变；结果保存在
+`/tmp/chromix-mac156-actual-probes/proof.json`。Python 编译、`git diff --check`
+通过，AST 比对确认仅原 `frozen_ninja` 函数发生变化，其余原验证函数及身份常量
+保持一致。
