@@ -115,8 +115,19 @@ jobs:
           test '${{ inputs.max-stages }}' = 8
           test '${{ inputs.build_profile }}:${{ inputs.use_upstream_cache }}' = fast:true
           test '${{ inputs.resume_run_id }}:${{ inputs.resume_tree_stage }}:${{ inputs.resume_attempt }}:${{ inputs.resume_artifact_ids }}' = 42455180503:8:1:13675184448
+      - name: Require exact mac156 Intel stage8 continuation inputs
+        if: inputs.resume_migration == 'mac156-x64-stage8'
+        run: |
+          set -euo pipefail
+          test '${{ github.repository }}' = xiaozhou26/Chromix
+          test '${{ github.event_name }}' = workflow_dispatch
+          test '${{ inputs.platform }}:${{ inputs.arch }}:${{ inputs.runner }}' = macos:x64:macos-26-intel
+          test '${{ inputs.artifact }}' = chromix-mac156-x64-stage8-resume
+          test '${{ inputs.max-stages }}' = 8
+          test '${{ inputs.build_profile }}:${{ inputs.use_upstream_cache }}' = fast:true
+          test '${{ inputs.resume_run_id }}:${{ inputs.resume_tree_stage }}:${{ inputs.resume_attempt }}:${{ inputs.resume_artifact_ids }}' = 42455177686:8:2:13701073762
       - name: Require exact Linux156 recovery inputs
-        if: inputs.resume_migration != '' && inputs.resume_migration != 'mac156-arm64-stage8'
+        if: inputs.resume_migration != '' && inputs.resume_migration != 'mac156-arm64-stage8' && inputs.resume_migration != 'mac156-x64-stage8'
         run: |
           set -euo pipefail
           test '${{ inputs.resume_migration }}' = linux156-ts
@@ -133,6 +144,9 @@ jobs:
       - name: Enable fixed unchanged mac156 continuation
         if: inputs.resume_migration == 'mac156-arm64-stage8'
         run: echo 'CHROMIX_UNCHANGED_RESUME=mac156-arm64-stage8' >> "$GITHUB_ENV"
+      - name: Enable fixed unchanged mac156 Intel continuation
+        if: inputs.resume_migration == 'mac156-x64-stage8'
+        run: echo 'CHROMIX_UNCHANGED_RESUME=mac156-x64-stage8' >> "$GITHUB_ENV"
 
       - name: Free Linux disk space
         if: runner.os == 'Linux'
@@ -298,6 +312,9 @@ jobs:
           if [ '${{ inputs.resume_migration }}' = mac156-arm64-stage8 ]; then
             python3 tools/validate_macos156_arm64_stage8_checkpoint.py --mode metadata \
               --report "${RUNNER_TEMP}/chromix-logs/snapshot-origin.json"
+          elif [ '${{ inputs.resume_migration }}' = mac156-x64-stage8 ]; then
+            python3 tools/validate_macos156_x64_stage8_checkpoint.py --mode metadata \
+              --report "${RUNNER_TEMP}/chromix-logs/snapshot-origin.json"
           elif [ '${{ inputs.resume_migration }}' = linux156-ts ]; then
             test "$BUILD_PLATFORM" = linux
             test "$BUILD_PROFILE" = fast
@@ -342,6 +359,11 @@ jobs:
           bash build/posix/restore-snapshot.sh "$RESTORE" "$WORK"
           if [ '${{ inputs.resume_migration }}' = mac156-arm64-stage8 ]; then
             python3 tools/validate_macos156_arm64_stage8_checkpoint.py --mode admit --workdir "$WORK" \
+              --previous-repo "$GITHUB_WORKSPACE/.chromix-previous-repo" --repo "$GITHUB_WORKSPACE" \
+              --origin "${RUNNER_TEMP}/chromix-logs/snapshot-origin.json" \
+              --download-report "${RUNNER_TEMP}/chromix-logs/snapshot-download.json"
+          elif [ '${{ inputs.resume_migration }}' = mac156-x64-stage8 ]; then
+            python3 tools/validate_macos156_x64_stage8_checkpoint.py --mode admit --workdir "$WORK" \
               --previous-repo "$GITHUB_WORKSPACE/.chromix-previous-repo" --repo "$GITHUB_WORKSPACE" \
               --origin "${RUNNER_TEMP}/chromix-logs/snapshot-origin.json" \
               --download-report "${RUNNER_TEMP}/chromix-logs/snapshot-download.json"
@@ -406,6 +428,7 @@ jobs:
           path: |
             ${{ runner.temp }}/chromix-build/dist/${{ inputs.artifact }}.zip
             ${{ runner.temp }}/chromix-build/dist/${{ inputs.resume_migration == 'mac156-arm64-stage8' && 'chromix-mac-arm64' || inputs.artifact }}.zip
+            ${{ runner.temp }}/chromix-build/dist/${{ inputs.resume_migration == 'mac156-x64-stage8' && 'chromix-mac-x64' || inputs.artifact }}.zip
             ${{ runner.temp }}/chromix-build/dist/SHA256SUMS
             ${{ runner.temp }}/chromix-build/runtime-smoke-stage-1/
             ${{ runner.temp }}/chromix-build/fingerprint-diagnostics/
@@ -416,11 +439,15 @@ jobs:
 
       - name: Preserve latest macOS compiled checkpoint
         id: runtime_checkpoint
-        if: ${{ !cancelled() && inputs.platform == 'macos' && steps.stage.outputs.compiled_ready == 'true' }}
+        if: ${{ !cancelled() && inputs.platform == 'macos' && (steps.stage.outputs.compiled_ready == 'true' || (inputs.resume_migration == 'mac156-x64-stage8' && failure())) }}
         run: |
           set -euo pipefail
           WORK="${RUNNER_TEMP}/chromix-build"
-          bash build/posix/ci-parts.sh "$WORK" "$WORK/.snapshot-stage-1"
+          test -d "$WORK/src"
+          if [ '${{ inputs.resume_migration }}' != mac156-x64-stage8 ] ||
+             [ '${{ steps.stage.outputs.upload_snapshot }}' != true ]; then
+            bash build/posix/ci-parts.sh "$WORK" "$WORK/.snapshot-stage-1"
+          fi
           echo "upload_snapshot=true" >> "$GITHUB_OUTPUT"
 
       - name: Upload failed Linux runtime bundle
@@ -526,6 +553,7 @@ jobs:
           path: |
             ${{ runner.temp }}/chromix-build/dist/${{ inputs.artifact }}.zip
             ${{ runner.temp }}/chromix-build/dist/${{ inputs.resume_migration == 'mac156-arm64-stage8' && 'chromix-mac-arm64' || inputs.artifact }}.zip
+            ${{ runner.temp }}/chromix-build/dist/${{ inputs.resume_migration == 'mac156-x64-stage8' && 'chromix-mac-x64' || inputs.artifact }}.zip
             ${{ runner.temp }}/chromix-build/dist/SHA256SUMS
           if-no-files-found: error
           retention-days: 14
@@ -600,6 +628,9 @@ jobs:
       - name: Enable fixed unchanged mac156 continuation
         if: inputs.resume_migration == 'mac156-arm64-stage8'
         run: echo 'CHROMIX_UNCHANGED_RESUME=mac156-arm64-stage8' >> "$GITHUB_ENV"
+      - name: Enable fixed unchanged mac156 Intel continuation
+        if: inputs.resume_migration == 'mac156-x64-stage8'
+        run: echo 'CHROMIX_UNCHANGED_RESUME=mac156-x64-stage8' >> "$GITHUB_ENV"
 
       - name: Free Linux disk space
         if: runner.os == 'Linux'
@@ -783,6 +814,7 @@ jobs:
           path: |
             ${{ runner.temp }}/chromix-build/dist/${{ inputs.artifact }}.zip
             ${{ runner.temp }}/chromix-build/dist/${{ inputs.resume_migration == 'mac156-arm64-stage8' && 'chromix-mac-arm64' || inputs.artifact }}.zip
+            ${{ runner.temp }}/chromix-build/dist/${{ inputs.resume_migration == 'mac156-x64-stage8' && 'chromix-mac-x64' || inputs.artifact }}.zip
             ${{ runner.temp }}/chromix-build/dist/SHA256SUMS
             ${{ runner.temp }}/chromix-build/runtime-smoke-stage-2/
             ${{ runner.temp }}/chromix-build/fingerprint-diagnostics/
@@ -793,11 +825,15 @@ jobs:
 
       - name: Preserve latest macOS compiled checkpoint
         id: runtime_checkpoint
-        if: ${{ !cancelled() && inputs.platform == 'macos' && steps.stage.outputs.compiled_ready == 'true' }}
+        if: ${{ !cancelled() && inputs.platform == 'macos' && (steps.stage.outputs.compiled_ready == 'true' || (inputs.resume_migration == 'mac156-x64-stage8' && failure())) }}
         run: |
           set -euo pipefail
           WORK="${RUNNER_TEMP}/chromix-build"
-          bash build/posix/ci-parts.sh "$WORK" "$WORK/.snapshot-stage-2"
+          test -d "$WORK/src"
+          if [ '${{ inputs.resume_migration }}' != mac156-x64-stage8 ] ||
+             [ '${{ steps.stage.outputs.upload_snapshot }}' != true ]; then
+            bash build/posix/ci-parts.sh "$WORK" "$WORK/.snapshot-stage-2"
+          fi
           echo "upload_snapshot=true" >> "$GITHUB_OUTPUT"
 
       - name: Upload failed Linux runtime bundle
@@ -903,6 +939,7 @@ jobs:
           path: |
             ${{ runner.temp }}/chromix-build/dist/${{ inputs.artifact }}.zip
             ${{ runner.temp }}/chromix-build/dist/${{ inputs.resume_migration == 'mac156-arm64-stage8' && 'chromix-mac-arm64' || inputs.artifact }}.zip
+            ${{ runner.temp }}/chromix-build/dist/${{ inputs.resume_migration == 'mac156-x64-stage8' && 'chromix-mac-x64' || inputs.artifact }}.zip
             ${{ runner.temp }}/chromix-build/dist/SHA256SUMS
           if-no-files-found: error
           retention-days: 14
@@ -977,6 +1014,9 @@ jobs:
       - name: Enable fixed unchanged mac156 continuation
         if: inputs.resume_migration == 'mac156-arm64-stage8'
         run: echo 'CHROMIX_UNCHANGED_RESUME=mac156-arm64-stage8' >> "$GITHUB_ENV"
+      - name: Enable fixed unchanged mac156 Intel continuation
+        if: inputs.resume_migration == 'mac156-x64-stage8'
+        run: echo 'CHROMIX_UNCHANGED_RESUME=mac156-x64-stage8' >> "$GITHUB_ENV"
 
       - name: Free Linux disk space
         if: runner.os == 'Linux'
@@ -1160,6 +1200,7 @@ jobs:
           path: |
             ${{ runner.temp }}/chromix-build/dist/${{ inputs.artifact }}.zip
             ${{ runner.temp }}/chromix-build/dist/${{ inputs.resume_migration == 'mac156-arm64-stage8' && 'chromix-mac-arm64' || inputs.artifact }}.zip
+            ${{ runner.temp }}/chromix-build/dist/${{ inputs.resume_migration == 'mac156-x64-stage8' && 'chromix-mac-x64' || inputs.artifact }}.zip
             ${{ runner.temp }}/chromix-build/dist/SHA256SUMS
             ${{ runner.temp }}/chromix-build/runtime-smoke-stage-3/
             ${{ runner.temp }}/chromix-build/fingerprint-diagnostics/
@@ -1170,11 +1211,15 @@ jobs:
 
       - name: Preserve latest macOS compiled checkpoint
         id: runtime_checkpoint
-        if: ${{ !cancelled() && inputs.platform == 'macos' && steps.stage.outputs.compiled_ready == 'true' }}
+        if: ${{ !cancelled() && inputs.platform == 'macos' && (steps.stage.outputs.compiled_ready == 'true' || (inputs.resume_migration == 'mac156-x64-stage8' && failure())) }}
         run: |
           set -euo pipefail
           WORK="${RUNNER_TEMP}/chromix-build"
-          bash build/posix/ci-parts.sh "$WORK" "$WORK/.snapshot-stage-3"
+          test -d "$WORK/src"
+          if [ '${{ inputs.resume_migration }}' != mac156-x64-stage8 ] ||
+             [ '${{ steps.stage.outputs.upload_snapshot }}' != true ]; then
+            bash build/posix/ci-parts.sh "$WORK" "$WORK/.snapshot-stage-3"
+          fi
           echo "upload_snapshot=true" >> "$GITHUB_OUTPUT"
 
       - name: Upload failed Linux runtime bundle
@@ -1280,6 +1325,7 @@ jobs:
           path: |
             ${{ runner.temp }}/chromix-build/dist/${{ inputs.artifact }}.zip
             ${{ runner.temp }}/chromix-build/dist/${{ inputs.resume_migration == 'mac156-arm64-stage8' && 'chromix-mac-arm64' || inputs.artifact }}.zip
+            ${{ runner.temp }}/chromix-build/dist/${{ inputs.resume_migration == 'mac156-x64-stage8' && 'chromix-mac-x64' || inputs.artifact }}.zip
             ${{ runner.temp }}/chromix-build/dist/SHA256SUMS
           if-no-files-found: error
           retention-days: 14
@@ -1354,6 +1400,9 @@ jobs:
       - name: Enable fixed unchanged mac156 continuation
         if: inputs.resume_migration == 'mac156-arm64-stage8'
         run: echo 'CHROMIX_UNCHANGED_RESUME=mac156-arm64-stage8' >> "$GITHUB_ENV"
+      - name: Enable fixed unchanged mac156 Intel continuation
+        if: inputs.resume_migration == 'mac156-x64-stage8'
+        run: echo 'CHROMIX_UNCHANGED_RESUME=mac156-x64-stage8' >> "$GITHUB_ENV"
 
       - name: Free Linux disk space
         if: runner.os == 'Linux'
@@ -1537,6 +1586,7 @@ jobs:
           path: |
             ${{ runner.temp }}/chromix-build/dist/${{ inputs.artifact }}.zip
             ${{ runner.temp }}/chromix-build/dist/${{ inputs.resume_migration == 'mac156-arm64-stage8' && 'chromix-mac-arm64' || inputs.artifact }}.zip
+            ${{ runner.temp }}/chromix-build/dist/${{ inputs.resume_migration == 'mac156-x64-stage8' && 'chromix-mac-x64' || inputs.artifact }}.zip
             ${{ runner.temp }}/chromix-build/dist/SHA256SUMS
             ${{ runner.temp }}/chromix-build/runtime-smoke-stage-4/
             ${{ runner.temp }}/chromix-build/fingerprint-diagnostics/
@@ -1547,11 +1597,15 @@ jobs:
 
       - name: Preserve latest macOS compiled checkpoint
         id: runtime_checkpoint
-        if: ${{ !cancelled() && inputs.platform == 'macos' && steps.stage.outputs.compiled_ready == 'true' }}
+        if: ${{ !cancelled() && inputs.platform == 'macos' && (steps.stage.outputs.compiled_ready == 'true' || (inputs.resume_migration == 'mac156-x64-stage8' && failure())) }}
         run: |
           set -euo pipefail
           WORK="${RUNNER_TEMP}/chromix-build"
-          bash build/posix/ci-parts.sh "$WORK" "$WORK/.snapshot-stage-4"
+          test -d "$WORK/src"
+          if [ '${{ inputs.resume_migration }}' != mac156-x64-stage8 ] ||
+             [ '${{ steps.stage.outputs.upload_snapshot }}' != true ]; then
+            bash build/posix/ci-parts.sh "$WORK" "$WORK/.snapshot-stage-4"
+          fi
           echo "upload_snapshot=true" >> "$GITHUB_OUTPUT"
 
       - name: Upload failed Linux runtime bundle
@@ -1657,6 +1711,7 @@ jobs:
           path: |
             ${{ runner.temp }}/chromix-build/dist/${{ inputs.artifact }}.zip
             ${{ runner.temp }}/chromix-build/dist/${{ inputs.resume_migration == 'mac156-arm64-stage8' && 'chromix-mac-arm64' || inputs.artifact }}.zip
+            ${{ runner.temp }}/chromix-build/dist/${{ inputs.resume_migration == 'mac156-x64-stage8' && 'chromix-mac-x64' || inputs.artifact }}.zip
             ${{ runner.temp }}/chromix-build/dist/SHA256SUMS
           if-no-files-found: error
           retention-days: 14
@@ -1731,6 +1786,9 @@ jobs:
       - name: Enable fixed unchanged mac156 continuation
         if: inputs.resume_migration == 'mac156-arm64-stage8'
         run: echo 'CHROMIX_UNCHANGED_RESUME=mac156-arm64-stage8' >> "$GITHUB_ENV"
+      - name: Enable fixed unchanged mac156 Intel continuation
+        if: inputs.resume_migration == 'mac156-x64-stage8'
+        run: echo 'CHROMIX_UNCHANGED_RESUME=mac156-x64-stage8' >> "$GITHUB_ENV"
 
       - name: Free Linux disk space
         if: runner.os == 'Linux'
@@ -1914,6 +1972,7 @@ jobs:
           path: |
             ${{ runner.temp }}/chromix-build/dist/${{ inputs.artifact }}.zip
             ${{ runner.temp }}/chromix-build/dist/${{ inputs.resume_migration == 'mac156-arm64-stage8' && 'chromix-mac-arm64' || inputs.artifact }}.zip
+            ${{ runner.temp }}/chromix-build/dist/${{ inputs.resume_migration == 'mac156-x64-stage8' && 'chromix-mac-x64' || inputs.artifact }}.zip
             ${{ runner.temp }}/chromix-build/dist/SHA256SUMS
             ${{ runner.temp }}/chromix-build/runtime-smoke-stage-5/
             ${{ runner.temp }}/chromix-build/fingerprint-diagnostics/
@@ -1924,11 +1983,15 @@ jobs:
 
       - name: Preserve latest macOS compiled checkpoint
         id: runtime_checkpoint
-        if: ${{ !cancelled() && inputs.platform == 'macos' && steps.stage.outputs.compiled_ready == 'true' }}
+        if: ${{ !cancelled() && inputs.platform == 'macos' && (steps.stage.outputs.compiled_ready == 'true' || (inputs.resume_migration == 'mac156-x64-stage8' && failure())) }}
         run: |
           set -euo pipefail
           WORK="${RUNNER_TEMP}/chromix-build"
-          bash build/posix/ci-parts.sh "$WORK" "$WORK/.snapshot-stage-5"
+          test -d "$WORK/src"
+          if [ '${{ inputs.resume_migration }}' != mac156-x64-stage8 ] ||
+             [ '${{ steps.stage.outputs.upload_snapshot }}' != true ]; then
+            bash build/posix/ci-parts.sh "$WORK" "$WORK/.snapshot-stage-5"
+          fi
           echo "upload_snapshot=true" >> "$GITHUB_OUTPUT"
 
       - name: Upload failed Linux runtime bundle
@@ -2034,6 +2097,7 @@ jobs:
           path: |
             ${{ runner.temp }}/chromix-build/dist/${{ inputs.artifact }}.zip
             ${{ runner.temp }}/chromix-build/dist/${{ inputs.resume_migration == 'mac156-arm64-stage8' && 'chromix-mac-arm64' || inputs.artifact }}.zip
+            ${{ runner.temp }}/chromix-build/dist/${{ inputs.resume_migration == 'mac156-x64-stage8' && 'chromix-mac-x64' || inputs.artifact }}.zip
             ${{ runner.temp }}/chromix-build/dist/SHA256SUMS
           if-no-files-found: error
           retention-days: 14
@@ -2108,6 +2172,9 @@ jobs:
       - name: Enable fixed unchanged mac156 continuation
         if: inputs.resume_migration == 'mac156-arm64-stage8'
         run: echo 'CHROMIX_UNCHANGED_RESUME=mac156-arm64-stage8' >> "$GITHUB_ENV"
+      - name: Enable fixed unchanged mac156 Intel continuation
+        if: inputs.resume_migration == 'mac156-x64-stage8'
+        run: echo 'CHROMIX_UNCHANGED_RESUME=mac156-x64-stage8' >> "$GITHUB_ENV"
 
       - name: Free Linux disk space
         if: runner.os == 'Linux'
@@ -2291,6 +2358,7 @@ jobs:
           path: |
             ${{ runner.temp }}/chromix-build/dist/${{ inputs.artifact }}.zip
             ${{ runner.temp }}/chromix-build/dist/${{ inputs.resume_migration == 'mac156-arm64-stage8' && 'chromix-mac-arm64' || inputs.artifact }}.zip
+            ${{ runner.temp }}/chromix-build/dist/${{ inputs.resume_migration == 'mac156-x64-stage8' && 'chromix-mac-x64' || inputs.artifact }}.zip
             ${{ runner.temp }}/chromix-build/dist/SHA256SUMS
             ${{ runner.temp }}/chromix-build/runtime-smoke-stage-6/
             ${{ runner.temp }}/chromix-build/fingerprint-diagnostics/
@@ -2301,11 +2369,15 @@ jobs:
 
       - name: Preserve latest macOS compiled checkpoint
         id: runtime_checkpoint
-        if: ${{ !cancelled() && inputs.platform == 'macos' && steps.stage.outputs.compiled_ready == 'true' }}
+        if: ${{ !cancelled() && inputs.platform == 'macos' && (steps.stage.outputs.compiled_ready == 'true' || (inputs.resume_migration == 'mac156-x64-stage8' && failure())) }}
         run: |
           set -euo pipefail
           WORK="${RUNNER_TEMP}/chromix-build"
-          bash build/posix/ci-parts.sh "$WORK" "$WORK/.snapshot-stage-6"
+          test -d "$WORK/src"
+          if [ '${{ inputs.resume_migration }}' != mac156-x64-stage8 ] ||
+             [ '${{ steps.stage.outputs.upload_snapshot }}' != true ]; then
+            bash build/posix/ci-parts.sh "$WORK" "$WORK/.snapshot-stage-6"
+          fi
           echo "upload_snapshot=true" >> "$GITHUB_OUTPUT"
 
       - name: Upload failed Linux runtime bundle
@@ -2411,6 +2483,7 @@ jobs:
           path: |
             ${{ runner.temp }}/chromix-build/dist/${{ inputs.artifact }}.zip
             ${{ runner.temp }}/chromix-build/dist/${{ inputs.resume_migration == 'mac156-arm64-stage8' && 'chromix-mac-arm64' || inputs.artifact }}.zip
+            ${{ runner.temp }}/chromix-build/dist/${{ inputs.resume_migration == 'mac156-x64-stage8' && 'chromix-mac-x64' || inputs.artifact }}.zip
             ${{ runner.temp }}/chromix-build/dist/SHA256SUMS
           if-no-files-found: error
           retention-days: 14
@@ -2485,6 +2558,9 @@ jobs:
       - name: Enable fixed unchanged mac156 continuation
         if: inputs.resume_migration == 'mac156-arm64-stage8'
         run: echo 'CHROMIX_UNCHANGED_RESUME=mac156-arm64-stage8' >> "$GITHUB_ENV"
+      - name: Enable fixed unchanged mac156 Intel continuation
+        if: inputs.resume_migration == 'mac156-x64-stage8'
+        run: echo 'CHROMIX_UNCHANGED_RESUME=mac156-x64-stage8' >> "$GITHUB_ENV"
 
       - name: Free Linux disk space
         if: runner.os == 'Linux'
@@ -2668,6 +2744,7 @@ jobs:
           path: |
             ${{ runner.temp }}/chromix-build/dist/${{ inputs.artifact }}.zip
             ${{ runner.temp }}/chromix-build/dist/${{ inputs.resume_migration == 'mac156-arm64-stage8' && 'chromix-mac-arm64' || inputs.artifact }}.zip
+            ${{ runner.temp }}/chromix-build/dist/${{ inputs.resume_migration == 'mac156-x64-stage8' && 'chromix-mac-x64' || inputs.artifact }}.zip
             ${{ runner.temp }}/chromix-build/dist/SHA256SUMS
             ${{ runner.temp }}/chromix-build/runtime-smoke-stage-7/
             ${{ runner.temp }}/chromix-build/fingerprint-diagnostics/
@@ -2678,11 +2755,15 @@ jobs:
 
       - name: Preserve latest macOS compiled checkpoint
         id: runtime_checkpoint
-        if: ${{ !cancelled() && inputs.platform == 'macos' && steps.stage.outputs.compiled_ready == 'true' }}
+        if: ${{ !cancelled() && inputs.platform == 'macos' && (steps.stage.outputs.compiled_ready == 'true' || (inputs.resume_migration == 'mac156-x64-stage8' && failure())) }}
         run: |
           set -euo pipefail
           WORK="${RUNNER_TEMP}/chromix-build"
-          bash build/posix/ci-parts.sh "$WORK" "$WORK/.snapshot-stage-7"
+          test -d "$WORK/src"
+          if [ '${{ inputs.resume_migration }}' != mac156-x64-stage8 ] ||
+             [ '${{ steps.stage.outputs.upload_snapshot }}' != true ]; then
+            bash build/posix/ci-parts.sh "$WORK" "$WORK/.snapshot-stage-7"
+          fi
           echo "upload_snapshot=true" >> "$GITHUB_OUTPUT"
 
       - name: Upload failed Linux runtime bundle
@@ -2788,6 +2869,7 @@ jobs:
           path: |
             ${{ runner.temp }}/chromix-build/dist/${{ inputs.artifact }}.zip
             ${{ runner.temp }}/chromix-build/dist/${{ inputs.resume_migration == 'mac156-arm64-stage8' && 'chromix-mac-arm64' || inputs.artifact }}.zip
+            ${{ runner.temp }}/chromix-build/dist/${{ inputs.resume_migration == 'mac156-x64-stage8' && 'chromix-mac-x64' || inputs.artifact }}.zip
             ${{ runner.temp }}/chromix-build/dist/SHA256SUMS
           if-no-files-found: error
           retention-days: 14
@@ -2862,6 +2944,9 @@ jobs:
       - name: Enable fixed unchanged mac156 continuation
         if: inputs.resume_migration == 'mac156-arm64-stage8'
         run: echo 'CHROMIX_UNCHANGED_RESUME=mac156-arm64-stage8' >> "$GITHUB_ENV"
+      - name: Enable fixed unchanged mac156 Intel continuation
+        if: inputs.resume_migration == 'mac156-x64-stage8'
+        run: echo 'CHROMIX_UNCHANGED_RESUME=mac156-x64-stage8' >> "$GITHUB_ENV"
 
       - name: Free Linux disk space
         if: runner.os == 'Linux'
@@ -3045,6 +3130,7 @@ jobs:
           path: |
             ${{ runner.temp }}/chromix-build/dist/${{ inputs.artifact }}.zip
             ${{ runner.temp }}/chromix-build/dist/${{ inputs.resume_migration == 'mac156-arm64-stage8' && 'chromix-mac-arm64' || inputs.artifact }}.zip
+            ${{ runner.temp }}/chromix-build/dist/${{ inputs.resume_migration == 'mac156-x64-stage8' && 'chromix-mac-x64' || inputs.artifact }}.zip
             ${{ runner.temp }}/chromix-build/dist/SHA256SUMS
             ${{ runner.temp }}/chromix-build/runtime-smoke-stage-8/
             ${{ runner.temp }}/chromix-build/fingerprint-diagnostics/
@@ -3055,11 +3141,15 @@ jobs:
 
       - name: Preserve latest macOS compiled checkpoint
         id: runtime_checkpoint
-        if: ${{ !cancelled() && inputs.platform == 'macos' && steps.stage.outputs.compiled_ready == 'true' }}
+        if: ${{ !cancelled() && inputs.platform == 'macos' && (steps.stage.outputs.compiled_ready == 'true' || (inputs.resume_migration == 'mac156-x64-stage8' && failure())) }}
         run: |
           set -euo pipefail
           WORK="${RUNNER_TEMP}/chromix-build"
-          bash build/posix/ci-parts.sh "$WORK" "$WORK/.snapshot-stage-8"
+          test -d "$WORK/src"
+          if [ '${{ inputs.resume_migration }}' != mac156-x64-stage8 ] ||
+             [ '${{ steps.stage.outputs.upload_snapshot }}' != true ]; then
+            bash build/posix/ci-parts.sh "$WORK" "$WORK/.snapshot-stage-8"
+          fi
           echo "upload_snapshot=true" >> "$GITHUB_OUTPUT"
 
       - name: Upload failed Linux runtime bundle
@@ -3165,6 +3255,7 @@ jobs:
           path: |
             ${{ runner.temp }}/chromix-build/dist/${{ inputs.artifact }}.zip
             ${{ runner.temp }}/chromix-build/dist/${{ inputs.resume_migration == 'mac156-arm64-stage8' && 'chromix-mac-arm64' || inputs.artifact }}.zip
+            ${{ runner.temp }}/chromix-build/dist/${{ inputs.resume_migration == 'mac156-x64-stage8' && 'chromix-mac-x64' || inputs.artifact }}.zip
             ${{ runner.temp }}/chromix-build/dist/SHA256SUMS
           if-no-files-found: error
           retention-days: 14

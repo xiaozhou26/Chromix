@@ -80,9 +80,17 @@ remaining_min() {
   echo "$left"
 }
 
+UNCHANGED_HELPER=""
+case "${CHROMIX_UNCHANGED_RESUME:-}" in
+  "") ;;
+  mac156-arm64-stage8) UNCHANGED_HELPER="$REPO/tools/validate_macos156_arm64_stage8_checkpoint.py" ;;
+  mac156-x64-stage8) UNCHANGED_HELPER="$REPO/tools/validate_macos156_x64_stage8_checkpoint.py" ;;
+  *) die "unknown unchanged continuation mode" ;;
+esac
+
 unchanged_check() {
-  if [ "${CHROMIX_UNCHANGED_RESUME:-}" = mac156-arm64-stage8 ]; then
-    python3 "$REPO/tools/validate_macos156_arm64_stage8_checkpoint.py" --mode check \
+  if [ -n "$UNCHANGED_HELPER" ]; then
+    python3 "$UNCHANGED_HELPER" --mode check \
       --repo "$REPO" --workdir "$WORK" --stage "$STAGE_INDEX" --phase "$1" ||
       die "unchanged mac156 continuation identity failed"
   fi
@@ -116,7 +124,11 @@ fi
 if [ "${CHROMIX_UNCHANGED_RESUME:-}" = mac156-arm64-stage8 ]; then
   [ "$PLATFORM:$ARCH:$MAX_STAGES" = macos:arm64:8 ] || die "invalid unchanged continuation target"
   unchanged_check before
-elif [ -e "$WORK/fingerprint-diagnostics/mac156-arm64-stage8-resume.json" ]; then
+elif [ "${CHROMIX_UNCHANGED_RESUME:-}" = mac156-x64-stage8 ]; then
+  [ "$PLATFORM:$ARCH:$MAX_STAGES" = macos:x64:8 ] || die "invalid unchanged continuation target"
+  unchanged_check before
+elif [ -e "$WORK/fingerprint-diagnostics/mac156-arm64-stage8-resume.json" ] ||
+     [ -e "$WORK/fingerprint-diagnostics/mac156-x64-stage8-resume.json" ]; then
   die "unchanged mac156 receipt requires the dedicated continuation mode"
 fi
 
@@ -234,8 +246,8 @@ fi
 # Guard the external process, not a sourced function: child errexit stays enabled.
 RC=0
 BUILD_COMMAND=(env CHROMIX_SKIP_DEPS=1 CHROMIX_WORKDIR="$WORK" "$BUILD_SCRIPT" "$WORK" "$ARCH")
-if [ "${CHROMIX_UNCHANGED_RESUME:-}" = mac156-arm64-stage8 ]; then
-  BUILD_COMMAND=(python3 "$REPO/tools/validate_macos156_arm64_stage8_checkpoint.py"
+if [ -n "$UNCHANGED_HELPER" ]; then
+  BUILD_COMMAND=(python3 "$UNCHANGED_HELPER"
     --mode compile --repo "$REPO" --workdir "$WORK" --stage "$STAGE_INDEX")
 fi
 if "$TIMEOUT" -k 7m -s SIGTERM "${NINJA_BUDGET}m" "${BUILD_COMMAND[@]}"; then

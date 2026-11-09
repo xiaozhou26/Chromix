@@ -331,6 +331,9 @@ RESUME_STEPS = """      - name: Validate selected POSIX checkpoint
           if [ '${{ inputs.resume_migration }}' = mac156-arm64-stage8 ]; then
             python3 tools/validate_macos156_arm64_stage8_checkpoint.py --mode metadata \\
               --report "${RUNNER_TEMP}/chromix-logs/snapshot-origin.json"
+          elif [ '${{ inputs.resume_migration }}' = mac156-x64-stage8 ]; then
+            python3 tools/validate_macos156_x64_stage8_checkpoint.py --mode metadata \\
+              --report "${RUNNER_TEMP}/chromix-logs/snapshot-origin.json"
           elif [ '${{ inputs.resume_migration }}' = linux156-ts ]; then
             test "$BUILD_PLATFORM" = linux
             test "$BUILD_PROFILE" = fast
@@ -378,6 +381,11 @@ RESUME_STEPS = """      - name: Validate selected POSIX checkpoint
               --previous-repo "$GITHUB_WORKSPACE/.chromix-previous-repo" --repo "$GITHUB_WORKSPACE" \\
               --origin "${RUNNER_TEMP}/chromix-logs/snapshot-origin.json" \\
               --download-report "${RUNNER_TEMP}/chromix-logs/snapshot-download.json"
+          elif [ '${{ inputs.resume_migration }}' = mac156-x64-stage8 ]; then
+            python3 tools/validate_macos156_x64_stage8_checkpoint.py --mode admit --workdir "$WORK" \\
+              --previous-repo "$GITHUB_WORKSPACE/.chromix-previous-repo" --repo "$GITHUB_WORKSPACE" \\
+              --origin "${RUNNER_TEMP}/chromix-logs/snapshot-origin.json" \\
+              --download-report "${RUNNER_TEMP}/chromix-logs/snapshot-download.json"
           elif [ '${{ inputs.resume_migration }}' = linux156-ts ]; then
             python3 tools/migrate_linux156_ts_snapshot.py --workdir "$WORK" \\
               --previous-repo "$GITHUB_WORKSPACE/.chromix-previous-repo" --repo "$GITHUB_WORKSPACE" \\
@@ -401,6 +409,7 @@ RUNTIME_FAILURE = """      - name: Upload failed macOS runtime bundle
           path: |
             ${{ runner.temp }}/chromix-build/dist/${{ inputs.artifact }}.zip
             ${{ runner.temp }}/chromix-build/dist/${{ inputs.resume_migration == 'mac156-arm64-stage8' && 'chromix-mac-arm64' || inputs.artifact }}.zip
+            ${{ runner.temp }}/chromix-build/dist/${{ inputs.resume_migration == 'mac156-x64-stage8' && 'chromix-mac-x64' || inputs.artifact }}.zip
             ${{ runner.temp }}/chromix-build/dist/SHA256SUMS
             ${{ runner.temp }}/chromix-build/runtime-smoke-stage-%(stage)d/
             ${{ runner.temp }}/chromix-build/fingerprint-diagnostics/
@@ -411,11 +420,15 @@ RUNTIME_FAILURE = """      - name: Upload failed macOS runtime bundle
 
       - name: Preserve latest macOS compiled checkpoint
         id: runtime_checkpoint
-        if: ${{ !cancelled() && inputs.platform == 'macos' && steps.stage.outputs.compiled_ready == 'true' }}
+        if: ${{ !cancelled() && inputs.platform == 'macos' && (steps.stage.outputs.compiled_ready == 'true' || (inputs.resume_migration == 'mac156-x64-stage8' && failure())) }}
         run: |
           set -euo pipefail
           WORK="${RUNNER_TEMP}/chromix-build"
-          bash build/posix/ci-parts.sh "$WORK" "$WORK/.snapshot-stage-%(stage)d"
+          test -d "$WORK/src"
+          if [ '${{ inputs.resume_migration }}' != mac156-x64-stage8 ] ||
+             [ '${{ steps.stage.outputs.upload_snapshot }}' != true ]; then
+            bash build/posix/ci-parts.sh "$WORK" "$WORK/.snapshot-stage-%(stage)d"
+          fi
           echo "upload_snapshot=true" >> "$GITHUB_OUTPUT"
 
 """
@@ -528,6 +541,7 @@ FINAL_UPLOADS = """      - name: Upload final bundle
           path: |
             ${{ runner.temp }}/chromix-build/dist/${{ inputs.artifact }}.zip
             ${{ runner.temp }}/chromix-build/dist/${{ inputs.resume_migration == 'mac156-arm64-stage8' && 'chromix-mac-arm64' || inputs.artifact }}.zip
+            ${{ runner.temp }}/chromix-build/dist/${{ inputs.resume_migration == 'mac156-x64-stage8' && 'chromix-mac-x64' || inputs.artifact }}.zip
             ${{ runner.temp }}/chromix-build/dist/SHA256SUMS
           if-no-files-found: error
           retention-days: 14
@@ -625,8 +639,19 @@ def job(stage: int) -> str:
           test '${{ inputs.max-stages }}' = 8
           test '${{ inputs.build_profile }}:${{ inputs.use_upstream_cache }}' = fast:true
           test '${{ inputs.resume_run_id }}:${{ inputs.resume_tree_stage }}:${{ inputs.resume_attempt }}:${{ inputs.resume_artifact_ids }}' = 42455180503:8:1:13675184448
+      - name: Require exact mac156 Intel stage8 continuation inputs
+        if: inputs.resume_migration == 'mac156-x64-stage8'
+        run: |
+          set -euo pipefail
+          test '${{ github.repository }}' = xiaozhou26/Chromix
+          test '${{ github.event_name }}' = workflow_dispatch
+          test '${{ inputs.platform }}:${{ inputs.arch }}:${{ inputs.runner }}' = macos:x64:macos-26-intel
+          test '${{ inputs.artifact }}' = chromix-mac156-x64-stage8-resume
+          test '${{ inputs.max-stages }}' = 8
+          test '${{ inputs.build_profile }}:${{ inputs.use_upstream_cache }}' = fast:true
+          test '${{ inputs.resume_run_id }}:${{ inputs.resume_tree_stage }}:${{ inputs.resume_attempt }}:${{ inputs.resume_artifact_ids }}' = 42455177686:8:2:13701073762
       - name: Require exact Linux156 recovery inputs
-        if: inputs.resume_migration != '' && inputs.resume_migration != 'mac156-arm64-stage8'
+        if: inputs.resume_migration != '' && inputs.resume_migration != 'mac156-arm64-stage8' && inputs.resume_migration != 'mac156-x64-stage8'
         run: |
           set -euo pipefail
           test '${{ inputs.resume_migration }}' = linux156-ts
@@ -644,6 +669,9 @@ def job(stage: int) -> str:
     parts.append("""      - name: Enable fixed unchanged mac156 continuation
         if: inputs.resume_migration == 'mac156-arm64-stage8'
         run: echo 'CHROMIX_UNCHANGED_RESUME=mac156-arm64-stage8' >> "$GITHUB_ENV"
+      - name: Enable fixed unchanged mac156 Intel continuation
+        if: inputs.resume_migration == 'mac156-x64-stage8'
+        run: echo 'CHROMIX_UNCHANGED_RESUME=mac156-x64-stage8' >> "$GITHUB_ENV"
 
 """)
     parts.append(LINUX_CLEAN)
