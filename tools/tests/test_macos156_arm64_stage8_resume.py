@@ -5,6 +5,7 @@ import json
 import os
 from pathlib import Path
 import re
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -256,22 +257,36 @@ class ReceiptTest(unittest.TestCase):
             with self.assertRaises(ValueError):
                 arm.continuation(ROOT, self.work, 2, 'before')
 
-    def test_compile_is_native_ninja_only_no_prepare_or_gn(self):
+    def test_compile_real_ninja_with_fresh_and_unchanged_receipts(self):
+        real_ninja(self)
+        if arm.restore_ninja.host_identity() != ('macos', 'arm64'):
+            self.skipTest('receipt compile requires native macOS ARM64')
+        out = self.work / 'src/out/Default'
+        original_args = (out / "args.gn").read_bytes()
+        sample_graph(out)
+        (out / "args.gn").write_bytes(original_args)
         self.admit()
         with patch.object(arm, 'native_state'), patch.object(arm, 'live_source'):
             arm.continuation(ROOT, self.work, 1, 'before')
-        with patch.object(arm.shutil, 'which', return_value='/usr/bin/ninja'), \
-                patch.object(arm.restore_ninja, 'host_identity', return_value=('macos', 'arm64')), \
-                patch.object(arm.restore_ninja, 'binary_architectures', return_value={'arm64'}), \
-                patch.object(arm.restore_ninja, 'probe_version', return_value='1.13.2'), \
-                patch.object(arm.subprocess, 'run') as run:
-            run.return_value.returncode = 1
-            self.assertEqual(arm.compile_tree(ROOT, self.work, 1), 1)
-            command = run.call_args.args[0]
-            self.assertEqual(command[1:], ['-d', 'norebuild', '-C', str(self.work / 'src/out/Default'), '-j', '3', 'chrome'])
-            self.assertFalse(any(key.startswith('DYLD_') for key in run.call_args.kwargs['env']))
+        proof = arm.source_state(ROOT, self.work)
+        self.assertEqual(set(proof), {'out/Default/build.ninja', 'out/Default/.ninja_log',
+                                     'out/Default/.ninja_deps', 'graph'})
+        self.assertEqual(arm.compile_tree(ROOT, self.work, 1), 0)
+        self.assertTrue((out / 'sample.o').is_file())
+        self.assertFalse((out / 'REGENERATED').exists())
+        self.assertEqual(arm.source_state(ROOT, self.work)['graph'], proof['graph'])
+        unchanged = arm.output_inventory(out)
+        with patch.object(arm, 'native_state'), patch.object(arm, 'live_source'):
+            arm.continuation(ROOT, self.work, 1, 'after')
+            arm.continuation(ROOT, self.work, 2, 'before')
+        self.assertEqual(arm.compile_tree(ROOT, self.work, 2), 0)
+        self.assertEqual(arm.output_inventory(out)['sample.o'], unchanged['sample.o'])
+        with patch.dict(os.environ, GITHUB_RUN_ATTEMPT='2'):
             with self.assertRaises((ValueError, RuntimeError)):
                 arm.compile_tree(ROOT, self.work, 2)
+        (out / 'build.ninja').write_text((out / 'build.ninja').read_text() + '# changed\n')
+        with self.assertRaises(ValueError):
+            arm.compile_tree(ROOT, self.work, 2)
 
     def test_native_readonly_rejects_environment_or_tools_drift(self):
         old = json.loads(FIXTURE['files']['upstream-cache-preparation.json'])
@@ -292,6 +307,125 @@ class ReceiptTest(unittest.TestCase):
             environment.return_value = {}
             with self.assertRaises(ValueError):
                 arm.native_state(ROOT, self.work)
+
+
+def real_ninja(test):
+    path = shutil.which('ninja')
+    if not path or not shutil.which('cc'):
+        test.skipTest('real Ninja and C compiler required')
+    if subprocess.check_output([path, '--version'], text=True).strip() != '1.13.2':
+        test.skipTest('exact donor Ninja 1.13.2 required')
+    return Path(path).resolve()
+
+
+def sample_graph(out, dependency='', extra=''):
+    (out / 'sample.c').write_text('int answer(void) { return 42; }\n')
+    (out / 'args.gn').write_text('# fixture GN args\n')
+    (out / 'build.ninja').write_text(
+        'rule regen\n  command = touch REGENERATED; exit 23\n  generator = 1\n'
+        'build build.ninja: regen always\nbuild always: phony\n'
+        'rule cc\n  command = cc -c sample.c -o sample.o\n'
+        'build sample.o: cc sample.c' + dependency + '\n'
+        'build chrome: phony sample.o\n' + extra)
+
+
+class RealNinjaTest(unittest.TestCase):
+    def setUp(self):
+        self.ninja = real_ninja(self)
+        self.tmp = tempfile.TemporaryDirectory(prefix='mac156-real-ninja-')
+        self.addCleanup(self.tmp.cleanup)
+        self.work = Path(self.tmp.name).resolve()
+        self.out = self.work / 'src/out/Default'
+        self.out.mkdir(parents=True)
+        (self.work / 'fingerprint-diagnostics').mkdir()
+        sample_graph(self.out)
+
+    def run_frozen(self):
+        return arm.frozen_ninja(self.ninja, self.work, '2', dict(os.environ))
+
+    def test_actual_supported_modes_and_fresh_build_without_regeneration(self):
+        modes = subprocess.run([str(self.ninja), '-d', 'list'], capture_output=True, text=True)
+        self.assertIn('keepdepfile', modes.stdout)
+        self.assertNotIn('norebuild', modes.stdout)
+        bad = subprocess.run([str(self.ninja), '-d', 'norebuild'], capture_output=True, text=True)
+        self.assertNotEqual(bad.returncode, 0)
+        normal = subprocess.run([str(self.ninja), '-C', str(self.out), '-n', '-v', 'chrome'],
+                                capture_output=True, text=True, check=True)
+        self.assertIn('touch REGENERATED', normal.stdout)
+        original = arm.output_inventory(self.out)
+        graph = (self.out / 'build.ninja').read_bytes()
+        self.assertEqual(self.run_frozen(), 0)
+        self.assertTrue((self.out / 'sample.o').is_file())
+        self.assertFalse((self.out / 'REGENERATED').exists())
+        self.assertEqual(graph, (self.out / 'build.ninja').read_bytes())
+        for name in ('sample.c', 'args.gn', 'build.ninja'):
+            self.assertEqual(original[name], arm.output_inventory(self.out)[name])
+        obj = arm.output_inventory(self.out)['sample.o']
+        self.assertEqual(self.run_frozen(), 0)
+        self.assertEqual(obj, arm.output_inventory(self.out)['sample.o'])
+        self.assertEqual(list((self.work / 'fingerprint-diagnostics').iterdir()), [])
+
+    def test_explicit_implicit_order_only_and_validation_regeneration_rejected(self):
+        for dependency in (' build.ninja', ' | build.ninja', ' || build.ninja', ' |@ build.ninja'):
+            with self.subTest(dependency=dependency):
+                sample_graph(self.out, dependency)
+                original = arm.output_inventory(self.out)
+                with self.assertRaisesRegex(ValueError, 'regeneration.*forbidden'):
+                    self.run_frozen()
+                self.assertEqual(original, arm.output_inventory(self.out))
+                self.assertFalse((self.out / 'sample.o').exists())
+                self.assertFalse((self.out / 'REGENERATED').exists())
+
+    def test_nested_manifest_and_args_generation_rejected(self):
+        for name in ('nested.ninja', 'args.gn'):
+            with self.subTest(name=name):
+                (self.out / 'nested.ninja').write_text('# unchanged subgraph\n')
+                sample_graph(self.out, ' |@ ' + name,
+                             f'include nested.ninja\nbuild {name}: regen always\n')
+                original = arm.output_inventory(self.out)
+                with self.assertRaisesRegex(ValueError, 'regeneration.*forbidden'):
+                    self.run_frozen()
+                self.assertEqual(original, arm.output_inventory(self.out))
+
+    def test_relative_paths_spaces_subninja_and_existing_object_reuse(self):
+        nested = self.out / 'sub'
+        nested.mkdir()
+        (self.out / 'sample.c').rename(self.out / 'source file.c')
+        graph = (self.out / 'build.ninja').read_text()
+        graph = graph[:graph.index('rule cc')] + 'subninja sub/objects.ninja\n'
+        (self.out / 'build.ninja').write_text(graph)
+        (nested / 'objects.ninja').write_text(
+            'rule cc\n  command = cc -c "source file.c" -o sample.o\n'
+            'build sample.o: cc source$ file.c\nbuild chrome: phony sample.o\n')
+        original = arm.output_inventory(self.out)
+        self.assertEqual(self.run_frozen(), 0)
+        self.assertFalse((self.out / 'REGENERATED').exists())
+        current = arm.output_inventory(self.out)
+        for name in ('build.ninja', 'sub/objects.ninja', 'source file.c', 'args.gn'):
+            self.assertEqual(current[name], original[name])
+        self.assertEqual(self.run_frozen(), 0)
+        self.assertEqual(arm.output_inventory(self.out)['sample.o'], current['sample.o'])
+
+    def test_depfile_discovered_manifest_regeneration_rejected(self):
+        graph = (self.out / 'build.ninja').read_text().replace(
+            '  command = cc -c sample.c -o sample.o',
+            '  command = cc -c sample.c -o sample.o\n  depfile = sample.o.d')
+        (self.out / 'build.ninja').write_text(graph)
+        (self.out / 'sample.o.d').write_text('sample.o: build.ninja\n')
+        original = arm.output_inventory(self.out)
+        with self.assertRaisesRegex(ValueError, 'regeneration.*forbidden'):
+            self.run_frozen()
+        self.assertEqual(original, arm.output_inventory(self.out))
+
+    def test_dynamic_dependency_and_compile_failure_fail_closed(self):
+        sample_graph(self.out, extra='dyndep = future.dd\n')
+        with self.assertRaisesRegex(ValueError, 'dynamic Ninja'):
+            self.run_frozen()
+        sample_graph(self.out)
+        (self.out / 'sample.c').write_text('this is not valid C;\n')
+        self.assertNotEqual(self.run_frozen(), 0)
+        self.assertFalse((self.out / 'REGENERATED').exists())
+        self.assertFalse((self.out / 'sample.o').exists())
 
 
 class WorkflowTest(unittest.TestCase):

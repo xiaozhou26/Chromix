@@ -67,7 +67,7 @@ source-final 和准备收据，并通过 scratch reverse/forward 复验真实源
 
 准入阶段只写新的 diagnostics/continuation receipt，不修改源码、准备标记、
 GN args、PGO 或 out 文件；对 out 库存和 Ninja 状态作前后检查。
-续编只运行原生 Ninja `1.13.2 -d norebuild ... chrome`，禁止重新 prepare、
+续编使用原生 Ninja `1.13.2` 和独立 `-f` 只读图入口（见下方参数修正），禁止重新 prepare、
 GN/bootstrap、工具修复、清理输出和 cold fallback。当前有效 PGO 仍是 donor
 `chrome_pgo_phase = 0`，不能拿上游 original_args 中被覆盖的 phase2 代替。
 每 stage 开始重新检查原生工具、工具链/生成器 hash、SDK 内容/环境及 Rust loader；
@@ -98,3 +98,43 @@ GN/bootstrap、工具修复、清理输出和 cold fallback。当前有效 PGO �
 532 passed、33 skipped、1406 subtests passed。测试日志保存在本机
 `/tmp/chromix-mac156-arm64-stage8-final-tests.log`；pytest 已完成通过，外层 zsh
 随后使用只读变量名 `status` 导致包装命令退出 1，不属于测试失败。
+
+
+### Ninja 1.13.2 参数修正（run42626844410）
+
+修复基于 API 核实的 main `a4be5aef98749e3493b903d450fd551b8eb4e264`。
+该 run 已完成原 stage8 下载/恢复、源码准入及 before/after source verify；失败日志
+第 901 行是 `ninja: error: unknown debug setting 'norebuild'`，并非编译错误。
+真实小诊断 artifact `13680446752`（557926 bytes）的 SHA-256 为
+`69661ea25636ce5ab49897b46debafe07ea7ffd89641c60be62225fe327fed6b`，已下载核验。
+
+runner 和原 donor 均为 Homebrew 原生 ARM64 Ninja `1.13.2`。核查其上游 tag
+`v1.13.2`，commit `3441b633c2fe2c494e958780ba0f4227b1327634` 的
+`src/ninja.cc`：`DebugEnable` 不提供 `norebuild`，正确枚举是 `-d list`，
+`-d help` 也不支持；`--quiet` 只影响输出，不会禁止 regeneration。
+`RebuildManifest` 只查找 `-f` 指定入口的生成 edge。
+
+因此不只删除错误参数：在 work 的 diagnostics 下创建临时私有 `entry.ninja`，
+内容仅为 `include build.ninja`。用标准 `-C out/Default -f <private-entry>`
+保持原 cwd、原规则和命令；原 `build.ninja`、子图、GN args 不编辑、不复制改写，
+私有入口没有生成 edge，因此不会自动走 GN manifest regeneration。
+另外使用真实 Ninja 的 `-t targets all` / `-t commands -s` 识别所有现有 Ninja
+图和 args.gn 的生成命令，再用 `-n -v` 检查实际 chrome 计划；如果其中包含这些
+命令立即拒绝，涵盖普通、implicit、order-only、validation 和已记录 depfile
+依赖。单独的 `-t inputs` 不含 validation，不能代替此检查。
+未知/多行计划、Ninja warning 或 dyndep 动态图一律 fail closed。预检前后核对
+out 全库存，不能创建/重写 log、deps、对象或图；只有通过后才执行真实编译。
+临时入口退出时删除，不进入 out，不改变 graph hash 或原四项 Ninja proof。
+
+新增测试使用真实 `1.13.2` 和 C 编译器产出 Mach-O 对象，验证新建对象、已有对象
+复用、子图/空格路径、fresh 与 unchanged receipt、各类 regeneration 依赖拒绝及
+编译失败传播，不再只 mock `subprocess.run`。固定原始 artifact/manifest、226
+patch/source-final、SDK 内容、core/tooling、GN/PGO 与 runtime gate 合同均保留。
+完整 Chromium compile 与原生 runtime 验收仍须父任务合入 main 后调度验证。
+
+本次专用测试为 21 passed、38 subtests passed；与 mac156 donor、Linux156
+checkpoint、旧 Mac checkpoint、Ninja 合同组合复跑为 126 passed、17 skipped、
+264 subtests passed（`/tmp/chromix-mac156-ninja-fix-regression.log`）。使用
+`COPYFILE_DISABLE=1 TMPDIR=/private/tmp /tmp/chromix-156-venv/bin/python`。
+AST 对比确认只有原 `compile_tree` 调用路径改变，所有原身份常量以及 source_state、
+SDK/core/recipe 准入函数保持一致。未 push、未 dispatch。

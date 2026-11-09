@@ -12,6 +12,7 @@ import os
 from pathlib import Path
 import subprocess
 import sys
+import tempfile
 
 try:
     from . import apply_restored_patches as arp
@@ -392,6 +393,61 @@ def native_state(repo, work):
             "Ninja dependency format changed")
 
 
+def frozen_ninja(ninja, work, jobs, env):
+    """Load the original graph through a non-generated entry, without touching out."""
+    out = work / "src/out/Default"
+    graphs = sorted(out.rglob("*.ninja"))
+    protected = {path.resolve() for path in graphs} | {(out / "args.gn").resolve()}
+    for path in graphs:
+        raw = read(out, path.relative_to(out).as_posix())
+        # A dry run cannot attest to dependencies introduced by future commands.
+        require(not re.search(rb"(?m)^\s*dyndep\s*=", raw),
+                "dynamic Ninja dependencies cannot use frozen-graph continuation")
+    inventory = output_inventory(out)
+    with tempfile.TemporaryDirectory(prefix="mac156-frozen-", dir=work / "fingerprint-diagnostics") as temporary:
+        wrapper = Path(temporary) / "entry.ninja"
+        wrapper.write_text("include build.ninja\n")
+        command = [str(ninja), "-C", str(out), "-f", str(wrapper)]
+
+        def inspect(arguments):
+            result = subprocess.run([*command, *arguments], cwd=work / "src", env=env,
+                                    capture_output=True, text=True, check=True, timeout=180)
+            require(not result.stderr, "Ninja graph inspection produced warnings")
+            return result.stdout
+
+        # RUN_AFTER_LOAD tools execute before OpenBuildLog/RebuildManifest in 1.13.2.
+        targets = inspect(["-t", "targets", "all"])
+        generated_manifests = []
+        for line in targets.splitlines():
+            name, separator, rule = line.rpartition(": ")
+            require(separator and name and rule, "invalid Ninja target inventory")
+            path = (out / name).resolve()
+            require(path != wrapper, "private Ninja entry must not have a generating edge")
+            if path in protected:
+                generated_manifests.append(name)
+        require("build.ninja" in generated_manifests, "authenticated GN regeneration edge missing")
+        regeneration = inspect(["-t", "commands", "-s", *generated_manifests])
+        forbidden = {line for line in regeneration.splitlines() if line}
+        require(forbidden, "GN regeneration commands must be identifiable")
+        # Unlike -t commands, the dry-run plan includes validation and log dependencies.
+        plan_env = dict(env, NINJA_STATUS="CHROMIX_FROZEN_PLAN ")
+        plan = subprocess.run([*command, "-n", "-v", "-j", jobs, "chrome"], cwd=work / "src",
+                              env=plan_env, capture_output=True, text=True, check=True, timeout=180)
+        require(not plan.stderr, "frozen Ninja dry run produced warnings")
+        planned = []
+        for line in plan.stdout.splitlines():
+            if line.startswith("CHROMIX_FROZEN_PLAN "):
+                planned.append(line.removeprefix("CHROMIX_FROZEN_PLAN "))
+            else:
+                require(line.startswith("ninja: Entering directory ") or line == "ninja: no work to do.",
+                        "unrecognized or multiline frozen Ninja command")
+        require(not forbidden.intersection(planned), "GN/manifest regeneration in compile plan is forbidden")
+        require(output_inventory(out) == inventory, "Ninja preflight modified existing output state")
+        # -f changes only the manifest entry point; the original graph, cwd and commands remain intact.
+        return subprocess.run([*command, "-j", jobs, "chrome"], cwd=work / "src",
+                              env=env, check=False).returncode
+
+
 def compile_tree(repo, work, stage):
     receipt = json.loads(read(work, RECEIPT))
     require(receipt.get("continuation_run") == os.environ.get("GITHUB_RUN_ID"), "unadmitted compile")
@@ -409,9 +465,7 @@ def compile_tree(repo, work, stage):
     jobs = os.environ.get("CHROMIX_JOBS", "")
     require(re.fullmatch(r"[1-9][0-9]*", jobs), "positive compile job count required")
     env = {key: value for key, value in os.environ.items() if not key.startswith("DYLD_")}
-    # Keep the authenticated GN graph; Ninja must never regenerate it.
-    return subprocess.run([str(ninja), "-d", "norebuild", "-C", str(work / "src/out/Default"), "-j", jobs, "chrome"],
-                          cwd=work / "src", env=env, check=False).returncode
+    return frozen_ninja(ninja, work, jobs, env)
 
 
 def main(argv=None):
