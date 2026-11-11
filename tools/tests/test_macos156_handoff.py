@@ -20,7 +20,10 @@ from tools.tests import test_macos156_arm64_stage8_resume as arm_tests
 from tools.tests.test_macos156_arm64_stage8_resume import sample_graph, real_ninja
 from tools.tests import test_macos156_x64_stage8_resume as intel_tests
 
+from tools.tests.macos156_historical import recipe_repo
+
 ROOT = Path(__file__).resolve().parents[2]
+HISTORICAL = recipe_repo()
 FIXTURE = json.loads(gzip.decompress(
     (ROOT / 'tools/tests/fixtures/macos156_arm64_stage1_receipts.json.gz').read_bytes()))
 
@@ -47,9 +50,9 @@ class HandoffMixin:
         helper = self.helper
         self.admit()
         with patch.object(helper, 'native_state'), patch.object(helper, 'live_source', side_effect=emit_source):
-            helper.continuation(ROOT, self.work, 1, 'before')
+            helper.continuation(HISTORICAL, self.work, 1, 'before')
             (self.work / 'src/out/Default/.ninja_log').write_text('# ninja log v7\ncompiled stage1\n')
-            after = helper.continuation(ROOT, self.work, 1, 'after')
+            after = helper.continuation(HISTORICAL, self.work, 1, 'after')
             prefix = f'mac156-{after["arch"]}-stage8-continuation'
             directory = self.work / 'fingerprint-diagnostics'
             path = directory / f'{prefix}-s1-after-attempt-1.json'
@@ -63,26 +66,26 @@ class HandoffMixin:
                 with self.subTest(field=field):
                     path.write_text(json.dumps(dict(after, **{field: value})))
                     with self.assertRaises(ValueError):
-                        helper.continuation(ROOT, self.work, 2, 'before')
+                        helper.continuation(HISTORICAL, self.work, 2, 'before')
             path.write_text(json.dumps(after))
             for attempt in ('', '2', '0'):
                 with patch.dict(os.environ, CHROMIX_PREVIOUS_ATTEMPT=attempt), self.assertRaises(ValueError):
-                    helper.continuation(ROOT, self.work, 2, 'before')
+                    helper.continuation(HISTORICAL, self.work, 2, 'before')
             duplicate = directory / f'{prefix}-s1-after-attempt-2.json'
             duplicate.write_text(json.dumps(dict(after, continuation_attempt='2')))
             with self.assertRaisesRegex(ValueError, 'exact previous'):
-                helper.continuation(ROOT, self.work, 2, 'before')
+                helper.continuation(HISTORICAL, self.work, 2, 'before')
             duplicate.unlink()
             # Failed-jobs reruns consume the successful producer's older attempt.
             with patch.dict(os.environ, GITHUB_RUN_ATTEMPT='2', CHROMIX_PREVIOUS_ATTEMPT='1'):
-                result = helper.continuation(ROOT, self.work, 2, 'before')
+                result = helper.continuation(HISTORICAL, self.work, 2, 'before')
                 self.assertEqual(result['continuation_attempt'], '2')
-                helper.continuation(ROOT, self.work, 2, 'after')
+                helper.continuation(HISTORICAL, self.work, 2, 'after')
             with patch.dict(os.environ, GITHUB_RUN_ATTEMPT='1', CHROMIX_PREVIOUS_ATTEMPT='2'):
                 with self.assertRaises(ValueError):
-                    helper.continuation(ROOT, self.work, 3, 'before')
+                    helper.continuation(HISTORICAL, self.work, 3, 'before')
             with patch.dict(os.environ, GITHUB_RUN_ATTEMPT='2', CHROMIX_PREVIOUS_ATTEMPT='2'):
-                helper.continuation(ROOT, self.work, 3, 'before')
+                helper.continuation(HISTORICAL, self.work, 3, 'before')
 
 
 class ArmHandoffTest(HandoffMixin, unittest.TestCase):
@@ -127,7 +130,7 @@ class ArmHandoffTest(HandoffMixin, unittest.TestCase):
                 'with patch.object(arm, "native_state"), '
                 'patch.object(arm, "live_source", side_effect=emit_source), '
                 'patch.object(arm, "compile_tree", side_effect=compile_tree):\n'
-                f'    raise SystemExit(arm.main([*sys.argv[1:], "--repo", {str(ROOT)!r}]))\n')
+                f'    raise SystemExit(arm.main([*sys.argv[1:], "--repo", {str(HISTORICAL)!r}]))\n')
             env = dict(os.environ, CHROMIX_UNCHANGED_RESUME='mac156-arm64-stage8',
                        COPYFILE_DISABLE='1', TMPDIR='/private/tmp', GITHUB_OUTPUT=str(base / 'outputs'),
                        PATH=str(Path(sys.executable).parent) + os.pathsep + os.environ['PATH'])
@@ -212,22 +215,22 @@ class LatestAdmissionTest(unittest.TestCase):
                     patch.object(arm.migration.restore, 'verify_restored'), patch.object(arm.migration, '_verify_tooling'):
                 bad_state = dict(state, **{'out/Default/.ninja_log': 'wrong'})
                 with patch.object(arm, 'source_state', return_value=bad_state), self.assertRaises(ValueError):
-                    latest.admit(work, donor, ROOT, origin, report)
-                result = latest.admit(work, donor, ROOT, origin, report)
+                    latest.admit(work, donor, HISTORICAL, origin, report)
+                result = latest.admit(work, donor, HISTORICAL, origin, report)
                 self.assertEqual(result['state'], state)
                 self.assertEqual(result['provenance']['manifest'], latest.expected_manifest())
                 self.assertEqual(result['changed_files'], [])
                 with self.assertRaises(ValueError):
-                    latest.admit(work, donor, ROOT, origin, report)
-                latest.continuation(ROOT, work, 1, 'before')
+                    latest.admit(work, donor, HISTORICAL, origin, report)
+                latest.continuation(HISTORICAL, work, 1, 'before')
                 with patch.object(arm.restore_ninja, 'host_identity', return_value=('macos', 'arm64')), \
                         patch.object(arm.restore_ninja, 'binary_architectures', return_value={'arm64'}), \
                         patch.object(arm.restore_ninja, 'probe_version', return_value='1.13.2'), \
                         patch.object(arm, 'frozen_ninja', return_value=124) as frozen:
-                    self.assertEqual(latest.main(['--mode', 'compile', '--repo', str(ROOT),
+                    self.assertEqual(latest.main(['--mode', 'compile', '--repo', str(HISTORICAL),
                                                   '--workdir', str(work), '--stage', '1']), 124)
                     frozen.assert_called_once()
-                latest.continuation(ROOT, work, 1, 'after')
+                latest.continuation(HISTORICAL, work, 1, 'after')
                 parts = base / 'parts'
                 subprocess.run(['/bin/bash', str(ROOT / 'build/posix/ci-parts.sh'), str(work), str(parts)],
                                check=True, capture_output=True, env=dict(os.environ, COPYFILE_DISABLE='1'))
@@ -235,9 +238,9 @@ class LatestAdmissionTest(unittest.TestCase):
                 subprocess.run([sys.executable, str(ROOT / 'tools/restore_posix_snapshot.py'), str(parts), str(restored)],
                                check=True, capture_output=True)
                 with patch.dict(os.environ, GITHUB_RUN_ATTEMPT='2', CHROMIX_PREVIOUS_ATTEMPT='1'):
-                    before = latest.continuation(ROOT, restored, 2, 'before')
+                    before = latest.continuation(HISTORICAL, restored, 2, 'before')
                     self.assertEqual(before['logical_stage'], 11)
-                    latest.continuation(ROOT, restored, 2, 'after')
+                    latest.continuation(HISTORICAL, restored, 2, 'after')
                 latest.donor_identity(restored)
                 for name in latest.DONOR_RECEIPTS:
                     self.assertEqual((work / name).read_bytes(), (restored / name).read_bytes())
@@ -246,7 +249,7 @@ class LatestAdmissionTest(unittest.TestCase):
                                        version='155', preparation_key='other', continuation_run='1').items():
                     (restored / latest.RECEIPT).write_text(json.dumps(dict(wrong, **{key: value})))
                     with self.assertRaises(ValueError):
-                        latest.continuation(ROOT, restored, 3, 'before')
+                        latest.continuation(HISTORICAL, restored, 3, 'before')
 
 
 class LatestMetadataTest(unittest.TestCase):
@@ -265,7 +268,7 @@ class LatestMetadataTest(unittest.TestCase):
                 path.write_text(text)
             latest.donor_identity(work)
             receipt = json.loads(FIXTURE['files'][arm.RECEIPT])
-            self.assertEqual(arm.recipes(ROOT), receipt['recipes'])
+            self.assertEqual(arm.recipes(HISTORICAL), receipt['recipes'])
             handoff = work / 'fingerprint-diagnostics/mac156-arm64-stage8-continuation-s1-after-attempt-1.json'
             original = json.loads(handoff.read_text())
             for key, value in dict(arch='x64', continuation_run='1', continuation_stage=2,

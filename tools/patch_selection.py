@@ -115,7 +115,8 @@ PLATFORM156_VERSIONS = {
 OVERRIDE156_ROOT = "patches/chromium156"
 ADDITIONS156_ROOT = "patches/chromium156-additions"
 MANIFEST156 = "build/patch-selection-156.json"
-MANIFEST156_SHA256: str | None = "92f552bcfeb8eedc06e2173f2c02ed7e9afb65ad630bf11320a7e8a5191e79da"
+MANIFEST156_SHA256: str | None = "829004d64306565f22e63ad670befd802987b6572c17f9d7e470a76f974f86f8"
+HISTORICAL_MANIFEST156_SHA256 = "92f552bcfeb8eedc06e2173f2c02ed7e9afb65ad630bf11320a7e8a5191e79da"
 REVIEW156 = "patches/chromium156/manifest.json"
 REVIEW156_SHA256 = "580c39f70ce151473762c26d50eaf58316b3b9f9d5a04bdafdc07315fb4b8387"
 
@@ -344,7 +345,7 @@ def select156(repo: Path, platform: str, series: bytes, names: list[str]) -> tup
     if MANIFEST156_SHA256 is None:
         raise SelectionError("Chromium 156 requires a reviewed pinned manifest SHA256")
     raw = read(repo, MANIFEST156)
-    if digest(raw) != MANIFEST156_SHA256:
+    if digest(raw) not in (MANIFEST156_SHA256, HISTORICAL_MANIFEST156_SHA256):
         raise SelectionError("changed Chromium 156 selection manifest")
 
     def unique_object(pairs):

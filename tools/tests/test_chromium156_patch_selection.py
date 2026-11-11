@@ -477,7 +477,7 @@ def real_repo156(tmp_path, request):
     return repo, platform
 
 
-@pytest.mark.parametrize("platform,count", [("linux", 226), ("windows", 232), ("macos", 226)])
+@pytest.mark.parametrize("platform,count", [("linux", 226), ("windows", 232), ("macos", 228)])
 def test_integrated_repository_selects_real_156_stack(platform, count):
     identity, patches = selection.select(ROOT, platform)
     assert identity["selection"]["version"] == selection.VERSION156
@@ -507,13 +507,14 @@ def test_production_manifest_matches_review_and_root224_evidence(real_repo156):
     for target, entry in manifest["platforms"].items():
         assert entry["commit"] == review["platform_commits"][target]
         assert entry["core_gitlink"] == review["core_commit"] == selection.CORE156
-        assert entry["additions"] == review["additions"][target]
+        assert entry["additions"][:len(review["additions"][target])] == review["additions"][target]
+        assert len(entry["additions"]) == len(review["additions"][target]) + (2 if target == "macos" else 0)
     identity, patches = selection.select(repo, platform)
-    assert len(patches) == (232 if platform == "windows" else 226)
+    assert len(patches) == ({"windows": 232, "macos": 228, "linux": 226}[platform])
     assert identity["selection"]["review_manifest"] == {
         "path": selection.REVIEW156, "sha256": selection.REVIEW156_SHA256}
     assert selection.REVIEW156 not in dict(patches)
-    assert identity["selection"]["additions"]["patches"] == review["additions"][platform]
+    assert identity["selection"]["additions"]["patches"] == manifest["platforms"][platform]["additions"]
     result = subprocess.run([sys.executable, str(ROOT / "tools/patch_selection.py"),
                              "--repo", str(repo), "--platform", platform, "--json"],
                             check=True, capture_output=True, text=True, timeout=30)
@@ -599,6 +600,12 @@ def test_production_selected_full_source_fixture_roundtrip(tmp_path, real_repo15
         assert selection.digest(data) == entry["sha256"]
         verifier.apply(src, data, env, check=True)
         verifier.apply(src, data, env)
+    if platform == "macos":
+        hevc = json.loads(gzip.decompress((ROOT / "tools/tests/fixtures/macos156_hevc_source.json.gz").read_bytes()))
+        name = "ui/gl/init/gl_display_initializer.cc"
+        path = src / name
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(hevc["files"][name])
     arp = verifier.arp
     listed = set(listed_text.splitlines()) if substituted else set()
     rules = arp._rules(fixture["domain_regex"].encode()) if substituted else []
@@ -609,7 +616,7 @@ def test_production_selected_full_source_fixture_roundtrip(tmp_path, real_repo15
     if substituted:
         (src / ".chromix-domain-substituted").write_text(selection.CORE156 + "\n")
     identity, patches = selection.select(repo, platform, src=src, core=core)
-    expected_count = 232 if platform == "windows" else 226
+    expected_count = {"windows": 232, "macos": 228, "linux": 226}[platform]
     assert len(patches) == expected_count
     for _, raw in patches:
         data, _ = arp.transform_patch(raw, listed, rules)

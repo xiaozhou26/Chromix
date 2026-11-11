@@ -16,7 +16,10 @@ import yaml
 
 from tools import validate_macos156_arm64_stage8_checkpoint as arm
 
+from tools.tests.macos156_historical import recipe_repo
+
 ROOT = Path(__file__).resolve().parents[2]
+HISTORICAL = recipe_repo()
 FIXTURE = json.loads(gzip.decompress(
     (ROOT / 'tools/tests/fixtures/macos156_arm64_stage8_receipts.json.gz').read_bytes()))
 GN_FIXTURE = json.loads(gzip.decompress(
@@ -136,7 +139,7 @@ class ReceiptTest(unittest.TestCase):
         with patch.object(arm, 'native_state'), patch.object(arm, 'live_source'), \
                 patch.object(arm.migration, '_verify_tooling'), \
                 patch.object(arm.migration.restore, 'verify_restored'):
-            return arm.admit(self.work, self.donor, ROOT, self.origin, self.download)
+            return arm.admit(self.work, self.donor, HISTORICAL, self.origin, self.download)
 
     def test_real_preimages_and_selected_226_patch_recipe(self):
         for name, digest in arm.PINNED_FILES.items():
@@ -145,15 +148,15 @@ class ReceiptTest(unittest.TestCase):
         self.assertEqual(source['patch_count'], 226)
         self.assertEqual(arm.identity_hash(source['identity']), arm.SOURCE_IDENTITY)
         self.assertEqual(arm.identity_hash(source['outputs']), arm.SOURCE_OUTPUTS)
-        self.assertEqual(arm.recipes(ROOT, self.donor), arm.recipes(ROOT))
+        self.assertEqual(arm.recipes(HISTORICAL, self.donor), arm.recipes(HISTORICAL))
         self.assertEqual(arm.migration.source_ready_key(self.donor, 'macos', 'arm64'), arm.KEY)
-        self.assertEqual(arm.arp.patch_selection.select(ROOT, 'macos'),
+        self.assertEqual(arm.arp.patch_selection.select(HISTORICAL, 'macos'),
                          arm.arp.patch_selection.select(self.donor, 'macos'))
 
     def test_reviewed_linux_only_function_exception_not_source_sha_trust(self):
         name = 'tools/prepare_restored_build.py'
         old = (self.donor / name).read_bytes()
-        new = (ROOT / name).read_bytes()
+        new = (HISTORICAL / name).read_bytes()
         self.assertNotEqual(old, new)
         self.assertEqual(arm.recipe_bytes(name, old), arm.recipe_bytes(name, new))
         for bad in (new + b'\n', new.replace(b'def environment_identity', b'def different_identity')):
@@ -199,40 +202,40 @@ class ReceiptTest(unittest.TestCase):
             original = path.read_bytes()
             path.write_bytes(original + b'changed')
             with self.subTest(name=name), self.assertRaises((ValueError, RuntimeError)):
-                arm.source_state(ROOT, self.work)
+                arm.source_state(HISTORICAL, self.work)
             path.write_bytes(original)
         for name in (arm.migration.TRANSACTION, arm.arp.IN_PROGRESS):
             path = self.work / 'src' / name
             path.touch()
             with self.assertRaises(ValueError):
-                arm.source_state(ROOT, self.work)
+                arm.source_state(HISTORICAL, self.work)
             path.unlink()
         target = self.work / 'src/out/Default/args.gn'
         target.unlink()
         target.symlink_to(self.work / 'src/.chromix-source-ready')
         with self.assertRaises(ValueError):
-            arm.source_state(ROOT, self.work)
+            arm.source_state(HISTORICAL, self.work)
 
     def test_continuation_isolated_stages_and_graph_immutable(self):
         self.admit()
         with patch.object(arm, 'native_state'), patch.object(arm, 'live_source'):
             for stage in range(1, 9):
-                before = arm.continuation(ROOT, self.work, stage, 'before')
+                before = arm.continuation(HISTORICAL, self.work, stage, 'before')
                 self.assertEqual(before['logical_stage'], stage + 8)
-                arm.continuation(ROOT, self.work, stage, 'after')
+                arm.continuation(HISTORICAL, self.work, stage, 'after')
             for stage in (0, 9):
                 with self.assertRaises(ValueError):
-                    arm.continuation(ROOT, self.work, stage, 'before')
+                    arm.continuation(HISTORICAL, self.work, stage, 'before')
             with patch.dict(os.environ, GITHUB_RUN_ID='888888'):
                 with self.assertRaises(ValueError):
-                    arm.continuation(ROOT, self.work, 2, 'before')
+                    arm.continuation(HISTORICAL, self.work, 2, 'before')
             with patch.dict(os.environ, CHROMIX_USE_UPSTREAM_CACHE='0'):
                 with self.assertRaises(ValueError):
-                    arm.continuation(ROOT, self.work, 2, 'before')
+                    arm.continuation(HISTORICAL, self.work, 2, 'before')
             path = self.work / 'src/out/Default/obj/test.ninja'
             path.write_text('changed graph')
             with self.assertRaises(ValueError):
-                arm.continuation(ROOT, self.work, 2, 'before')
+                arm.continuation(HISTORICAL, self.work, 2, 'before')
 
     def test_live_source_rejects_old_count_identity_or_output_hash(self):
         original = json.loads(FIXTURE['files']['fingerprint-diagnostics/source-final.json'])
@@ -244,20 +247,20 @@ class ReceiptTest(unittest.TestCase):
             with patch.object(arm.subprocess, 'run', side_effect=verify):
                 if changes:
                     with self.assertRaises(ValueError):
-                        arm.live_source(ROOT, self.work, output)
+                        arm.live_source(HISTORICAL, self.work, output)
                 else:
-                    arm.live_source(ROOT, self.work, output)
+                    arm.live_source(HISTORICAL, self.work, output)
 
     def test_missing_handoff_and_same_run_changed_state_rejected(self):
         self.admit()
         with patch.object(arm, 'native_state'), patch.object(arm, 'live_source'):
             with self.assertRaises(ValueError):
-                arm.continuation(ROOT, self.work, 2, 'before')
-            arm.continuation(ROOT, self.work, 1, 'before')
-            arm.continuation(ROOT, self.work, 1, 'after')
+                arm.continuation(HISTORICAL, self.work, 2, 'before')
+            arm.continuation(HISTORICAL, self.work, 1, 'before')
+            arm.continuation(HISTORICAL, self.work, 1, 'after')
             (self.work / 'src/out/Default/.ninja_log').write_text('# ninja log v7\nchanged')
             with self.assertRaises(ValueError):
-                arm.continuation(ROOT, self.work, 2, 'before')
+                arm.continuation(HISTORICAL, self.work, 2, 'before')
 
     def test_compile_real_ninja_with_fresh_and_unchanged_receipts(self):
         real_ninja(self)
@@ -269,26 +272,26 @@ class ReceiptTest(unittest.TestCase):
         (out / "args.gn").write_bytes(original_args)
         self.admit()
         with patch.object(arm, 'native_state'), patch.object(arm, 'live_source'):
-            arm.continuation(ROOT, self.work, 1, 'before')
-        proof = arm.source_state(ROOT, self.work)
+            arm.continuation(HISTORICAL, self.work, 1, 'before')
+        proof = arm.source_state(HISTORICAL, self.work)
         self.assertEqual(set(proof), {'out/Default/build.ninja', 'out/Default/.ninja_log',
                                      'out/Default/.ninja_deps', 'graph'})
-        self.assertEqual(arm.compile_tree(ROOT, self.work, 1), 0)
+        self.assertEqual(arm.compile_tree(HISTORICAL, self.work, 1), 0)
         self.assertTrue((out / 'sample.o').is_file())
         self.assertFalse((out / 'REGENERATED').exists())
-        self.assertEqual(arm.source_state(ROOT, self.work)['graph'], proof['graph'])
+        self.assertEqual(arm.source_state(HISTORICAL, self.work)['graph'], proof['graph'])
         unchanged = arm.output_inventory(out)
         with patch.object(arm, 'native_state'), patch.object(arm, 'live_source'):
-            arm.continuation(ROOT, self.work, 1, 'after')
-            arm.continuation(ROOT, self.work, 2, 'before')
-        self.assertEqual(arm.compile_tree(ROOT, self.work, 2), 0)
+            arm.continuation(HISTORICAL, self.work, 1, 'after')
+            arm.continuation(HISTORICAL, self.work, 2, 'before')
+        self.assertEqual(arm.compile_tree(HISTORICAL, self.work, 2), 0)
         self.assertEqual(arm.output_inventory(out)['sample.o'], unchanged['sample.o'])
         with patch.dict(os.environ, GITHUB_RUN_ATTEMPT='2'):
             with self.assertRaises((ValueError, RuntimeError)):
-                arm.compile_tree(ROOT, self.work, 2)
+                arm.compile_tree(HISTORICAL, self.work, 2)
         (out / 'build.ninja').write_text((out / 'build.ninja').read_text() + '# changed\n')
         with self.assertRaises(ValueError):
-            arm.compile_tree(ROOT, self.work, 2)
+            arm.compile_tree(HISTORICAL, self.work, 2)
 
     def test_native_readonly_rejects_environment_or_tools_drift(self):
         old = json.loads(FIXTURE['files']['upstream-cache-preparation.json'])
@@ -300,15 +303,15 @@ class ReceiptTest(unittest.TestCase):
                     k: v for k, v in old['generator_fingerprint'].items() if k != 'macos154'}), \
                 patch.object(arm.macos_restored_generators, 'prepare', return_value=old['generator_fingerprint']['macos154']) as generators, \
                 patch.object(arm.macos_runtime, 'verify_runtime_loader'):
-            arm.native_state(ROOT, self.work)
+            arm.native_state(HISTORICAL, self.work)
             self.assertNotIn('repair', generators.call_args.kwargs)
             tools.return_value = {}
             with self.assertRaises(ValueError):
-                arm.native_state(ROOT, self.work)
+                arm.native_state(HISTORICAL, self.work)
             tools.return_value = old['tool_fingerprint']
             environment.return_value = {}
             with self.assertRaises(ValueError):
-                arm.native_state(ROOT, self.work)
+                arm.native_state(HISTORICAL, self.work)
 
 
 def real_ninja(test):

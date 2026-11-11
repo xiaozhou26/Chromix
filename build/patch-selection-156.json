@@ -1086,6 +1086,14 @@
         {
           "path": "patches/chromium156-additions/0227-opaque-png-export-consistency.patch",
           "sha256": "4c048a50930c3541a3bb9e4442ad7f18e94c04ebccf86c0cfbfc286b15a70751"
+        },
+        {
+          "path": "patches/chromium156-additions/0234-macos-empty-angle-native-default.patch",
+          "sha256": "4180de95a9097d230faaa29006cd959437279bdd8251a6eebf6b07e89ff7e944"
+        },
+        {
+          "path": "patches/chromium156-additions/0235-macos-hevc-recorder-mime.patch",
+          "sha256": "b9f895112210e0753abe0ff4c8a065db0b26f006ba763819b2530969584eb961"
         }
       ]
     }

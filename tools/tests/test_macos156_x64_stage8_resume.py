@@ -17,7 +17,10 @@ from tools import validate_macos156_x64_stage8_checkpoint as intel
 from tools import validate_macos156_arm64_stage8_checkpoint as arm
 from tools.tests.test_macos156_arm64_stage8_resume import real_ninja, sample_graph
 
+from tools.tests.macos156_historical import recipe_repo
+
 ROOT = Path(__file__).resolve().parents[2]
+HISTORICAL = recipe_repo()
 FIXTURE = json.loads(gzip.decompress(
     (ROOT / 'tools/tests/fixtures/macos156_x64_stage8_receipts.json.gz').read_bytes()))
 ENV = {'GITHUB_RUN_ID': '999999', 'GITHUB_RUN_ATTEMPT': '1', 'CHROMIX_PREVIOUS_ATTEMPT': '1',
@@ -154,7 +157,7 @@ class ReceiptTest(unittest.TestCase):
         with patch.object(intel, 'native_state'), patch.object(intel, 'live_source'), \
                 patch.object(intel.migration, '_verify_tooling'), \
                 patch.object(intel.migration.restore, 'verify_restored'):
-            return intel.admit(self.work, self.donor, ROOT, self.origin, self.download)
+            return intel.admit(self.work, self.donor, HISTORICAL, self.origin, self.download)
 
     def test_real_preimages_and_selected_226_patch_recipe(self):
         for name, digest in intel.PINNED_FILES.items():
@@ -163,15 +166,15 @@ class ReceiptTest(unittest.TestCase):
         self.assertEqual(source['patch_count'], 226)
         self.assertEqual(intel.identity_hash(source['identity']), intel.SOURCE_IDENTITY)
         self.assertEqual(intel.identity_hash(source['outputs']), intel.SOURCE_OUTPUTS)
-        self.assertEqual(intel.recipes(ROOT, self.donor), intel.recipes(ROOT))
+        self.assertEqual(intel.recipes(HISTORICAL, self.donor), intel.recipes(HISTORICAL))
         self.assertEqual(intel.migration.source_ready_key(self.donor, 'macos', 'x64'), intel.KEY)
-        self.assertEqual(intel.arp.patch_selection.select(ROOT, 'macos'),
+        self.assertEqual(intel.arp.patch_selection.select(HISTORICAL, 'macos'),
                          intel.arp.patch_selection.select(self.donor, 'macos'))
 
     def test_reviewed_linux_only_function_exception_not_source_sha_trust(self):
         name = 'tools/prepare_restored_build.py'
         old = (self.donor / name).read_bytes()
-        new = (ROOT / name).read_bytes()
+        new = (HISTORICAL / name).read_bytes()
         self.assertNotEqual(old, new)
         self.assertEqual(intel.recipe_bytes(name, old), intel.recipe_bytes(name, new))
         for bad in (new + b'\n', new.replace(b'def environment_identity', b'def different_identity')):
@@ -217,40 +220,40 @@ class ReceiptTest(unittest.TestCase):
             original = path.read_bytes()
             path.write_bytes(original + b'changed')
             with self.subTest(name=name), self.assertRaises((ValueError, RuntimeError)):
-                intel.source_state(ROOT, self.work)
+                intel.source_state(HISTORICAL, self.work)
             path.write_bytes(original)
         for name in (intel.migration.TRANSACTION, intel.arp.IN_PROGRESS):
             path = self.work / 'src' / name
             path.touch()
             with self.assertRaises(ValueError):
-                intel.source_state(ROOT, self.work)
+                intel.source_state(HISTORICAL, self.work)
             path.unlink()
         target = self.work / 'src/out/Default/args.gn'
         target.unlink()
         target.symlink_to(self.work / 'src/.chromix-source-ready')
         with self.assertRaises(ValueError):
-            intel.source_state(ROOT, self.work)
+            intel.source_state(HISTORICAL, self.work)
 
     def test_continuation_isolated_stages_and_graph_immutable(self):
         self.admit()
         with patch.object(intel, 'native_state'), patch.object(intel, 'live_source'):
             for stage in range(1, 9):
-                before = intel.continuation(ROOT, self.work, stage, 'before')
+                before = intel.continuation(HISTORICAL, self.work, stage, 'before')
                 self.assertEqual(before['logical_stage'], stage + 8)
-                intel.continuation(ROOT, self.work, stage, 'after')
+                intel.continuation(HISTORICAL, self.work, stage, 'after')
             for stage in (0, 9):
                 with self.assertRaises(ValueError):
-                    intel.continuation(ROOT, self.work, stage, 'before')
+                    intel.continuation(HISTORICAL, self.work, stage, 'before')
             with patch.dict(os.environ, GITHUB_RUN_ID='888888'):
                 with self.assertRaises(ValueError):
-                    intel.continuation(ROOT, self.work, 2, 'before')
+                    intel.continuation(HISTORICAL, self.work, 2, 'before')
             with patch.dict(os.environ, CHROMIX_USE_UPSTREAM_CACHE='0'):
                 with self.assertRaises(ValueError):
-                    intel.continuation(ROOT, self.work, 2, 'before')
+                    intel.continuation(HISTORICAL, self.work, 2, 'before')
             path = self.work / 'src/out/Default/obj/test.ninja'
             path.write_text('changed graph')
             with self.assertRaises(ValueError):
-                intel.continuation(ROOT, self.work, 2, 'before')
+                intel.continuation(HISTORICAL, self.work, 2, 'before')
 
     def test_live_source_rejects_old_count_identity_or_output_hash(self):
         original = json.loads(FIXTURE['files']['fingerprint-diagnostics/source-final.json'])
@@ -262,20 +265,20 @@ class ReceiptTest(unittest.TestCase):
             with patch.object(intel.subprocess, 'run', side_effect=verify):
                 if changes:
                     with self.assertRaises(ValueError):
-                        intel.live_source(ROOT, self.work, output)
+                        intel.live_source(HISTORICAL, self.work, output)
                 else:
-                    intel.live_source(ROOT, self.work, output)
+                    intel.live_source(HISTORICAL, self.work, output)
 
     def test_missing_handoff_and_same_run_changed_state_rejected(self):
         self.admit()
         with patch.object(intel, 'native_state'), patch.object(intel, 'live_source'):
             with self.assertRaises(ValueError):
-                intel.continuation(ROOT, self.work, 2, 'before')
-            intel.continuation(ROOT, self.work, 1, 'before')
-            intel.continuation(ROOT, self.work, 1, 'after')
+                intel.continuation(HISTORICAL, self.work, 2, 'before')
+            intel.continuation(HISTORICAL, self.work, 1, 'before')
+            intel.continuation(HISTORICAL, self.work, 1, 'after')
             (self.work / 'src/out/Default/.ninja_log').write_text('# ninja log v7\nchanged')
             with self.assertRaises(ValueError):
-                intel.continuation(ROOT, self.work, 2, 'before')
+                intel.continuation(HISTORICAL, self.work, 2, 'before')
 
     def test_compile_real_ninja_with_fresh_and_unchanged_receipts(self):
         real_ninja(self)
@@ -287,31 +290,31 @@ class ReceiptTest(unittest.TestCase):
         (out / "args.gn").write_bytes(original_args)
         self.admit()
         with patch.object(intel, 'native_state'), patch.object(intel, 'live_source'):
-            intel.continuation(ROOT, self.work, 1, 'before')
-        proof = intel.source_state(ROOT, self.work)
+            intel.continuation(HISTORICAL, self.work, 1, 'before')
+        proof = intel.source_state(HISTORICAL, self.work)
         self.assertEqual(set(proof), {'out/Default/build.ninja', 'out/Default/.ninja_log',
                                      'out/Default/.ninja_deps', 'graph'})
-        self.assertEqual(intel.compile_tree(ROOT, self.work, 1), 0)
+        self.assertEqual(intel.compile_tree(HISTORICAL, self.work, 1), 0)
         self.assertTrue((out / 'sample.o').is_file())
         self.assertFalse((out / 'REGENERATED').exists())
-        self.assertEqual(intel.source_state(ROOT, self.work)['graph'], proof['graph'])
+        self.assertEqual(intel.source_state(HISTORICAL, self.work)['graph'], proof['graph'])
         unchanged = intel.output_inventory(out)
         with patch.object(intel, 'native_state'), patch.object(intel, 'live_source'):
-            intel.continuation(ROOT, self.work, 1, 'after')
-            intel.continuation(ROOT, self.work, 2, 'before')
-        self.assertEqual(intel.compile_tree(ROOT, self.work, 2), 0)
+            intel.continuation(HISTORICAL, self.work, 1, 'after')
+            intel.continuation(HISTORICAL, self.work, 2, 'before')
+        self.assertEqual(intel.compile_tree(HISTORICAL, self.work, 2), 0)
         self.assertEqual(intel.output_inventory(out)['sample.o'], unchanged['sample.o'])
         with patch.dict(os.environ, GITHUB_RUN_ATTEMPT='2'):
             with self.assertRaises((ValueError, RuntimeError)):
-                intel.compile_tree(ROOT, self.work, 2)
+                intel.compile_tree(HISTORICAL, self.work, 2)
         (out / 'build.ninja').write_text((out / 'build.ninja').read_text() + '# changed\n')
         with self.assertRaises(ValueError):
-            intel.compile_tree(ROOT, self.work, 2)
+            intel.compile_tree(HISTORICAL, self.work, 2)
 
     def test_intel_compile_rejects_foreign_host_ninja_and_invalid_jobs(self):
         self.admit()
         with patch.object(intel, 'native_state'), patch.object(intel, 'live_source'):
-            intel.continuation(ROOT, self.work, 1, 'before')
+            intel.continuation(HISTORICAL, self.work, 1, 'before')
         with patch.object(intel.restore_ninja, 'host_identity', return_value=('macos', 'x64')) as host, \
                 patch.object(intel.restore_ninja, 'binary_architectures', return_value={'x64'}) as arches, \
                 patch.object(intel.restore_ninja, 'probe_version', return_value='1.13.2') as version, \
@@ -323,18 +326,18 @@ class ReceiptTest(unittest.TestCase):
                                             (version, '1.12.1', '1.13.2')]:
                 probe.return_value = value
                 with self.assertRaises(ValueError):
-                    intel.compile_tree(ROOT, self.work, 1)
+                    intel.compile_tree(HISTORICAL, self.work, 1)
                 probe.return_value = original
             for jobs in ('0', '-1', 'auto', '2; echo unsafe'):
                 with patch.dict(os.environ, CHROMIX_JOBS=jobs), self.assertRaises(ValueError):
-                    intel.compile_tree(ROOT, self.work, 1)
+                    intel.compile_tree(HISTORICAL, self.work, 1)
             compile.assert_not_called()
             with patch.dict(os.environ, DYLD_LIBRARY_PATH='/foreign'):
-                self.assertEqual(intel.compile_tree(ROOT, self.work, 1), 0)
+                self.assertEqual(intel.compile_tree(HISTORICAL, self.work, 1), 0)
             self.assertNotIn('DYLD_LIBRARY_PATH', compile.call_args.args[-1])
         with patch.object(intel.prepared, 'host_identity', return_value=('macos', 'arm64')):
             with self.assertRaisesRegex(ValueError, 'native macOS Intel'):
-                intel.native_state(ROOT, self.work)
+                intel.native_state(HISTORICAL, self.work)
 
     def test_intel_entry_reuses_current_real_ninja_isolation(self):
         self.assertIs(intel.frozen_ninja, arm.frozen_ninja)
@@ -364,15 +367,15 @@ class ReceiptTest(unittest.TestCase):
                     k: v for k, v in old['generator_fingerprint'].items() if k != 'macos154'}), \
                 patch.object(intel.macos_restored_generators, 'prepare', return_value=old['generator_fingerprint']['macos154']) as generators, \
                 patch.object(intel.macos_runtime, 'verify_runtime_loader'):
-            intel.native_state(ROOT, self.work)
+            intel.native_state(HISTORICAL, self.work)
             self.assertNotIn('repair', generators.call_args.kwargs)
             tools.return_value = {}
             with self.assertRaises(ValueError):
-                intel.native_state(ROOT, self.work)
+                intel.native_state(HISTORICAL, self.work)
             tools.return_value = old['tool_fingerprint']
             environment.return_value = {}
             with self.assertRaises(ValueError):
-                intel.native_state(ROOT, self.work)
+                intel.native_state(HISTORICAL, self.work)
 
 
 class WorkflowTest(unittest.TestCase):

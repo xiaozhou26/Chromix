@@ -17,7 +17,10 @@ from tools import validate_macos156_arm64_stage3_checkpoint as latest
 from tools.tests import test_macos156_arm64_stage8_resume as arm_tests
 from tools.tests.test_macos156_handoff import emit_source
 
+from tools.tests.macos156_historical import recipe_repo
+
 ROOT = Path(__file__).resolve().parents[2]
+HISTORICAL = recipe_repo()
 FIXTURE = json.loads(gzip.decompress(
     (ROOT / 'tools/tests/fixtures/macos156_arm64_stage3_receipts.json.gz').read_bytes()))
 
@@ -69,23 +72,23 @@ class LatestAdmissionTest(unittest.TestCase):
                     patch.object(arm.migration.restore, 'verify_restored'), patch.object(arm.migration, '_verify_tooling'):
                 bad_state = dict(state, **{'out/Default/.ninja_log': 'wrong'})
                 with patch.object(arm, 'source_state', return_value=bad_state), self.assertRaises(ValueError):
-                    latest.admit(work, donor, ROOT, origin, report)
-                result = latest.admit(work, donor, ROOT, origin, report)
+                    latest.admit(work, donor, HISTORICAL, origin, report)
+                result = latest.admit(work, donor, HISTORICAL, origin, report)
                 self.assertEqual(result['state'], state)
                 self.assertEqual(result['provenance']['manifest'], latest.expected_manifest())
                 self.assertEqual(result['changed_files'], [])
                 self.assertEqual(result['tool_only_changes'], {})
                 with self.assertRaises(ValueError):
-                    latest.admit(work, donor, ROOT, origin, report)
-                latest.continuation(ROOT, work, 1, 'before')
+                    latest.admit(work, donor, HISTORICAL, origin, report)
+                latest.continuation(HISTORICAL, work, 1, 'before')
                 with patch.object(arm.restore_ninja, 'host_identity', return_value=('macos', 'arm64')), \
                         patch.object(arm.restore_ninja, 'binary_architectures', return_value={'arm64'}), \
                         patch.object(arm.restore_ninja, 'probe_version', return_value='1.13.2'), \
                         patch.object(arm, 'frozen_ninja', return_value=124) as frozen:
-                    self.assertEqual(latest.main(['--mode', 'compile', '--repo', str(ROOT),
+                    self.assertEqual(latest.main(['--mode', 'compile', '--repo', str(HISTORICAL),
                                                   '--workdir', str(work), '--stage', '1']), 124)
                     frozen.assert_called_once()
-                latest.continuation(ROOT, work, 1, 'after')
+                latest.continuation(HISTORICAL, work, 1, 'after')
                 parts = base / 'parts'
                 subprocess.run(['/bin/bash', str(ROOT / 'build/posix/ci-parts.sh'), str(work), str(parts)],
                                check=True, capture_output=True, env=dict(os.environ, COPYFILE_DISABLE='1'))
@@ -93,9 +96,9 @@ class LatestAdmissionTest(unittest.TestCase):
                 subprocess.run([sys.executable, str(ROOT / 'tools/restore_posix_snapshot.py'), str(parts), str(restored)],
                                check=True, capture_output=True)
                 with patch.dict(os.environ, GITHUB_RUN_ATTEMPT='2', CHROMIX_PREVIOUS_ATTEMPT='1'):
-                    before = latest.continuation(ROOT, restored, 2, 'before')
+                    before = latest.continuation(HISTORICAL, restored, 2, 'before')
                     self.assertEqual(before['logical_stage'], 14)
-                    latest.continuation(ROOT, restored, 2, 'after')
+                    latest.continuation(HISTORICAL, restored, 2, 'after')
                 latest.donor_identity(restored)
                 for name in latest.DONOR_RECEIPTS:
                     self.assertEqual((work / name).read_bytes(), (restored / name).read_bytes())
@@ -104,7 +107,7 @@ class LatestAdmissionTest(unittest.TestCase):
                                        version='155', preparation_key='other', continuation_run='1').items():
                     (restored / latest.RECEIPT).write_text(json.dumps(dict(wrong, **{key: value})))
                     with self.assertRaises(ValueError):
-                        latest.continuation(ROOT, restored, 3, 'before')
+                        latest.continuation(HISTORICAL, restored, 3, 'before')
 
 
 class SameBrowserTest(unittest.TestCase):
@@ -120,31 +123,31 @@ class SameBrowserTest(unittest.TestCase):
     def test_exact_reviewed_probe_revision_only_and_no_old_helper_relaxation(self):
         name = 'tools/fingerprint_backend_probe.js'
         original = arm.read
-        changed = original(ROOT, name) + b'\n// reviewed test revision\n'
+        changed = original(HISTORICAL, name) + b'\n// reviewed test revision\n'
         digest = arm.sha(changed)
         def read(root, path):
-            return changed if root == ROOT and path == name else original(root, path)
-        baseline = arm.recipes(ROOT)
+            return changed if root == HISTORICAL and path == name else original(root, path)
+        baseline = arm.recipes(HISTORICAL)
         with patch.object(arm, 'read', side_effect=read):
             with self.assertRaisesRegex(ValueError, 'unreviewed'):
-                latest.samebrowser_recipes(ROOT, self.donor, self.receipt)
+                latest.samebrowser_recipes(HISTORICAL, self.donor, self.receipt)
             with patch.dict(latest.APPROVED_TOOL_REVISIONS, {name: (digest,)}):
-                result = latest.samebrowser_recipes(ROOT, self.donor, self.receipt)
+                result = latest.samebrowser_recipes(HISTORICAL, self.donor, self.receipt)
                 self.assertEqual(result[name], digest)
-                self.assertEqual(arm.recipes(ROOT), baseline)
+                self.assertEqual(arm.recipes(HISTORICAL), baseline)
         self.assertEqual(latest.APPROVED_TOOL_REVISIONS, {})
 
     def test_non_tool_recipe_drift_cannot_be_approved(self):
         original = arm.read
         for name in ('build/args.macos.gn', 'build/macos/build.sh', 'build/macos/package-macos.sh',
                      'tools/restore_ninja.py', 'tools/macos_runtime.py', 'tools/verify_patch_stack.py'):
-            changed = original(ROOT, name) + b'\n'
+            changed = original(HISTORICAL, name) + b'\n'
             def read(root, path):
-                return changed if root == ROOT and path == name else original(root, path)
+                return changed if root == HISTORICAL and path == name else original(root, path)
             with self.subTest(name=name), patch.object(arm, 'read', side_effect=read), \
                     patch.dict(latest.APPROVED_TOOL_REVISIONS, {name: (arm.sha(changed),)}), \
                     self.assertRaisesRegex(ValueError, 'source/build recipe changed'):
-                latest.samebrowser_recipes(ROOT, self.donor, self.receipt)
+                latest.samebrowser_recipes(HISTORICAL, self.donor, self.receipt)
 
     def test_every_pinned_donor_receipt_and_failure_remain_immutable(self):
         work = self.base / 'work'
@@ -208,7 +211,7 @@ class LatestMetadataTest(unittest.TestCase):
                 path.write_text(text)
             latest.donor_identity(work)
             receipt = json.loads(FIXTURE['files'][latest.previous.RECEIPT])
-            self.assertEqual(arm.recipes(ROOT), receipt['recipes'])
+            self.assertEqual(arm.recipes(HISTORICAL), receipt['recipes'])
             self.assertTrue(FIXTURE['launch']['passed'])
             self.assertFalse(json.loads(FIXTURE['files'][latest.FAILURE])['ci_gate_passed'])
             handoff = work / latest.HANDOFF
@@ -308,14 +311,14 @@ class LatestMetadataTest(unittest.TestCase):
         values = job['with']
         self.assertEqual(values['resume_run_id'], str(latest.RUN))
         self.assertEqual(values['resume_artifact_ids'], '13748238839,13748243740')
-        self.assertEqual(values['resume_migration'], 'mac156-arm64-stage3')
+        self.assertEqual(values['resume_migration'], 'mac156-arm64-hevc')
         self.assertEqual(values['resume_tree_stage'], '3')
         self.assertEqual(values['max-stages'], 8)
         jobs = yaml.safe_load((ROOT / '.github/workflows/build-posix-github.yml').read_text())['jobs']
         for stage in range(1, 9):
             steps = jobs[f'posix-{stage}']['steps']
-            self.assertTrue(any(s.get('if') == "inputs.resume_migration == 'mac156-arm64-stage3'"
-                                and 'CHROMIX_UNCHANGED_RESUME=mac156-arm64-stage3' in s.get('run', '') for s in steps))
+            self.assertTrue(any(s.get('if') == "inputs.resume_migration == 'mac156-arm64-hevc'"
+                                and 'CHROMIX_UNCHANGED_RESUME=mac156-arm64-hevc' in s.get('run', '') for s in steps))
             if stage > 1:
                 producer = next(s for s in steps if s.get('name') == 'Record exact mac156 handoff producer attempt')
                 self.assertIn('CHROMIX_PREVIOUS_ATTEMPT=$PRODUCER_ATTEMPT', producer['run'])
