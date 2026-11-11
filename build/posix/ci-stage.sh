@@ -83,6 +83,7 @@ remaining_min() {
 UNCHANGED_HELPER=""
 case "${CHROMIX_UNCHANGED_RESUME:-}" in
   "") ;;
+  mac156-arm64-stage3) UNCHANGED_HELPER="$REPO/tools/validate_macos156_arm64_stage3_checkpoint.py" ;;
   mac156-arm64-stage1) UNCHANGED_HELPER="$REPO/tools/validate_macos156_arm64_stage1_checkpoint.py" ;;
   mac156-arm64-stage8) UNCHANGED_HELPER="$REPO/tools/validate_macos156_arm64_stage8_checkpoint.py" ;;
   mac156-x64-stage3) UNCHANGED_HELPER="$REPO/tools/validate_macos156_x64_stage3_checkpoint.py" ;;
@@ -125,7 +126,8 @@ if [ -n "$FROM_SNAPSHOT" ] && [ -d "$FROM_SNAPSHOT" ]; then
 fi
 
 if [ "${CHROMIX_UNCHANGED_RESUME:-}" = mac156-arm64-stage8 ] ||
-   [ "${CHROMIX_UNCHANGED_RESUME:-}" = mac156-arm64-stage1 ]; then
+   [ "${CHROMIX_UNCHANGED_RESUME:-}" = mac156-arm64-stage1 ] ||
+   [ "${CHROMIX_UNCHANGED_RESUME:-}" = mac156-arm64-stage3 ]; then
   [ "$PLATFORM:$ARCH:$MAX_STAGES" = macos:arm64:8 ] || die "invalid unchanged continuation target"
   unchanged_check before
 elif [ "${CHROMIX_UNCHANGED_RESUME:-}" = mac156-x64-stage8 ] ||
@@ -134,6 +136,7 @@ elif [ "${CHROMIX_UNCHANGED_RESUME:-}" = mac156-x64-stage8 ] ||
   [ "$PLATFORM:$ARCH:$MAX_STAGES" = macos:x64:8 ] || die "invalid unchanged continuation target"
   unchanged_check before
 elif [ -e "$WORK/fingerprint-diagnostics/mac156-x64-stage3-resume.json" ] ||
+     [ -e "$WORK/fingerprint-diagnostics/mac156-arm64-stage3-resume.json" ] ||
      [ -e "$WORK/fingerprint-diagnostics/mac156-x64-stage2-resume.json" ] ||
      [ -e "$WORK/fingerprint-diagnostics/mac156-arm64-stage1-resume.json" ] ||
      [ -e "$WORK/fingerprint-diagnostics/mac156-arm64-stage8-resume.json" ] ||

@@ -124,6 +124,16 @@ jobs:
           test '${{ inputs.max-stages }}' = 8
           test '${{ inputs.build_profile }}:${{ inputs.use_upstream_cache }}' = fast:true
           test '${{ inputs.resume_run_id }}:${{ inputs.resume_tree_stage }}:${{ inputs.resume_attempt }}:${{ inputs.resume_artifact_ids }}' = 42683707985:2:1:13724617338
+      - name: Require exact mac156 ARM64 stage3 continuation inputs
+        if: inputs.resume_migration == 'mac156-arm64-stage3'
+        run: |
+          set -euo pipefail
+          test '${{ github.repository }}:${{ github.event_name }}:${{ github.ref }}' = xiaozhou26/Chromix:workflow_dispatch:refs/heads/main
+          test '${{ inputs.platform }}:${{ inputs.arch }}:${{ inputs.runner }}' = macos:arm64:macos-26
+          test '${{ inputs.artifact }}' = chromix-mac156-arm64-stage3-resume
+          test '${{ inputs.max-stages }}' = 8
+          test '${{ inputs.build_profile }}:${{ inputs.use_upstream_cache }}' = fast:true
+          test '${{ inputs.resume_run_id }}:${{ inputs.resume_tree_stage }}:${{ inputs.resume_attempt }}:${{ inputs.resume_artifact_ids }}' = 42703307545:3:1:13748238839,13748243740
       - name: Require exact mac156 ARM64 stage1 continuation inputs
         if: inputs.resume_migration == 'mac156-arm64-stage1'
         run: |
@@ -157,7 +167,7 @@ jobs:
           test '${{ inputs.build_profile }}:${{ inputs.use_upstream_cache }}' = fast:true
           test '${{ inputs.resume_run_id }}:${{ inputs.resume_tree_stage }}:${{ inputs.resume_attempt }}:${{ inputs.resume_artifact_ids }}' = 42455177686:8:2:13701073762
       - name: Require exact Linux156 recovery inputs
-        if: inputs.resume_migration != '' && inputs.resume_migration != 'mac156-arm64-stage8' && inputs.resume_migration != 'mac156-x64-stage8' && inputs.resume_migration != 'mac156-arm64-stage1' && inputs.resume_migration != 'mac156-x64-stage2' && inputs.resume_migration != 'mac156-x64-stage3'
+        if: inputs.resume_migration != '' && inputs.resume_migration != 'mac156-arm64-stage8' && inputs.resume_migration != 'mac156-x64-stage8' && inputs.resume_migration != 'mac156-arm64-stage1' && inputs.resume_migration != 'mac156-x64-stage2' && inputs.resume_migration != 'mac156-x64-stage3' && inputs.resume_migration != 'mac156-arm64-stage3'
         run: |
           set -euo pipefail
           test '${{ inputs.resume_migration }}' = linux156-ts
@@ -177,6 +187,9 @@ jobs:
       - name: Enable fixed unchanged mac156 Intel stage2 continuation
         if: inputs.resume_migration == 'mac156-x64-stage2'
         run: echo 'CHROMIX_UNCHANGED_RESUME=mac156-x64-stage2' >> "$GITHUB_ENV"
+      - name: Enable fixed unchanged mac156 stage3 continuation
+        if: inputs.resume_migration == 'mac156-arm64-stage3'
+        run: echo 'CHROMIX_UNCHANGED_RESUME=mac156-arm64-stage3' >> "$GITHUB_ENV"
       - name: Enable fixed unchanged mac156 stage1 continuation
         if: inputs.resume_migration == 'mac156-arm64-stage1'
         run: echo 'CHROMIX_UNCHANGED_RESUME=mac156-arm64-stage1' >> "$GITHUB_ENV"
@@ -354,6 +367,9 @@ jobs:
           elif [ '${{ inputs.resume_migration }}' = mac156-x64-stage2 ]; then
             python3 tools/validate_macos156_x64_stage2_checkpoint.py --mode metadata \
               --report "${RUNNER_TEMP}/chromix-logs/snapshot-origin.json"
+          elif [ '${{ inputs.resume_migration }}' = mac156-arm64-stage3 ]; then
+            python3 tools/validate_macos156_arm64_stage3_checkpoint.py --mode metadata \
+              --report "${RUNNER_TEMP}/chromix-logs/snapshot-origin.json"
           elif [ '${{ inputs.resume_migration }}' = mac156-arm64-stage1 ]; then
             python3 tools/validate_macos156_arm64_stage1_checkpoint.py --mode metadata \
               --report "${RUNNER_TEMP}/chromix-logs/snapshot-origin.json"
@@ -412,6 +428,11 @@ jobs:
               --download-report "${RUNNER_TEMP}/chromix-logs/snapshot-download.json"
           elif [ '${{ inputs.resume_migration }}' = mac156-x64-stage2 ]; then
             python3 tools/validate_macos156_x64_stage2_checkpoint.py --mode admit --workdir "$WORK" \
+              --previous-repo "$GITHUB_WORKSPACE/.chromix-previous-repo" --repo "$GITHUB_WORKSPACE" \
+              --origin "${RUNNER_TEMP}/chromix-logs/snapshot-origin.json" \
+              --download-report "${RUNNER_TEMP}/chromix-logs/snapshot-download.json"
+          elif [ '${{ inputs.resume_migration }}' = mac156-arm64-stage3 ]; then
+            python3 tools/validate_macos156_arm64_stage3_checkpoint.py --mode admit --workdir "$WORK" \
               --previous-repo "$GITHUB_WORKSPACE/.chromix-previous-repo" --repo "$GITHUB_WORKSPACE" \
               --origin "${RUNNER_TEMP}/chromix-logs/snapshot-origin.json" \
               --download-report "${RUNNER_TEMP}/chromix-logs/snapshot-download.json"
@@ -490,7 +511,7 @@ jobs:
           name: ${{ inputs.artifact }}-failed-runtime-s1-attempt-${{ github.run_attempt }}
           path: |
             ${{ runner.temp }}/chromix-build/dist/${{ inputs.artifact }}.zip
-            ${{ runner.temp }}/chromix-build/dist/${{ (inputs.resume_migration == 'mac156-arm64-stage8' || inputs.resume_migration == 'mac156-arm64-stage1') && 'chromix-mac-arm64' || inputs.artifact }}.zip
+            ${{ runner.temp }}/chromix-build/dist/${{ (inputs.resume_migration == 'mac156-arm64-stage8' || inputs.resume_migration == 'mac156-arm64-stage1' || inputs.resume_migration == 'mac156-arm64-stage3') && 'chromix-mac-arm64' || inputs.artifact }}.zip
             ${{ runner.temp }}/chromix-build/dist/${{ (inputs.resume_migration == 'mac156-x64-stage8' || inputs.resume_migration == 'mac156-x64-stage2' || inputs.resume_migration == 'mac156-x64-stage3') && 'chromix-mac-x64' || inputs.artifact }}.zip
             ${{ runner.temp }}/chromix-build/dist/SHA256SUMS
             ${{ runner.temp }}/chromix-build/runtime-smoke-stage-1/
@@ -617,7 +638,7 @@ jobs:
           name: ${{ inputs.artifact }}
           path: |
             ${{ runner.temp }}/chromix-build/dist/${{ inputs.artifact }}.zip
-            ${{ runner.temp }}/chromix-build/dist/${{ (inputs.resume_migration == 'mac156-arm64-stage8' || inputs.resume_migration == 'mac156-arm64-stage1') && 'chromix-mac-arm64' || inputs.artifact }}.zip
+            ${{ runner.temp }}/chromix-build/dist/${{ (inputs.resume_migration == 'mac156-arm64-stage8' || inputs.resume_migration == 'mac156-arm64-stage1' || inputs.resume_migration == 'mac156-arm64-stage3') && 'chromix-mac-arm64' || inputs.artifact }}.zip
             ${{ runner.temp }}/chromix-build/dist/${{ (inputs.resume_migration == 'mac156-x64-stage8' || inputs.resume_migration == 'mac156-x64-stage2' || inputs.resume_migration == 'mac156-x64-stage3') && 'chromix-mac-x64' || inputs.artifact }}.zip
             ${{ runner.temp }}/chromix-build/dist/SHA256SUMS
           if-no-files-found: error
@@ -696,6 +717,9 @@ jobs:
       - name: Enable fixed unchanged mac156 Intel stage2 continuation
         if: inputs.resume_migration == 'mac156-x64-stage2'
         run: echo 'CHROMIX_UNCHANGED_RESUME=mac156-x64-stage2' >> "$GITHUB_ENV"
+      - name: Enable fixed unchanged mac156 stage3 continuation
+        if: inputs.resume_migration == 'mac156-arm64-stage3'
+        run: echo 'CHROMIX_UNCHANGED_RESUME=mac156-arm64-stage3' >> "$GITHUB_ENV"
       - name: Enable fixed unchanged mac156 stage1 continuation
         if: inputs.resume_migration == 'mac156-arm64-stage1'
         run: echo 'CHROMIX_UNCHANGED_RESUME=mac156-arm64-stage1' >> "$GITHUB_ENV"
@@ -832,7 +856,7 @@ jobs:
         if: runner.os == 'macOS' && inputs.use_upstream_cache
         run: python3 tools/inspect_macos_sdk.py --report "${RUNNER_TEMP}/chromix-logs/sdk-content.json"
       - name: Record exact mac156 handoff producer attempt
-        if: inputs.resume_migration == 'mac156-x64-stage3' || inputs.resume_migration == 'mac156-x64-stage2' || inputs.resume_migration == 'mac156-arm64-stage1' || inputs.resume_migration == 'mac156-arm64-stage8' || inputs.resume_migration == 'mac156-x64-stage8'
+        if: inputs.resume_migration == 'mac156-arm64-stage3' || inputs.resume_migration == 'mac156-x64-stage3' || inputs.resume_migration == 'mac156-x64-stage2' || inputs.resume_migration == 'mac156-arm64-stage1' || inputs.resume_migration == 'mac156-arm64-stage8' || inputs.resume_migration == 'mac156-x64-stage8'
         env:
           PRODUCER_ATTEMPT: ${{ needs.posix-1.outputs.snapshot_attempt }}
         run: echo "CHROMIX_PREVIOUS_ATTEMPT=$PRODUCER_ATTEMPT" >> "$GITHUB_ENV"
@@ -892,7 +916,7 @@ jobs:
           name: ${{ inputs.artifact }}-failed-runtime-s2-attempt-${{ github.run_attempt }}
           path: |
             ${{ runner.temp }}/chromix-build/dist/${{ inputs.artifact }}.zip
-            ${{ runner.temp }}/chromix-build/dist/${{ (inputs.resume_migration == 'mac156-arm64-stage8' || inputs.resume_migration == 'mac156-arm64-stage1') && 'chromix-mac-arm64' || inputs.artifact }}.zip
+            ${{ runner.temp }}/chromix-build/dist/${{ (inputs.resume_migration == 'mac156-arm64-stage8' || inputs.resume_migration == 'mac156-arm64-stage1' || inputs.resume_migration == 'mac156-arm64-stage3') && 'chromix-mac-arm64' || inputs.artifact }}.zip
             ${{ runner.temp }}/chromix-build/dist/${{ (inputs.resume_migration == 'mac156-x64-stage8' || inputs.resume_migration == 'mac156-x64-stage2' || inputs.resume_migration == 'mac156-x64-stage3') && 'chromix-mac-x64' || inputs.artifact }}.zip
             ${{ runner.temp }}/chromix-build/dist/SHA256SUMS
             ${{ runner.temp }}/chromix-build/runtime-smoke-stage-2/
@@ -1019,7 +1043,7 @@ jobs:
           name: ${{ inputs.artifact }}
           path: |
             ${{ runner.temp }}/chromix-build/dist/${{ inputs.artifact }}.zip
-            ${{ runner.temp }}/chromix-build/dist/${{ (inputs.resume_migration == 'mac156-arm64-stage8' || inputs.resume_migration == 'mac156-arm64-stage1') && 'chromix-mac-arm64' || inputs.artifact }}.zip
+            ${{ runner.temp }}/chromix-build/dist/${{ (inputs.resume_migration == 'mac156-arm64-stage8' || inputs.resume_migration == 'mac156-arm64-stage1' || inputs.resume_migration == 'mac156-arm64-stage3') && 'chromix-mac-arm64' || inputs.artifact }}.zip
             ${{ runner.temp }}/chromix-build/dist/${{ (inputs.resume_migration == 'mac156-x64-stage8' || inputs.resume_migration == 'mac156-x64-stage2' || inputs.resume_migration == 'mac156-x64-stage3') && 'chromix-mac-x64' || inputs.artifact }}.zip
             ${{ runner.temp }}/chromix-build/dist/SHA256SUMS
           if-no-files-found: error
@@ -1098,6 +1122,9 @@ jobs:
       - name: Enable fixed unchanged mac156 Intel stage2 continuation
         if: inputs.resume_migration == 'mac156-x64-stage2'
         run: echo 'CHROMIX_UNCHANGED_RESUME=mac156-x64-stage2' >> "$GITHUB_ENV"
+      - name: Enable fixed unchanged mac156 stage3 continuation
+        if: inputs.resume_migration == 'mac156-arm64-stage3'
+        run: echo 'CHROMIX_UNCHANGED_RESUME=mac156-arm64-stage3' >> "$GITHUB_ENV"
       - name: Enable fixed unchanged mac156 stage1 continuation
         if: inputs.resume_migration == 'mac156-arm64-stage1'
         run: echo 'CHROMIX_UNCHANGED_RESUME=mac156-arm64-stage1' >> "$GITHUB_ENV"
@@ -1234,7 +1261,7 @@ jobs:
         if: runner.os == 'macOS' && inputs.use_upstream_cache
         run: python3 tools/inspect_macos_sdk.py --report "${RUNNER_TEMP}/chromix-logs/sdk-content.json"
       - name: Record exact mac156 handoff producer attempt
-        if: inputs.resume_migration == 'mac156-x64-stage3' || inputs.resume_migration == 'mac156-x64-stage2' || inputs.resume_migration == 'mac156-arm64-stage1' || inputs.resume_migration == 'mac156-arm64-stage8' || inputs.resume_migration == 'mac156-x64-stage8'
+        if: inputs.resume_migration == 'mac156-arm64-stage3' || inputs.resume_migration == 'mac156-x64-stage3' || inputs.resume_migration == 'mac156-x64-stage2' || inputs.resume_migration == 'mac156-arm64-stage1' || inputs.resume_migration == 'mac156-arm64-stage8' || inputs.resume_migration == 'mac156-x64-stage8'
         env:
           PRODUCER_ATTEMPT: ${{ needs.posix-2.outputs.snapshot_attempt }}
         run: echo "CHROMIX_PREVIOUS_ATTEMPT=$PRODUCER_ATTEMPT" >> "$GITHUB_ENV"
@@ -1294,7 +1321,7 @@ jobs:
           name: ${{ inputs.artifact }}-failed-runtime-s3-attempt-${{ github.run_attempt }}
           path: |
             ${{ runner.temp }}/chromix-build/dist/${{ inputs.artifact }}.zip
-            ${{ runner.temp }}/chromix-build/dist/${{ (inputs.resume_migration == 'mac156-arm64-stage8' || inputs.resume_migration == 'mac156-arm64-stage1') && 'chromix-mac-arm64' || inputs.artifact }}.zip
+            ${{ runner.temp }}/chromix-build/dist/${{ (inputs.resume_migration == 'mac156-arm64-stage8' || inputs.resume_migration == 'mac156-arm64-stage1' || inputs.resume_migration == 'mac156-arm64-stage3') && 'chromix-mac-arm64' || inputs.artifact }}.zip
             ${{ runner.temp }}/chromix-build/dist/${{ (inputs.resume_migration == 'mac156-x64-stage8' || inputs.resume_migration == 'mac156-x64-stage2' || inputs.resume_migration == 'mac156-x64-stage3') && 'chromix-mac-x64' || inputs.artifact }}.zip
             ${{ runner.temp }}/chromix-build/dist/SHA256SUMS
             ${{ runner.temp }}/chromix-build/runtime-smoke-stage-3/
@@ -1421,7 +1448,7 @@ jobs:
           name: ${{ inputs.artifact }}
           path: |
             ${{ runner.temp }}/chromix-build/dist/${{ inputs.artifact }}.zip
-            ${{ runner.temp }}/chromix-build/dist/${{ (inputs.resume_migration == 'mac156-arm64-stage8' || inputs.resume_migration == 'mac156-arm64-stage1') && 'chromix-mac-arm64' || inputs.artifact }}.zip
+            ${{ runner.temp }}/chromix-build/dist/${{ (inputs.resume_migration == 'mac156-arm64-stage8' || inputs.resume_migration == 'mac156-arm64-stage1' || inputs.resume_migration == 'mac156-arm64-stage3') && 'chromix-mac-arm64' || inputs.artifact }}.zip
             ${{ runner.temp }}/chromix-build/dist/${{ (inputs.resume_migration == 'mac156-x64-stage8' || inputs.resume_migration == 'mac156-x64-stage2' || inputs.resume_migration == 'mac156-x64-stage3') && 'chromix-mac-x64' || inputs.artifact }}.zip
             ${{ runner.temp }}/chromix-build/dist/SHA256SUMS
           if-no-files-found: error
@@ -1500,6 +1527,9 @@ jobs:
       - name: Enable fixed unchanged mac156 Intel stage2 continuation
         if: inputs.resume_migration == 'mac156-x64-stage2'
         run: echo 'CHROMIX_UNCHANGED_RESUME=mac156-x64-stage2' >> "$GITHUB_ENV"
+      - name: Enable fixed unchanged mac156 stage3 continuation
+        if: inputs.resume_migration == 'mac156-arm64-stage3'
+        run: echo 'CHROMIX_UNCHANGED_RESUME=mac156-arm64-stage3' >> "$GITHUB_ENV"
       - name: Enable fixed unchanged mac156 stage1 continuation
         if: inputs.resume_migration == 'mac156-arm64-stage1'
         run: echo 'CHROMIX_UNCHANGED_RESUME=mac156-arm64-stage1' >> "$GITHUB_ENV"
@@ -1636,7 +1666,7 @@ jobs:
         if: runner.os == 'macOS' && inputs.use_upstream_cache
         run: python3 tools/inspect_macos_sdk.py --report "${RUNNER_TEMP}/chromix-logs/sdk-content.json"
       - name: Record exact mac156 handoff producer attempt
-        if: inputs.resume_migration == 'mac156-x64-stage3' || inputs.resume_migration == 'mac156-x64-stage2' || inputs.resume_migration == 'mac156-arm64-stage1' || inputs.resume_migration == 'mac156-arm64-stage8' || inputs.resume_migration == 'mac156-x64-stage8'
+        if: inputs.resume_migration == 'mac156-arm64-stage3' || inputs.resume_migration == 'mac156-x64-stage3' || inputs.resume_migration == 'mac156-x64-stage2' || inputs.resume_migration == 'mac156-arm64-stage1' || inputs.resume_migration == 'mac156-arm64-stage8' || inputs.resume_migration == 'mac156-x64-stage8'
         env:
           PRODUCER_ATTEMPT: ${{ needs.posix-3.outputs.snapshot_attempt }}
         run: echo "CHROMIX_PREVIOUS_ATTEMPT=$PRODUCER_ATTEMPT" >> "$GITHUB_ENV"
@@ -1696,7 +1726,7 @@ jobs:
           name: ${{ inputs.artifact }}-failed-runtime-s4-attempt-${{ github.run_attempt }}
           path: |
             ${{ runner.temp }}/chromix-build/dist/${{ inputs.artifact }}.zip
-            ${{ runner.temp }}/chromix-build/dist/${{ (inputs.resume_migration == 'mac156-arm64-stage8' || inputs.resume_migration == 'mac156-arm64-stage1') && 'chromix-mac-arm64' || inputs.artifact }}.zip
+            ${{ runner.temp }}/chromix-build/dist/${{ (inputs.resume_migration == 'mac156-arm64-stage8' || inputs.resume_migration == 'mac156-arm64-stage1' || inputs.resume_migration == 'mac156-arm64-stage3') && 'chromix-mac-arm64' || inputs.artifact }}.zip
             ${{ runner.temp }}/chromix-build/dist/${{ (inputs.resume_migration == 'mac156-x64-stage8' || inputs.resume_migration == 'mac156-x64-stage2' || inputs.resume_migration == 'mac156-x64-stage3') && 'chromix-mac-x64' || inputs.artifact }}.zip
             ${{ runner.temp }}/chromix-build/dist/SHA256SUMS
             ${{ runner.temp }}/chromix-build/runtime-smoke-stage-4/
@@ -1823,7 +1853,7 @@ jobs:
           name: ${{ inputs.artifact }}
           path: |
             ${{ runner.temp }}/chromix-build/dist/${{ inputs.artifact }}.zip
-            ${{ runner.temp }}/chromix-build/dist/${{ (inputs.resume_migration == 'mac156-arm64-stage8' || inputs.resume_migration == 'mac156-arm64-stage1') && 'chromix-mac-arm64' || inputs.artifact }}.zip
+            ${{ runner.temp }}/chromix-build/dist/${{ (inputs.resume_migration == 'mac156-arm64-stage8' || inputs.resume_migration == 'mac156-arm64-stage1' || inputs.resume_migration == 'mac156-arm64-stage3') && 'chromix-mac-arm64' || inputs.artifact }}.zip
             ${{ runner.temp }}/chromix-build/dist/${{ (inputs.resume_migration == 'mac156-x64-stage8' || inputs.resume_migration == 'mac156-x64-stage2' || inputs.resume_migration == 'mac156-x64-stage3') && 'chromix-mac-x64' || inputs.artifact }}.zip
             ${{ runner.temp }}/chromix-build/dist/SHA256SUMS
           if-no-files-found: error
@@ -1902,6 +1932,9 @@ jobs:
       - name: Enable fixed unchanged mac156 Intel stage2 continuation
         if: inputs.resume_migration == 'mac156-x64-stage2'
         run: echo 'CHROMIX_UNCHANGED_RESUME=mac156-x64-stage2' >> "$GITHUB_ENV"
+      - name: Enable fixed unchanged mac156 stage3 continuation
+        if: inputs.resume_migration == 'mac156-arm64-stage3'
+        run: echo 'CHROMIX_UNCHANGED_RESUME=mac156-arm64-stage3' >> "$GITHUB_ENV"
       - name: Enable fixed unchanged mac156 stage1 continuation
         if: inputs.resume_migration == 'mac156-arm64-stage1'
         run: echo 'CHROMIX_UNCHANGED_RESUME=mac156-arm64-stage1' >> "$GITHUB_ENV"
@@ -2038,7 +2071,7 @@ jobs:
         if: runner.os == 'macOS' && inputs.use_upstream_cache
         run: python3 tools/inspect_macos_sdk.py --report "${RUNNER_TEMP}/chromix-logs/sdk-content.json"
       - name: Record exact mac156 handoff producer attempt
-        if: inputs.resume_migration == 'mac156-x64-stage3' || inputs.resume_migration == 'mac156-x64-stage2' || inputs.resume_migration == 'mac156-arm64-stage1' || inputs.resume_migration == 'mac156-arm64-stage8' || inputs.resume_migration == 'mac156-x64-stage8'
+        if: inputs.resume_migration == 'mac156-arm64-stage3' || inputs.resume_migration == 'mac156-x64-stage3' || inputs.resume_migration == 'mac156-x64-stage2' || inputs.resume_migration == 'mac156-arm64-stage1' || inputs.resume_migration == 'mac156-arm64-stage8' || inputs.resume_migration == 'mac156-x64-stage8'
         env:
           PRODUCER_ATTEMPT: ${{ needs.posix-4.outputs.snapshot_attempt }}
         run: echo "CHROMIX_PREVIOUS_ATTEMPT=$PRODUCER_ATTEMPT" >> "$GITHUB_ENV"
@@ -2098,7 +2131,7 @@ jobs:
           name: ${{ inputs.artifact }}-failed-runtime-s5-attempt-${{ github.run_attempt }}
           path: |
             ${{ runner.temp }}/chromix-build/dist/${{ inputs.artifact }}.zip
-            ${{ runner.temp }}/chromix-build/dist/${{ (inputs.resume_migration == 'mac156-arm64-stage8' || inputs.resume_migration == 'mac156-arm64-stage1') && 'chromix-mac-arm64' || inputs.artifact }}.zip
+            ${{ runner.temp }}/chromix-build/dist/${{ (inputs.resume_migration == 'mac156-arm64-stage8' || inputs.resume_migration == 'mac156-arm64-stage1' || inputs.resume_migration == 'mac156-arm64-stage3') && 'chromix-mac-arm64' || inputs.artifact }}.zip
             ${{ runner.temp }}/chromix-build/dist/${{ (inputs.resume_migration == 'mac156-x64-stage8' || inputs.resume_migration == 'mac156-x64-stage2' || inputs.resume_migration == 'mac156-x64-stage3') && 'chromix-mac-x64' || inputs.artifact }}.zip
             ${{ runner.temp }}/chromix-build/dist/SHA256SUMS
             ${{ runner.temp }}/chromix-build/runtime-smoke-stage-5/
@@ -2225,7 +2258,7 @@ jobs:
           name: ${{ inputs.artifact }}
           path: |
             ${{ runner.temp }}/chromix-build/dist/${{ inputs.artifact }}.zip
-            ${{ runner.temp }}/chromix-build/dist/${{ (inputs.resume_migration == 'mac156-arm64-stage8' || inputs.resume_migration == 'mac156-arm64-stage1') && 'chromix-mac-arm64' || inputs.artifact }}.zip
+            ${{ runner.temp }}/chromix-build/dist/${{ (inputs.resume_migration == 'mac156-arm64-stage8' || inputs.resume_migration == 'mac156-arm64-stage1' || inputs.resume_migration == 'mac156-arm64-stage3') && 'chromix-mac-arm64' || inputs.artifact }}.zip
             ${{ runner.temp }}/chromix-build/dist/${{ (inputs.resume_migration == 'mac156-x64-stage8' || inputs.resume_migration == 'mac156-x64-stage2' || inputs.resume_migration == 'mac156-x64-stage3') && 'chromix-mac-x64' || inputs.artifact }}.zip
             ${{ runner.temp }}/chromix-build/dist/SHA256SUMS
           if-no-files-found: error
@@ -2304,6 +2337,9 @@ jobs:
       - name: Enable fixed unchanged mac156 Intel stage2 continuation
         if: inputs.resume_migration == 'mac156-x64-stage2'
         run: echo 'CHROMIX_UNCHANGED_RESUME=mac156-x64-stage2' >> "$GITHUB_ENV"
+      - name: Enable fixed unchanged mac156 stage3 continuation
+        if: inputs.resume_migration == 'mac156-arm64-stage3'
+        run: echo 'CHROMIX_UNCHANGED_RESUME=mac156-arm64-stage3' >> "$GITHUB_ENV"
       - name: Enable fixed unchanged mac156 stage1 continuation
         if: inputs.resume_migration == 'mac156-arm64-stage1'
         run: echo 'CHROMIX_UNCHANGED_RESUME=mac156-arm64-stage1' >> "$GITHUB_ENV"
@@ -2440,7 +2476,7 @@ jobs:
         if: runner.os == 'macOS' && inputs.use_upstream_cache
         run: python3 tools/inspect_macos_sdk.py --report "${RUNNER_TEMP}/chromix-logs/sdk-content.json"
       - name: Record exact mac156 handoff producer attempt
-        if: inputs.resume_migration == 'mac156-x64-stage3' || inputs.resume_migration == 'mac156-x64-stage2' || inputs.resume_migration == 'mac156-arm64-stage1' || inputs.resume_migration == 'mac156-arm64-stage8' || inputs.resume_migration == 'mac156-x64-stage8'
+        if: inputs.resume_migration == 'mac156-arm64-stage3' || inputs.resume_migration == 'mac156-x64-stage3' || inputs.resume_migration == 'mac156-x64-stage2' || inputs.resume_migration == 'mac156-arm64-stage1' || inputs.resume_migration == 'mac156-arm64-stage8' || inputs.resume_migration == 'mac156-x64-stage8'
         env:
           PRODUCER_ATTEMPT: ${{ needs.posix-5.outputs.snapshot_attempt }}
         run: echo "CHROMIX_PREVIOUS_ATTEMPT=$PRODUCER_ATTEMPT" >> "$GITHUB_ENV"
@@ -2500,7 +2536,7 @@ jobs:
           name: ${{ inputs.artifact }}-failed-runtime-s6-attempt-${{ github.run_attempt }}
           path: |
             ${{ runner.temp }}/chromix-build/dist/${{ inputs.artifact }}.zip
-            ${{ runner.temp }}/chromix-build/dist/${{ (inputs.resume_migration == 'mac156-arm64-stage8' || inputs.resume_migration == 'mac156-arm64-stage1') && 'chromix-mac-arm64' || inputs.artifact }}.zip
+            ${{ runner.temp }}/chromix-build/dist/${{ (inputs.resume_migration == 'mac156-arm64-stage8' || inputs.resume_migration == 'mac156-arm64-stage1' || inputs.resume_migration == 'mac156-arm64-stage3') && 'chromix-mac-arm64' || inputs.artifact }}.zip
             ${{ runner.temp }}/chromix-build/dist/${{ (inputs.resume_migration == 'mac156-x64-stage8' || inputs.resume_migration == 'mac156-x64-stage2' || inputs.resume_migration == 'mac156-x64-stage3') && 'chromix-mac-x64' || inputs.artifact }}.zip
             ${{ runner.temp }}/chromix-build/dist/SHA256SUMS
             ${{ runner.temp }}/chromix-build/runtime-smoke-stage-6/
@@ -2627,7 +2663,7 @@ jobs:
           name: ${{ inputs.artifact }}
           path: |
             ${{ runner.temp }}/chromix-build/dist/${{ inputs.artifact }}.zip
-            ${{ runner.temp }}/chromix-build/dist/${{ (inputs.resume_migration == 'mac156-arm64-stage8' || inputs.resume_migration == 'mac156-arm64-stage1') && 'chromix-mac-arm64' || inputs.artifact }}.zip
+            ${{ runner.temp }}/chromix-build/dist/${{ (inputs.resume_migration == 'mac156-arm64-stage8' || inputs.resume_migration == 'mac156-arm64-stage1' || inputs.resume_migration == 'mac156-arm64-stage3') && 'chromix-mac-arm64' || inputs.artifact }}.zip
             ${{ runner.temp }}/chromix-build/dist/${{ (inputs.resume_migration == 'mac156-x64-stage8' || inputs.resume_migration == 'mac156-x64-stage2' || inputs.resume_migration == 'mac156-x64-stage3') && 'chromix-mac-x64' || inputs.artifact }}.zip
             ${{ runner.temp }}/chromix-build/dist/SHA256SUMS
           if-no-files-found: error
@@ -2706,6 +2742,9 @@ jobs:
       - name: Enable fixed unchanged mac156 Intel stage2 continuation
         if: inputs.resume_migration == 'mac156-x64-stage2'
         run: echo 'CHROMIX_UNCHANGED_RESUME=mac156-x64-stage2' >> "$GITHUB_ENV"
+      - name: Enable fixed unchanged mac156 stage3 continuation
+        if: inputs.resume_migration == 'mac156-arm64-stage3'
+        run: echo 'CHROMIX_UNCHANGED_RESUME=mac156-arm64-stage3' >> "$GITHUB_ENV"
       - name: Enable fixed unchanged mac156 stage1 continuation
         if: inputs.resume_migration == 'mac156-arm64-stage1'
         run: echo 'CHROMIX_UNCHANGED_RESUME=mac156-arm64-stage1' >> "$GITHUB_ENV"
@@ -2842,7 +2881,7 @@ jobs:
         if: runner.os == 'macOS' && inputs.use_upstream_cache
         run: python3 tools/inspect_macos_sdk.py --report "${RUNNER_TEMP}/chromix-logs/sdk-content.json"
       - name: Record exact mac156 handoff producer attempt
-        if: inputs.resume_migration == 'mac156-x64-stage3' || inputs.resume_migration == 'mac156-x64-stage2' || inputs.resume_migration == 'mac156-arm64-stage1' || inputs.resume_migration == 'mac156-arm64-stage8' || inputs.resume_migration == 'mac156-x64-stage8'
+        if: inputs.resume_migration == 'mac156-arm64-stage3' || inputs.resume_migration == 'mac156-x64-stage3' || inputs.resume_migration == 'mac156-x64-stage2' || inputs.resume_migration == 'mac156-arm64-stage1' || inputs.resume_migration == 'mac156-arm64-stage8' || inputs.resume_migration == 'mac156-x64-stage8'
         env:
           PRODUCER_ATTEMPT: ${{ needs.posix-6.outputs.snapshot_attempt }}
         run: echo "CHROMIX_PREVIOUS_ATTEMPT=$PRODUCER_ATTEMPT" >> "$GITHUB_ENV"
@@ -2902,7 +2941,7 @@ jobs:
           name: ${{ inputs.artifact }}-failed-runtime-s7-attempt-${{ github.run_attempt }}
           path: |
             ${{ runner.temp }}/chromix-build/dist/${{ inputs.artifact }}.zip
-            ${{ runner.temp }}/chromix-build/dist/${{ (inputs.resume_migration == 'mac156-arm64-stage8' || inputs.resume_migration == 'mac156-arm64-stage1') && 'chromix-mac-arm64' || inputs.artifact }}.zip
+            ${{ runner.temp }}/chromix-build/dist/${{ (inputs.resume_migration == 'mac156-arm64-stage8' || inputs.resume_migration == 'mac156-arm64-stage1' || inputs.resume_migration == 'mac156-arm64-stage3') && 'chromix-mac-arm64' || inputs.artifact }}.zip
             ${{ runner.temp }}/chromix-build/dist/${{ (inputs.resume_migration == 'mac156-x64-stage8' || inputs.resume_migration == 'mac156-x64-stage2' || inputs.resume_migration == 'mac156-x64-stage3') && 'chromix-mac-x64' || inputs.artifact }}.zip
             ${{ runner.temp }}/chromix-build/dist/SHA256SUMS
             ${{ runner.temp }}/chromix-build/runtime-smoke-stage-7/
@@ -3029,7 +3068,7 @@ jobs:
           name: ${{ inputs.artifact }}
           path: |
             ${{ runner.temp }}/chromix-build/dist/${{ inputs.artifact }}.zip
-            ${{ runner.temp }}/chromix-build/dist/${{ (inputs.resume_migration == 'mac156-arm64-stage8' || inputs.resume_migration == 'mac156-arm64-stage1') && 'chromix-mac-arm64' || inputs.artifact }}.zip
+            ${{ runner.temp }}/chromix-build/dist/${{ (inputs.resume_migration == 'mac156-arm64-stage8' || inputs.resume_migration == 'mac156-arm64-stage1' || inputs.resume_migration == 'mac156-arm64-stage3') && 'chromix-mac-arm64' || inputs.artifact }}.zip
             ${{ runner.temp }}/chromix-build/dist/${{ (inputs.resume_migration == 'mac156-x64-stage8' || inputs.resume_migration == 'mac156-x64-stage2' || inputs.resume_migration == 'mac156-x64-stage3') && 'chromix-mac-x64' || inputs.artifact }}.zip
             ${{ runner.temp }}/chromix-build/dist/SHA256SUMS
           if-no-files-found: error
@@ -3108,6 +3147,9 @@ jobs:
       - name: Enable fixed unchanged mac156 Intel stage2 continuation
         if: inputs.resume_migration == 'mac156-x64-stage2'
         run: echo 'CHROMIX_UNCHANGED_RESUME=mac156-x64-stage2' >> "$GITHUB_ENV"
+      - name: Enable fixed unchanged mac156 stage3 continuation
+        if: inputs.resume_migration == 'mac156-arm64-stage3'
+        run: echo 'CHROMIX_UNCHANGED_RESUME=mac156-arm64-stage3' >> "$GITHUB_ENV"
       - name: Enable fixed unchanged mac156 stage1 continuation
         if: inputs.resume_migration == 'mac156-arm64-stage1'
         run: echo 'CHROMIX_UNCHANGED_RESUME=mac156-arm64-stage1' >> "$GITHUB_ENV"
@@ -3244,7 +3286,7 @@ jobs:
         if: runner.os == 'macOS' && inputs.use_upstream_cache
         run: python3 tools/inspect_macos_sdk.py --report "${RUNNER_TEMP}/chromix-logs/sdk-content.json"
       - name: Record exact mac156 handoff producer attempt
-        if: inputs.resume_migration == 'mac156-x64-stage3' || inputs.resume_migration == 'mac156-x64-stage2' || inputs.resume_migration == 'mac156-arm64-stage1' || inputs.resume_migration == 'mac156-arm64-stage8' || inputs.resume_migration == 'mac156-x64-stage8'
+        if: inputs.resume_migration == 'mac156-arm64-stage3' || inputs.resume_migration == 'mac156-x64-stage3' || inputs.resume_migration == 'mac156-x64-stage2' || inputs.resume_migration == 'mac156-arm64-stage1' || inputs.resume_migration == 'mac156-arm64-stage8' || inputs.resume_migration == 'mac156-x64-stage8'
         env:
           PRODUCER_ATTEMPT: ${{ needs.posix-7.outputs.snapshot_attempt }}
         run: echo "CHROMIX_PREVIOUS_ATTEMPT=$PRODUCER_ATTEMPT" >> "$GITHUB_ENV"
@@ -3304,7 +3346,7 @@ jobs:
           name: ${{ inputs.artifact }}-failed-runtime-s8-attempt-${{ github.run_attempt }}
           path: |
             ${{ runner.temp }}/chromix-build/dist/${{ inputs.artifact }}.zip
-            ${{ runner.temp }}/chromix-build/dist/${{ (inputs.resume_migration == 'mac156-arm64-stage8' || inputs.resume_migration == 'mac156-arm64-stage1') && 'chromix-mac-arm64' || inputs.artifact }}.zip
+            ${{ runner.temp }}/chromix-build/dist/${{ (inputs.resume_migration == 'mac156-arm64-stage8' || inputs.resume_migration == 'mac156-arm64-stage1' || inputs.resume_migration == 'mac156-arm64-stage3') && 'chromix-mac-arm64' || inputs.artifact }}.zip
             ${{ runner.temp }}/chromix-build/dist/${{ (inputs.resume_migration == 'mac156-x64-stage8' || inputs.resume_migration == 'mac156-x64-stage2' || inputs.resume_migration == 'mac156-x64-stage3') && 'chromix-mac-x64' || inputs.artifact }}.zip
             ${{ runner.temp }}/chromix-build/dist/SHA256SUMS
             ${{ runner.temp }}/chromix-build/runtime-smoke-stage-8/
@@ -3431,7 +3473,7 @@ jobs:
           name: ${{ inputs.artifact }}
           path: |
             ${{ runner.temp }}/chromix-build/dist/${{ inputs.artifact }}.zip
-            ${{ runner.temp }}/chromix-build/dist/${{ (inputs.resume_migration == 'mac156-arm64-stage8' || inputs.resume_migration == 'mac156-arm64-stage1') && 'chromix-mac-arm64' || inputs.artifact }}.zip
+            ${{ runner.temp }}/chromix-build/dist/${{ (inputs.resume_migration == 'mac156-arm64-stage8' || inputs.resume_migration == 'mac156-arm64-stage1' || inputs.resume_migration == 'mac156-arm64-stage3') && 'chromix-mac-arm64' || inputs.artifact }}.zip
             ${{ runner.temp }}/chromix-build/dist/${{ (inputs.resume_migration == 'mac156-x64-stage8' || inputs.resume_migration == 'mac156-x64-stage2' || inputs.resume_migration == 'mac156-x64-stage3') && 'chromix-mac-x64' || inputs.artifact }}.zip
             ${{ runner.temp }}/chromix-build/dist/SHA256SUMS
           if-no-files-found: error

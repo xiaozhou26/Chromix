@@ -1,0 +1,39 @@
+name: build-mac156-arm64-stage3-resume
+run-name: macOS156 ARM64 exact stage3 continuation (logical 13..20)
+
+on:
+  workflow_dispatch:
+    inputs:
+      compile_jobs:
+        description: 'Ninja jobs; compiled stage3 donor and unchanged source/GN/PGO are fixed'
+        type: string
+        default: auto
+
+permissions:
+  actions: read
+  contents: read
+
+concurrency:
+  group: mac156-arm64-stage3-resume-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  resume:
+    if: github.ref == 'refs/heads/main'
+    name: macOS156 ARM64 (read-only stage3 admission, logical 13..20)
+    uses: ./.github/workflows/build-posix-github.yml
+    with:
+      platform: macos
+      arch: arm64
+      runner: macos-26
+      artifact: chromix-mac156-arm64-stage3-resume
+      max-stages: 8
+      build_profile: fast
+      compile_jobs: ${{ inputs.compile_jobs || 'auto' }}
+      resume_migration: mac156-arm64-stage3
+      resume_run_id: '42703307545'
+      resume_tree_stage: '3'
+      resume_attempt: '1'
+      resume_artifact_ids: '13748238839,13748243740'
+      use_upstream_cache: true
+    secrets: inherit
