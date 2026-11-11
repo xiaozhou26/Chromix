@@ -1,0 +1,14 @@
+diff --git a/ui/gl/init/gl_display_initializer.cc b/ui/gl/init/gl_display_initializer.cc
+--- a/ui/gl/init/gl_display_initializer.cc
++++ b/ui/gl/init/gl_display_initializer.cc
+@@ -58,6 +58,10 @@
+   bool use_angle_default =
+       !force_software_gl &&
+       (!command_line->HasSwitch(switches::kUseANGLE) ||
++#if BUILDFLAG(IS_MAC)
++       // A bare --use-angle requests the native default, not an empty backend.
++       requested_renderer.empty() ||
++#endif
+        requested_renderer == kANGLEImplementationDefaultName);
+ 
+   // Only allow falling back to requesting the default display if we're not
