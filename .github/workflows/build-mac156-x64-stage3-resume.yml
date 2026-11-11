@@ -1,0 +1,39 @@
+name: build-mac156-x64-stage3-resume
+run-name: macOS156 Intel failed stage3 checkpoint continuation (logical 12..19)
+
+on:
+  workflow_dispatch:
+    inputs:
+      compile_jobs:
+        description: 'Ninja jobs; latest failed stage3 donor and unchanged source/GN/PGO are fixed'
+        type: string
+        default: auto
+
+permissions:
+  actions: read
+  contents: read
+
+concurrency:
+  group: mac156-x64-stage3-resume-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  resume:
+    if: github.ref == 'refs/heads/main'
+    name: macOS156 Intel (read-only stage3 admission, logical 12..19)
+    uses: ./.github/workflows/build-posix-github.yml
+    with:
+      platform: macos
+      arch: x64
+      runner: macos-26-intel
+      artifact: chromix-mac156-x64-stage3-resume
+      max-stages: 8
+      build_profile: fast
+      compile_jobs: ${{ inputs.compile_jobs || 'auto' }}
+      resume_migration: mac156-x64-stage3
+      resume_run_id: '42735558594'
+      resume_tree_stage: '3'
+      resume_attempt: '1'
+      resume_artifact_ids: '13757361205'
+      use_upstream_cache: true
+    secrets: inherit

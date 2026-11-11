@@ -157,14 +157,15 @@ def donor_identity(work):
     return receipt, handoff
 
 
-def admit(work, donor, repo, origin, download_report):
+def admit(work, donor, repo, origin, download_report, *, checkpoint=None):
+    contract = checkpoint or sys.modules[__name__]
     require(re.fullmatch(r"[1-9][0-9]*", os.environ.get("GITHUB_RUN_ID", "")), "continuation run required")
-    provenance = download_identity(origin, download_report)
-    require(intel.migration._donor_git(donor, repo, "rev-parse", "HEAD").decode().strip() == SHA
-            and intel.migration._donor_git(donor, repo, "rev-parse", "HEAD^{tree}").decode().strip() == TREE
+    provenance = contract.download_identity(origin, download_report)
+    require(intel.migration._donor_git(donor, repo, "rev-parse", "HEAD").decode().strip() == contract.SHA
+            and intel.migration._donor_git(donor, repo, "rev-parse", "HEAD^{tree}").decode().strip() == contract.TREE
             and not intel.migration._donor_git(donor, repo, "status", "--porcelain", "--untracked-files=all"),
             "clean exact stage2 producer checkout required")
-    old, handoff = donor_identity(work)
+    old, handoff = contract.donor_identity(work)
     recipes = intel.recipes(repo)
     require(recipes == old.get("recipes") == intel.recipes(donor), "stage2 admitted recipes changed")
     require(intel.arp.patch_selection.select(repo, "macos") == intel.arp.patch_selection.select(donor, "macos"),
@@ -176,22 +177,24 @@ def admit(work, donor, repo, origin, download_report):
     intel.native_state(repo, work)
     intel.migration.restore.verify_restored(work, "macos", "x64", repo=repo)
     intel.migration._verify_tooling(work, repo, (work, donor, repo), "macos")
-    output = work / RECEIPT
+    output = work / contract.RECEIPT
     require(not output.exists(), "stage2 recovery already admitted")
-    intel.live_source(repo, work, output.with_name("mac156-x64-stage2-source-admission.json"))
+    source_report = output.with_name(Path(contract.RECEIPT).name.replace("-resume.json", "-source-admission.json"))
+    intel.live_source(repo, work, source_report)
     require(intel.source_state(repo, work) == state and intel.output_inventory(work / "src/out/Default") == inventory,
             "stage2 admission modified existing build state")
-    result = dict(continuation_identity(), provenance=provenance, recipes=recipes, state=state,
-                  continuation_run=os.environ["GITHUB_RUN_ID"], donor_receipts=DONOR_RECEIPTS)
+    result = dict(contract.continuation_identity(), provenance=provenance, recipes=recipes, state=state,
+                  continuation_run=os.environ["GITHUB_RUN_ID"], donor_receipts=contract.DONOR_RECEIPTS)
     output.write_bytes(intel.arp._json(result))
     return result
 
 
-def continuation(repo, work, stage, phase):
-    _, handoff = donor_identity(work)
+def continuation(repo, work, stage, phase, *, checkpoint=None):
+    contract = checkpoint or sys.modules[__name__]
+    _, handoff = contract.donor_identity(work)
     base = handoff["logical_stage"]
-    receipt_name, prefix = RECEIPT, CONTINUATION
-    expected, manifest = continuation_identity(), expected_manifest()
+    receipt_name, prefix = contract.RECEIPT, contract.CONTINUATION
+    expected, manifest = contract.continuation_identity(), contract.expected_manifest()
     require(phase in ("before", "after"), "invalid continuation phase")
     require(re.fullmatch(r"[1-9][0-9]*", os.environ.get("GITHUB_RUN_ID", "")), "continuation run ID required")
     require(re.fullmatch(r"[1-9][0-9]*", os.environ.get("GITHUB_RUN_ATTEMPT", "")), "continuation attempt required")
@@ -225,10 +228,11 @@ def continuation(repo, work, stage, phase):
     return result
 
 
-def compile_tree(repo, work, stage):
-    _, handoff = donor_identity(work)
+def compile_tree(repo, work, stage, *, checkpoint=None):
+    contract = checkpoint or sys.modules[__name__]
+    _, handoff = contract.donor_identity(work)
     base = handoff["logical_stage"]
-    receipt_name, prefix, expected = RECEIPT, CONTINUATION, continuation_identity()
+    receipt_name, prefix, expected = contract.RECEIPT, contract.CONTINUATION, contract.continuation_identity()
     receipt = json.loads(intel.read(work, receipt_name))
     require(all(receipt.get(key) == value for key, value in expected.items())
             and receipt.get("continuation_run") == os.environ.get("GITHUB_RUN_ID"), "unadmitted compile")
@@ -251,7 +255,8 @@ def compile_tree(repo, work, stage):
     return intel.frozen_ninja(ninja, work, jobs, env)
 
 
-def main(argv=None):
+def main(argv=None, *, checkpoint=None):
+    contract = checkpoint or sys.modules[__name__]
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--mode", choices=("metadata", "admit", "check", "compile"), required=True)
     for flag in ("repo", "workdir", "previous-repo", "origin", "download-report", "report"):
@@ -263,27 +268,27 @@ def main(argv=None):
         if args.mode == "metadata":
             require(args.report is not None, "metadata report required")
             repository = os.environ.get("GITHUB_REPOSITORY", intel.REPOSITORY)
-            result = validate_metadata(intel.snapshot.Client(repository, os.environ.get("GH_TOKEN", "")),
-                                       repository, [a["id"] for a in ARTIFACTS])
+            result = contract.validate_metadata(intel.snapshot.Client(repository, os.environ.get("GH_TOKEN", "")),
+                                                repository, [a["id"] for a in contract.ARTIFACTS])
             args.report.parent.mkdir(parents=True, exist_ok=True)
             args.report.write_bytes(intel.arp._json(result))
             if os.environ.get("GITHUB_OUTPUT"):
                 with open(os.environ["GITHUB_OUTPUT"], "a") as output:
-                    output.write(f"head_sha={SHA}\npattern={result['pattern']}\n")
+                    output.write(f"head_sha={contract.SHA}\npattern={result['pattern']}\n")
         else:
             require(args.workdir is not None, "workdir required")
             work = args.workdir.resolve()
             repo = (args.repo or Path(__file__).resolve().parents[1]).resolve()
             if args.mode == "admit":
                 require(all((args.previous_repo, args.origin, args.download_report)), "admission provenance required")
-                admit(work, args.previous_repo.resolve(), repo, args.origin, args.download_report)
+                contract.admit(work, args.previous_repo.resolve(), repo, args.origin, args.download_report)
             elif args.mode == "check":
                 require(args.stage is not None and args.phase is not None, "stage and phase required")
-                continuation(repo, work, args.stage, args.phase)
+                contract.continuation(repo, work, args.stage, args.phase)
             else:
-                return compile_tree(repo, work, args.stage)
+                return contract.compile_tree(repo, work, args.stage)
     except (OSError, ValueError, RuntimeError, KeyError, TypeError, subprocess.SubprocessError) as error:
-        print(f"mac156 Intel stage2 recovery rejected: {error}", file=sys.stderr)
+        print(f"mac156 Intel stage{contract.expected_manifest()['stage']} recovery rejected: {error}", file=sys.stderr)
         return 1
     return 0
 
