@@ -1,0 +1,11 @@
+diff --git a/third_party/node/node.gni b/third_party/node/node.gni
+--- a/third_party/node/node.gni
++++ b/third_party/node/node.gni
+@@ -17,6 +17,7 @@
+     inputs += [
+       "//package.json",
+       "//third_party/node/node.py",
++      "//third_party/node/update_node_binaries",
+       "//third_party/node/node_modules.py",
+       "//third_party/node/node_modules.tar.gz.sha1",
+     ]

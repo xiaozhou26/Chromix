@@ -1,0 +1,29 @@
+diff --git a/third_party/devtools-frontend/src/scripts/build/typescript/typescript_vars.gni b/third_party/devtools-frontend/src/scripts/build/typescript/typescript_vars.gni
+--- a/third_party/devtools-frontend/src/scripts/build/typescript/typescript_vars.gni
++++ b/third_party/devtools-frontend/src/scripts/build/typescript/typescript_vars.gni
+@@ -4,6 +4,10 @@
+ 
+ import("//build/toolchain/rbe.gni")
+ import("../ninja/vars.gni")
++import("//ui/webui/webui_features.gni")
++
++assert(host_os != "linux" || use_typescript_go,
++       "Linux157 requires the pinned native TypeScript compiler")
+ 
+ if (host_os == "linux") {
+   tsc_binary = "//third_party/typescript/linux-amd64/src/lib/tsc"
+diff --git a/third_party/devtools-frontend/src/third_party/typescript/typescript.py b/third_party/devtools-frontend/src/third_party/typescript/typescript.py
+--- a/third_party/devtools-frontend/src/third_party/typescript/typescript.py
++++ b/third_party/devtools-frontend/src/third_party/typescript/typescript.py
+@@ -32,7 +32,10 @@
+ 
+ 
+ def RunTypeScriptRaw(cmd_parts, stdout=None):
+-    cmd = [GetBinaryPath()] + cmd_parts
++    binary = GetBinaryPath()
++    if not os_path.isfile(binary):
++        raise RuntimeError("Missing pinned TypeScript compiler: " + binary)
++    cmd = [binary] + cmd_parts
+     process = subprocess.Popen(cmd,
+                                cwd=os.getcwd(),
+                                stdout=subprocess.PIPE,

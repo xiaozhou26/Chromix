@@ -78,12 +78,20 @@ def _load_pins(repo: Path, platform: str | None) -> dict:
     if not re.fullmatch(r"[0-9]+(?:\.[0-9]+){3}", version):
         raise PinError("invalid ChromiumVersion")
     core = pins["UngoogledVersion"]
-    for key in ("UngoogledVersion", *platform_fields[:1]):
+    downstream_linux157 = platform == "linux" and version == "157.0.8103.78"
+    if downstream_linux157:
+        try:
+            from .linux157_source import validate_pins
+        except ImportError:
+            from linux157_source import validate_pins
+        validate_pins(pins, repo)
+    for key in ("UngoogledVersion", *(platform_fields[:1] if not downstream_linux157 else ())):
         value = pins[key]
         if (not re.fullmatch(r"[0-9]+(?:\.[0-9]+){3}-[0-9]+(?:\.[0-9]+)*", value)
                 or value.split("-", 1)[0] != version):
             raise PinError(f"{key} does not match ChromiumVersion")
-    if platform_fields and pins[platform_fields[0]] != core and not pins[platform_fields[0]].startswith(core + "."):
+    if (platform_fields and not downstream_linux157 and pins[platform_fields[0]] != core
+            and not pins[platform_fields[0]].startswith(core + ".")):
         raise PinError(f"{platform_fields[0]} does not match UngoogledVersion")
     for key in ("UngoogledCommit", *platform_fields[1:]):
         if not re.fullmatch(r"[a-f0-9]{40}", pins[key]):

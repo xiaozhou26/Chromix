@@ -26,6 +26,10 @@ CHROMIUM_VERSION="$(revision ChromiumVersion)"
 CORE_COMMIT="$(revision UngoogledCommit)"
 PLATFORM_COMMIT="$(revision "${PLATFORM_KEY}Commit")"
 PLATFORM_VERSION="$(revision "${PLATFORM_KEY}Version")"
+if [ "$PLATFORM:$CHROMIUM_VERSION" = linux:157.0.8103.78 ]; then
+  exec python3 "$REPO/tools/linux157_source.py" --repo "$REPO" --phase prepare \
+    --workdir "$WORK" --arch "$ARCH"
+fi
 if [[ "$PLATFORM:$CHROMIUM_VERSION" = macos:156.0.8078.79 ||
       "$PLATFORM:$CHROMIUM_VERSION" = macos:157.0.8103.78 ]] &&
     [ ! -f "$SRC/.chromix-upstream-restored.json" ]; then

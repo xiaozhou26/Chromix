@@ -171,6 +171,18 @@ class FetchUpstreamCacheTest(unittest.TestCase):
             if (cache.ROOT / name).is_file():
                 shutil.copyfile(cache.ROOT / name, self.root / name)
         self.manifest = json.loads((self.root / "build/upstream-cache.json").read_text())
+        # Archive transport cases use an available historical donor, not fresh Linux157.
+        historical = json.loads((Path(__file__).parent / "fixtures/linux156_cache_source.json").read_text())
+        self.manifest["sources"]["linux"] = historical
+        pinfile = self.root / "build/ungoogled-revisions.psd1"
+        text = pinfile.read_text().replace('LinuxChromiumVersion = "157.0.8103.78"',
+                                          'LinuxChromiumVersion = "156.0.8078.79"')
+        text = text.replace('LinuxUngoogledVersion = "157.0.8103.78-1"',
+                            'LinuxUngoogledVersion = "156.0.8078.79-1"')
+        text = text.replace('LinuxUngoogledCommit = "8c886dffc6ade39d8f7df5d64ace5a8824b455e1"',
+                            'LinuxUngoogledCommit = "28a211ab4ab6b83d919966a4f58a6df23cf4fb29"')
+        pinfile.write_text(text)
+        (self.root / "CHROMIUM_LINUX_VERSION").write_text("156.0.8078.79\n")
         self.manifest["sources"]["windows"] = synthetic_windows_source(self.root)
         self.save_manifest()
         self.destination = self.root / "cache"
@@ -559,58 +571,19 @@ class FetchUpstreamCacheTest(unittest.TestCase):
                 self.assertEqual(result["download_bytes"], 0)
                 self.assertEqual(client.mock_calls, [])
 
-    def test_checked_in_linux156_cache_matches_exact_two_arch_metadata(self):
+    def test_checked_in_linux157_fresh_source_has_no_donor(self):
         manifest = json.loads(cache.MANIFEST.read_text())
-        self.assertEqual(manifest["schema_version"], 1)
-        self.assertEqual(manifest["chromium_version"], "156.0.8078.79")
-        self.assertEqual(manifest["ungoogled_commit"], "28a211ab4ab6b83d919966a4f58a6df23cf4fb29")
         source = manifest["sources"]["linux"]
-        self.assertEqual(source, {
-            "chromium_version": "156.0.8078.79",
-            "ungoogled_commit": "28a211ab4ab6b83d919966a4f58a6df23cf4fb29",
-            "repository": "ungoogled-software/ungoogled-chromium-portablelinux",
-            "repository_id": 177191557,
-            "head_sha": "6f0aa178c2394fc0a177edc0fd64e41f402a0418",
-            "head_branch": "156.0.8078.79-1", "event": "push",
-            "workflow_path": ".github/workflows/build.yml",
-            "run_id": 41095740465, "source_roots": ["build/src"],
-            "artifacts": {
-                "x64": {
-                    "id": 13026649061, "name": "build-cache-x86_64", "size_in_bytes": 4645837265,
-                    "digest": "sha256:05d7ff132b7e8fb6f3efc257d801680efb03328dfdac1b358a7fd833ef3d0e88",
-                    "expires_at": "2027-01-28T17:05:28Z", "inner_archive": "build-cache-x86_64.tar.zst",
-                },
-                "arm64": {
-                    "id": 13033900099, "name": "build-cache-arm64", "size_in_bytes": 5589999894,
-                    "digest": "sha256:996fee570a4f1b0732037a872ddfafa44fec851f8b0dec8dcc75d4521adbbd66",
-                    "expires_at": "2027-01-28T17:05:28Z", "inner_archive": "build-cache-arm64.tar.zst",
-                },
-            },
-        })
+        self.assertIs(source["available"], False)
+        self.assertEqual(set(source), cache.UNAVAILABLE_SOURCE_FIELDS)
+        self.assertEqual(source["chromium_version"], "157.0.8103.78")
+        self.assertEqual(source["ungoogled_commit"], "8c886dffc6ade39d8f7df5d64ace5a8824b455e1")
+        self.assertEqual(source["head_branch"], "156.0.8078.79-1")
         for arch in ("x64", "arm64"):
             with self.subTest(arch=arch):
-                pin, identity = cache.load_manifest("linux", arch, 41095740465, root=cache.ROOT)
-                self.assertIs(pin.get("available", True), True)
-                self.assertEqual(pin, {
-                    **{key: value for key, value in source.items() if key != "artifacts"},
-                    "artifact": source["artifacts"][arch],
-                })
-                self.assertEqual(identity["target"], "linux-" + arch)
-                self.assertEqual(identity["chromium_version"], "156.0.8078.79")
-                self.assertEqual(identity["run_id"], 41095740465)
-                self.assertEqual(identity["artifact_id"], source["artifacts"][arch]["id"])
-                self.assertEqual(identity["artifact_digest"], source["artifacts"][arch]["digest"])
-                self.assert_metadata_provenance(pin, datetime(2026, 11, 8, tzinfo=timezone.utc))
-                run, _ = metadata(pin)
-                other_pin, _ = cache.load_manifest(
-                    "linux", "arm64" if arch == "x64" else "x64", root=cache.ROOT)
-                _, other_artifact = metadata(other_pin)
-                with self.assertRaisesRegex(cache.CacheMiss, "artifact_mismatch"):
-                    cache.validate_metadata(pin, run, other_artifact, NOW)
                 client = mock.Mock()
-                result = cache.fetch("linux", arch, self.destination, 37906884923,
-                                     root=cache.ROOT, client=client)
-                self.assertEqual(result["reason"], "run_id_mismatch")
+                result = cache.fetch("linux", arch, self.destination, root=cache.ROOT, client=client)
+                self.assertEqual(result["reason"], "source_unavailable")
                 self.assertEqual(result["download_bytes"], 0)
                 self.assertEqual(client.mock_calls, [])
 

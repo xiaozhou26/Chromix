@@ -1,0 +1,153 @@
+diff --git a/build/toolchain/linux/BUILD.gn b/build/toolchain/linux/BUILD.gn
+--- a/build/toolchain/linux/BUILD.gn
++++ b/build/toolchain/linux/BUILD.gn
+@@ -182,6 +182,13 @@
+   }
+ }
+ 
++clang_v8_toolchain("clang_arm64_v8_x64") {
++  toolchain_args = {
++    current_cpu = "arm64"
++    v8_current_cpu = "x64"
++  }
++}
++
+ gcc_toolchain("x64") {
+   cc = "gcc"
+   cxx = "g++"
+diff --git a/tools/clang/scripts/build.py b/tools/clang/scripts/build.py
+--- a/tools/clang/scripts/build.py
++++ b/tools/clang/scripts/build.py
+@@ -708,6 +708,13 @@
+   DownloadAndUnpackPackage(
+     'clang', PINNED_CLANG_DIR, GetDefaultHostOs(), PINNED_CLANG_VERSION
+   )
++
++
++def GetHostSysrootPlatform():
++  assert sys.platform == "linux"
++  arch = platform.machine()
++  return {"aarch64": "arm64", "aarch64_be": "arm64", "armv7l": "arm",
++          "armv8b": "arm64", "armv8l": "arm64", "x86_64": "amd64"}.get(arch, arch)
+ 
+ 
+ def VerifyVersionOfBuiltClangMatchesVERSION():
+diff --git a/tools/rust/build_bindgen.py b/tools/rust/build_bindgen.py
+--- a/tools/rust/build_bindgen.py
++++ b/tools/rust/build_bindgen.py
+@@ -41,6 +41,7 @@
+     CheckoutGitRepo,
+     DownloadAndUnpack,
+     LLVM_BUILD_TOOLS_DIR,
++    GetHostSysrootPlatform,
+ )
+ from update import RmTree
+ 
+@@ -74,7 +75,7 @@
+     assert sys.platform.startswith('linux')
+     ncursesw_dir = os.path.join(LLVM_BUILD_TOOLS_DIR, 'ncursesw')
+     ncursesw_url = (
+-        f'{CIPD_DOWNLOAD_URL}/{NCURSESW_CIPD_LINUX_AMD_PATH}'
++        f'{CIPD_DOWNLOAD_URL}/{NCURSESW_CIPD_LINUX_AMD_PATH.replace("amd64", GetHostSysrootPlatform())}'
+         f'/+/version:2@{NCURSESW_CIPD_LINUX_AMD_VERSION}'
+     )
+ 
+diff --git a/tools/rust/build_rust.py b/tools/rust/build_rust.py
+--- a/tools/rust/build_rust.py
++++ b/tools/rust/build_rust.py
+@@ -66,6 +66,7 @@
+     DownloadDebianSysroot,
+     FetchUrl,
+     GetLibXml2Dirs,
++    GetHostSysrootPlatform,
+     GitCherryPick,
+     GitRevert,
+     LLVM_DIR,
+@@ -251,7 +252,7 @@
+         )
+     else:
+         ssl_url = (
+-            f'{CIPD_DOWNLOAD_URL}/{OPENSSL_CIPD_LINUX_AMD_PATH}'
++            f'{CIPD_DOWNLOAD_URL}/{OPENSSL_CIPD_LINUX_AMD_PATH.replace("amd64", GetHostSysrootPlatform())}'
+             f'/+/version:2@{OPENSSL_CIPD_LINUX_AMD_VERSION}'
+         )
+ 
+@@ -650,7 +651,7 @@
+     elif sys.platform == 'win32':
+         return 'x86_64-pc-windows-msvc'
+     else:
+-        return 'x86_64-unknown-linux-gnu'
++        return f'{platform.machine()}-unknown-linux-gnu'
+ 
+ 
+ @functools.cache
+@@ -670,6 +671,9 @@
+         sys.executable,
+         os.path.join(CLANG_SCRIPTS_DIR, 'build.py'),
+         '--disable-asserts',
++        '--use-system-cmake',
++        '--host-cc=clang',
++        '--host-cxx=clang++',
+         '--no-tools',
+         '--no-runtimes',
+         # PIC needed for Rust build (links LLVM into shared object)
+@@ -966,7 +970,7 @@
+         # Fetch sysroot we build rustc against. This ensures a minimum supported
+         # host (not Chromium target). Since the rustc linux package is for
+         # x86_64 only, that is the sole needed sysroot.
+-        debian_sysroot = DownloadDebianSysroot('amd64', args.skip_checkout)
++        debian_sysroot = DownloadDebianSysroot(GetHostSysrootPlatform(), args.skip_checkout)
+ 
+     # Require zlib compression.
+     if sys.platform == 'win32':
+diff --git a/tools/rust/cargo-config.toml.template b/tools/rust/cargo-config.toml.template
+--- a/tools/rust/cargo-config.toml.template
++++ b/tools/rust/cargo-config.toml.template
+@@ -21,3 +21,8 @@
+ # Use the same sysroot for host artifacts as target artifacts. Target rustflags
+ # are configured via environment variables.
+ rustflags = ["-Clink-arg=--sysroot=$DEBIAN_SYSROOT"]
++
++[host.aarch64-unknown-linux-gnu]
++# Use the same sysroot for host artifacts as target artifacts. Target rustflags
++# are configured via environment variables.
++rustflags = ["-Clink-arg=--sysroot=$DEBIAN_SYSROOT"]
+diff --git a/tools/rust/config.toml.template b/tools/rust/config.toml.template
+--- a/tools/rust/config.toml.template
++++ b/tools/rust/config.toml.template
+@@ -95,3 +95,14 @@
+ linker = "$LLVM_BIN/clang"
+ jemalloc = true
+ 
++
++[target.aarch64-unknown-linux-gnu]
++llvm-config = "$LLVM_BIN/llvm-config"
++# TODO(danakj): We don't ship this in the clang toolchain package.
++# ranlib = "$LLVM_BIN/llvm-ranlib"
++ar = "$LLVM_BIN/llvm-ar"
++cc = "$LLVM_BIN/clang"
++cxx = "$LLVM_BIN/clang++"
++linker = "$LLVM_BIN/clang"
++jemalloc = true
++
+diff --git a/tools/rust/host_tools.py b/tools/rust/host_tools.py
+--- a/tools/rust/host_tools.py
++++ b/tools/rust/host_tools.py
+@@ -35,7 +35,7 @@
+     )
+ )
+ 
+-from build import DownloadDebianSysroot, RunCommand
++from build import DownloadDebianSysroot, GetHostSysrootPlatform, RunCommand
+ 
+ EXE = '.exe' if sys.platform == 'win32' else ''
+ 
+@@ -51,7 +51,7 @@
+     `build_rust.py` downloads it, so this function only computes the path.
+     """
+     assert sys.platform.startswith('linux')
+-    sysroot = DownloadDebianSysroot('amd64', skip_download=True)
++    sysroot = DownloadDebianSysroot(GetHostSysrootPlatform(), skip_download=True)
+     if not os.path.isdir(sysroot):
+         raise RuntimeError(
+             f'{sysroot} not found.  Run `tools/rust/build_rust.py` first.'

@@ -1,0 +1,28 @@
+diff --git a/components/web_package/BUILD.gn b/components/web_package/BUILD.gn
+--- a/components/web_package/BUILD.gn
++++ b/components/web_package/BUILD.gn
+@@ -3,6 +3,10 @@
+ # found in the LICENSE file.
+ 
+ import("//testing/libfuzzer/fuzzer_test.gni")
++import("//build/config/rust.gni")
++
++assert(!is_linux || enable_cpp_api_from_rust,
++       "Linux157 WebBundle parsing requires the official Rust/Crubit toolchain")
+ 
+ source_set("web_package_headers") {
+   visibility = [ ":*" ]
+diff --git a/third_party/blink/renderer/platform/BUILD.gn b/third_party/blink/renderer/platform/BUILD.gn
+--- a/third_party/blink/renderer/platform/BUILD.gn
++++ b/third_party/blink/renderer/platform/BUILD.gn
+@@ -6,6 +6,10 @@
+ import("//build/buildflag_header.gni")
+ import("//build/compiled_action.gni")
+ import("//build/config/compiler/compiler.gni")
++import("//build/config/rust.gni")
++
++assert(!is_linux || enable_cpp_api_from_rust,
++       "Linux157 font and IFT support requires the official Rust/Crubit toolchain")
+ import("//build/config/ui.gni")
+ import("//build/nocompile.gni")
+ import("//media/media_options.gni")

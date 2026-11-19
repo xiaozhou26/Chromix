@@ -59,7 +59,7 @@ def save(root, values):
 
 
 @pytest.mark.parametrize("platform,version,core,overlay", [
-    ("linux", "156.0.8078.79", "28a211ab4ab6b83d919966a4f58a6df23cf4fb29",
+    ("linux", "157.0.8103.78", "8c886dffc6ade39d8f7df5d64ace5a8824b455e1",
      "6f0aa178c2394fc0a177edc0fd64e41f402a0418"),
     ("macos", "157.0.8103.78", "8c886dffc6ade39d8f7df5d64ace5a8824b455e1",
      "84768e74ece113d9e68e5d774808afe6c3a8fbe6"),
@@ -73,7 +73,8 @@ def test_checked_in_target_pins(platform, version, core, overlay):
     assert result["UngoogledCommit"] == core
     assert result["Ungoogled" + pins.PLATFORMS[platform] + "Commit"] == overlay
     suffix = "-1" if platform == "linux" else "-1.1"
-    assert result["Ungoogled" + pins.PLATFORMS[platform] + "Version"] == version + suffix
+    expected_platform = "156.0.8078.79-1" if platform == "linux" else version + suffix
+    assert result["Ungoogled" + pins.PLATFORMS[platform] + "Version"] == expected_platform
     assert (pins.ROOT / "CHROMIUM_VERSION").read_text().strip() == "156.0.8078.79"
     assert (pins.ROOT / "UNGOOGLED_VERSION").read_text().strip() == "156.0.8078.79-1"
     assert (pins.ROOT / "UNGOOGLED_WINDOWS_VERSION").read_text().strip() == "156.0.8078.79-1.1"
