@@ -477,9 +477,10 @@ def real_repo156(tmp_path, request):
     return repo, platform
 
 
-@pytest.mark.parametrize("platform,count", [("linux", 226), ("windows", 232), ("macos", 228)])
-def test_integrated_repository_selects_real_156_stack(platform, count):
-    identity, patches = selection.select(ROOT, platform)
+def test_integrated_repository_selects_real_156_stack(real_repo156):
+    repo, platform = real_repo156
+    count = {"linux": 226, "windows": 232, "macos": 228}[platform]
+    identity, patches = selection.select(repo, platform)
     assert identity["selection"]["version"] == selection.VERSION156
     assert len(patches) == count
     assert len([name for name, _ in patches if name.startswith(selection.OVERRIDE156_ROOT + "/")]) == 23

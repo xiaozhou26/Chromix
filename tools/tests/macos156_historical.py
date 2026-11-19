@@ -1,4 +1,4 @@
-"""Historical 226-patch recipes are tested against their fixed reviewed checkout."""
+"""Historical 156 recipes are tested against their fixed reviewed checkout."""
 import atexit
 from functools import cache
 from pathlib import Path
@@ -9,11 +9,11 @@ BASE = '29983e226787c9afc4fc7c416374f3aa4f83dc82'
 
 
 @cache
-def recipe_repo():
-    temporary = tempfile.TemporaryDirectory(prefix='mac156-226-recipes-')
+def recipe_repo(base=BASE):
+    temporary = tempfile.TemporaryDirectory(prefix='mac156-recipes-')
     atexit.register(temporary.cleanup)
     root = Path(temporary.name).resolve() / 'repo'
     current = Path(__file__).resolve().parents[2]
     subprocess.run(['git', 'clone', '--quiet', '--shared', '--no-checkout', str(current), str(root)], check=True)
-    subprocess.run(['git', '-C', str(root), 'checkout', '--quiet', BASE], check=True)
+    subprocess.run(['git', '-C', str(root), 'checkout', '--quiet', base], check=True)
     return root

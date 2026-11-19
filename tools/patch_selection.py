@@ -121,6 +121,35 @@ REVIEW156 = "patches/chromium156/manifest.json"
 REVIEW156_SHA256 = "580c39f70ce151473762c26d50eaf58316b3b9f9d5a04bdafdc07315fb4b8387"
 
 
+VERSION157 = "157.0.8103.78"
+CORE157 = "8c886dffc6ade39d8f7df5d64ace5a8824b455e1"
+PLATFORM157_COMMITS = {
+    "windows": "20e9a348fc616bd73a366fbd5d8881613d6c5cb0",
+    "macos": "84768e74ece113d9e68e5d774808afe6c3a8fbe6",
+    "linux": "6f0aa178c2394fc0a177edc0fd64e41f402a0418",
+}
+# Linux has no 157 tag; its real 156 gitlink cannot certify the downstream overlay.
+PLATFORM157_VERSIONS = {
+    platform: VERSION156 + "-1" if platform == "linux" else VERSION157 + "-1.1"
+    for platform in PLATFORM157_COMMITS
+}
+PLATFORM157_GITLINKS = {
+    platform: CORE156 if platform == "linux" else CORE157
+    for platform in PLATFORM157_COMMITS
+}
+PLATFORM157_STATUS = {
+    platform: "blocked-platform-overlay" if platform == "linux" else "reviewed-patches"
+    for platform in PLATFORM157_COMMITS
+}
+PATCH_COUNTS157 = {"windows": 232, "macos": 228, "linux": 226}
+OVERRIDE157_ROOT = "patches/chromium157"
+ADDITIONS157_ROOT = "patches/chromium157-additions"
+MANIFEST157 = "build/patch-selection-157.json"
+MANIFEST157_SHA256 = "8e6f9ed5b7c8a3c21b5d6f6e4c4092211108f04ebccca23c5e6f329ea99187c7"
+REVIEW157 = "patches/chromium157/manifest.json"
+REVIEW157_SHA256 = "41cb3473ae99ea99156996c4cc8fb1f23e3952c9c631d183bf4e8e98a5964695"
+
+
 MACOS152_VERSION = "152.0.7977.82"
 MACOS152_CORE = "e71b91c6e336d0f25cfc6b9ef09298a9d2506e24"
 MACOS152_PLATFORM = "038db2b41f7aeb00bbceb2f5a56912b26eb5b284"
@@ -405,6 +434,152 @@ def select156(repo: Path, platform: str, series: bytes, names: list[str]) -> tup
             [entry["path"] for entry in additions], selection)
 
 
+def validate_manifest157(manifest: object) -> dict:
+    """Validate isolated 157 schema, retaining the blocked Linux platform's real identity."""
+    def fields(value, expected, label):
+        if not isinstance(value, dict) or set(value) != set(expected):
+            raise SelectionError("invalid Chromium 157 manifest fields: " + label)
+
+    def sha256(value):
+        if not isinstance(value, str) or not re.fullmatch(r"[0-9a-f]{64}", value):
+            raise SelectionError("invalid Chromium 157 manifest SHA256")
+
+    def entries(value, root, *, overrides=False):
+        if not isinstance(value, list):
+            raise SelectionError("invalid Chromium 157 manifest patch list")
+        paths = set()
+        for entry in value:
+            fields(entry, ("path", "sha256", "original_sha256") if overrides else
+                   ("path", "sha256"), "patch")
+            path = entry["path"]
+            roots = (root,) if isinstance(root, str) else root
+            pattern = "(?:" + "|".join(re.escape(item) for item in roots) + ")"
+            if (not isinstance(path, str) or not re.fullmatch(
+                    pattern + r"/[0-9]{4}-[A-Za-z0-9_.-]+\.patch", path)
+                    or path in paths):
+                raise SelectionError("unsafe or duplicate Chromium 157 manifest patch path")
+            paths.add(path)
+            sha256(entry["sha256"])
+            if overrides:
+                sha256(entry["original_sha256"])
+        return paths
+
+    fields(manifest, ("schema_version", "kind", "chromium_version", "core_commit",
+                      "base_series_sha256", "base_patches", "overrides", "platforms"), "root")
+    if (type(manifest["schema_version"]) is not int or manifest["schema_version"] != 1
+            or manifest["kind"] != "chromium157-patch-selection"
+            or manifest["chromium_version"] != VERSION157 or manifest["core_commit"] != CORE157):
+        raise SelectionError("unreviewed Chromium 157 manifest identity")
+    sha256(manifest["base_series_sha256"])
+    entries(manifest["base_patches"], "patches")
+    if len(manifest["base_patches"]) != 224:
+        raise SelectionError("Chromium 157 requires the complete 224-patch base series")
+    base = {Path(entry["path"]).name: entry["sha256"] for entry in manifest["base_patches"]}
+    entries(manifest["overrides"], OVERRIDE157_ROOT, overrides=True)
+    for entry in manifest["overrides"]:
+        if base.get(Path(entry["path"]).name) != entry["original_sha256"]:
+            raise SelectionError("mismatched Chromium 157 manifest override predecessor")
+    fields(manifest["platforms"], PLATFORM157_COMMITS, "platforms")
+    shared = {}
+    for platform, commit in PLATFORM157_COMMITS.items():
+        entry = manifest["platforms"][platform]
+        fields(entry, ("version", "commit", "core_gitlink", "selection_status", "additions"), platform)
+        if (entry["version"] != PLATFORM157_VERSIONS[platform] or entry["commit"] != commit
+                or entry["core_gitlink"] != PLATFORM157_GITLINKS[platform]
+                or entry["selection_status"] != PLATFORM157_STATUS[platform]):
+            raise SelectionError("unreviewed Chromium 157 platform identity or core gitlink: " + platform)
+        paths = entries(entry["additions"], ADDITIONS157_ROOT)
+        if len(entry["additions"]) + 224 != PATCH_COUNTS157[platform]:
+            raise SelectionError("incomplete Chromium 157 additions: " + platform)
+        basenames = [Path(path).name for path in paths]
+        if len(basenames) != len(set(basenames)) or any(name in base for name in basenames):
+            raise SelectionError("Chromium 157 addition collides with base or another addition")
+        for patch in entry["additions"]:
+            if shared.setdefault(patch["path"], patch["sha256"]) != patch["sha256"]:
+                raise SelectionError("inconsistent Chromium 157 shared addition SHA256")
+    return manifest
+
+
+def select157(repo: Path, platform: str, series: bytes, names: list[str]) -> tuple[list[str], list[str], dict]:
+    """Authenticate the fixed manifest before consuming any of its patch paths."""
+    if platform not in PLATFORM157_COMMITS:
+        raise SelectionError("Chromium 157 requires an explicit supported platform")
+    if platform == "linux":
+        raise SelectionError("Chromium 157 Linux blocked: full downstream platform overlay is not reviewed")
+    if MANIFEST157_SHA256 is None:
+        raise SelectionError("Chromium 157 requires a reviewed pinned manifest SHA256")
+    raw = read(repo, MANIFEST157)
+    if digest(raw) != MANIFEST157_SHA256:
+        raise SelectionError("changed Chromium 157 selection manifest")
+
+    def unique_object(pairs):
+        result = {}
+        for key, value in pairs:
+            if key in result:
+                raise SelectionError("duplicate Chromium 157 manifest field: " + key)
+            result[key] = value
+        return result
+
+    try:
+        manifest = validate_manifest157(json.loads(raw, object_pairs_hook=unique_object))
+    except (UnicodeError, json.JSONDecodeError) as exc:
+        raise SelectionError("malformed Chromium 157 selection manifest") from exc
+    if (digest(series) != manifest["base_series_sha256"]
+            or names != [entry["path"] for entry in manifest["base_patches"]]):
+        raise SelectionError("changed Chromium 157 base series")
+
+    def inventory(root, entries, *, base=False):
+        directory = repo / root
+        if not entries and not directory.exists() and not directory.is_symlink():
+            return
+        if directory.is_symlink() or not directory.is_dir():
+            raise SelectionError("missing or linked Chromium 157 patch directory: " + root)
+        actual = {path.name for path in directory.iterdir() if not base or path.suffix == ".patch"}
+        if actual != {Path(entry["path"]).name for entry in entries}:
+            raise SelectionError("partial or unexpected Chromium 157 patch inventory: " + root)
+        for entry in entries:
+            if digest(read(repo, entry["path"])) != entry["sha256"]:
+                raise SelectionError("changed Chromium 157 patch: " + entry["path"])
+
+    inventory("patches", manifest["base_patches"], base=True)
+    # The fixed review evidence is required, not a wildcard inventory exception.
+    review_identity = {"path": REVIEW157, "sha256": REVIEW157_SHA256}
+    inventory(OVERRIDE157_ROOT, [*manifest["overrides"], review_identity])
+    review = json.loads(read(repo, REVIEW157))
+    if (manifest["base_patches"] != review["base_patches"]
+            or manifest["overrides"] != [
+                {key: entry[key] for key in ("path", "original_sha256", "sha256")}
+                for entry in review["overrides"]]):
+        raise SelectionError("Chromium 157 selection disagrees with fixed patch review")
+    shared = {}
+    for target, entry in manifest["platforms"].items():
+        if entry["additions"] != [
+                {key: patch[key] for key in ("path", "sha256")}
+                for patch in review["additions"][target]]:
+            raise SelectionError("Chromium 157 additions disagree with fixed patch review: " + target)
+        root = OVERRIDE157_ROOT + "-" + target
+        inventory(root, [patch for patch in entry["additions"] if Path(patch["path"]).parent.as_posix() == root])
+        shared.update({patch["path"]: patch for patch in entry["additions"]
+                       if Path(patch["path"]).parent.as_posix() == ADDITIONS157_ROOT})
+    inventory(ADDITIONS157_ROOT, list(shared.values()))
+    overrides = {Path(entry["path"]).name: entry["path"] for entry in manifest["overrides"]}
+    additions = manifest["platforms"][platform]["additions"]
+    manifest_identity = {"path": MANIFEST157, "sha256": digest(raw)}
+    selection = {
+        "schema_version": 1, "version": VERSION157, "platform": platform,
+        "core_commit": CORE157, "platform_commit": PLATFORM157_COMMITS[platform],
+        "base_series_sha256": digest(series), "manifest": manifest_identity,
+        "review_manifest": review_identity,
+        "core_gitlink": manifest["platforms"][platform]["core_gitlink"],
+        "selection_status": manifest["platforms"][platform]["selection_status"],
+        "overrides": manifest["overrides"],
+        "additions": {"schema_version": 1, "kind": manifest["kind"],
+                      "manifest": manifest_identity, "patches": additions},
+    }
+    return ([overrides.get(Path(name).name, name) for name in names],
+            [entry["path"] for entry in additions], selection)
+
+
 def select(repo: Path, platform: str | None = None, *, src: Path | None = None,
            core: Path | None = None) -> tuple[dict, list[tuple[str, bytes]]]:
     """Return raw selected-byte identity and ordered (physical path, bytes)."""
@@ -437,6 +612,8 @@ def select(repo: Path, platform: str | None = None, *, src: Path | None = None,
               OVERRIDE155_ROOT, LINUX155_ADDITIONS_ROOT, LINUX155_ADDITIONS_MANIFEST,
               MACOS154_ADDITIONS_ROOT, MACOS154_ADDITIONS_MANIFEST,
               WINDOWS155_ADDITIONS_ROOT, WINDOWS155_ADDITIONS_MANIFEST,
+              OVERRIDE157_ROOT, ADDITIONS157_ROOT, MANIFEST157,
+              *(OVERRIDE157_ROOT + "-" + target for target in PLATFORM157_COMMITS),
               OVERRIDE156_ROOT, ADDITIONS156_ROOT, MANIFEST156,
               *(OVERRIDE156_ROOT + "-" + target for target in PLATFORM156_COMMITS))):
         raise SelectionError("patch version selection requires complete repository pins")
@@ -444,13 +621,13 @@ def select(repo: Path, platform: str | None = None, *, src: Path | None = None,
     macos152 = platform == "macos" and version == MACOS152_VERSION
     if src is not None and version is not None:
         source_version_path = Path(src) / "chrome/VERSION"
-        if version in (VERSION, VERSION155, VERSION156) or macos152 or source_version_path.is_symlink():
+        if version in (VERSION, VERSION155, VERSION156, VERSION157) or macos152 or source_version_path.is_symlink():
             observed = source_version(Path(src))
             if observed != version:
                 raise SelectionError("source version does not match selected repository pins")
     if core is not None and version is not None:
         core_version_path = Path(core) / "chromium_version.txt"
-        if version in (VERSION, VERSION155, VERSION156) or macos152 or core_version_path.is_symlink():
+        if version in (VERSION, VERSION155, VERSION156, VERSION157) or macos152 or core_version_path.is_symlink():
             observed = read(Path(core), "chromium_version.txt").decode("ascii").strip()
             if observed != version:
                 raise SelectionError("core version does not match selected repository pins")
@@ -501,6 +678,17 @@ def select(repo: Path, platform: str | None = None, *, src: Path | None = None,
                 or pins[prefix + "Version"] != PLATFORM156_VERSIONS[platform]):
             raise SelectionError("Chromium 156 core/platform pins do not match reviewed overrides")
         selected, additions156, selection = select156(repo, platform, series, names)
+    elif version == VERSION157:
+        if platform not in PLATFORM157_COMMITS:
+            raise SelectionError("Chromium 157 overrides require Windows, Linux, or macOS")
+        if platform == "linux":
+            raise SelectionError("Chromium 157 Linux blocked: full downstream platform overlay is not reviewed")
+        prefix = "Ungoogled" + PLATFORMS[platform]
+        if (pins["UngoogledCommit"] != CORE157 or pins["UngoogledVersion"] != VERSION157 + "-1"
+                or pins[prefix + "Commit"] != PLATFORM157_COMMITS[platform]
+                or pins[prefix + "Version"] != PLATFORM157_VERSIONS[platform]):
+            raise SelectionError("Chromium 157 core/platform pins do not match reviewed overrides")
+        selected, additions157, selection = select157(repo, platform, series, names)
     elif macos152:
         if (pins["UngoogledCommit"] != MACOS152_CORE
                 or pins["UngoogledVersion"] != MACOS152_VERSION + "-1"
@@ -552,6 +740,11 @@ def select(repo: Path, platform: str | None = None, *, src: Path | None = None,
         if not effective_series.endswith(b"\n"):
             effective_series += b"\n"
         effective_series += "".join(name + "\n" for name in additions156).encode("utf-8")
+    if version == VERSION157 and additions157:
+        selected = [*selected, *additions157]
+        if not effective_series.endswith(b"\n"):
+            effective_series += b"\n"
+        effective_series += "".join(name + "\n" for name in additions157).encode("utf-8")
     patches = [(name, read(repo, name)) for name in selected]
     identity = {"series_sha256": digest(effective_series),
                 "patches": [{"path": name, "sha256": digest(raw)} for name, raw in patches]}
