@@ -33,6 +33,8 @@ except ImportError:
 
 MANIFEST = "build/linux/157.0.8103.78/locale-checkpoint.json"
 MANIFEST_SHA256 = "42a6d9d6e9d40812cb4bee4077768213987586387f7f8816e08b9bd066993208"
+ARM64_MANIFEST = "build/linux/157.0.8103.78/arm64-locale-checkpoint.json"
+ARM64_MANIFEST_SHA256 = "825e7d02d900f808b72e014cbcc708b2417d2e21b4c0a9898da72db7010f14a2"
 TARGETS = ("base/i18n/icubridge/default_icu_locale.h",
            "third_party/blink/renderer/core/timezone/timezone_controller.cc")
 OLD_COUNT = 226
@@ -42,30 +44,33 @@ MARKER = ".chromix-linux157-locale-migration.json"
 PENDING = ".chromix-linux157-locale-migration-in-progress"
 BACKUP = "linux157-locale-origin"
 CHANGED = {"tools/linux157_source.py", "tools/linux157_build.py"}
-ADDED = {"tools/linux157_locale.py", MANIFEST}
+ADDED = {"tools/linux157_locale.py", MANIFEST, ARM64_MANIFEST}
 
 
-def load(repo=source.ROOT):
-    raw = source.regular(repo, MANIFEST).read_bytes()
-    if source.digest(raw) != MANIFEST_SHA256:
+def load(repo=source.ROOT, arch="x64"):
+    if arch not in ("x64", "arm64"):
+        raise ValueError("unsupported locale donor architecture")
+    path, digest = (ARM64_MANIFEST, ARM64_MANIFEST_SHA256) if arch == "arm64" else (MANIFEST, MANIFEST_SHA256)
+    raw = source.regular(repo, path).read_bytes()
+    if source.digest(raw) != digest:
         raise ValueError("unreviewed compiled locale checkpoint manifest")
     return json.loads(raw)
 
 
 def expected(arch, repo=source.ROOT):
-    m = load(repo)
+    m = load(repo, arch)
     if arch != m["arch"]:
-        raise ValueError("locale recovery only admits the exact x64 compiled donor")
-    return {"repository": m["repository"], "platform": "linux", "workflow": "build-linux157-x64-post-gn-resume",
+        raise ValueError("locale recovery architecture does not match its fixed donor")
+    return {"repository": m["repository"], "platform": "linux", "workflow": Path(m["workflow_path"]).stem,
             "run_id": m["run_id"], "attempt": m["attempt"], "stage": m["stage"], "arch": arch,
             "head_sha": m["head_sha"], "job_id": m["job_id"],
-            "pattern": "chromix-linux-x64-tree-s1-attempt-1-part*",
+            "pattern": f"chromix-linux-{arch}-tree-s{m['stage']}-attempt-{m['attempt']}-part*",
             "artifacts": [{k: v for k, v in m["artifact"].items() if k != "expires_at"} | {"expired": False}]}
 
 
 def validate_metadata(client, arch, repo=source.ROOT):
     want = expected(arch, repo)
-    m = load(repo)
+    m = load(repo, arch)
     run = client.get(f"/actions/runs/{m['run_id']}")
     if (run.get("id") != m["run_id"] or run.get("path") != m["workflow_path"]
             or run.get("head_sha") != m["head_sha"] or run.get("head_branch") != "main"
@@ -81,13 +86,13 @@ def validate_metadata(client, arch, repo=source.ROOT):
     job = jobs[0]
     steps = {s["name"]: s.get("conclusion") for s in job["steps"]}
     if (job.get("name") != m["job_name"] or job.get("conclusion") != "failure"
-            or job.get("status") != "completed" or steps.get("Run stage 1") != "failure"
+            or job.get("status") != "completed" or steps.get(f"Run stage {m['stage']}") != "failure"
             or steps.get("Preserve latest failed Linux source/output checkpoint") != "success"
             or steps.get("Verify handoff snapshot") != "success"
             or any(steps.get(f"Upload tree part {i}") != "success" for i in range(1, 5))):
         raise ValueError("compiled donor did not preserve verified failed output")
     artifacts = [a for a in client.items(f"/actions/runs/{m['run_id']}/artifacts", "artifacts")
-                 if a.get("name", "").startswith("chromix-linux-x64-tree-s1-attempt-1-part")]
+                 if a.get("name", "").startswith(f"chromix-linux-{arch}-tree-s{m['stage']}-attempt-{m['attempt']}-part")]
     if len(artifacts) != 1:
         raise ValueError("unexpected compiled donor artifact set")
     artifact = artifacts[0]
@@ -266,7 +271,8 @@ def verify_ninja(work, repo=source.ROOT):
         from . import restore_ninja
     except ImportError:
         import restore_ninja
-    pin = load(repo)["ninja"]
+    receipt = json.loads(source.regular(work / "src", source.RECEIPT).read_bytes())
+    pin = load(repo, receipt["target_arch"])["ninja"]
     chosen = shutil.which("ninja")
     if not chosen or restore_ninja.host_identity() != tuple(pin["host"]):
         raise ValueError("compiled locale recovery requires native donor-compatible Ninja")
@@ -315,7 +321,7 @@ def publish_sources(src, before, revised):
 
 
 def admit(work, arch, metadata, repo=source.ROOT):
-    m = load(repo)
+    m = load(repo, arch)
     if metadata != expected(arch, repo):
         raise ValueError("locale metadata tuple mismatch")
     src = work / "src"
@@ -423,11 +429,11 @@ def verify(work, arch, repo=source.ROOT):
             PENDING, ".chromix-layer-in-progress", source.IN_PROGRESS,
             ".chromix-linux157-libclang-in-progress", ".chromix-domain-substitution-in-progress")):
         raise ValueError("incomplete locale migration")
-    m = load(repo)
+    m = load(repo, arch)
     proof = json.loads(source.regular(src, MARKER).read_bytes())
     selected, raw = patch_selection.select(repo, "linux", src=src)
     additions = validate_additions(selected, raw, m, repo)
-    if (arch != "x64" or proof.get("metadata") != expected(arch, repo)
+    if (arch != m["arch"] or proof.get("metadata") != expected(arch, repo)
             or proof.get("origin_recipe") != m["source_receipt"]["recipe"]
             or proof.get("current_recipe") != source.recipe(repo) or proof.get("phase") != "exact-compiled-locale"
             or proof.get("new_patch_count") != NEW_COUNT or proof.get("patches") != selected["patches"][-ADDITION_COUNT:]
@@ -463,7 +469,7 @@ def verify(work, arch, repo=source.ROOT):
 def restore(work, arch, repo=source.ROOT):
     if work.exists() or work.is_symlink():
         raise ValueError("compiled restore requires absent workdir")
-    m = load(repo)
+    m = load(repo, arch)
     selected, patches = patch_selection.select(repo, "linux")
     validate_additions(selected, patches, m, repo)
     metadata = validate_metadata(snapshot.Client(m["repository"], os.environ.get("GH_TOKEN", "")), arch, repo)
@@ -490,7 +496,7 @@ def main(argv=None):
     args = parser.parse_args(argv)
     try:
         if args.phase == "metadata":
-            result = validate_metadata(snapshot.Client(load(args.repo)["repository"], os.environ.get("GH_TOKEN", "")), args.arch, args.repo)
+            result = validate_metadata(snapshot.Client(load(args.repo, args.arch)["repository"], os.environ.get("GH_TOKEN", "")), args.arch, args.repo)
         elif args.phase == "restore" and args.workdir:
             result = restore(args.workdir.absolute(), args.arch, args.repo)
         elif args.phase == "admit" and args.workdir and args.metadata:

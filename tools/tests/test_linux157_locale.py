@@ -81,8 +81,8 @@ def test_compiled_metadata_has_objects_not_old_postgn():
     assert m['files']['src/out/Chromix/.ninja_log']
     assert m['files']['src/out/Chromix/.ninja_deps']
     assert m['source_final']['patch_count'] == 226
-    with pytest.raises(ValueError, match='x64'):
-        locale.expected('arm64')
+    assert locale.expected('arm64')['run_id'] == 44578888695
+    assert locale.expected('arm64')['stage'] == 2
 
 
 @pytest.mark.parametrize('field', ['run_id','attempt','stage','head_sha','job_id'])

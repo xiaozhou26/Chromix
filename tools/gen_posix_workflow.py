@@ -259,12 +259,12 @@ CACHE_RESTORE = """      # The pinned download cache is deliberately outside the
 """
 
 
-def run_step(stage: int) -> str:
+def run_step(stage: int, first_stage: int = 1) -> str:
     # GHA expressions use ${{ ... }}, so f-strings cannot carry them (their
     # braces would collapse to single braces). Use token replacement instead.
     # For stage 1 no restore argument exists; the continuation chain must stay
     # valid shell, so the token sits inline rather than as a standalone line.
-    if stage > 1:
+    if stage > first_stage:
         restore_args = (
             '--from-snapshot "${RUNNER_TEMP}/chromix-restore" '
             "\\\n            "
@@ -703,11 +703,11 @@ def auxiliary_steps(text: str) -> str:
                                   "        continue-on-error: ${{ " + COMPILE_RELEASE + " }}\n        uses: actions/upload-artifact@v4")
 
 
-def job(stage: int) -> str:
-    needs = f"posix-{stage - 1}" if stage > 1 else None
+def job(stage: int, first_stage: int = 1) -> str:
+    needs = f"posix-{stage - 1}" if stage > first_stage else None
     # Job titles also carry GHA expressions; build them without f-strings.
-    if stage == 1:
-        title = "${{ inputs.platform }}-${{ inputs.arch }} stage 1 (prepare + first compile)"
+    if stage == first_stage:
+        title = "${{ inputs.platform }}-${{ inputs.arch }} stage " + str(stage) + " (prepare + first compile)"
     else:
         title = (
             "${{ inputs.platform }}-${{ inputs.arch }} stage "
@@ -747,7 +747,7 @@ def job(stage: int) -> str:
     parts.append('      - name: Record snapshot producer attempt\n'
                  '        id: snapshot_origin\n'
                  '        run: echo "attempt=$GITHUB_RUN_ATTEMPT" >> "$GITHUB_OUTPUT"\n')
-    if stage == 1:
+    if stage == first_stage:
         parts.append("""      - name: Require exact mac156 Intel stage3 continuation inputs
         if: inputs.resume_migration == 'mac156-x64-stage3'
         run: |
@@ -909,7 +909,7 @@ def job(stage: int) -> str:
             > "${RUNNER_TEMP}/chromix-logs/linux157-recipe.json"
 
 """)
-    if stage == 1:
+    if stage == first_stage:
         parts.append("""      - name: Restore latest compiled Linux157 locale checkpoint
         if: inputs.linux157_locale_recovery
         env:
@@ -983,13 +983,13 @@ def job(stage: int) -> str:
 
 """)
         parts.append(RESUME_STEPS)
-    if stage > 1:
+    if stage > first_stage:
         parts.append(DOWNLOAD_STEP % {"prev": stage - 1})
         parts.append("\n")
     parts.append(CACHE_RESTORE)
     parts.append("      - name: Select compile parallelism\n"
                  "        run: python3 tools/build_resources.py --github-env\n\n")
-    parts.append(run_step(stage))
+    parts.append(run_step(stage, first_stage))
     parts.append(compile_release_uploads(stage))
     parts.append(RUNTIME_FAILURE.replace("        id: runtime_checkpoint\n",
                                         "        id: runtime_checkpoint\n        continue-on-error: ${{ " + COMPILE_RELEASE + " }}\n") % {"stage": stage})
@@ -1079,6 +1079,11 @@ NATIVE_LINUX_ARM64 = """  verify-linux-arm64:
           retention-days: 14
 """
 
-body = HEADER + "\n".join(job(s) for s in range(1, STAGES + 1)) + "\n" + NATIVE_LINUX_ARM64
-OUT.write_text(body, encoding="utf-8", newline="\n")
-print(f"wrote {OUT} ({len(body)} bytes, {STAGES} stages)")
+def main():
+    body = HEADER + "\n".join(job(s) for s in range(1, STAGES + 1)) + "\n" + NATIVE_LINUX_ARM64
+    OUT.write_text(body, encoding="utf-8", newline="\n")
+    print(f"wrote {OUT} ({len(body)} bytes, {STAGES} stages)")
+
+
+if __name__ == "__main__":
+    main()

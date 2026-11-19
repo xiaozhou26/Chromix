@@ -1,0 +1,34 @@
+name: build-linux157-arm64-locale-resume
+run-name: Linux157 ARM64 compiled stage2 44578888695 to logical stage3 locale repair
+
+on:
+  workflow_dispatch:
+    inputs:
+      compile_jobs:
+        description: 'Ninja jobs; exact stage2 attempt1 donor and two-file locale migration are fixed'
+        type: string
+        default: auto
+
+permissions:
+  actions: read
+  contents: read
+
+concurrency:
+  group: linux157-arm64-locale-resume-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  resume:
+    name: Linux157 ARM64 (latest stage2 compiled tree, continue stage3)
+    uses: ./.github/workflows/build-linux157-arm64-locale-stages.yml
+    with:
+      platform: linux
+      arch: arm64
+      runner: ubuntu-24.04
+      artifact: chromix-linux-arm64
+      max-stages: 8
+      build_profile: fast
+      compile_jobs: ${{ inputs.compile_jobs || 'auto' }}
+      use_upstream_cache: false
+      linux157_locale_recovery: true
+    secrets: inherit

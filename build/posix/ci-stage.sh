@@ -157,7 +157,12 @@ case "${CHROMIX_LINUX157_PRE_GN_RECOVERY:-0}:${CHROMIX_LINUX157_POST_GN_RECOVERY
   0:0:0) ;;
   1:0:0|0:1:0) LINUX157_RECOVERY=1 ;;
   0:0:1)
-    [ "$PLATFORM:$ARCH" = linux:x64 ] || die "locale recovery requires exact Linux x64 donor"
+    case "$PLATFORM:$ARCH:${CHROMIX_LINUX157_ARM64_STAGE2_RECOVERY:-0}" in
+      linux:x64:0) ;;
+      linux:arm64:1)
+        [ "$STAGE_INDEX" -ge 3 ] || die "ARM locale continuation must start at logical stage3" ;;
+      *) die "locale recovery requires exact architecture donor route" ;;
+    esac
     LINUX157_RECOVERY=1 ;;
   *) die "select exactly one Linux157 recovery route" ;;
 esac
