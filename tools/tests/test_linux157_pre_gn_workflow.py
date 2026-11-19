@@ -176,7 +176,7 @@ raise SystemExit(17)
     assert (work/'src/out/Chromix/args.gn').read_text()==f'target_cpu="{arch}"\nchrome_pgo_phase=0\n'
 
 
-def test_real_builder_checks_migration_and_source_before_exact_args_repair(tmp_path):
+def test_current_builder_checks_postgn_proof_without_repeating_args_repair(tmp_path):
     work=tmp_path;src=work/'src';src.mkdir();(src/'.chromix-domain-substituted').touch()
     order=[]
     def run(args,**kwargs):
@@ -194,10 +194,10 @@ def test_real_builder_checks_migration_and_source_before_exact_args_repair(tmp_p
          mock.patch.object(build,'prepare_host_go',return_value={}), \
          mock.patch.object(build.shutil,'which',return_value=sys.executable), \
          mock.patch.object(build.subprocess,'run',side_effect=run), \
-         mock.patch.object(build.checkpoint,'prepare_args',side_effect=lambda *a:order.append('exact-three-args')), \
+         mock.patch.object(build.postgn,'verify',side_effect=lambda *a:order.append('read-postgn-proof')), \
          mock.patch.object(build.host_gn,'prepare',side_effect=ValueError('stop-before-GN')):
         with pytest.raises(ValueError,match='stop-before-GN'):build.build(work,'arm64')
-    assert order==['verify-migrated-source','verified-tools','source-proof','exact-three-args']
+    assert order==['verify-migrated-source','verified-tools','source-proof','read-postgn-proof']
 
 
 def test_stage_layout_and_native_gate_unchanged():

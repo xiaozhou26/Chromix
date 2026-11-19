@@ -203,9 +203,23 @@ def test_generated_all_stages_match_and_native_gates_unchanged():
     assert workflow['jobs']['verify-linux-arm64'] == original['jobs']['verify-linux-arm64']
     for stage in range(1, 9):
         new = workflow['jobs'][f'posix-{stage}']['steps']; old = original['jobs'][f'posix-{stage}']['steps']
+        postgn_names = {'Guard exact Linux157 post-GN recovery request',
+                        'Restore exact Linux157 latest post-GN checkpoint'}
+        new = [s for s in new if s.get('name') not in postgn_names]
+        old = [s for s in old if s.get('name') not in postgn_names]
         assert len(new) == len(old)
         for a, b in zip(new, old):
-            if a.get('id') == 'checkpoint':
-                assert a['if'] == b['if']
-            else:
-                assert a == b
+            if a.get('id') == 'stage':
+                a = dict(a, env={k:v for k,v in a['env'].items() if k != 'CHROMIX_LINUX157_POST_GN_RECOVERY'})
+                b = dict(b, env={k:v for k,v in b['env'].items() if k != 'CHROMIX_LINUX157_POST_GN_RECOVERY'})
+            elif a.get('name') == 'Validate exact Linux157 fresh source route':
+                assert a['if'] == b['if'] and a['env'] == b['env']
+                continue
+            elif a.get('name', '').startswith('Upload build diagnostics'):
+                a = a.copy()
+                a['with'] = dict(a['with'], path='\n'.join(line for line in a['with']['path'].splitlines()
+                    if '/linux157-postgn-' not in line))
+                b = b.copy()
+                b['with'] = dict(b['with'], path='\n'.join(line for line in b['with']['path'].splitlines()
+                    if '/linux157-postgn-' not in line))
+            assert a == b

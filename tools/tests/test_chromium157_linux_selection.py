@@ -14,7 +14,7 @@ from tools import patch_selection as selection
 from tools.tests.test_patch_selection import clone_repo, set_platform_pins
 
 ROOT = Path(__file__).resolve().parents[2]
-LINUX_IMPLEMENTATION = "3fa53151090069ba6453569598109627ccfc491c"
+LINUX_IMPLEMENTATION = "501dd12cc295285ef6206cb3dd3786168a3820d9"
 MANIFEST = json.loads((ROOT / selection.MANIFEST157).read_bytes())
 DOWNSTREAM = MANIFEST["platforms"]["linux"]["downstream"]
 
@@ -84,12 +84,12 @@ def test_exact_recipe_source_and_nine_override_group_match_actual_implementation
         for entry in source["patches"]]
     assert len(DOWNSTREAM["platform_overrides"]) == 9
     assert DOWNSTREAM["platform_override_group_sha256"] == selection.canonical_digest(DOWNSTREAM["platform_overrides"])
-    assert DOWNSTREAM["recipe"]["sha256"] == "ee6fe2d6b8df89e65093e8b3ef41335dee233a8739fa139d321af6babea88b4e"
+    assert DOWNSTREAM["recipe"]["sha256"] == "131f3d59a27e1db157e1d0a8bfdbfcdc5b70a7c10bc7f0c4fa5936a6841cc692"
 
 
 def test_precise_host_go_helper_and_previous_unbound_helper_rejected(linux_repo):
     helper = "tools/linux157_build.py"
-    assert DOWNSTREAM["recipe"]["inputs"][helper] == "c646e9e39049e0ce02d3efa90910c43f30696d10bc775f1a201345b425393096"
+    assert DOWNSTREAM["recipe"]["inputs"][helper] == "f5c30730663ccb70b5b04505053296c88d39df683f010b06aa792d3d8ab53315"
     delta = DOWNSTREAM["validation"]["recipe_integration"]["changed_inputs"][helper]
     assert delta == {
         "before_sha256": "048e644354c26812c5b0db71e272c53066eb6f1b7d19d68821bb4329cfdb6503",
@@ -119,7 +119,7 @@ def test_gn_recovery_binds_exact_new_inputs_and_preserves_donor_patch_identity(l
     from tools import linux157_checkpoint as checkpoint
     from tools import linux157_gn as gn
     delta = DOWNSTREAM["validation"]["recipe_integration"]["gn_recovery"]
-    assert delta["recipe_sha256"] == DOWNSTREAM["recipe"]["sha256"]
+    assert delta["recipe_sha256"] == DOWNSTREAM["validation"]["recipe_integration"]["libclang_recovery"]["previous_recipe_sha256"]
     assert set(delta["changed_inputs"]) == checkpoint.REVIEWED_CHANGED | checkpoint.REVIEWED_ADDED
     assert delta["source_manifest_unchanged"] == DOWNSTREAM["source_manifest"]
     assert delta["host_gn"]["compiler_binaries"] == gn.BINARIES
@@ -129,7 +129,11 @@ def test_gn_recovery_binds_exact_new_inputs_and_preserves_donor_patch_identity(l
         "v8_use_metagen_instance_types=false\n"]
     selected, _ = selection.select(linux_repo, "linux")
     for arch, donor in checkpoint.load(linux_repo)["donors"].items():
-        checkpoint.validate_recipe_delta(donor["source_receipt"]["recipe"], DOWNSTREAM["recipe"])
+        from tools import linux157_postgn as postgn
+        historical = postgn.load(linux_repo)["donors"][arch]["source_receipt"]["recipe"]
+        checkpoint.validate_recipe_delta(donor["source_receipt"]["recipe"], historical)
+        with pytest.raises(ValueError, match="delta"):
+            checkpoint.validate_recipe_delta(donor["source_receipt"]["recipe"], DOWNSTREAM["recipe"])
         checkpoint.compatible_selection(donor["source_receipt"]["chromix_selection"], selected)
         assert delta["gn_args"]["identities"][arch]["original_sha256"] == donor["files"]["src/out/Chromix/args.gn"]
         assert delta["donors"][arch]["artifact"] == donor["artifact"]
@@ -160,6 +164,62 @@ def test_unknown_gn_recovery_scope_is_rejected(mutation):
         delta["host_gn"]["compiler_binaries"]["clang"] = "0" * 64
     else:
         downstream["recipe"]["inputs"]["tools/unreviewed_gn.py"] = "0" * 64
+    with pytest.raises(selection.SelectionError, match="downstream recipe"):
+        selection.validate_manifest157(manifest)
+
+
+def test_libclang_scope_and_latest_postgn_donors_are_exact(linux_repo):
+    from tools import linux157_checkpoint as prior
+    from tools import linux157_libclang as libclang
+    from tools import linux157_postgn as postgn
+    delta = DOWNSTREAM["validation"]["recipe_integration"]["libclang_recovery"]
+    assert delta["recipe_sha256"] == DOWNSTREAM["recipe"]["sha256"]
+    assert set(delta["changed_inputs"]) == postgn.CHANGED | postgn.ADDED
+    assert delta["post_gn_manifest"] == {"path": postgn.MANIFEST, "sha256": postgn.MANIFEST_SHA256}
+    assert delta["libclang_manifest"] == {"path": libclang.MANIFEST, "sha256": libclang.MANIFEST_SHA256}
+    package = libclang.load(linux_repo)
+    assert delta["package"]["download"] == package["download"]
+    assert delta["package"]["files_sha256"] == selection.canonical_digest(package["files"])
+    assert len(package["files"]) == 16
+    for name, expected in delta["preserved_inputs"].items():
+        assert selection.digest(blob(name, delta["baseline_commit"])) == expected
+        assert DOWNSTREAM["recipe"]["inputs"][name] == expected
+    selected, _ = selection.select(linux_repo, "linux")
+    for arch, donor in postgn.load(linux_repo)["donors"].items():
+        postgn.delta(donor["source_receipt"]["recipe"], DOWNSTREAM["recipe"])
+        prior.compatible_selection(donor["source_receipt"]["chromix_selection"], selected)
+        assert delta["donors"][arch]["artifact"] == donor["artifact"]
+        assert delta["donors"][arch]["workflow_path"] == donor["workflow_path"]
+        assert donor["files"]["src/out/Chromix/build.ninja"]
+
+
+@pytest.mark.parametrize("helper", ["tools/linux157_source.py", "tools/linux157_build.py"])
+def test_pre_libclang_helper_rollback_is_rejected(linux_repo, helper):
+    delta = DOWNSTREAM["validation"]["recipe_integration"]["libclang_recovery"]
+    old = blob(helper, delta["baseline_commit"])
+    assert selection.digest(old) == delta["changed_inputs"][helper]["before_sha256"]
+    store(linux_repo, helper, old)
+    with pytest.raises(selection.SelectionError, match="changed Linux157 recipe input"):
+        selection.select(linux_repo, "linux")
+
+
+@pytest.mark.parametrize("mutation", ["package", "postgn", "old-pregn", "donor", "bindings-only", "extra-helper"])
+def test_unknown_libclang_input_scope_is_rejected(mutation):
+    manifest = copy.deepcopy(MANIFEST)
+    downstream = manifest["platforms"]["linux"]["downstream"]
+    delta = downstream["validation"]["recipe_integration"]["libclang_recovery"]
+    if mutation == "package":
+        delta["package"]["download"]["sha256"] = "0" * 64
+    elif mutation == "postgn":
+        delta["post_gn_manifest"]["sha256"] = "0" * 64
+    elif mutation == "old-pregn":
+        downstream["recipe"]["inputs"]["build/linux/157.0.8103.78/pre-gn-checkpoints.json"] = "0" * 64
+    elif mutation == "donor":
+        delta["donors"]["arm64"]["run_id"] += 1
+    elif mutation == "bindings-only":
+        delta["package"]["file_count"] = 2
+    else:
+        downstream["recipe"]["inputs"]["tools/unreviewed_libclang.py"] = "0" * 64
     with pytest.raises(selection.SelectionError, match="downstream recipe"):
         selection.validate_manifest157(manifest)
 

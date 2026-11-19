@@ -152,16 +152,22 @@ elif [ -e "$WORK/fingerprint-diagnostics/mac156-x64-stage3-resume.json" ] ||
 fi
 
 LINUX157_FRESH=0
-if [ "${CHROMIX_LINUX157_PRE_GN_RECOVERY:-0}" = 1 ] && [ "$PLATFORM" != linux ]; then
-  die "Linux157 pre-GN recovery is Linux-only"
+LINUX157_RECOVERY=0
+case "${CHROMIX_LINUX157_PRE_GN_RECOVERY:-0}:${CHROMIX_LINUX157_POST_GN_RECOVERY:-0}" in
+  0:0) ;;
+  1:0|0:1) LINUX157_RECOVERY=1 ;;
+  *) die "select exactly one Linux157 recovery route" ;;
+esac
+if [ "$LINUX157_RECOVERY" = 1 ] && [ "$PLATFORM" != linux ]; then
+  die "Linux157 recovery is Linux-only"
 fi
 if [ "$PLATFORM" = linux ] && [ -f "$REPO/CHROMIUM_LINUX_VERSION" ]; then
   read -r LINUX_VERSION < "$REPO/CHROMIUM_LINUX_VERSION"
   if [ "$LINUX_VERSION" = 157.0.8103.78 ]; then
     python3 "$REPO/tools/linux157_source.py" --phase route --repo "$REPO" --arch "$ARCH" ||
       die "Linux157 fresh route identity/cache policy failed"
-    [ "${CHROMIX_LINUX157_PRE_GN_RECOVERY:-0}" = 1 ] ||
-      die "Linux157 requires the dedicated exact pre-GN checkpoint recovery workflow"
+    [ "$LINUX157_RECOVERY" = 1 ] ||
+      die "Linux157 requires a dedicated exact checkpoint recovery workflow"
     [ "${CHROMIX_BUILD_PROFILE:-release}" = fast ] || die "Linux157 recovery preserves the fast donor profile"
     [ -d "$SRC" ] || die "Linux157 prepared donor must be restored before the stage; fresh fallback forbidden"
     python3 "$REPO/tools/linux157_source.py" --phase checkpoint --repo "$REPO" \
@@ -169,8 +175,8 @@ if [ "$PLATFORM" = linux ] && [ -f "$REPO/CHROMIUM_LINUX_VERSION" ]; then
     LINUX157_FRESH=1
   fi
 fi
-if [ "${CHROMIX_LINUX157_PRE_GN_RECOVERY:-0}" = 1 ] && [ "$LINUX157_FRESH" -ne 1 ]; then
-  die "pre-GN recovery requires exact Linux157 pins"
+if [ "$LINUX157_RECOVERY" = 1 ] && [ "$LINUX157_FRESH" -ne 1 ]; then
+  die "checkpoint recovery requires exact Linux157 pins"
 fi
 
 # Historical donor mode remains mandatory when explicitly selected.
