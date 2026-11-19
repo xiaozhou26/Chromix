@@ -120,6 +120,33 @@ WINDOWS155_RECORDS = (
         "after_sha256": WINDOWS155_REPAIRED_SHA256,
     }),
 )
+# Exact 157 source + Windows overlay + domain rules reproduce these bytes.
+# The ARM64 donor must still match the reconstructed digest at restore time.
+WINDOWS157_ORIGINAL_SHA256 = "0c0062cc6b73e1d0874e2a3304498f48ad1cb552d11d49eea223319051dde831"
+WINDOWS157_REPAIRED_SHA256 = "466824620fd2348229c24d477d114e4c7acc0a5e75a8f1b162729809a0dfccde"
+WINDOWS157_RECORDS = (
+    MappingProxyType({
+        "identity": MappingProxyType({
+            "chromium_version": "157.0.8103.78",
+            "ungoogled_commit": "8c886dffc6ade39d8f7df5d64ace5a8824b455e1",
+            "head_sha": "20e9a348fc616bd73a366fbd5d8881613d6c5cb0",
+            "platform": "windows",
+            "arch": "arm64",
+            "repository": "ungoogled-software/ungoogled-chromium-windows",
+            "repository_id": 177210827,
+            "head_branch": "157.0.8103.78-1.1",
+            "event": "push",
+            "workflow_path": ".github/workflows/build-arm.yml",
+            "run_id": 43476895318,
+            "artifact_id": 14178413147,
+            "artifact_name": "build-artifact-arm",
+            "artifact_digest": "sha256:83cc3de8d97af50d04c2e24124fb01999ce90f01c85d453d4b64e1bf96f30ea9",
+            "artifact_size_in_bytes": 16438090945,
+        }),
+        "before_sha256": WINDOWS157_ORIGINAL_SHA256,
+        "after_sha256": WINDOWS157_REPAIRED_SHA256,
+    }),
+)
 BEFORE = b"""            open(file_path, 'wb').close()
         shutil.copy(file_path, outdir)
 """
@@ -176,6 +203,11 @@ def _exact_identity(identity: dict, expected) -> bool:
 def _windows154_record(identity: dict, arch: str, records: tuple):
     return _versioned_record(identity, arch, records, "154.0.8037.97",
                              WINDOWS154_ORIGINAL_SHA256, WINDOWS154_REPAIRED_SHA256)
+
+
+def transform157(payload: bytes) -> bytes:
+    """Accept only the reconstructed Windows157 donor or repaired bytes."""
+    return _transform(payload, WINDOWS157_ORIGINAL_SHA256, WINDOWS157_REPAIRED_SHA256)
 
 
 def _versioned_record(identity: dict, arch: str, records: tuple, version: str,
@@ -498,14 +530,17 @@ def _proof(src: Path, identity: dict, *, before_sha256=ORIGINAL_SHA256,
 
 
 def apply(src: Path, platform: str, arch: str, identity: dict, *,
-          records=WINDOWS154_RECORDS, records155=WINDOWS155_RECORDS) -> dict:
+          records=WINDOWS154_RECORDS, records155=WINDOWS155_RECORDS,
+          records157=WINDOWS157_RECORDS) -> dict:
     """Match a strict-restore identity against independent, reviewed donor pins."""
     if platform != "windows":
         return {"status": "not_applicable"}
     path = src.absolute() / SCRIPT
-    if _safe_stat(path) is None:
-        return {"status": "no_repair_targets", "path": SCRIPT}
     version = str(identity.get("chromium_version", ""))
+    if _safe_stat(path) is None:
+        if version.startswith("157."):
+            raise ValueError("Windows157 restored MIDL script is missing")
+        return {"status": "no_repair_targets", "path": SCRIPT}
     if version.startswith("153."):
         if arch not in IDENTITIES or not _exact_identity(identity, IDENTITIES[arch]):
             raise ValueError("unverified Windows153 MIDL upstream identity")
@@ -520,6 +555,11 @@ def apply(src: Path, platform: str, arch: str, identity: dict, *,
                                    WINDOWS155_ORIGINAL_SHA256, WINDOWS155_REPAIRED_SHA256)
         before_sha256, after_sha256 = record["before_sha256"], record["after_sha256"]
         repair = transform155
+    elif version.startswith("157."):
+        record = _versioned_record(identity, arch, records157, "157.0.8103.78",
+                                   WINDOWS157_ORIGINAL_SHA256, WINDOWS157_REPAIRED_SHA256)
+        before_sha256, after_sha256 = record["before_sha256"], record["after_sha256"]
+        repair = transform157
     else:
         return {"status": "not_applicable", "path": SCRIPT}
     original, info = _read(path)

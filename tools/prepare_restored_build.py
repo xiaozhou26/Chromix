@@ -990,6 +990,12 @@ def _prepare(workdir: Path, platform: str, arch: str, *, phase: str, repo: Path,
                                   and pending.get("rust_libraries") != data["rust_libraries"]))
     data["operation"] = "generator_fingerprint"
     generators = generator_fingerprint(src, platform, arch, host_arch=inspection["host"]["arch"])
+    if platform == "windows" and receipt["identity"]["chromium_version"] == "157.0.8103.78":
+        try:
+            from .windows157_tools import restored_fingerprint
+        except ImportError:
+            from windows157_tools import restored_fingerprint
+        generators.update(restored_fingerprint(src))
     if platform == "linux":
         data["operation"] = "inspect_linux_typescript"
         generators["typescript"] = prepare_linux_typescript(src, host_arch=inspection["host"]["arch"], repo=repo)

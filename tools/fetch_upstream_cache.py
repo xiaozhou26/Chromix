@@ -193,8 +193,16 @@ def load_manifest(platform, arch, run_id=None, root=ROOT):
                     "manifest_checkpoint")
             require(type(source["run_id"]) is int and source["run_id"] > 0, "manifest_id")
             targets = set(source["artifacts"])
-            require(targets in ({"x64"}, {"x64", "arm64"}) if target == "windows"
-                    else targets == {"x64", "arm64"}, "manifest_targets")
+            unavailable = source.get("unavailable_arches", {})
+            require(isinstance(unavailable, dict), "manifest_availability")
+            if unavailable:
+                require(target == "windows" and unavailable == {"x64": "artifact_unavailable"}
+                        and targets == {"arm64"}, "manifest_availability")
+            if target == "windows":
+                require(targets in ({"x64"}, {"x64", "arm64"}) or
+                        targets == {"arm64"} and bool(unavailable), "manifest_targets")
+            else:
+                require(not unavailable and targets == {"x64", "arm64"}, "manifest_targets")
             for artifact_arch, artifact in source["artifacts"].items():
                 fields = ARTIFACT_FIELDS
                 if target == "windows" and artifact_arch == "arm64":
@@ -233,8 +241,13 @@ def load_manifest(platform, arch, run_id=None, root=ROOT):
         if source.get("available", True) is False:
             identity.update(available=False, ungoogled_commit=source["ungoogled_commit"])
             raise CacheMiss("source_unavailable", details={"manifest": identity})
+        if arch in source.get("unavailable_arches", {}):
+            identity.update(available=False, ungoogled_commit=source["ungoogled_commit"],
+                            reason=source["unavailable_arches"][arch])
+            raise CacheMiss("source_unavailable", details={"manifest": identity})
         require(arch in source["artifacts"], "unsupported_target")
-        pin = {key: value for key, value in source.items() if key != "artifacts"}
+        pin = {key: value for key, value in source.items()
+               if key not in ("artifacts", "unavailable_arches")}
         pin["artifact"] = source["artifacts"][arch]
         overrides = {key: value for key, value in pin["artifact"].items()
                      if key in ARTIFACT_OVERRIDES | CHECKPOINT_FIELDS}

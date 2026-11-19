@@ -46,7 +46,7 @@ def run_patch(directory, path, reverse=False):
 @pytest.fixture(scope="module")
 def sources(tmp_path_factory):
     directory = tmp_path_factory.mktemp("windows155-timezone")
-    assert EVIDENCE["version"] == (ROOT / "CHROMIUM_WINDOWS_VERSION").read_text().strip()
+    assert EVIDENCE["version"] == "155.0.8059.39"
     for name, entry in EVIDENCE["sources"].items():
         raw = entry["text"].encode()
         assert hashlib.sha256(raw).hexdigest() == entry["sha256"]
@@ -127,7 +127,7 @@ def test_manifest_appends_231_without_changing_donor230():
     ]
 
 
-def test_selector_authenticates_target231_and_donor230_manifest():
+def test_selector_authenticates_target231_and_donor230_manifest(tmp_path):
     from tools import patch_selection
 
     manifest = ROOT / patch_selection.WINDOWS155_ADDITIONS_MANIFEST
@@ -135,7 +135,14 @@ def test_selector_authenticates_target231_and_donor230_manifest():
     donor = {**data, "patches": data["patches"][:-1]}
     assert hashlib.sha256((json.dumps(donor, indent=2) + "\n").encode()).hexdigest() == (
         "5e7983a05e07f8f3ec10806fa06f180fb5ef20490568d8d83ce1b1e3db5fa104")
-    identity, patches = patch_selection.select(ROOT, "windows")
+    historical = json.loads((FIXTURES / "windows155_repository.json").read_text())
+    for name, content in historical["files"].items():
+        path = tmp_path / name
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(content)
+    shutil.copytree(ROOT / "patches", tmp_path / "patches")
+    shutil.copy2(manifest, tmp_path / patch_selection.WINDOWS155_ADDITIONS_MANIFEST)
+    identity, patches = patch_selection.select(tmp_path, "windows")
     assert len(patches) == 231
     assert identity["selection"]["additions"]["patches"] == data["patches"]
     assert patches[-1][0] == PATCHES[-1]

@@ -34,6 +34,23 @@ V8_156_HASHES = {
     "instance_types.py": "29e4ad046474f9058a50024aa5aef10dbd10c093c506ff91c65b72031ebf5537",
     "metagen.py": "d3552858b3f30c03e9543afbe17b394e0089f1aa357a7e6af124f40f328bb14b",
 }
+CHROMIUM157_VERSION = "157.0.8103.78"
+V8_157_REVISION = "307108153d1e35e6e74528ee55f97b0cd59bf182"
+V8_157_HASHES = {
+    "__init__.py": "10f3921b5fd6be69400ee0b4c539f82ec3b63002bd26f6eadd622712c14dcf25",
+    "clang_bootstrap.py": "379efab292b32dae08182bcff5ff76834bd406e123691657f504bdcccfe7ddb7",
+    "compile_flags.py": "c195e82163525fa43ec4a485d003f9539ae1042a20bf4ffe2c1a8c29647cf8c5",
+    "cpp_hier.py": "f64080bd7ce7018a0d92e4e0551c5654788f749d49a76d413caba5298f6f55d9",
+    "extract.py": "d2f4626752cf6f63eafe626da86cd1754d91b9ea51a7531cc21e1e9f3654590a",
+    "instance_types.py": "29e4ad046474f9058a50024aa5aef10dbd10c093c506ff91c65b72031ebf5537",
+    "layout_extract.py": "f91568a6b43ba0ef15654f6589cd034edd9fd1417b2c32a0770ca3b9bd9543ab",
+    "layout_ir.py": "b6de719b9f6498c51b25a7b1eae70b80bbecd972f1382214ffd2b964c285ed7d",
+    "metagen.py": "dccf41631ab2e10b8bdb2c953a9afb3b77f2f0d5f7f1a8ece6ee018ec960f9b9"
+}
+V8_157_DOMAIN_HASHES = {
+    **V8_157_HASHES,
+    "compile_flags.py": "fd03623336a1cafd81c43f213b70ec90f175e52b6328cd23e1af19aff2527957",
+}
 HASHES = {
     "__init__.py": "961d8ad419dc7aa10d8d7b75e5fcd624cc681403a55ce99ad14ae4fe4a7be749",
     "cindex.py": "0d572be5704bd7065420166bbe5e5b3fb5943423bd73ba6e40e4f8e9253c3f08",
@@ -49,6 +66,8 @@ PINS = {
     CHROMIUM_VERSION: {"v8_revision": V8_REVISION, "target_cpus": ("x64", "arm64")},
     CHROMIUM156_VERSION: {"v8_revision": V8_156_REVISION, "target_cpus": ("x64", "arm64"),
                           "scripts_sha256": V8_156_HASHES},
+    CHROMIUM157_VERSION: {"v8_revision": V8_157_REVISION, "target_cpus": ("x64", "arm64"),
+                          "scripts_sha256": V8_157_HASHES},
 }
 AMD64 = 0x8664
 
@@ -166,7 +185,7 @@ def split_command(command: str) -> list[str]:
     return list(lexer)
 
 
-def action_contract(commands: str, out: Path) -> dict:
+def action_contract(commands: str, out: Path, version: str | None = None) -> dict:
     actions = []
     for line in commands.splitlines():
         if "metagen.py" not in line:
@@ -181,6 +200,10 @@ def action_contract(commands: str, out: Path) -> dict:
                 if word in options or index + 1 == len(argv) or argv[index + 1].startswith("--"):
                     raise ValueError(f"invalid metagen option: {word}")
                 options[word] = argv[index + 1]
+        if version == CHROMIUM157_VERSION:
+            modes = [word for word in argv[2:] if word.startswith("--driver-mode")]
+            if modes != ["--driver-mode=cl"] or "--clang-builtin-headers-dir" in argv:
+                raise ValueError("Windows157 metagen requires explicit driver-mode=cl and resource directory")
         def absolute(value):
             path = Path(value)
             return Path(os.path.abspath(path if path.is_absolute() else out / path))
@@ -309,16 +332,23 @@ def validate_sources(src: Path, version: str) -> dict[str, str]:
     if re.findall(r"['\"]v8_revision['\"]\s*:\s*['\"]([0-9a-f]{40})['\"]", deps) != [pin["v8_revision"]]:
         raise ValueError("unexpected exact DEPS V8 revision")
     hashes = pin.get("scripts_sha256", {})
+    actual = {}
     for name, expected in hashes.items():
         path = local(src / "v8/tools/metagen" / name)
-        if (not path.is_file() or path.stat().st_nlink != 1 or path.stat().st_size > MAX_FILE
-                or digest(path.read_bytes()) != expected):
+        if not path.is_file() or path.stat().st_nlink != 1 or path.stat().st_size > MAX_FILE:
             raise ValueError("V8 metagen source SHA256 mismatch: " + name)
-    return hashes
+        actual[name] = digest(path.read_bytes())
+        allowed = {expected}
+        if version == CHROMIUM157_VERSION:
+            allowed.add(V8_157_DOMAIN_HASHES[name])
+        if actual[name] not in allowed:
+            raise ValueError("V8 metagen source SHA256 mismatch: " + name)
+    return actual
 
 
 def probe(bindings: Path, library: Path, src: Path, version: str | None = None) -> dict:
     validate_runtime(runtime_info())
+    chromium_version = version
     if version is not None:
         if version not in PINS or PINS[version] is None:
             raise ValueError("unsupported Chromium metagen bindings pin")
@@ -344,6 +374,9 @@ def probe(bindings: Path, library: Path, src: Path, version: str | None = None) 
         raise ValueError("libclang API cursor preflight failed")
     sys.path.insert(0, str(src / "v8/tools"))
     importlib.import_module("metagen.cpp_hier")
+    if chromium_version == CHROMIUM157_VERSION:
+        importlib.import_module("metagen.layout_ir")
+        importlib.import_module("metagen.layout_extract")
     return {"python": sys.executable, "bindings": cindex.__file__, "library": str(library),
             "libclang_version": version, "api_preflight": "passed"}
 
@@ -353,6 +386,28 @@ def configure(src: Path, out: Path, version: str) -> dict:
         return {"status": "unchanged"}
     path = out / "args.gn"
     text = path.read_text(encoding="utf-8")
+    if version == CHROMIUM157_VERSION:
+        validate_sources(src, version)
+        library = src.resolve() / "third_party/llvm-build/Release+Asserts/bin/libclang.dll"
+        validate_library(local(library))
+        replacements = {
+            "v8_metagen_libclang_so": (library.as_posix(),
+                "C:/ungoogled-chromium-windows/build/src/third_party/llvm-build/Release+Asserts/bin/libclang.dll"),
+            "v8_metagen_libclang_bindings_dir": (
+                (src.resolve() / "third_party/llvm-build/Release+Asserts/bindings/python").as_posix(),
+                "C:/hostedtoolcache/windows/Python/3.12.10/x64/Lib/site-packages"),
+        }
+        for key, (destination, donor) in replacements.items():
+            expression = r'(?m)^(\s*' + key + r'\s*=\s*)"([^"\r\n]*)"(\s*(?:#[^\r\n]*)?)$'
+            found = list(re.finditer(expression, text))
+            if len(found) != 1 or found[0][2] not in (destination, donor):
+                raise ValueError("Windows157 unverified native metagen argument: " + key)
+            match = found[0]
+            text = text[:match.start()] + match[1] + '"' + destination + '"' + match[3] + text[match.end():]
+        if text == path.read_text(encoding="utf-8"):
+            return {"status": "unchanged"}
+        path.write_text(text, encoding="utf-8")
+        return {"status": "rebased", "library": str(library)}
     pattern = r'(?m)^(\s*v8_metagen_libclang_so\s*=\s*)"([^"\r\n]*)"(\s*(?:#[^\r\n]*)?)$'
     matches = list(re.finditer(pattern, text))
     if not matches:
@@ -383,7 +438,13 @@ def install(src: Path, out: Path, ninja: Path, version: str, *, download: bool) 
     source_hashes = validate_sources(src, version)
     commands = subprocess.run([str(ninja), "-C", str(out), "-t", "commands", TARGET],
                               check=True, text=True, capture_output=True, timeout=120).stdout
-    contract = action_contract(commands, out)
+    contract = action_contract(commands, out, version)
+    if version == CHROMIUM157_VERSION:
+        layouts = subprocess.run([str(ninja), "-C", str(out), "-t", "commands",
+                                  "gen/v8/metagen/layouts.json"], check=True, text=True,
+                                 capture_output=True, timeout=120).stdout
+        if action_contract(layouts, out, version) != contract:
+            raise ValueError("Windows157 metagen layout and instance-type actions differ")
     runtime = run_json([contract["python"], "-I", "-c",
                         "import json,runpy; print(json.dumps(runpy.run_path("
                         + repr(str(Path(__file__).resolve())) + ")['runtime_info']()))"], cwd=out)

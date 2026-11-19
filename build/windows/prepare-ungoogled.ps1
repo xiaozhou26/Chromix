@@ -107,10 +107,12 @@ function Prepare-RustToolchain {
   # -windows: this prepare script runs under Windows PowerShell 5.1 on GitHub,
   # and a PowerShell transcription of the copy loop silently dropped
   # bin\cargo.exe on the first CI run while pwsh replications looked perfect.
-  Invoke-Checked $Python @(
+  $rustArgs = @(
     (Join-Path $Repo "build\windows\prep_rust_toolchain.py"),
     "--third-party-root", (Join-Path $Src "third_party"), "--arch", $Arch
   )
+  if ($Revisions.ChromiumVersion -eq "157.0.8103.78") { $rustArgs += @("--chromium-version", $Revisions.ChromiumVersion) }
+  Invoke-Checked $Python $rustArgs
   foreach ($binary in @("cargo.exe", "rustc.exe")) {
     if (-not (Test-Path (Join-Path $destination "bin\$binary"))) {
       Get-ChildItem (Join-Path $Src "third_party") -Directory |
@@ -316,9 +318,10 @@ function Assert-RestoredToolchain {
 }
 
 function Repair-FreshMidl {
-  if ($Revisions.ChromiumVersion -ne "156.0.8078.79" -or $RestoredUpstream) { return }
+  if ($Revisions.ChromiumVersion -notin @("156.0.8078.79", "157.0.8103.78") -or $RestoredUpstream) { return }
+  $helper = if ($Revisions.ChromiumVersion -eq "157.0.8103.78") { "tools\windows157_fresh.py" } else { "tools\windows156_fresh.py" }
   Invoke-Checked $Python @(
-    (Join-Path $Repo "tools\windows156_fresh.py"), "--phase", "midl",
+    (Join-Path $Repo $helper), "--phase", "midl",
     "--repo", $Repo, "--workdir", $Root, "--arch", $Arch
   )
 }
@@ -347,6 +350,13 @@ $versionKey = "$($Revisions.ChromiumVersion)|$($Revisions.UngoogledCommit)|$($Re
 $toolchainKey = "$($Revisions.UngoogledCommit)|$($Revisions.UngoogledWindowsCommit)"
 $readyMarker = Join-Path $Src ".chromix-source-ready"
 $RestoredUpstream = Test-Path (Join-Path $Src ".chromix-upstream-restored.json")
+if ($Revisions.ChromiumVersion -eq "157.0.8103.78" -and -not $RestoredUpstream) {
+  if ($Arch -ne "x64") { throw "Windows157 ARM64 requires its exact upstream cache; no cold fallback" }
+  $freshPhase = if (Test-Path $Src) { "resume" } else { "initialize" }
+  if (-not (Test-Path (Join-Path $Root ".chromix-windows157-fresh.json"))) { throw "Windows157 source preparation lacks explicit fresh receipt" }
+  Invoke-Checked $Python @((Join-Path $Repo "tools\windows157_fresh.py"), "--phase", $freshPhase,
+    "--repo", $Repo, "--workdir", $Root, "--arch", $Arch)
+}
 if (Get-ChildItem -LiteralPath $Root -Directory -Filter ".chromix-upstream-restore-*" -ErrorAction SilentlyContinue) {
   throw "upstream restore transaction was interrupted; use a clean work directory"
 }
@@ -397,7 +407,8 @@ $resumeChromixPatchIsClean = $false
 if (Test-Path (Join-Path $Src ".chromix-layer-in-progress")) {
   $interruptedLayer = (Get-Content (Join-Path $Src ".chromix-layer-in-progress") -Raw).Trim()
   if ($interruptedLayer -eq "chromix") {
-    if ($Revisions.ChromiumVersion -in @("154.0.8037.97", "155.0.8059.39", "156.0.8078.79") -and
+    if (($Revisions.ChromiumVersion -in @("154.0.8037.97", "155.0.8059.39", "156.0.8078.79") -or
+         $Revisions.ChromiumVersion -eq "157.0.8103.78") -and
         -not (Test-Marker ".chromix-patch-selection" $patchSetKey)) {
       throw "interrupted Chromium $($Revisions.ChromiumVersion) stack has missing or mismatched selection identity; restore clean source"
     }
@@ -441,7 +452,7 @@ if (Test-Path (Join-Path $Src ".chromix-layer-in-progress")) {
     }
     Remove-Item (Join-Path $Src ".chromix-layer-in-progress") -Force
   } else {
-    if ($Revisions.ChromiumVersion -eq "156.0.8078.79") {
+    if ($Revisions.ChromiumVersion -in @("156.0.8078.79", "157.0.8103.78")) {
       throw "interrupted fresh source layer $interruptedLayer; preserve this tree and restore the latest valid snapshot"
     }
     Write-Host "==> discarding a source tree interrupted during $interruptedLayer application"
@@ -498,7 +509,7 @@ if ($RestoredUpstream) {
 }
 
 if (-not (Test-Marker ".chromix-source-unpacked" $Revisions.ChromiumVersion)) {
-  if ($Revisions.ChromiumVersion -eq "156.0.8078.79" -and (Test-Path $Src) -and
+  if ($Revisions.ChromiumVersion -in @("156.0.8078.79", "157.0.8103.78") -and (Test-Path $Src) -and
       (Get-ChildItem -LiteralPath $Src -Force | Select-Object -First 1)) {
     throw "fresh source unpack marker missing; restore the latest valid snapshot; refusing to delete the build tree"
   }
@@ -525,7 +536,7 @@ if (-not (Test-Marker ".chromix-source-unpacked" $Revisions.ChromiumVersion)) {
     (Join-Path $Src "third_party\microsoft_webauthn\src"),
     (Join-Path $Src "third_party\devtools-frontend\src\third_party\esbuild")
   )
-  if ($Revisions.ChromiumVersion -eq "156.0.8078.79") {
+  if ($Revisions.ChromiumVersion -in @("156.0.8078.79", "157.0.8103.78")) {
     $dependencyDirectories += @(
       (Join-Path $Src "third_party\typescript\windows-amd64\src"),
       (Join-Path $Src "third_party\microsoft_multimedia_redirection\src")

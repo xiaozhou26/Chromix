@@ -83,6 +83,7 @@ def main():
                              "rust-toolchain merge target (default: cwd)")
     parser.add_argument("--arch", choices=("x64", "arm64"), default="x64")
     parser.add_argument("--verify-only", action="store_true")
+    parser.add_argument("--chromium-version", default="")
     args = parser.parse_args()
 
     root = Path(args.third_party_root or ".").resolve()
@@ -90,8 +91,15 @@ def main():
     if args.verify_only:
         verify(destination, root, args.arch)
         return
+    version157 = args.chromium_version == "157.0.8103.78"
+    if args.chromium_version and not version157:
+        fail("unsupported version-specific Rust merge")
     if destination.exists():
-        shutil.rmtree(destination)
+        if version157:
+            if destination.is_symlink() or set(p.name for p in destination.iterdir()) != {"crubit"}:
+                fail("Windows157 fresh Rust destination must contain only downloaded Crubit")
+        else:
+            shutil.rmtree(destination)
 
     sources = []
     for suffix in ("x64", "x86", "arm"):
@@ -103,6 +111,13 @@ def main():
         fail(f"no downloaded x64 rust bundle under {root}")
 
     merge_toolchain(sources, destination)
+    if version157:
+        development = root / "rust-toolchain-x64-dev"
+        libraries = list(development.glob("*/lib/*"))
+        if not libraries or any(not path.is_dir() or path.is_symlink() for path in libraries):
+            fail("exact Windows157 rustc-dev host libraries missing or linked")
+        for path in libraries:
+            shutil.copytree(path, destination / "lib" / path.name, dirs_exist_ok=True)
     # Verify before writing the version stamp: a missing cargo must fail even
     # on platforms where executing the bundled rustc binary is impossible.
     verify(destination, root, args.arch)

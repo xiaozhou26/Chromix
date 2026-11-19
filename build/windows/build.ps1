@@ -25,12 +25,19 @@ $Src = Join-Path $WorkDir "src"
 $Out = Join-Path $Src "out\Chromix"
 $Fresh156 = $Revisions.ChromiumVersion -eq "156.0.8078.79" -and
   -not (Test-Path (Join-Path $Src ".chromix-upstream-restored.json"))
-if ($Fresh156) {
-  if (-not $FreshNative -and -not $Resume) { throw "Windows156 first source build requires explicit -FreshNative" }
-  if ($env:CHROMIX_BUILD_PROFILE -and $env:CHROMIX_BUILD_PROFILE -ne "native") { throw "Windows156 fresh requires native PGO2" }
+$Fresh157 = $Revisions.ChromiumVersion -eq "157.0.8103.78" -and
+  -not (Test-Path (Join-Path $Src ".chromix-upstream-restored.json"))
+if ($Fresh157 -and $Arch -ne "x64") { throw "Windows157 ARM64 requires its exact upstream cache" }
+$FreshSource = $Fresh156 -or $Fresh157
+$FreshHelper = if ($Fresh157) { "tools\windows157_fresh.py" } else { "tools\windows156_fresh.py" }
+$FreshLabel = if ($Fresh157) { "Windows157" } else { "Windows156" }
+$FreshOverlay = if ($Fresh157) { "windows157-native.gn" } else { "windows156-native.gn" }
+if ($FreshSource) {
+  if (-not $FreshNative -and -not $Resume) { throw "$FreshLabel first source build requires explicit -FreshNative" }
+  if ($env:CHROMIX_BUILD_PROFILE -and $env:CHROMIX_BUILD_PROFILE -ne "native") { throw "$FreshLabel fresh requires native PGO2" }
   $phase = if ($Resume) { "resume" } else { "initialize" }
-  python (Join-Path $Repo "tools\windows156_fresh.py") --phase $phase --repo $Repo --workdir $WorkDir --arch $Arch
-  if ($LASTEXITCODE -ne 0) { throw "Windows156 fresh identity check failed" }
+  python (Join-Path $Repo $FreshHelper) --phase $phase --repo $Repo --workdir $WorkDir --arch $Arch
+  if ($LASTEXITCODE -ne 0) { throw "$FreshLabel fresh identity check failed" }
 }
 $UngoogledTooling = Join-Path $WorkDir "tooling\ungoogled-chromium"
 $WindowsTooling = Join-Path $WorkDir "tooling\ungoogled-chromium-windows"
@@ -76,10 +83,10 @@ if ($Arch -eq "arm64") { $mergeArgs += (Join-Path $Repo "build\args.windows.arm6
 if (Test-Path (Join-Path $Src ".chromix-upstream-restored.json")) {
   $mergeArgs += @("--preserve-pgo-from", $mergedArgs)
 }
-if ($Fresh156) {
-  python (Join-Path $Repo "tools\windows156_fresh.py") --phase overlay --repo $Repo --workdir $WorkDir --arch $Arch
-  if ($LASTEXITCODE -ne 0) { throw "Windows156 native PGO2 overlay failed" }
-  $mergeArgs += (Join-Path $WorkDir "windows156-native.gn")
+if ($FreshSource) {
+  python (Join-Path $Repo $FreshHelper) --phase overlay --repo $Repo --workdir $WorkDir --arch $Arch
+  if ($LASTEXITCODE -ne 0) { throw "$FreshLabel native PGO2 overlay failed" }
+  $mergeArgs += (Join-Path $WorkDir $FreshOverlay)
 }
 python @mergeArgs
 if ($LASTEXITCODE -ne 0) { throw "GN argument merge failed" }
@@ -119,18 +126,22 @@ for relative, keys in RESTORED.items():
       --platform windows --arch $Arch --workdir $WorkDir
     if ($LASTEXITCODE -ne 0) { throw "restored build preparation failed (exit $LASTEXITCODE)" }
   }
+  if ($Fresh157) {
+    python (Join-Path $Repo "tools\windows157_tools.py") --phase prepare --repo $Repo --workdir $WorkDir --arch $Arch
+    if ($LASTEXITCODE -ne 0) { throw "Windows157 Crubit/MINIBRANCH preparation failed" }
+  }
   $gn = Join-Path $Out "gn.exe"
   if (-not (Test-Path $gn)) {
     python tools\gn\bootstrap\bootstrap.py -o $gn --skip-generate-buildfiles
     if ($LASTEXITCODE -ne 0) { throw "GN bootstrap failed" }
   }
 
-  if ($Fresh156) {
-    python (Join-Path $Repo "tools\windows156_fresh.py") --phase probe --repo $Repo --workdir $WorkDir --arch $Arch
-    if ($LASTEXITCODE -ne 0) { throw "Windows156 dependencies/PGO verification failed" }
+  if ($FreshSource) {
+    python (Join-Path $Repo $FreshHelper) --phase probe --repo $Repo --workdir $WorkDir --arch $Arch
+    if ($LASTEXITCODE -ne 0) { throw "$FreshLabel dependencies/PGO verification failed" }
   }
 
-  if ($ApplyDomainSubstitution -and $Fresh156) {
+  if ($ApplyDomainSubstitution -and $FreshSource) {
     $domainMarker = Join-Path $Src ".chromix-domain-substituted"
     if (-not (Test-Path $domainMarker)) {
       $cache = Join-Path $WorkDir "domain_substitution_cache.tar.gz"
@@ -155,7 +166,7 @@ for relative, keys in RESTORED.items():
     }
   }
 
-  $needsMetagen = $Revisions.ChromiumVersion -eq "156.0.8078.79"
+  $needsMetagen = $Revisions.ChromiumVersion -in @("156.0.8078.79", "157.0.8103.78")
   $metagenBindings = Join-Path $Repo "tools\install_windows_metagen_bindings.py"
   if ($needsMetagen) {
     & python -X utf8 $metagenBindings --configure --src $Src --out $Out `
@@ -168,6 +179,10 @@ for relative, keys in RESTORED.items():
     & python -X utf8 $metagenBindings --src $Src --out $Out --ninja $Ninja `
       --chromium-version $Revisions.ChromiumVersion --download
     if ($LASTEXITCODE -ne 0) { throw "Windows metagen bindings/API preflight failed" }
+  }
+  if ($Revisions.ChromiumVersion -eq "157.0.8103.78") {
+    python (Join-Path $Repo "tools\windows157_tools.py") --phase probe --repo $Repo --workdir $WorkDir --arch $Arch
+    if ($LASTEXITCODE -ne 0) { throw "Windows157 native host generators/PGO validation failed" }
   }
 
   if (Test-Path (Join-Path $Src ".chromix-upstream-restored.json")) {

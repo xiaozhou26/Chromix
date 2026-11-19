@@ -69,19 +69,37 @@
       }
     },
     "windows": {
-      "available": false,
-      "chromium_version": "156.0.8078.79",
-      "ungoogled_commit": "28a211ab4ab6b83d919966a4f58a6df23cf4fb29",
+      "chromium_version": "157.0.8103.78",
+      "ungoogled_commit": "8c886dffc6ade39d8f7df5d64ace5a8824b455e1",
       "repository": "ungoogled-software/ungoogled-chromium-windows",
       "repository_id": 177210827,
-      "head_sha": "8492884eb30fdd9417ea7816aa92def805c97c74",
-      "head_branch": "156.0.8078.79-1.1",
+      "head_sha": "20e9a348fc616bd73a366fbd5d8881613d6c5cb0",
+      "head_branch": "157.0.8103.78-1.1",
       "event": "push",
       "workflow_path": ".github/workflows/build-x64.yml",
+      "run_id": 43476895250,
       "source_roots": [
         "src",
         "build/src"
-      ]
+      ],
+      "unavailable_arches": {
+        "x64": "artifact_unavailable"
+      },
+      "artifacts": {
+        "arm64": {
+          "id": 14178413147,
+          "name": "build-artifact-arm",
+          "size_in_bytes": 16438090945,
+          "digest": "sha256:83cc3de8d97af50d04c2e24124fb01999ce90f01c85d453d4b64e1bf96f30ea9",
+          "expires_at": "2026-11-19T20:14:29Z",
+          "inner_archive": "artifacts.zip",
+          "run_id": 43476895318,
+          "workflow_path": ".github/workflows/build-arm.yml",
+          "run_attempt": 1,
+          "producer_job_id": 132865547833,
+          "producer_job_name": "build / build-11"
+        }
+      }
     }
   }
 }

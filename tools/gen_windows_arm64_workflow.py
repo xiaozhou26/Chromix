@@ -148,19 +148,21 @@ def workflow():
     return result
 
 
-def fresh_workflow(arch):
-    """Keep the one-time 156 source authorization separate from historical entries."""
+def fresh_workflow(arch, major=156):
+    """Keep each explicit source authorization separate from historical entries."""
+    if major not in (156, 157) or major == 157 and arch != "x64":
+        raise ValueError("unsupported Windows fresh version/architecture")
     if arch not in ('x64', 'arm64'):
         raise ValueError('unsupported Windows fresh architecture')
     result = deepcopy(workflow())
-    name = f'build-win-{arch}-156-fresh'
+    name = f'build-win-{arch}-{major}-fresh'
     result['name'] = name
     result['run-name'] = dispatch_run_name(
-        f'w156-{arch}', (('cache', 'use_upstream_cache'), ('run', 'resume_run_id'),
+        f'w{major}-{arch}', (('cache', 'use_upstream_cache'), ('run', 'resume_run_id'),
                         ('jobs', 'compile_jobs')), name)
     result['on'] = {'workflow_dispatch': {'inputs': {
         'use_upstream_cache': {'type': 'boolean', 'default': True,
-                               'description': 'Set false explicitly to authorize this Windows156 fresh/native-PGO2 path.'},
+                               'description': f'Set false explicitly to authorize this Windows{major} fresh/native-PGO2 path.'},
         'resume_run_id': {'type': 'string', 'default': '',
                           'description': 'After failure: donor run containing the latest valid same-SHA preserved tree; never fresh fallback.'},
         'compile_jobs': {'type': 'string', 'default': 'auto'},
@@ -173,7 +175,7 @@ def fresh_workflow(arch):
                          DEPOT_TOOLS_COLLECT_METRICS='0')
     for index in range(1, 13):
         job = result['jobs'][f'build-{index}']
-        job['name'] = f'Windows156 {arch} stage {index}'
+        job['name'] = f'Windows{major} {arch} stage {index}'
         steps = []
         for step in job['steps']:
             label = step.get('name', '')
@@ -183,7 +185,7 @@ def fresh_workflow(arch):
                 step['run'] = ('python tools/gen_windows_arm64_workflow.py --check\n'
                                'if ($LASTEXITCODE -ne 0) { throw "Windows workflow generation is stale" }')
             if label == 'Download tree from previous stage':
-                step['with']['pattern'] = (f'win-{arch}-156-tree-s{index-1}-attempt-'
+                step['with']['pattern'] = (f'win-{arch}-{major}-tree-s{index-1}-attempt-'
                     '${{ needs.build-' + str(index - 1) + '.outputs.snapshot_attempt }}-part*')
             if step.get('id') == 'stage':
                 step.pop('env', None)
@@ -200,7 +202,7 @@ def fresh_workflow(arch):
                 step['if'] = "${{ always() && steps.stage.outputs.snapshot_safe == 'true' && steps.stage.outputs.finished != 'true' }}"
             if label.startswith('Upload tree part'):
                 part = label.rsplit(' ', 1)[1]
-                step['with']['name'] = f'win-{arch}-156-tree-s{index}-attempt-${{{{ github.run_attempt }}}}-part{part}'
+                step['with']['name'] = f'win-{arch}-{major}-tree-s{index}-attempt-${{{{ github.run_attempt }}}}-part{part}'
                 step['with']['retention-days'] = 14
             if label == 'Upload fingerprint diagnostics':
                 step['with']['name'] = step['with']['name'].replace('win-arm64', f'win-{arch}')
@@ -211,16 +213,16 @@ def fresh_workflow(arch):
                 continue
             if step.get('uses') == 'actions/checkout@v4':
                 steps.append(step)
-                steps.append({'name': 'Require explicit Windows156 fresh authorization', 'shell': 'powershell',
+                steps.append({'name': f'Require explicit Windows{major} fresh authorization', 'shell': 'powershell',
                               'env': {'CACHE': '${{ inputs.use_upstream_cache }}'},
                               'run': "if ($env:CACHE -cne 'false') { throw 'Set use_upstream_cache=false explicitly; no automatic cold fallback' }"})
                 if index == 1:
                     steps.append({'name': 'Restore latest valid preserved snapshot',
                                   'if': "${{ inputs.resume_run_id != '' }}", 'shell': 'powershell',
                                   'env': {'RESUME_RUN_ID': '${{ inputs.resume_run_id }}', 'GH_TOKEN': '${{ github.token }}'},
-                                  'run': f'''python tools/windows156_fresh.py --phase snapshot --repo "$env:GITHUB_WORKSPACE" --workdir C:\\c\\chromix --arch {arch} --run-id "$env:RESUME_RUN_ID" --report "$env:RUNNER_TEMP\\windows156-snapshot.json"
+                                  'run': f'''python tools/windows{major}_fresh.py --phase snapshot --repo "$env:GITHUB_WORKSPACE" --workdir C:\\c\\chromix --arch {arch} --run-id "$env:RESUME_RUN_ID" --report "$env:RUNNER_TEMP\\windows{major}-snapshot.json"
 if ($LASTEXITCODE -ne 0) {{ throw 'No valid preserved snapshot; refusing fresh fallback' }}
-python tools/download_windows_snapshot.py --manifest "$env:RUNNER_TEMP\\windows156-snapshot.json" --destination C:\\restore --report "$env:RUNNER_TEMP\\windows156-download.json"
+python tools/download_windows_snapshot.py --manifest "$env:RUNNER_TEMP\\windows{major}-snapshot.json" --destination C:\\restore --report "$env:RUNNER_TEMP\\windows{major}-download.json"
 if ($LASTEXITCODE -ne 0) {{ throw 'Snapshot download/digest verification failed' }}
 ''' + fresh_extract()})
                 continue
@@ -301,9 +303,9 @@ if ($LASTEXITCODE -ne 0) { throw 'Preserved tree restore failed' }
 Remove-Item -LiteralPath C:\\restore -Recurse -Force'''
 
 
-def render_fresh(arch):
-    return ('# Generated by tools/gen_windows_arm64_workflow.py; explicit Windows156 fresh/native-PGO2 only.\n'
-            + yaml.safe_dump(fresh_workflow(arch), sort_keys=False, width=120))
+def render_fresh(arch, major=156):
+    return (f'# Generated by tools/gen_windows_arm64_workflow.py; explicit Windows{major} fresh/native-PGO2 only.\n'
+            + yaml.safe_dump(fresh_workflow(arch, major), sort_keys=False, width=120))
 
 
 def render():
@@ -316,7 +318,8 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--check', action='store_true')
     args = parser.parse_args()
-    outputs = {OUTPUT: render()}
+    outputs = {OUTPUT: render(),
+               OUTPUT.parent / "build-win-x64-157-fresh.yml": render_fresh("x64", 157)}
     outputs.update({OUTPUT.parent / f'build-win-{arch}-156-fresh.yml': render_fresh(arch)
                     for arch in ('x64', 'arm64')})
     outputs.update({OUTPUT.parent / f'build-win-{arch}-156-preflight-resume.yml': render_preflight(arch)

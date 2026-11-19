@@ -38,11 +38,25 @@ $RecoveryDiagnostics = $null
 # CI opt-in requires a full restore, including validation and artifact resumes.
 $RequireUpstreamCache = $UseUpstreamCache -or $UpstreamRunId -or ($env:CHROMIX_USE_UPSTREAM_CACHE -eq "1")
 $Fresh156 = $FreshNative -and $Revisions.ChromiumVersion -eq "156.0.8078.79"
-if ($FreshNative -and (-not $Fresh156 -or $BuildProfile -cne "native" -or $RequireUpstreamCache -or
+$Fresh157 = $FreshNative -and $Revisions.ChromiumVersion -eq "157.0.8103.78" -and $Arch -eq "x64"
+$FreshSource = $Fresh156 -or $Fresh157
+if ($Fresh157 -and $env:GITHUB_ACTIONS -eq "true" -and
+    ($env:GITHUB_EVENT_NAME -ne "workflow_dispatch" -or
+     $env:GITHUB_WORKFLOW_REF -notmatch '/[.]github/workflows/build-win-x64-157-fresh[.]yml@refs/heads/')) {
+  throw "Windows157 fresh requires its explicitly authorized workflow; historical fresh entries cannot change versions"
+}
+$FreshHelper = if ($Fresh157) { "tools\windows157_fresh.py" } else { "tools\windows156_fresh.py" }
+$FreshLabel = if ($Revisions.ChromiumVersion -eq "157.0.8103.78") { "Windows157" } else { "Windows156" }
+$FreshOverlay = if ($Fresh157) { "windows157-native.gn" } else { "windows156-native.gn" }
+if ($Revisions.ChromiumVersion -eq "157.0.8103.78" -and $Arch -eq "arm64") {
+  if ($FreshNative -or $BuildProfile -cne "native") { throw "Windows157 ARM64 requires cache and native PGO2" }
+  $RequireUpstreamCache = $true
+}
+if ($FreshNative -and (-not $FreshSource -or $BuildProfile -cne "native" -or $RequireUpstreamCache -or
     $env:CHROMIX_PREFER_UPSTREAM_CACHE -eq "1" -or $FromArtifact -or $MigrationReceipt -or $MigrationDonorRepo -or
     $env:CHROMIX_WINDOWS_MIGRATION_REPO -or $env:CHROMIX_WINDOWS_MIGRATION_SHA -or
     $env:CHROMIX_WINDOWS_VERIFY_SOURCE_REPO -or $env:CHROMIX_WINDOWS_VERIFY_SOURCE_SHA)) {
-  throw "Windows156 fresh requires native PGO2, explicit cache=false, and no historical recovery inputs"
+  throw "$FreshLabel fresh requires native PGO2, explicit cache=false, and no historical recovery inputs"
 }
 $PartsDir = "C:\parts"
 $UpstreamCacheDir = "C:\u"
@@ -836,9 +850,9 @@ if ($MigrationReceipt -or $MigrationDonorRepo) {
   }
   [IO.File]::Copy($MigrationReceipt, (Join-Path $RecoveryDiagnostics 'migration.json'), $false)
   Write-OutVar recovery_report_dir $RecoveryDiagnostics
-} elseif ($FromSynced -and $Fresh156) {
-  python (Join-Path $Repo "tools\windows156_fresh.py") --phase resume --repo $Repo --workdir $WorkDir --arch $Arch
-  if ($LASTEXITCODE -ne 0) { throw "Windows156 preserved tree verification failed; refusing cold fallback" }
+} elseif ($FromSynced -and $FreshSource) {
+  python (Join-Path $Repo $FreshHelper) --phase resume --repo $Repo --workdir $WorkDir --arch $Arch
+  if ($LASTEXITCODE -ne 0) { throw "$FreshLabel preserved tree verification failed; refusing cold fallback" }
 } elseif ($FromSynced) {
   if ($FromArtifact -or $StageIndex -ne 13 -or $Arch -cne 'arm64' -or
       $BuildProfile -cne 'native' -or -not $RequireUpstreamCache -or $ValidateOnly -or
@@ -993,14 +1007,14 @@ if ($RequireUpstreamCache -and -not $RestoredUpstream -and
 }
 
 $VerifyRestoredSource = $false
-if ($Fresh156 -and -not $FromSynced) {
-  if ($StageIndex -ne 1 -or (Test-Path $Src)) { throw "Windows156 first fresh entry requires an empty stage1 workdir" }
-  python (Join-Path $Repo "tools\windows156_fresh.py") --phase initialize --repo $Repo --workdir $WorkDir --arch $Arch
-  if ($LASTEXITCODE -ne 0) { throw "Windows156 fresh identity initialization failed" }
+if ($FreshSource -and -not $FromSynced) {
+  if ($StageIndex -ne 1 -or (Test-Path $Src)) { throw "$FreshLabel first fresh entry requires an empty stage1 workdir" }
+  python (Join-Path $Repo $FreshHelper) --phase initialize --repo $Repo --workdir $WorkDir --arch $Arch
+  if ($LASTEXITCODE -ne 0) { throw "$FreshLabel fresh identity initialization failed" }
 }
-if ($Revisions.ChromiumVersion -eq "156.0.8078.79" -and -not $RestoredUpstream -and
-    -not $RequireUpstreamCache -and -not $Fresh156) {
-  throw "Windows156 source preparation requires explicit -FreshNative; no implicit cold fallback"
+if ($Revisions.ChromiumVersion -in @("156.0.8078.79", "157.0.8103.78") -and -not $RestoredUpstream -and
+    -not $RequireUpstreamCache -and -not $FreshSource) {
+  throw "$FreshLabel source preparation requires explicit -FreshNative; no implicit cold fallback"
 }
 if ($FromArtifact -and -not $RestoredUpstream) {
   $unpackedMarker = Join-Path $Src ".chromix-source-unpacked"
@@ -1129,10 +1143,10 @@ $mergeArgs += @(
   (Join-Path $Repo "build\args.windows.gn")
 )
 if ($Arch -eq "arm64") { $mergeArgs += (Join-Path $Repo "build\args.windows.arm64.gn") }
-if ($Fresh156) {
-  python (Join-Path $Repo "tools\windows156_fresh.py") --phase overlay --repo $Repo --workdir $WorkDir --arch $Arch
-  if ($LASTEXITCODE -ne 0) { throw "Windows156 native PGO2 overlay failed" }
-  $mergeArgs += (Join-Path $WorkDir "windows156-native.gn")
+if ($FreshSource) {
+  python (Join-Path $Repo $FreshHelper) --phase overlay --repo $Repo --workdir $WorkDir --arch $Arch
+  if ($LASTEXITCODE -ne 0) { throw "$FreshLabel native PGO2 overlay failed" }
+  $mergeArgs += (Join-Path $WorkDir $FreshOverlay)
 }
 python @mergeArgs
 if ($LASTEXITCODE -ne 0) { throw "GN argument merge failed" }
@@ -1192,15 +1206,19 @@ for relative, keys in RESTORED.items():
       --platform windows --arch $Arch --workdir $WorkDir
     if ($LASTEXITCODE -ne 0) { throw "restored build preparation failed (exit $LASTEXITCODE)" }
   }
+  if ($Fresh157) {
+    python (Join-Path $Repo "tools\windows157_tools.py") --phase prepare --repo $Repo --workdir $WorkDir --arch $Arch
+    if ($LASTEXITCODE -ne 0) { throw "Windows157 Crubit/MINIBRANCH preparation failed" }
+  }
   $gn = Join-Path $OutDir "gn.exe"
   if (-not (Test-Path $gn)) {
     python tools\gn\bootstrap\bootstrap.py -o $gn --skip-generate-buildfiles
     if ($LASTEXITCODE -ne 0) { throw "GN bootstrap failed" }
   }
-  if ($Fresh156) {
+  if ($FreshSource) {
     & "$PSScriptRoot\configure-node.ps1" -NodePath (Join-Path $Src "third_party\node\win\node.exe")
-    python (Join-Path $Repo "tools\windows156_fresh.py") --phase probe --repo $Repo --workdir $WorkDir --arch $Arch
-    if ($LASTEXITCODE -ne 0) { throw "Windows156 dependencies/PGO verification failed" }
+    python (Join-Path $Repo $FreshHelper) --phase probe --repo $Repo --workdir $WorkDir --arch $Arch
+    if ($LASTEXITCODE -ne 0) { throw "$FreshLabel dependencies/PGO verification failed" }
   }
   if (-not (Test-Path $domainMarker)) {
     # The pinned helper selects compression from the cache filename's suffix.
@@ -1239,6 +1257,10 @@ for relative, keys in RESTORED.items():
   & python -X utf8 $metagenBindings --src $Src --out $OutDir --ninja $Ninja `
     --chromium-version $Revisions.ChromiumVersion --download
   if ($LASTEXITCODE -ne 0) { throw "Windows metagen bindings/API preflight failed" }
+  if ($Revisions.ChromiumVersion -eq "157.0.8103.78") {
+    python (Join-Path $Repo "tools\windows157_tools.py") --phase probe --repo $Repo --workdir $WorkDir --arch $Arch
+    if ($LASTEXITCODE -ne 0) { throw "Windows157 native host generators/PGO validation failed" }
+  }
   if ($RestoredUpstream) {
     Write-Host "==> recording incremental Ninja plan for restored upstream source/out/Default"
     & $Ninja -C $OutDir -n chrome `
