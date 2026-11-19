@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
-  "chromium_version": "156.0.8078.79",
-  "ungoogled_commit": "28a211ab4ab6b83d919966a4f58a6df23cf4fb29",
+  "chromium_version": "157.0.8103.78",
+  "ungoogled_commit": "8c886dffc6ade39d8f7df5d64ace5a8824b455e1",
   "sources": {
     "linux": {
       "chromium_version": "156.0.8078.79",

@@ -1,7 +1,7 @@
 @{
-  ChromiumVersion = "156.0.8078.79"
-  UngoogledVersion = "156.0.8078.79-1"
-  UngoogledCommit = "28a211ab4ab6b83d919966a4f58a6df23cf4fb29"
+  ChromiumVersion = "157.0.8103.78"
+  UngoogledVersion = "157.0.8103.78-1"
+  UngoogledCommit = "8c886dffc6ade39d8f7df5d64ace5a8824b455e1"
   WindowsChromiumVersion = "156.0.8078.79"
   WindowsUngoogledVersion = "156.0.8078.79-1"
   WindowsUngoogledCommit = "28a211ab4ab6b83d919966a4f58a6df23cf4fb29"
