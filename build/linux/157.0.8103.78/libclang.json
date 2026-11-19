@@ -1,0 +1,95 @@
+{
+  "chromium_version": "157.0.8103.78",
+  "clang_version": "clang version 24.0.0git (https://chromium.googlesource.com/a/external/github.com/llvm/llvm-project 86922d51225db089fffb99475eefc4904f79e3c8)",
+  "download": {
+    "sha256": "1472e8a5cfc4959f94ff18aa5ec864b07991d877995a563eeb4176e344a7fa59",
+    "size": 22761568,
+    "url": "https://commondatastorage.googleapis.com/chromium-browser-clang/Linux_x64/rust-libclang-1edd55dcfcd573872c727fa3e086369a71661ee0-1125-llvmorg-24-init-7747-g62397f8b.tar.xz"
+  },
+  "files": {
+    "bindings/python/clang/__init__.py": {
+      "sha256": "961d8ad419dc7aa10d8d7b75e5fcd624cc681403a55ce99ad14ae4fe4a7be749",
+      "size": 595
+    },
+    "bindings/python/clang/cindex.py": {
+      "sha256": "63d99dac8ecc68dbc10b9d77fda2784fdcc13c4c555d84c6d150b59ede1865d5",
+      "size": 145846
+    },
+    "include/clang-c/BuildSystem.h": {
+      "sha256": "d2881516aa13442a5e139eac3f83d7413b5044514b91ba85d7f0e3a3ed881fba",
+      "size": 7539
+    },
+    "include/clang-c/CXCompilationDatabase.h": {
+      "sha256": "38207d300ba333f08ef0c4eb75d265e2a85b0dff2376d1687a73f81e6cab4b76",
+      "size": 5228
+    },
+    "include/clang-c/CXDiagnostic.h": {
+      "sha256": "38ebaab016fd4faf9df6d2fc0c7e8dfffd8ae1740ae9126c077063a453b90afe",
+      "size": 12038
+    },
+    "include/clang-c/CXErrorCode.h": {
+      "sha256": "fbcc4225b3dd36e6cb1a90d26472522ccd9fe3d78e65b99d820181c9a624539b",
+      "size": 1969
+    },
+    "include/clang-c/CXFile.h": {
+      "sha256": "5c23551b7a08863501c992bda30d4fcc1b928a6881eca693a82f17b11a739e3c",
+      "size": 2525
+    },
+    "include/clang-c/CXSourceLocation.h": {
+      "sha256": "a1918b043df970ada2540d34cdbe7399f50d2c81bdc3c2cfd2296efc1c67622f",
+      "size": 10396
+    },
+    "include/clang-c/CXString.h": {
+      "sha256": "c82e38b8283c1f9d39ac0637d74f2ef4ead933fc344b880688e5ea2a7f321316",
+      "size": 2257
+    },
+    "include/clang-c/Documentation.h": {
+      "sha256": "5f61b503f4956ca0e5b3ef36149e12ebc13a411fbb2e69ce3e05948fc6a4775c",
+      "size": 18220
+    },
+    "include/clang-c/ExternC.h": {
+      "sha256": "d64d9d58750dc7d240a8c35b3192d8801672200f3df3d6417695ae5e59c12cbc",
+      "size": 2007
+    },
+    "include/clang-c/FatalErrorHandler.h": {
+      "sha256": "e2bc1b7fea90a98752afe4fae4a1d2f9605f5b0098dbdbc04856556a8678663f",
+      "size": 1326
+    },
+    "include/clang-c/Index.h": {
+      "sha256": "2eb4205543667b9a2ec8a46d2b3113cf5a5836e29d4d0ce29837d9053f8598c3",
+      "size": 221491
+    },
+    "include/clang-c/Platform.h": {
+      "sha256": "b2e246692d6cecea2c57aaef424fa9e35cd30a5dfcd4b0521e562fde059aaaa2",
+      "size": 1828
+    },
+    "include/clang-c/Rewrite.h": {
+      "sha256": "3ce45b1fd6f750376e4d23d29455de087f69043e8c14db50ca80a9c68d7fb8c1",
+      "size": 2102
+    },
+    "lib/libclang.so": {
+      "sha256": "da4043334e18d7f6e129d300ae372fee6a676fb722b6fae3bd32cbc3b0cacc32",
+      "size": 108051136
+    }
+  },
+  "host": "linux-x64",
+  "llvm_revision": "llvmorg-24-init-7747-g62397f8b",
+  "rust_revision": "1edd55dcfcd573872c727fa3e086369a71661ee0-1125",
+  "schema_version": 1,
+  "source_inputs": {
+    "DEPS": "70f36c59069488921a7d83b5ad0dfb3d221211be2be966f28ed84ef6ceeb8daa",
+    "third_party/llvm-build/Release+Asserts/lib/clang/24/include/stddef.h": "b3e62a046ddf28d09eedebe6eb9461cb7060e47cad2c69964b222c4eea10347e",
+    "v8/BUILD.gn": "f1d15ceec71efac112135fdc76c85e496a145a0054903a54a1e97b88eacb7711",
+    "v8/src/objects/all-objects.h": "f6f7506c607ec6830f22f234b21d086150bcd5c5f02fe3a18cac49ecb4c9f72b",
+    "v8/tools/metagen/__init__.py": "10f3921b5fd6be69400ee0b4c539f82ec3b63002bd26f6eadd622712c14dcf25",
+    "v8/tools/metagen/clang_bootstrap.py": "379efab292b32dae08182bcff5ff76834bd406e123691657f504bdcccfe7ddb7",
+    "v8/tools/metagen/compile_flags.py": "fd03623336a1cafd81c43f213b70ec90f175e52b6328cd23e1af19aff2527957",
+    "v8/tools/metagen/cpp_hier.py": "f64080bd7ce7018a0d92e4e0551c5654788f749d49a76d413caba5298f6f55d9",
+    "v8/tools/metagen/extract.py": "d2f4626752cf6f63eafe626da86cd1754d91b9ea51a7531cc21e1e9f3654590a",
+    "v8/tools/metagen/harvest-driver.cc": "f9bebe26a7c72b096b670201889ee741f6f0462089090f3dd8b3ed0c0f8c655a",
+    "v8/tools/metagen/instance_types.py": "29e4ad046474f9058a50024aa5aef10dbd10c093c506ff91c65b72031ebf5537",
+    "v8/tools/metagen/layout_extract.py": "f91568a6b43ba0ef15654f6589cd034edd9fd1417b2c32a0770ca3b9bd9543ab",
+    "v8/tools/metagen/layout_ir.py": "b6de719b9f6498c51b25a7b1eae70b80bbecd972f1382214ffd2b964c285ed7d",
+    "v8/tools/metagen/metagen.py": "dccf41631ab2e10b8bdb2c953a9afb3b77f2f0d5f7f1a8ece6ee018ec960f9b9"
+  }
+}

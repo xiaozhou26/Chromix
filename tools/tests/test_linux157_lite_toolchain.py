@@ -14,7 +14,7 @@ import pytest
 from tools import linux157_source as source
 from tools import linux157_toolchain as tools
 from tools import linux157_build as build
-from tools import linux157_checkpoint as checkpoint
+from tools import linux157_postgn as checkpoint
 
 
 def lite_inputs(tmp_path):
@@ -194,7 +194,7 @@ def test_checkpoint_rejects_recoverable_but_not_yet_restored_inputs(tmp_path):
     identity = source.recipe()
     (src / ".chromix-source-ready").write_text("linux157-fresh|x64|" + identity["sha256"])
     receipt = {"stage": "chromix-applied", "target_arch": "x64", "chromix_selection": {}}
-    with mock.patch.object(checkpoint, "verify_migrated"), \
+    with mock.patch.object(checkpoint, "verify"), \
             mock.patch.object(source, "validate_route"), \
             mock.patch.object(source, "verify_receipt", return_value=receipt), \
             mock.patch.object(source, "get_platform"), \

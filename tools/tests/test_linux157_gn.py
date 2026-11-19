@@ -96,7 +96,8 @@ def test_only_latest_stage1_artifact_tuple(arch, run, artifact):
 
 def test_recipe_delta_only_reviewed_host_tools():
     old = checkpoint.load()["donors"]["x64"]["source_receipt"]["recipe"]
-    new = source.recipe()
+    from tools import linux157_postgn
+    new = linux157_postgn.load()["donors"]["x64"]["source_receipt"]["recipe"]
     checkpoint.validate_recipe_delta(old, new)
     changed = copy.deepcopy(new)
     changed["inputs"]["tools/linux157_toolchain.py"] = "0" * 64
@@ -137,7 +138,7 @@ def test_no_warning_suppression_or_third_fresh_source_route():
     assert "-Wno" not in text and "-Werror=false" not in text
     build = (source.ROOT / "tools/linux157_build.py").read_text()
     assert 'target_gn.write_text' not in build
-    assert 'checkpoint.prepare_args(work, arch, repo)' in build
+    assert 'postgn.verify(work, arch, repo)' in build
     assert "fresh fallback forbidden" in build
 
 
