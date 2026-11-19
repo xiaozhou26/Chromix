@@ -36,37 +36,41 @@ def replay_fixture(tmp_path):
         p.parent.mkdir(exist_ok=True)
         p.write_text(f'new{i}\n')
         stack.append(patch(name, f'old{i}\n', f'new{i}\n'))
-    target = src / locale.TARGET
+    target = src / locale.TARGETS[1]
     target.parent.mkdir(parents=True)
     target.write_text('SetICUDefaultLocale(locale.getName());\n')
-    stack.append(patch(locale.TARGET, 'old locale code\n', target.read_text()))
-    stack.append(patch(locale.TARGET, target.read_text(), 'SetICUDefaultLocale(locale);\n'))
+    stack.append(patch(locale.TARGETS[1], 'old locale code\n', target.read_text()))
+    header = src / locale.TARGETS[0]
+    header.parent.mkdir(parents=True)
+    header.write_text('class Key {};\n')
+    stack.append(patch(locale.TARGETS[0], header.read_text(), 'class Key { friend class TimeZoneController; };\n'))
+    stack.append(patch(locale.TARGETS[1], target.read_text(), 'SetDefaultIcuLocale(key, tag);\n'))
     return src, stack
 
 
-def test_full_226_reverse_forward_then_227_private_roundtrip(tmp_path):
+def test_full_226_reverse_forward_then_228_private_roundtrip(tmp_path):
     src, stack = replay_fixture(tmp_path)
     original = {p: (p.read_bytes(), p.stat().st_mtime_ns) for p in src.rglob('*') if p.is_file()}
     before, after = locale.private_migration(src, stack, tmp_path)
-    assert len(stack) == 227 and len(before) == 226
-    assert after[locale.TARGET] == b'SetICUDefaultLocale(locale);\n'
+    assert len(stack) == 228 and len(before) == 227
+    assert after[locale.TARGETS[1]] == b'SetDefaultIcuLocale(key, tag);\n'
     assert {p: (p.read_bytes(), p.stat().st_mtime_ns) for p in original} == original
 
 
 def test_unknown_old_stack_byte_fails_without_publishing(tmp_path):
     src, stack = replay_fixture(tmp_path)
     (src / 'sources/file8.cc').write_text('unexpected donor edit\n')
-    original = (src / locale.TARGET).read_bytes()
+    original = (src / locale.TARGETS[1]).read_bytes()
     with pytest.raises(ValueError, match='private stack reverse'):
         locale.private_migration(src, stack, tmp_path)
-    assert (src / locale.TARGET).read_bytes() == original
+    assert (src / locale.TARGETS[1]).read_bytes() == original
     assert not (src / locale.PENDING).exists()
 
 
 def test_unrelated_addition_cannot_publish(tmp_path):
     src, stack = replay_fixture(tmp_path)
     stack[-1] = patch('sources/file1.cc', 'new1\n', 'modified unrelated\n')
-    with pytest.raises(ValueError, match='unrelated'):
+    with pytest.raises(ValueError, match='exact ordered two-source'):
         locale.private_migration(src, stack, tmp_path)
 
 
@@ -189,9 +193,9 @@ with open(os.environ['CALL_LOG'],'a') as f:f.write('latest-compiled-restore\\n')
 (w/'src/out/Chromix').mkdir(parents=True);(w/'fingerprint-diagnostics').mkdir()
 for n,v in [('args.gn','target_cpu=\"x64\"\\nchrome_pgo_phase=0\\n'),('build.ninja','protected graph'),('.ninja_log','# ninja log v7\\n'),('.ninja_deps','protected deps'),('keep.o','compiled object')]:
  (w/'src/out/Chromix'/n).write_text(v)
-(w/'src/.chromix-linux157-locale-migration.json').write_text('{\"phase\":\"exact-compiled-locale\",\"count\":227}')
+(w/'src/.chromix-linux157-locale-migration.json').write_text('{\"phase\":\"exact-compiled-locale\",\"count\":228}')
 (w/'src/.chromix-source-ready').write_text('reviewed-new-ready')
-(w/'fingerprint-diagnostics/source-final.json').write_text('{\"status\":\"verified\",\"patch_count\":227}')
+(w/'fingerprint-diagnostics/source-final.json').write_text('{\"status\":\"verified\",\"patch_count\":228}')
 with open(os.environ['CALL_LOG'],'a') as f:f.write('atomic-locale-migration\\n')
 """)
     put(root/'tools/linux157_source.py',"""import json,os,sys
@@ -199,13 +203,13 @@ from pathlib import Path
 a=sys.argv;phase=a[a.index('--phase')+1]
 if phase=='checkpoint':
  w=Path(a[a.index('--workdir')+1]);p=json.loads((w/'src/.chromix-linux157-locale-migration.json').read_text())
- assert p=={'phase':'exact-compiled-locale','count':227}
+ assert p=={'phase':'exact-compiled-locale','count':228}
 with open(os.environ['CALL_LOG'],'a') as f:f.write(phase+'\\n')
 print('{\"status\":\"verified\"}')
 """)
     put(root/'tools/verify_linux157_upload.py',"""import json,os,sys
 from pathlib import Path
-w=Path(sys.argv[sys.argv.index('--workdir')+1]);assert json.loads((w/'fingerprint-diagnostics/source-final.json').read_text())['patch_count']==227
+w=Path(sys.argv[sys.argv.index('--workdir')+1]);assert json.loads((w/'fingerprint-diagnostics/source-final.json').read_text())['patch_count']==228
 with open(os.environ['CALL_LOG'],'a') as f:f.write('actual-upload-gate\\n')
 """)
     put(root/'tools/linux157_build.py',"""import os,sys
@@ -243,28 +247,122 @@ def test_missing_reviewed0236_blocks_before_download(tmp_path):
     assert not (tmp_path/'work').exists()
 
 
-def test_multi_source_scope_cannot_be_smuggled_as_one0236(tmp_path):
-    m=locale.load();selected=copy.deepcopy(m['source_receipt']['chromix_selection'])
-    one=patch(locale.TARGET,'old\n','new\n')[1]
-    two=patch('base/i18n/icubridge/default_icu_locale.h','old\n','new\n')[1]
-    name='patches/chromium157-additions/0236-review.patch';raw=one+two
-    selected['patches'].append({'path':name,'sha256':source.digest(raw)})
-    with mock.patch.object(locale.patch_selection,'select',return_value=(selected,[('old',b'')]*226+[(name,raw)])), \
-            mock.patch.object(locale,'validate_metadata') as metadata:
-        with pytest.raises(ValueError,match='only timezone'):
+def addition_fixture():
+    m = copy.deepcopy(locale.load())
+    selected = copy.deepcopy(m['source_receipt']['chromix_selection'])
+    raw = [('old', b'')]*226
+    for pin in m['migration']['additions']:
+        data = patch(pin['target'], 'old\n', 'new\n')[1]
+        pin['sha256'] = source.digest(data)
+        entry = {'path': pin['patch'], 'sha256': pin['sha256']}
+        raw.append((pin['patch'], data))
+        selected['patches'].append(entry)
+        selected['selection']['additions']['patches'].append(entry)
+    return m, selected, raw
+
+
+@pytest.mark.parametrize('attack', ['swapped', 'missing', 'third', 'tamper', 'oldpatch', 'wrongtarget', 'multi'])
+def test_only_exact_ordered_two_file_additions_accepted(tmp_path, attack):
+    m, selected, raw = addition_fixture()
+    locale.validate_additions(selected, raw, m)
+    if attack == 'swapped':
+        raw[-2:] = reversed(raw[-2:])
+    elif attack == 'missing':
+        raw.pop(); selected['patches'].pop()
+    elif attack == 'third':
+        raw.append(('0238.patch', b'extra')); selected['patches'].append({'path':'0238.patch','sha256':'0'*64})
+    elif attack == 'tamper':
+        raw[-1] = (raw[-1][0], raw[-1][1]+b'changed')
+    elif attack == 'oldpatch':
+        selected['patches'][0]['sha256']='0'*64
+    else:
+        data = patch('base/unapproved.h', 'old\n', 'new\n')[1]
+        if attack == 'multi':
+            data = raw[-1][1] + data
+        raw[-1] = (raw[-1][0], data)
+        # Even a manifest-shaped hash cannot widen the fixed two-source scope.
+        m['migration']['additions'][-1]['sha256']=source.digest(data)
+        selected['patches'][-1]['sha256']=source.digest(data)
+    with mock.patch.object(locale, 'load', return_value=m), \
+            mock.patch.object(locale.patch_selection, 'select', return_value=(selected, raw)), \
+            mock.patch.object(locale, 'validate_metadata') as metadata:
+        with pytest.raises(ValueError):
             locale.restore(tmp_path/'work','x64')
         metadata.assert_not_called()
+    assert not (tmp_path/'work').exists()
 
 
-def test_interrupted_publication_keeps_block_marker_and_old_or_new_whole_file(tmp_path):
-    src,stack=replay_fixture(tmp_path)
-    _,new=locale.private_migration(src,stack,tmp_path)
-    target=src/locale.TARGET;old=target.read_bytes()
-    (src/locale.PENDING).write_text('transaction in progress')
-    with mock.patch.object(locale.os,'replace',side_effect=OSError('interrupted before replace')):
-        with pytest.raises(OSError):locale.atomic_bytes(target,new[locale.TARGET])
-    assert target.read_bytes()==old
+@pytest.mark.parametrize('failure_after', [0, 1])
+def test_interrupted_two_file_publication_never_admits_half_ready_tree(tmp_path, failure_after):
+    src, stack = replay_fixture(tmp_path)
+    before, revised = locale.private_migration(src, stack, tmp_path)
+    for marker in (locale.PENDING, '.chromix-layer-in-progress'):
+        (src/marker).write_text('transaction in progress')
+    original = locale.atomic_bytes
+    calls = []
+    def interrupted(path, raw, **kwargs):
+        if len(calls) == failure_after:
+            raise OSError('interrupted two-file publication')
+        original(path, raw, **kwargs)
+        calls.append(path)
+    with mock.patch.object(locale, 'atomic_bytes', side_effect=interrupted):
+        with pytest.raises(OSError):locale.publish_sources(src, before, revised)
+    for index, name in enumerate(locale.TARGETS):
+        assert (src/name).read_bytes() == (revised[name] if index < failure_after else before[name][0])
+    assert (src/locale.PENDING).exists() and (src/'.chromix-layer-in-progress').exists()
+    assert not (src/locale.MARKER).exists()
+    with pytest.raises(ValueError, match='incomplete'):locale.verify(tmp_path, 'x64')
+
+
+def test_two_file_publication_requires_both_blockers_and_preserves_other_files(tmp_path):
+    src, stack = replay_fixture(tmp_path)
+    before, revised = locale.private_migration(src, stack, tmp_path)
+    other = src/'sources/file3.cc'
+    old = (other.read_bytes(), other.stat().st_mtime_ns)
+    with pytest.raises(ValueError, match='both transaction'):locale.publish_sources(src,before,revised)
+    for marker in (locale.PENDING, '.chromix-layer-in-progress'):(src/marker).touch()
+    locale.publish_sources(src,before,revised)
+    for name in locale.TARGETS:assert (src/name).read_bytes() == revised[name]
+    assert (other.read_bytes(),other.stat().st_mtime_ns)==old
     with pytest.raises(ValueError,match='incomplete'):locale.verify(tmp_path,'x64')
-    locale.atomic_bytes(target,new[locale.TARGET])
-    assert target.read_bytes()==new[locale.TARGET]
-    with pytest.raises(ValueError,match='incomplete'):locale.verify(tmp_path,'x64')
+
+
+def test_exact_two_file_migration_manifest_binds_pre_and_postimages():
+    m=locale.load();migration=m['migration']
+    assert migration['old_patch_count']==226 and migration['new_patch_count']==228
+    assert tuple(x['target'] for x in migration['additions'])==locale.TARGETS
+    assert [Path(x['patch']).name[:5] for x in migration['additions']]==['0236-','0237-']
+    for pin in migration['additions']:
+        for key in ('sha256','before','after'):
+            assert len(pin[key])==64 and set(pin[key])<=set('0123456789abcdef')
+        assert pin['before']!=pin['after']
+    assert migration['additions'][1]['before']==m['source_receipt']['substituted_outputs'][locale.TARGETS[1]]
+
+
+def test_real_agent_additions_are_read_only_and_full228_replay(tmp_path):
+    donor=os.environ.get('CHROMIX_LOCALE_COMPILED_SRC')
+    patches=os.environ.get('CHROMIX_LOCALE_PATCH_REPO')
+    if not donor or not patches:
+        pytest.skip('requires exact compiled donor and separate real patch-agent worktree')
+    src=Path(donor);patch_repo=Path(patches);m=locale.load()
+    core=src.parent/'tooling/ungoogled-chromium'
+    listed=set(source.regular(core,'domain_substitution.list').read_text().splitlines())
+    rules=arp._rules(source.regular(core,'domain_regex.list').read_bytes())
+    stack=[]
+    entries=m['source_receipt']['chromix_selection']['patches']+[
+        {'path':p['patch'],'sha256':p['sha256']} for p in m['migration']['additions']]
+    patch_states={}
+    for entry in entries:
+        root=patch_repo if entry['path'] in {p['patch'] for p in m['migration']['additions']} else ROOT
+        p=source.regular(root,entry['path']);raw=p.read_bytes()
+        assert source.digest(raw)==entry['sha256']
+        patch_states[p]=(raw,p.stat().st_mtime_ns)
+        data,targets=arp.transform_patch(raw,listed,rules);stack.append((entry['path'],data,targets))
+    locale.prior.verify_files(src,m['source_receipt']['substituted_outputs'])
+    before,revised=locale.private_migration(src,stack,tmp_path)
+    assert len(stack)==228
+    for pin in m['migration']['additions']:
+        assert source.digest(before[pin['target']][0])==pin['before']
+        assert source.digest(revised[pin['target']])==pin['after']
+        assert source.regular(src,pin['target']).read_bytes()==before[pin['target']][0]
+    for p,state in patch_states.items():assert (p.read_bytes(),p.stat().st_mtime_ns)==state

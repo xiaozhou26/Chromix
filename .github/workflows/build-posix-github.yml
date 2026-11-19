@@ -55,7 +55,7 @@ on:
         type: string
         default: '1'
       linux157_locale_recovery:
-        description: 'Restore only compiled x64 run44578881741 and migrate the reviewed locale API addition'
+        description: 'Restore only compiled x64 run44578881741 and migrate only reviewed0236/0237 locale additions (226 to228)'
         required: false
         type: boolean
         default: false

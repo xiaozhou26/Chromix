@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Migrate one exact compiled Linux157 tree through the reviewed locale API patch."""
+"""Migrate one exact compiled Linux157 tree through the reviewed two-file locale API additions."""
 from __future__ import annotations
 
 import argparse
@@ -32,9 +32,12 @@ except ImportError:
     import patch_selection
 
 MANIFEST = "build/linux/157.0.8103.78/locale-checkpoint.json"
-MANIFEST_SHA256 = "47f2a033115e440229922fe04a330b9f2986009f233be7a68e5f604b905e8f2d"
-TARGET = "third_party/blink/renderer/core/timezone/timezone_controller.cc"
-ADDITION_PREFIX = "0236-"
+MANIFEST_SHA256 = "42a6d9d6e9d40812cb4bee4077768213987586387f7f8816e08b9bd066993208"
+TARGETS = ("base/i18n/icubridge/default_icu_locale.h",
+           "third_party/blink/renderer/core/timezone/timezone_controller.cc")
+OLD_COUNT = 226
+NEW_COUNT = 228
+ADDITION_COUNT = 2
 MARKER = ".chromix-linux157-locale-migration.json"
 PENDING = ".chromix-linux157-locale-migration-in-progress"
 BACKUP = "linux157-locale-origin"
@@ -106,29 +109,44 @@ def recipe_delta(old, new):
         raise ValueError("locale recovery recipe delta is not reviewed")
 
 
-def selected_stacks(repo, core, tooling, src, manifest):
-    selected, raw = patch_selection.select(repo, "linux", src=src, core=core)
+def validate_additions(selected, raw, manifest):
     old = manifest["source_receipt"]["chromix_selection"]
-    if len(raw) != 227 or selected["patches"][:-1] != old["patches"]:
-        raise ValueError("locale recovery requires exact old226 plus one reviewed addition")
-    if selected["series_sha256"] != old["series_sha256"]:
-        raise ValueError("base patch series changed")
-    patch_name, patch_data = raw[-1]
-    if (not Path(patch_name).name.startswith(ADDITION_PREFIX) or not patch_name.endswith(".patch")
-            or selected["patches"][-1]["path"] != patch_name
-            or selected["patches"][-1]["sha256"] != source.digest(patch_data)):
-        raise ValueError("unreviewed locale API addition")
-    identity, stack, _ = arp._load(repo, core, tooling, "linux", src=src)
-    if len(stack) != 227 or [entry[0] for entry in stack[-1][2]] != [TARGET]:
-        raise ValueError("locale addition must modify only timezone_controller.cc")
-    if stack[-1][2][0][1] != "modify":
-        raise ValueError("locale addition must not create/delete sources")
+    additions = manifest["migration"]["additions"]
+    if (len(raw) != NEW_COUNT or len(selected["patches"]) != NEW_COUNT
+            or selected["patches"][:-ADDITION_COUNT] != old["patches"]
+            or selected["series_sha256"] != old["series_sha256"]):
+        raise ValueError("reviewed0236/0237 migration unavailable: require unchanged old226 plus exact two additions")
+    if (manifest["migration"]["old_patch_count"] != OLD_COUNT
+            or manifest["migration"]["new_patch_count"] != NEW_COUNT
+            or tuple(entry["target"] for entry in additions) != TARGETS):
+        raise ValueError("unreviewed locale migration surface")
+    for offset, ((name, data), pin) in enumerate(zip(raw[-ADDITION_COUNT:], additions)):
+        expected = {"path": pin["patch"], "sha256": pin["sha256"]}
+        if (name != pin["patch"] or source.digest(data) != pin["sha256"]
+                or selected["patches"][-ADDITION_COUNT + offset] != expected):
+            raise ValueError("unreviewed locale API addition identity or order")
+        _, entries = arp.transform_patch(data, set(), [])
+        if len(entries) != 1 or entries[0][0] != pin["target"] or entries[0][1] != "modify":
+            raise ValueError("each locale addition must modify exactly its approved source")
     old_meta, new_meta = old["selection"], selected["selection"]
     for key in ("version", "platform", "core_commit", "core_gitlink", "platform_commit", "platform_version", "overrides"):
         if old_meta.get(key) != new_meta.get(key):
             raise ValueError("unreviewed source/platform patch identity change")
-    if new_meta["additions"]["patches"][:-1] != old_meta["additions"]["patches"]:
+    expected_additions = [{"path": pin["patch"], "sha256": pin["sha256"]} for pin in additions]
+    if new_meta["additions"]["patches"] != old_meta["additions"]["patches"] + expected_additions:
         raise ValueError("previous additions changed")
+    return additions
+
+
+def selected_stacks(repo, core, tooling, src, manifest):
+    selected, raw = patch_selection.select(repo, "linux", src=src, core=core)
+    additions = validate_additions(selected, raw, manifest)
+    identity, stack, _ = arp._load(repo, core, tooling, "linux", src=src)
+    if len(stack) != NEW_COUNT:
+        raise ValueError("incomplete current locale stack")
+    for item, pin in zip(stack[-ADDITION_COUNT:], additions):
+        if len(item[2]) != 1 or item[2][0][0] != pin["target"] or item[2][0][1] != "modify":
+            raise ValueError("domain transformation changed the approved locale surface")
     return selected, identity, stack
 
 
@@ -161,6 +179,10 @@ def apply_one(stage, patch, reverse, root):
 
 
 def private_migration(src, stack, temporary_root):
+    if (len(stack) != NEW_COUNT or any(
+            len(item[2]) != 1 or item[2][0][0] != target or item[2][0][1] != "modify"
+            for item, target in zip(stack[-ADDITION_COUNT:], TARGETS))):
+        raise ValueError("private replay requires the complete228 stack and exact ordered two-source additions")
     names = {entry[0] for _, _, entries in stack for entry in entries}
     before = arp._snapshot(src, names)
     with tempfile.TemporaryDirectory(prefix="locale-stack-", dir=temporary_root) as temporary:
@@ -172,7 +194,7 @@ def private_migration(src, stack, temporary_root):
                 p = stage / name
                 p.parent.mkdir(parents=True, exist_ok=True)
                 p.write_bytes(raw.replace(b"\r\n", b"\n"))
-        old = stack[:-1]
+        old = stack[:-ADDITION_COUNT]
         for reverse, sequence in ((True, reversed(old)), (False, old)):
             for item in sequence:
                 apply_one(stage, item, reverse, root)
@@ -180,11 +202,12 @@ def private_migration(src, stack, temporary_root):
             p = stage / name
             if (p.read_bytes() if p.exists() else None) != (raw.replace(b"\r\n", b"\n") if raw is not None else None):
                 raise ValueError("old226 private roundtrip changed source: " + name)
-        apply_one(stage, stack[-1], False, root)
+        for item in stack[-ADDITION_COUNT:]:
+            apply_one(stage, item, False, root)
         expected = {name: (stage / name).read_bytes() if (stage / name).exists() else None for name in names}
         for name, raw in expected.items():
             old_raw = before[name][0]
-            if name != TARGET and raw != (old_raw.replace(b"\r\n", b"\n") if old_raw is not None else None):
+            if name not in TARGETS and raw != (old_raw.replace(b"\r\n", b"\n") if old_raw is not None else None):
                 raise ValueError("locale migration changed an unrelated source")
         for reverse, sequence in ((True, reversed(stack)), (False, stack)):
             for item in sequence:
@@ -192,7 +215,7 @@ def private_migration(src, stack, temporary_root):
         for name, raw in expected.items():
             p = stage / name
             if (p.read_bytes() if p.exists() else None) != raw:
-                raise ValueError("new227 private roundtrip changed source: " + name)
+                raise ValueError("new228 private roundtrip changed source: " + name)
         for name, (raw, info) in before.items():
             p = src / name
             if ((p.read_bytes() if p.exists() else None) != raw
@@ -239,6 +262,21 @@ def json_bytes(value):
     return (json.dumps(value, sort_keys=True, indent=2) + "\n").encode()
 
 
+def publish_sources(src, before, revised):
+    """The pair stays unready until both replacements and all receipts are committed."""
+    if not (src / PENDING).is_file() or not (src / ".chromix-layer-in-progress").is_file():
+        raise ValueError("two-file publication requires both transaction blockers")
+    if set(TARGETS) - before.keys() or set(TARGETS) - revised.keys():
+        raise ValueError("incomplete two-file publication")
+    for name in TARGETS:
+        raw, info = before[name]
+        path = source.regular(src, name)
+        if path.read_bytes() != raw or path.stat().st_mtime_ns != info.st_mtime_ns:
+            raise ValueError("locale source changed before atomic publication")
+    for name in TARGETS:
+        atomic_bytes(src / name, revised[name], mode=stat.S_IMODE(before[name][1].st_mode))
+
+
 def admit(work, arch, metadata, repo=source.ROOT):
     m = load(repo)
     if metadata != expected(arch, repo):
@@ -259,6 +297,7 @@ def admit(work, arch, metadata, repo=source.ROOT):
     if old != m["source_receipt"] or old.get("stage") != "chromix-applied":
         raise ValueError("compiled source preparation identity changed")
     prior.verify_files(src, old["substituted_outputs"])
+    prior.verify_files(src, {pin["target"]: pin["before"] for pin in m["migration"]["additions"]})
     final = json.loads(source.regular(work, "fingerprint-diagnostics/source-final.json").read_bytes())
     if final != m["source_final"] or final.get("patch_count") != 226:
         raise ValueError("compiled source-final does not match old226")
@@ -277,8 +316,12 @@ def admit(work, arch, metadata, repo=source.ROOT):
     out_before = snapshot_outputs(src / "out")
     before, revised = private_migration(src, stack, work)
     changed = {name for name in revised if revised[name] != (before[name][0].replace(b"\r\n", b"\n") if before[name][0] is not None else None)}
-    if changed != {TARGET}:
-        raise ValueError("locale addition must change exactly the allowed source")
+    if changed != set(TARGETS):
+        raise ValueError("locale additions must change exactly the two approved sources")
+    for pin in m["migration"]["additions"]:
+        name = pin["target"]
+        if source.digest(before[name][0]) != pin["before"] or source.digest(revised[name]) != pin["after"]:
+            raise ValueError("locale source preimage/postimage mismatch: " + name)
     if snapshot_outputs(src / "out") != out_before:
         raise ValueError("GN/PGO/Ninja output changed during migration")
     prior.verify_files(work, m["files"])
@@ -292,13 +335,14 @@ def admit(work, arch, metadata, repo=source.ROOT):
                  ".chromix-linux157-toolchain.json": source.regular(src, ".chromix-linux157-toolchain.json").read_bytes(),
                  ".chromix-source-ready": source.regular(src, ".chromix-source-ready").read_bytes(),
                  "source-final.json": source.regular(work, "fingerprint-diagnostics/source-final.json").read_bytes(),
-                 "timezone_controller.cc": before[TARGET][0]}
+                 **{Path(name).name: before[name][0] for name in TARGETS}}
     for name, raw in originals.items():
         (backup / name).write_bytes(raw)
     proof = {"schema_version": 1, "phase": "exact-compiled-locale", "arch": arch, "metadata": metadata,
              "origin_recipe": old["recipe"], "current_recipe": new_recipe, "old_patch_count": 226,
-             "new_patch_count": 227, "patch_sha256": selected["patches"][-1]["sha256"],
-             "before": source.digest(originals["timezone_controller.cc"]), "after": source.digest(revised[TARGET]),
+             "new_patch_count": NEW_COUNT, "patches": selected["patches"][-ADDITION_COUNT:],
+             "before": {pin["target"]: pin["before"] for pin in m["migration"]["additions"]},
+             "after": {pin["target"]: pin["after"] for pin in m["migration"]["additions"]},
              "originals": {n: source.digest(b) for n, b in originals.items()}, "runtime_verified": False}
     # Publication is guarded until source, receipts and source-final are committed together.
     with (src / PENDING).open("xb") as stream:
@@ -309,15 +353,16 @@ def admit(work, arch, metadata, repo=source.ROOT):
         stream.write(json_bytes(proof))
         stream.flush()
         os.fsync(stream.fileno())
-    atomic_bytes(src / TARGET, revised[TARGET], mode=stat.S_IMODE(before[TARGET][1].st_mode))
+    publish_sources(src, before, revised)
     receipt = copy.deepcopy(old)
     receipt.update(recipe=new_recipe, chromix_selection=selected)
-    receipt["prepared_outputs"][TARGET] = source.digest(revised[TARGET])
-    receipt["substituted_outputs"][TARGET] = source.digest(revised[TARGET])
+    for name in TARGETS:
+        receipt["prepared_outputs"][name] = source.digest(revised[name])
+        receipt["substituted_outputs"][name] = source.digest(revised[name])
     tool["recipe"] = new_recipe
     new_final = {"schema_version": 1, "status": "verified", "method": "reverse-forward-in-scratch",
-                 "qualification": "complete old226 and new227 private roundtrips; only timezone source published",
-                 "domain_substituted": True, "patch_count": 227, "identity": identity,
+                 "qualification": "complete old226 and new228 private roundtrips; exact two approved sources published",
+                 "domain_substituted": True, "patch_count": NEW_COUNT, "identity": identity,
                  "outputs": {n: source.digest(b) if b is not None else None for n, b in revised.items()}}
     atomic_bytes(src / source.RECEIPT, json_bytes(receipt))
     atomic_bytes(src / ".chromix-linux157-toolchain.json", json_bytes(tool))
@@ -344,13 +389,11 @@ def verify(work, arch, repo=source.ROOT):
     m = load(repo)
     proof = json.loads(source.regular(src, MARKER).read_bytes())
     selected, raw = patch_selection.select(repo, "linux", src=src)
-    if (len(raw) != 227 or not Path(raw[-1][0]).name.startswith(ADDITION_PREFIX)
-            or selected["patches"][:-1] != m["source_receipt"]["chromix_selection"]["patches"]):
-        raise ValueError("locale target patch manifest is not the reviewed old226 plus one")
+    additions = validate_additions(selected, raw, m)
     if (arch != "x64" or proof.get("metadata") != expected(arch, repo)
             or proof.get("origin_recipe") != m["source_receipt"]["recipe"]
             or proof.get("current_recipe") != source.recipe(repo) or proof.get("phase") != "exact-compiled-locale"
-            or proof.get("new_patch_count") != 227 or proof.get("patch_sha256") != source.digest(raw[-1][1])
+            or proof.get("new_patch_count") != NEW_COUNT or proof.get("patches") != selected["patches"][-ADDITION_COUNT:]
             or proof.get("runtime_verified") is not False):
         raise ValueError("locale migration identity mismatch")
     recipe_delta(proof["origin_recipe"], proof["current_recipe"])
@@ -358,13 +401,23 @@ def verify(work, arch, repo=source.ROOT):
                           ".chromix-linux157-toolchain.json": m["files"]["src/.chromix-linux157-toolchain.json"],
                           ".chromix-source-ready": m["files"]["src/.chromix-source-ready"],
                           "source-final.json": m["files"]["fingerprint-diagnostics/source-final.json"],
-                          "timezone_controller.cc": m["source_receipt"]["substituted_outputs"][TARGET]}
+                          **{Path(pin["target"]).name: pin["before"] for pin in additions}}
     if proof.get("originals") != expected_originals:
         raise ValueError("locale origin backups do not match exact compiled donor")
     prior.verify_files(work / BACKUP, expected_originals)
-    if proof.get("before") != m["source_receipt"]["substituted_outputs"][TARGET]:
-        raise ValueError("locale origin source mismatch")
-    prior.verify_files(src, {TARGET: proof["after"]})
+    expected_before = {pin["target"]: pin["before"] for pin in additions}
+    expected_after = {pin["target"]: pin["after"] for pin in additions}
+    if proof.get("before") != expected_before or proof.get("after") != expected_after:
+        raise ValueError("locale source preimage/postimage identity mismatch")
+    receipt = json.loads(source.regular(src, source.RECEIPT).read_bytes())
+    if receipt.get("chromix_selection") != selected or receipt.get("recipe") != proof["current_recipe"]:
+        raise ValueError("locale source receipt is not bound to the current228 review")
+    for field in ("prepared_outputs", "substituted_outputs"):
+        outputs = dict(m["source_receipt"][field])
+        outputs.update(expected_after)
+        if receipt.get(field) != outputs:
+            raise ValueError("locale receipt changed beyond the exact two-source delta")
+    prior.verify_files(src, expected_after)
     prior.verify_files(work, {"src/out/Chromix/args.gn": m["files"]["src/out/Chromix/args.gn"]})
     libclang.verify_package(src / libclang.PACKAGE, libclang.load(repo))
     return proof
@@ -375,12 +428,7 @@ def restore(work, arch, repo=source.ROOT):
         raise ValueError("compiled restore requires absent workdir")
     m = load(repo)
     selected, patches = patch_selection.select(repo, "linux")
-    if (len(patches) != 227 or selected["patches"][:-1] != m["source_receipt"]["chromix_selection"]["patches"]
-            or not Path(patches[-1][0]).name.startswith(ADDITION_PREFIX)):
-        raise ValueError("reviewed single-file0236 migration is unavailable; do not download or fall back")
-    _, entries = arp.transform_patch(patches[-1][1], set(), [])
-    if [entry[0] for entry in entries] != [TARGET] or entries[0][1] != "modify":
-        raise ValueError("compiled locale recovery allows only timezone_controller.cc")
+    validate_additions(selected, patches, m)
     metadata = validate_metadata(snapshot.Client(m["repository"], os.environ.get("GH_TOKEN", "")), arch, repo)
     work.parent.mkdir(parents=True, exist_ok=True)
     with tempfile.TemporaryDirectory(prefix="linux157-locale-", dir=work.parent) as temp:

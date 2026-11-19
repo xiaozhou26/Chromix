@@ -552,6 +552,26 @@
   "job_id": 135753768953,
   "job_name": "Linux157 x64 (latest post-GN tree + official libclang) / linux-x64 stage 1 (prepare + first compile)",
   "kind": "linux157-compiled-locale-recovery",
+  "migration": {
+    "additions": [
+      {
+        "after": "e264e1484db3e05693c766132f5190bb717cb822dcc741a9601dba9530531663",
+        "before": "f415c2354ec91b6a69bdda447a6fc160d744cf1cfa2ed15b82d759c30080c04b",
+        "patch": "patches/chromium157-additions/0236-timezone-default-locale-setter-key.patch",
+        "sha256": "aff87c11adaabdd3d3f832e7e175e878f416e60dce7390c6655d9314f7139b5a",
+        "target": "base/i18n/icubridge/default_icu_locale.h"
+      },
+      {
+        "after": "9896389d368df46e5fb27b18f2a18783e177eb454bc9d3fe18bf10fa09b10374",
+        "before": "fd6f3e033c2f3c0ebc7055ad18aa47f2e8ced2e9c6185bf516313c5bcfe53837",
+        "patch": "patches/chromium157-additions/0237-timezone-default-locale-api.patch",
+        "sha256": "e2ea0e503ad413a5a7ded2e06d3f9d49d48dc56b78d48937ad275e03aa3a9d1e",
+        "target": "third_party/blink/renderer/core/timezone/timezone_controller.cc"
+      }
+    ],
+    "new_patch_count": 228,
+    "old_patch_count": 226
+  },
   "ninja": {
     "host": [
       "linux",

@@ -5,7 +5,7 @@ on:
   workflow_dispatch:
     inputs:
       compile_jobs:
-        description: 'Ninja jobs; latest compiled donor and single locale source migration are fixed'
+        description: 'Ninja jobs; latest compiled donor and exact two-file locale migration are fixed'
         type: string
         default: auto
 
