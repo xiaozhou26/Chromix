@@ -1155,9 +1155,12 @@
           },
           "inputs": {
             "build/linux/157.0.8103.78/source.json": "5ad5898d9442cc31b6ed571702f9e88510e9eea144ed544f60187e66e5c948d8",
-            "tools/linux157_source.py": "c1e90fb1e718568766294544b937ae9f9d9b3b7cf4ba11206496612cc69c55ce",
+            "tools/linux157_source.py": "60feecc2bc3d91de039a31fb96bfd9ee9286bdd16754d02e961dde9a1e3169e8",
             "tools/linux157_toolchain.py": "539a28814632a79333adefe55d2f8bd6b8e37455aaf43f2b506175d3b733954a",
-            "tools/linux157_build.py": "884a738a1fee14534795076ebd97bf4c6a2705b2e4cb78059231d2968fc88361",
+            "tools/linux157_build.py": "c646e9e39049e0ce02d3efa90910c43f30696d10bc775f1a201345b425393096",
+            "tools/linux157_gn.py": "bdf432f04eaa7665d93026724deadf2eaa6127c27d5ee4533e29140e27f88805",
+            "tools/linux157_checkpoint.py": "c3da7c80314cc166677ad2b9b624786f6b70874d5799717597a58822d5a19d36",
+            "build/linux/157.0.8103.78/pre-gn-checkpoints.json": "a644c2bdd1ea5756320fe34e822dd9864bf57812388a5c434b64c20832da73c3",
             "build/windows/lite-tarball-files/v8/test/torque/test-torque.tq": "502c92560d745fc94e93ec7b95a1c562a55167f58a2ce79e3d0e4881dfb928c5",
             "build/linux/157.0.8103.78/patches/use-oauth2-client-switches-as-default.patch": "9564c36390f1ca1d08ffe42a81a1088aaba7eec8249ba6ff66a85f0592a282ef",
             "build/linux/157.0.8103.78/patches/fix-compiling-on-arm64.patch": "a2932c2ea04e4822e5d5c3e94f39b779134990c9d417a707a1652702239705a6",
@@ -1169,7 +1172,7 @@
             "build/linux/157.0.8103.78/patches/chromium-156-revert-crubit-changes.patch": "70c63c2d028c5b4069c16b13152e97ce42785752cf9837cc63bbc0243d3e20d0",
             "build/linux/157.0.8103.78/patches/chromium-156-revert-use-typescript-go.patch": "e1f21b386321371bf76fc0dd5d14c5f142f54f495685e6e7b67313a1d3a0ce6f"
           },
-          "sha256": "0c7aa841f0fafff1e7d03a765c3693f00de1ccb2d40786f2bb5ecc425c20933c"
+          "sha256": "ee6fe2d6b8df89e65093e8b3ef41335dee233a8739fa139d321af6babea88b4e"
         },
         "source_manifest": {
           "path": "build/linux/157.0.8103.78/source.json",
@@ -1246,11 +1249,11 @@
           },
           "replayed_recipe_sha256": "42d788d91c0ec2345c253044665af7f623501a73c8bdb627a94d1739790aeb11",
           "recipe_integration": {
-            "recipe_sha256": "0c7aa841f0fafff1e7d03a765c3693f00de1ccb2d40786f2bb5ecc425c20933c",
+            "recipe_sha256": "ee6fe2d6b8df89e65093e8b3ef41335dee233a8739fa139d321af6babea88b4e",
             "changed_inputs": {
               "tools/linux157_source.py": {
                 "before_sha256": "342b7c98f191280bc23e9c988b1ffe1f39cdc514f460f0b186ab026bb2d4a9d9",
-                "sha256": "c1e90fb1e718568766294544b937ae9f9d9b3b7cf4ba11206496612cc69c55ce"
+                "sha256": "60feecc2bc3d91de039a31fb96bfd9ee9286bdd16754d02e961dde9a1e3169e8"
               },
               "build/windows/lite-tarball-files/v8/test/torque/test-torque.tq": {
                 "before_sha256": null,
@@ -1258,14 +1261,26 @@
               },
               "tools/linux157_build.py": {
                 "before_sha256": "048e644354c26812c5b0db71e272c53066eb6f1b7d19d68821bb4329cfdb6503",
-                "sha256": "884a738a1fee14534795076ebd97bf4c6a2705b2e4cb78059231d2968fc88361"
+                "sha256": "c646e9e39049e0ce02d3efa90910c43f30696d10bc775f1a201345b425393096"
               },
               "tools/linux157_toolchain.py": {
                 "before_sha256": "0d5d2bfeaccfea5cf75f874e0f52831773f77419e89ec45b0a36d1cfee324d04",
                 "sha256": "539a28814632a79333adefe55d2f8bd6b8e37455aaf43f2b506175d3b733954a"
+              },
+              "tools/linux157_gn.py": {
+                "before_sha256": null,
+                "sha256": "bdf432f04eaa7665d93026724deadf2eaa6127c27d5ee4533e29140e27f88805"
+              },
+              "tools/linux157_checkpoint.py": {
+                "before_sha256": null,
+                "sha256": "c3da7c80314cc166677ad2b9b624786f6b70874d5799717597a58822d5a19d36"
+              },
+              "build/linux/157.0.8103.78/pre-gn-checkpoints.json": {
+                "before_sha256": null,
+                "sha256": "a644c2bdd1ea5756320fe34e822dd9864bf57812388a5c434b64c20832da73c3"
               }
             },
-            "review": "Source helper adds exact lite Torque payload binding/copy, explicit source-manifest identity, and fail-closed fresh route/checkpoint validation. Build helper binds Linux amd64 host Go1.27.1 to its complete GOROOT, checks binary/compiler identity, and compiles/runs a standard-library probe using the copied Go executable before passing its bound environment to the build. The subsequent exact pruning-recovery delta below updates all three helpers. Source manifest, GN/source patches and all nine platform replacements remain unchanged. This reviewed helper delta extends recipe identity, not the original patch replay or compilation/runtime evidence.",
+            "review": "Source helper adds exact lite Torque payload binding/copy, explicit source-manifest identity, and fail-closed fresh route/checkpoint validation. Build helper binds Linux amd64 host Go1.27.1 to its complete GOROOT, checks binary/compiler identity, and compiles/runs a standard-library probe using the copied Go executable before passing its bound environment to the build. The subsequent exact pruning-recovery delta below updates all three helpers. Source manifest, GN/source patches and all nine platform replacements remain unchanged. This reviewed helper delta extends recipe identity, not the original patch replay or compilation/runtime evidence. The subsequent GN recovery delta admits only two exact pre-GN checkpoints, disables fresh preparation, binds the official host GN compiler/bootstrap inputs, and removes only three hash-bound obsolete args; original patch replay scope is unchanged.",
             "base_commit": "98f97fb23a97b41140c8a2d50e72ad7ad403a9b8",
             "pruning_recovery": {
               "baseline_commit": "f2d0021993567111b0dd740d61b45bcf774a4f29",
@@ -1302,6 +1317,119 @@
                 "prune_script_sha256": "43e44d422196e23b2a6a72c0234863495226631fed5000e6c05e3963bd620bc8"
               },
               "review": "The official lite archive contains all 13 pinned toolchain inputs. Exact core CONTINGENT_PATHS pruning deletes only the native TypeScript 3pp patch among those inputs. Authenticate existing inputs before pruning; restore only the exact missing official patch with exclusive creation after all input checks; bind it in prepared source outputs. Checkpoint admission remains read-only and rejects missing inputs; failure metadata uses that same exact checkpoint gate rather than build.ninja existence. This is tool-input preimage recovery, not a source/platform patch change or migration of old ready snapshots."
+            },
+            "gn_recovery": {
+              "baseline_commit": "ac31edfa95c7af7afce3e2faf6487b0ac33ce018",
+              "implementation_commit": "3fa53151090069ba6453569598109627ccfc491c",
+              "previous_recipe_sha256": "0c7aa841f0fafff1e7d03a765c3693f00de1ccb2d40786f2bb5ecc425c20933c",
+              "recipe_sha256": "ee6fe2d6b8df89e65093e8b3ef41335dee233a8739fa139d321af6babea88b4e",
+              "changed_inputs": {
+                "tools/linux157_source.py": {
+                  "before_sha256": "c1e90fb1e718568766294544b937ae9f9d9b3b7cf4ba11206496612cc69c55ce",
+                  "sha256": "60feecc2bc3d91de039a31fb96bfd9ee9286bdd16754d02e961dde9a1e3169e8"
+                },
+                "tools/linux157_build.py": {
+                  "before_sha256": "884a738a1fee14534795076ebd97bf4c6a2705b2e4cb78059231d2968fc88361",
+                  "sha256": "c646e9e39049e0ce02d3efa90910c43f30696d10bc775f1a201345b425393096"
+                },
+                "tools/linux157_gn.py": {
+                  "before_sha256": null,
+                  "sha256": "bdf432f04eaa7665d93026724deadf2eaa6127c27d5ee4533e29140e27f88805"
+                },
+                "tools/linux157_checkpoint.py": {
+                  "before_sha256": null,
+                  "sha256": "c3da7c80314cc166677ad2b9b624786f6b70874d5799717597a58822d5a19d36"
+                },
+                "build/linux/157.0.8103.78/pre-gn-checkpoints.json": {
+                  "before_sha256": null,
+                  "sha256": "a644c2bdd1ea5756320fe34e822dd9864bf57812388a5c434b64c20832da73c3"
+                }
+              },
+              "source_manifest_unchanged": {
+                "path": "build/linux/157.0.8103.78/source.json",
+                "sha256": "5ad5898d9442cc31b6ed571702f9e88510e9eea144ed544f60187e66e5c948d8"
+              },
+              "checkpoint_manifest": {
+                "path": "build/linux/157.0.8103.78/pre-gn-checkpoints.json",
+                "sha256": "a644c2bdd1ea5756320fe34e822dd9864bf57812388a5c434b64c20832da73c3"
+              },
+              "donor_head": "e2fb7d2129c47d941e341ae8e25f503b07527bfe",
+              "donors": {
+                "arm64": {
+                  "run_id": 44547869671,
+                  "job_id": 135643262002,
+                  "stage": 1,
+                  "attempt": 1,
+                  "artifact": {
+                    "digest": "sha256:abd03e33b74bdc6664d638860aefbbe6f907134f3475b4940e9008c68b86c189",
+                    "expires_at": "2026-11-22T15:02:07Z",
+                    "id": 14544060048,
+                    "name": "chromix-linux-arm64-tree-s1-attempt-1-part1",
+                    "size_in_bytes": 2240636120
+                  }
+                },
+                "x64": {
+                  "run_id": 44547858334,
+                  "job_id": 135643223233,
+                  "stage": 1,
+                  "attempt": 1,
+                  "artifact": {
+                    "digest": "sha256:a253944d39107f33c22812e72dc7057056d6ece87aac50c0f5dda6c2ed66aa67",
+                    "expires_at": "2026-11-22T14:58:21Z",
+                    "id": 14542955675,
+                    "name": "chromix-linux-x64-tree-s1-attempt-1-part1",
+                    "size_in_bytes": 2192370999
+                  }
+                }
+              },
+              "gn_args": {
+                "removed_lines": [
+                  "rust_prebuilt_stdlib = false\n",
+                  "use_chromium_rust_toolchain = true\n",
+                  "v8_use_metagen_instance_types=false\n"
+                ],
+                "identities": {
+                  "arm64": {
+                    "original_sha256": "8898db7ac38e7ddd1c4f53404ed516ef9ac1e2b27ac3b70d1e8db13abc0d9743",
+                    "revised_sha256": "86f17f04fabdf51870a48f54d0d04f01c85752fdb420587a6b6c29d90101a793"
+                  },
+                  "x64": {
+                    "original_sha256": "c5279f417ca268da4cd133e413d9fc9cd9e1a9585551184d2103dade3029b4e4",
+                    "revised_sha256": "2368fb9594bcebf1f5f74ffcd49bb0684d6e479d4e5f010a46f47f555b588027"
+                  }
+                },
+                "constraint": "Only these three complete lines may be deleted exactly once from the fully hash-bound donor args; every other byte, including target/profile/PGO, remains unchanged."
+              },
+              "host_gn": {
+                "version": "2595 (0035961837fb)",
+                "compiler_binaries": {
+                  "clang": "8091a95554f24a2affa32c80e884c3d36960c5d971560d3410391ffc36af19a7",
+                  "clang++": "8091a95554f24a2affa32c80e884c3d36960c5d971560d3410391ffc36af19a7",
+                  "llvm-ar": "7d3156f6ebb7dd4b24886e07d5feb66f80b44f210685fb69548df0dd1f814c5c"
+                },
+                "bootstrap_inputs": {
+                  "tools/gn/bootstrap/bootstrap.py": "983ab6d697037f05b58d1550b37fa133a37a7c9fb3e2e597fe774d5de9a9f3ca",
+                  "tools/gn/bootstrap/libc++.ninja": "2708e17cee9526856591c67a540db052b2bd3eb8e0da7d11ff9a3257f6fd4efe",
+                  "buildtools/third_party/libc++/__config_site": "fcac9dc8ea709997ab8b43af6c4e4e2a3674531c6f6303ca42eaf1e3fe189064",
+                  "third_party/llvm-libc/src/shared/fp_bits.h": "4f2e29e66446ae730c2b33d852352bece3122954888587dcb4f13a738f6867e5",
+                  "third_party/libc++/src/include/__config": "8a22f6575188bd4a8af218746301b442900356d0ad5b92e5747ac1d5e3a7a8dc",
+                  "third_party/libc++abi/src/include/__cxxabi_config.h": "a4981a422d321ad1eef57a4786bad355e374f97c685834908030f26740819927"
+                },
+                "stdlib": "Chromium157 in-tree libc++/libc++abi",
+                "mode": "--use-custom-libcxx",
+                "extra_include": "third_party/llvm-libc/src",
+                "gnu_host_compiler_admitted": false,
+                "warning_suppression_added": false
+              },
+              "audit_sha256": {
+                "gn-bootstrap-gcc12.log": "954d95f17ab3699404a8fd178856ae33a071f49cb1df294f7c3196cad618cc23",
+                "gn-bootstrap-final-helper.log": "d2ab9cf4723eab0a9973730fa1ce5e4e6671fb49a26b3c2287c31455a4fa263b",
+                "gn-final-reuse.json": "014c19ab28970d521cc4c27af646a93e43a8eace7d401347a908273c8e201517",
+                "gn-gen-after-fix.log": "92652528993f52d5b4694391e671cf64b0195ddf25e22ded2102e0099e3ab461",
+                "gn-gen-arm64-after-fix.log": "34f26a7650c0af07a6c474bb3bf2476d08b356ebcc60788d136a02f708fe48e3"
+              },
+              "review_delta_sha256": "bd8a2cd62d7c2bcfa7f7705e563eb0d129cd76142dd4159b56dde8cee1e3e800",
+              "qualification": "Reported exact official-clang/libc++ host GN build (60 libc++ and 217 GN steps) and both target GN generations; not Chromium compilation or native runtime. Original core/platform/Chromix replay files and source manifest remain unchanged. New helper/checkpoint inputs bind execution and exact donor provenance, not additional source patches. No third fresh preparation or arbitrary pre-GN checkpoint is admitted."
             }
           },
           "patch_count": 226,

@@ -67,6 +67,11 @@ on:
         required: false
         type: string
         default: '1'
+      linux157_pre_gn_recovery:
+        description: 'Restore only the reviewed Linux157 stage1 pre-GN donor; no fresh fallback'
+        required: false
+        type: boolean
+        default: false
       macos_compile_release:
         description: 'macOS only: publish integrity-verified compiled bundles; runtime diagnostics are nonblocking (automatic for 157, never for frozen mac156 recovery)'
         required: false
@@ -261,6 +266,7 @@ def run_step(stage: int) -> str:
         id: stage
         env:
           CHROMIX_BUILD_PROFILE: ${{ inputs.build_profile }}
+          CHROMIX_LINUX157_PRE_GN_RECOVERY: ${{ inputs.linux157_pre_gn_recovery && '1' || '0' }}
           CHROMIX_MACOS_COMPILE_RELEASE: ${{ inputs.platform == 'macos' && inputs.macos_compile_release && '1' || '0' }}
           # Mac runtime gates need 45m in addition to packaging/checkpoint reserve.
           CHROMIX_RESERVE_MINUTES: ${{ inputs.platform == 'macos' && '90' || inputs['max-stages'] == 1 && '15' || '45' }}
@@ -631,6 +637,8 @@ FINAL_UPLOADS = """      - name: Upload final bundle
             ${{ runner.temp }}/chromix-build/src/.chromix-linux157-in-progress
             ${{ runner.temp }}/chromix-build/linux157-failed.json
             ${{ runner.temp }}/chromix-build/linux157-compiled.json
+            ${{ runner.temp }}/chromix-build/linux157-checkpoint-download.json
+            ${{ runner.temp }}/chromix-build/linux157-pre-gn-origin/
             ${{ runner.temp }}/chromix-build/upstream-cache-restore.json
             ${{ runner.temp }}/chromix-build/upstream-cache-preparation.json
             ${{ runner.temp }}/chromix-build/upstream-cache-ninja.json
@@ -826,12 +834,26 @@ def job(stage: int) -> str:
     parts.append(NODE_PY)
     parts.append(PIN_VERSION)
     parts.append(SDK_PREFLIGHT)
+    parts.append("""      - name: Guard exact Linux157 pre-GN recovery request
+        if: inputs.linux157_pre_gn_recovery
+        run: |
+          set -euo pipefail
+          test '${{ github.repository }}:${{ github.event_name }}:${{ github.ref }}' = xiaozhou26/Chromix:workflow_dispatch:refs/heads/main
+          test '${{ inputs.platform }}:${{ inputs.build_profile }}:${{ inputs.use_upstream_cache }}' = linux:fast:false
+          test "$CHROMIUM_VERSION" = 157.0.8103.78
+          test '${{ inputs.resume_migration }}:${{ inputs.resume_run_id }}:${{ inputs.resume_artifact_ids }}' = ::
+          test '${{ inputs.resume_attempt }}' = 1
+          test "$(uname -m)" = x86_64
+          case '${{ inputs.arch }}' in x64|arm64) ;; *) exit 1 ;; esac
+
+""")
     parts.append("""      - name: Validate exact Linux157 fresh source route
         if: inputs.platform == 'linux' && env.CHROMIUM_VERSION == '157.0.8103.78'
         env:
           CHROMIX_USE_UPSTREAM_CACHE: ${{ inputs.use_upstream_cache && '1' || '0' }}
         run: |
           set -euo pipefail
+          test '${{ inputs.linux157_pre_gn_recovery }}' = true
           test '${{ inputs.resume_migration }}' = ''
           test '${{ inputs.resume_run_id }}' = ''
           test "$(uname -m)" = x86_64
@@ -840,6 +862,36 @@ def job(stage: int) -> str:
 
 """)
     if stage == 1:
+        parts.append("""      - name: Restore exact Linux157 prepared stage1 checkpoint
+        if: inputs.linux157_pre_gn_recovery
+        env:
+          GH_TOKEN: ${{ secrets.UPSTREAM_ACTIONS_TOKEN || github.token }}
+          CHROMIX_USE_UPSTREAM_CACHE: '0'
+        run: |
+          set -euo pipefail
+          WORK="${RUNNER_TEMP}/chromix-build"
+          test ! -e "$WORK"
+          test ! -L "$WORK"
+          python3 tools/linux157_checkpoint.py --phase restore --arch '${{ inputs.arch }}' --workdir "$WORK" \\
+            > "${RUNNER_TEMP}/chromix-logs/linux157-pre-gn-admission.json"
+          python3 tools/linux157_source.py --phase checkpoint --arch '${{ inputs.arch }}' --workdir "$WORK" \\
+            > "${RUNNER_TEMP}/chromix-logs/linux157-pre-gn-source.json"
+          python3 - "$WORK" '${{ inputs.arch }}' <<'PY'
+          from pathlib import Path
+          import sys
+          from tools.linux157_checkpoint import prepare_args, verify_migrated
+          work, arch = Path(sys.argv[1]), sys.argv[2]
+          verify_migrated(work, arch)
+          prepare_args(work, arch)
+          PY
+          PROOF="$WORK/fingerprint-diagnostics/source-after-pre-gn-admission.json"
+          python3 tools/verify_patch_stack.py --src "$WORK/src" --repo "$GITHUB_WORKSPACE" \\
+            --core "$WORK/tooling/ungoogled-chromium" \\
+            --platform-tooling "$WORK/tooling/ungoogled-chromium-portablelinux" \\
+            --platform linux --output "$PROOF"
+          cp "$PROOF" "$WORK/fingerprint-diagnostics/source-final.json"
+
+""")
         parts.append(RESUME_STEPS)
     if stage > 1:
         parts.append(DOWNLOAD_STEP % {"prev": stage - 1})

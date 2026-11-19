@@ -14,7 +14,7 @@ from tools import patch_selection as selection
 from tools.tests.test_patch_selection import clone_repo, set_platform_pins
 
 ROOT = Path(__file__).resolve().parents[2]
-LINUX_IMPLEMENTATION = "e57311afc6bf765b707da4f06e9c0488e564928a"
+LINUX_IMPLEMENTATION = "3fa53151090069ba6453569598109627ccfc491c"
 MANIFEST = json.loads((ROOT / selection.MANIFEST157).read_bytes())
 DOWNSTREAM = MANIFEST["platforms"]["linux"]["downstream"]
 
@@ -84,12 +84,12 @@ def test_exact_recipe_source_and_nine_override_group_match_actual_implementation
         for entry in source["patches"]]
     assert len(DOWNSTREAM["platform_overrides"]) == 9
     assert DOWNSTREAM["platform_override_group_sha256"] == selection.canonical_digest(DOWNSTREAM["platform_overrides"])
-    assert DOWNSTREAM["recipe"]["sha256"] == "0c7aa841f0fafff1e7d03a765c3693f00de1ccb2d40786f2bb5ecc425c20933c"
+    assert DOWNSTREAM["recipe"]["sha256"] == "ee6fe2d6b8df89e65093e8b3ef41335dee233a8739fa139d321af6babea88b4e"
 
 
 def test_precise_host_go_helper_and_previous_unbound_helper_rejected(linux_repo):
     helper = "tools/linux157_build.py"
-    assert DOWNSTREAM["recipe"]["inputs"][helper] == "884a738a1fee14534795076ebd97bf4c6a2705b2e4cb78059231d2968fc88361"
+    assert DOWNSTREAM["recipe"]["inputs"][helper] == "c646e9e39049e0ce02d3efa90910c43f30696d10bc775f1a201345b425393096"
     delta = DOWNSTREAM["validation"]["recipe_integration"]["changed_inputs"][helper]
     assert delta == {
         "before_sha256": "048e644354c26812c5b0db71e272c53066eb6f1b7d19d68821bb4329cfdb6503",
@@ -106,13 +106,62 @@ def test_precise_host_go_helper_and_previous_unbound_helper_rejected(linux_repo)
                                     "tools/linux157_build.py"])
 def test_previous_pruning_recipe_helper_is_rejected(linux_repo, helper):
     delta = DOWNSTREAM["validation"]["recipe_integration"]["pruning_recovery"]
-    assert delta["recipe_sha256"] == DOWNSTREAM["recipe"]["sha256"]
+    assert delta["recipe_sha256"] == DOWNSTREAM["validation"]["recipe_integration"]["gn_recovery"]["previous_recipe_sha256"]
     old = blob(helper, delta["baseline_commit"])
     assert selection.digest(old) == delta["changed_inputs"][helper]["before_sha256"]
-    assert DOWNSTREAM["recipe"]["inputs"][helper] == delta["changed_inputs"][helper]["sha256"]
+    assert selection.digest(blob(helper, delta["implementation_commit"])) == delta["changed_inputs"][helper]["sha256"]
     store(linux_repo, helper, old)
     with pytest.raises(selection.SelectionError, match="changed Linux157 recipe input"):
         selection.select(linux_repo, "linux")
+
+
+def test_gn_recovery_binds_exact_new_inputs_and_preserves_donor_patch_identity(linux_repo):
+    from tools import linux157_checkpoint as checkpoint
+    from tools import linux157_gn as gn
+    delta = DOWNSTREAM["validation"]["recipe_integration"]["gn_recovery"]
+    assert delta["recipe_sha256"] == DOWNSTREAM["recipe"]["sha256"]
+    assert set(delta["changed_inputs"]) == checkpoint.REVIEWED_CHANGED | checkpoint.REVIEWED_ADDED
+    assert delta["source_manifest_unchanged"] == DOWNSTREAM["source_manifest"]
+    assert delta["host_gn"]["compiler_binaries"] == gn.BINARIES
+    assert delta["host_gn"]["bootstrap_inputs"] == gn.INPUTS
+    assert delta["gn_args"]["removed_lines"] == [
+        "rust_prebuilt_stdlib = false\n", "use_chromium_rust_toolchain = true\n",
+        "v8_use_metagen_instance_types=false\n"]
+    selected, _ = selection.select(linux_repo, "linux")
+    for arch, donor in checkpoint.load(linux_repo)["donors"].items():
+        checkpoint.validate_recipe_delta(donor["source_receipt"]["recipe"], DOWNSTREAM["recipe"])
+        checkpoint.compatible_selection(donor["source_receipt"]["chromix_selection"], selected)
+        assert delta["gn_args"]["identities"][arch]["original_sha256"] == donor["files"]["src/out/Chromix/args.gn"]
+        assert delta["donors"][arch]["artifact"] == donor["artifact"]
+
+
+@pytest.mark.parametrize("helper", ["tools/linux157_source.py", "tools/linux157_build.py"])
+def test_pre_gn_helper_rollback_is_rejected(linux_repo, helper):
+    delta = DOWNSTREAM["validation"]["recipe_integration"]["gn_recovery"]
+    old = blob(helper, delta["baseline_commit"])
+    assert selection.digest(old) == delta["changed_inputs"][helper]["before_sha256"]
+    store(linux_repo, helper, old)
+    with pytest.raises(selection.SelectionError, match="changed Linux157 recipe input"):
+        selection.select(linux_repo, "linux")
+
+
+@pytest.mark.parametrize("mutation", ["args-line", "args-hash", "donor", "compiler", "new-input"])
+def test_unknown_gn_recovery_scope_is_rejected(mutation):
+    manifest = copy.deepcopy(MANIFEST)
+    downstream = manifest["platforms"]["linux"]["downstream"]
+    delta = downstream["validation"]["recipe_integration"]["gn_recovery"]
+    if mutation == "args-line":
+        delta["gn_args"]["removed_lines"].append("chrome_pgo_phase=0\n")
+    elif mutation == "args-hash":
+        delta["gn_args"]["identities"]["x64"]["original_sha256"] = "0" * 64
+    elif mutation == "donor":
+        delta["donors"]["arm64"]["run_id"] += 1
+    elif mutation == "compiler":
+        delta["host_gn"]["compiler_binaries"]["clang"] = "0" * 64
+    else:
+        downstream["recipe"]["inputs"]["tools/unreviewed_gn.py"] = "0" * 64
+    with pytest.raises(selection.SelectionError, match="downstream recipe"):
+        selection.validate_manifest157(manifest)
 
 
 def test_reviewed_activation_preserves_real_origin_and_effective_core(linux_repo, monkeypatch):

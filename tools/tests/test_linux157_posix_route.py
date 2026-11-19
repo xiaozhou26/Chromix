@@ -37,8 +37,9 @@ def test_real_stage_selects_exact_fresh_or_historical_builder(tmp_path, arch, ve
     put(repo / "build/build.sh", '#!/bin/sh\necho legacy >> "$CALL_LOG"\nexit 17\n')
     put(repo / "build/prepare-ungoogled.sh", '#!/bin/sh\necho legacy-prepare >> "$CALL_LOG"\nexit 99\n')
     put(repo / "tools/linux157_source.py", '''import os,sys
-with open(os.environ['CALL_LOG'],'a') as f:f.write('route:'+sys.argv[sys.argv.index('--arch')+1]+'\\n')
-assert sys.argv[sys.argv.index('--phase')+1]=='route'
+phase=sys.argv[sys.argv.index('--phase')+1]
+with open(os.environ['CALL_LOG'],'a') as f:f.write(phase+':'+sys.argv[sys.argv.index('--arch')+1]+'\\n')
+assert phase in ('route','checkpoint')
 ''')
     put(repo / "tools/linux157_build.py", '''import os,sys
 with open(os.environ['CALL_LOG'],'a') as f:f.write('fresh:'+sys.argv[sys.argv.index('--arch')+1]+'\\n')
@@ -49,10 +50,12 @@ raise SystemExit(17)
     result = subprocess.run(['bash', str(stage), '--platform', 'linux', '--arch', arch,
                              '--workdir', str(work)], capture_output=True, text=True,
                             env=dict(os.environ, PATH=str(binaries)+os.pathsep+os.environ['PATH'],
-                                     CHROMIX_USE_UPSTREAM_CACHE='0', CALL_LOG=str(log)), timeout=15)
+                                     CHROMIX_USE_UPSTREAM_CACHE='0', CHROMIX_BUILD_PROFILE='fast',
+                                     CHROMIX_LINUX157_PRE_GN_RECOVERY='1' if version.startswith('157') else '0',
+                                     CALL_LOG=str(log)), timeout=15)
     assert result.returncode == 1
     assert 'build script failed' in result.stderr
-    expected = [f'route:{arch}', f'fresh:{arch}'] if version.startswith('157') else ['legacy']
+    expected = [f'route:{arch}', f'checkpoint:{arch}', f'fresh:{arch}'] if version.startswith('157') else ['legacy']
     assert log.read_text().splitlines() == expected
 
 
