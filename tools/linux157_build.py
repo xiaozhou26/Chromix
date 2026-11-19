@@ -205,16 +205,16 @@ def main(argv=None) -> int:
     except (OSError, ValueError, subprocess.SubprocessError) as error:
         work.mkdir(parents=True, exist_ok=True)
         retry_valid = False
+        checkpoint_error = None
         try:
-            receipt = source.verify_receipt(work / "src", args.repo)
-            retry_valid = (receipt.get("target_arch") == args.arch
-                           and (work / "src/out/Chromix/build.ninja").is_file()
-                           and not (work / "src/.chromix-domain-substitution-in-progress").exists())
-        except (OSError, ValueError):
-            pass
+            source.checkpoint(work, args.arch, args.repo)
+            retry_valid = True
+        except (OSError, ValueError, subprocess.SubprocessError) as failure:
+            checkpoint_error = str(failure)
         (work / "linux157-failed.json").write_text(json.dumps({
             "schema_version": 1, "target_arch": args.arch, "error": str(error),
             "snapshot_valid_for_retry": retry_valid, "preserve_worktree": True,
+            "checkpoint_error": checkpoint_error,
             "runtime_verified": False}, indent=2) + "\n")
         print("Linux157 build failed; preserve worktree snapshot: " + str(error), file=sys.stderr)
         return 1

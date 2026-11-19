@@ -276,8 +276,16 @@ def prepare(work: Path, arch: str, repo: Path = ROOT) -> None:
     subprocess.run([sys.executable, str(core / "utils/patches.py"), "apply", str(src),
                     str(core / "patches")], env=env, check=True)
     apply_platform(src, tooling, repo, patch_bin)
+    try:
+        from .linux157_toolchain import preflight_inputs, TSGO_PATCH_PATH
+    except ImportError:
+        from linux157_toolchain import preflight_inputs, TSGO_PATCH_PATH
+    # Reject altered 3pp bytes before pruning could erase the evidence.
+    preflight_inputs(src, load_manifest(repo), restore=False)
+    (src / IN_PROGRESS).write_text("pruning-and-lite-inputs\n")
     subprocess.run([sys.executable, str(core / "utils/prune_binaries.py"), str(src),
                     str(core / "pruning.list")], check=True)
+    preflight_inputs(src, load_manifest(repo))
     (src / IN_PROGRESS).write_text("chromix-patches\n")
     lite = regular(repo, LITE_PATH).read_bytes()
     if digest(lite) != LITE_SHA256:
@@ -299,7 +307,7 @@ def prepare(work: Path, arch: str, repo: Path = ROOT) -> None:
     subprocess.run([str(repo / "build/apply-patches.sh"), str(src)],
                    env=dict(env, CHROMIX_PATCH_PLATFORM="linux"), check=True)
     receipt = json.loads(regular(src, RECEIPT).read_bytes())
-    watched = set(load_manifest(repo)["final_outputs"]) | {lite_target}
+    watched = set(load_manifest(repo)["final_outputs"]) | {lite_target, TSGO_PATCH_PATH}
     for _, raw in patch_selection.select(repo, "linux", src=src, core=core)[1]:
         watched.update(re.findall(r"^diff --git a/\S+ b/(\S+)$", raw.decode(), re.M))
     outputs = {}
@@ -349,6 +357,15 @@ def checkpoint(work: Path, arch: str, repo: Path = ROOT) -> dict:
         raise ValueError("incomplete or changed Linux157 checkpoint")
     get_platform(work / "tooling/ungoogled-chromium",
                  work / "tooling/ungoogled-chromium-portablelinux", repo)
+    try:
+        from .linux157_toolchain import preflight_inputs
+    except ImportError:
+        from linux157_toolchain import preflight_inputs
+    if not (src / ".chromix-domain-substituted").exists():
+        # A completed source may be checkpointed before tool installation succeeds.
+        preflight = preflight_inputs(src, load_manifest(repo), restore=False)
+        if preflight["recoverable_missing"]:
+            raise ValueError("incomplete Linux157 checkpoint toolchain inputs")
     return {"schema_version": 1, "status": "verified", "platform": "linux", "arch": arch,
             "recipe": recipe(repo), "source_verified": True, "runtime_verified": False,
             "output": "src/out/Chromix", "qualification": "same-recipe fresh checkpoint, not build success"}

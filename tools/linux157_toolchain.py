@@ -138,6 +138,101 @@ def install_bundle(src: Path, cache: Path, pin: dict, name: str, relative: str,
     return {"path": relative, "archive_sha256": pin["sha256"], "files": expected}
 
 
+# Exact Chromium 157.0.8103.78 Git blob f43b2d7b72858c118777dfd394d9edc28f6e49fe.
+# Core pruning removes this 3pp input from the official lite source tree.
+TSGO_PATCH_PATH = "third_party/typescript/linux-amd64/3pp/patches/typescript_native_preview.patch"
+TSGO_PATCH_SHA256 = "00150dd2e4944be353977639bcd1313786d9f839e84f1564ca983d841dab00de"
+TSGO_PATCH = """diff --git a/lib/lib.dom.d.ts b/lib/lib.dom.d.ts
+index 9e127c3..88c6398 100644
+--- a/lib/lib.dom.d.ts
++++ b/lib/lib.dom.d.ts
+@@ -13567,7 +13567,10 @@ interface Element extends Node, ARIAMixin, Animatable, ChildNode, NonDocumentTyp
+      *
+      * [MDN Reference](https://developer.mozilla.org/docs/Web/API/Element/innerHTML)
+      */
+-    innerHTML: string;
++    // Chromium modification to work around
++    // https://github.com/microsoft/TypeScript/issues/30024.
++    get innerHTML(): string;
++    set innerHTML(html: string|TrustedHTML);
+     /**
+      * The **`Element.localName`** read-only property returns the local part of the qualified name of an element.
+      *
+@@ -17768,7 +17771,8 @@ interface HTMLElement extends Element, ElementCSSInlineStyle, ElementContentEdit
+      *
+      * [MDN Reference](https://developer.mozilla.org/docs/Web/API/HTMLElement/hidden)
+      */
+-    hidden: boolean | "until-found";
++    // Chromium modification since a lot of errors are thrown when `hidden` is boolean|"until-found"
++    hidden: boolean;
+     /**
+      * The HTMLElement property **`inert`** reflects the value of the element's inert attribute. It is a boolean value that, when present, makes the browser "ignore" user input events for the element, including focus events and events from assistive technologies. The browser may also ignore page search and text selection in the element. This can be useful when building UIs such as modals where you would want to "trap" the focus inside the modal when it's visible.
+      *
+@@ -20440,7 +20444,10 @@ interface HTMLScriptElement extends HTMLElement {
+      *
+      * [MDN Reference](https://developer.mozilla.org/docs/Web/API/HTMLScriptElement/src)
+      */
+-    src: string;
++    // Chromium modification to work around
++    // https://github.com/microsoft/TypeScript/issues/30024.
++    get src(): string;
++    set src(url: string|TrustedScriptURL);
+     /**
+      * The **`text`** property of the HTMLScriptElement interface represents the inline text content of the <script> element. It behaves in the same way as the textContent and innerText property.
+      *
+@@ -35294,7 +35301,10 @@ interface ShadowRoot extends DocumentFragment, DocumentOrShadowRoot {
+      *
+      * [MDN Reference](https://developer.mozilla.org/docs/Web/API/ShadowRoot/innerHTML)
+      */
+-    innerHTML: string;
++    // Chromium modification to work around
++    // https://github.com/microsoft/TypeScript/issues/30024.
++    get innerHTML(): string;
++    set innerHTML(html: string|TrustedHTML);
+     /**
+      * The **`mode`** read-only property of the ShadowRoot specifies its mode — either open or closed. This defines whether or not the shadow root's internal features are accessible from JavaScript.
+      *
+
+""".encode("utf-8")
+
+
+def preflight_inputs(src: Path, manifest: dict, *, restore: bool = True) -> dict:
+    """Validate all existing inputs before restoring the one omitted official blob."""
+    if (manifest["toolchain_inputs"].get(TSGO_PATCH_PATH) != TSGO_PATCH_SHA256
+            or source.digest(TSGO_PATCH) != TSGO_PATCH_SHA256):
+        raise ValueError("unverified Linux157 native TypeScript patch payload")
+    missing, invalid = [], []
+    for name, expected in manifest["toolchain_inputs"].items():
+        path = src / name
+        if not path.exists() and not path.is_symlink():
+            missing.append(name)
+            continue
+        try:
+            if file_hash(source.regular(src, name)) != expected:
+                invalid.append(name + ": SHA256 mismatch")
+        except (OSError, ValueError) as error:
+            invalid.append(name + ": " + str(error))
+    unexpected = [name for name in missing if name != TSGO_PATCH_PATH]
+    if invalid or unexpected:
+        raise ValueError("Linux157 toolchain preflight failed: " + json.dumps(
+            {"missing": unexpected, "invalid": invalid}, sort_keys=True))
+    restored = []
+    if TSGO_PATCH_PATH in missing and restore:
+        parent = src
+        for part in TSGO_PATCH_PATH.split("/")[:-1]:
+            parent = parent / part
+            if parent.is_symlink() or (parent.exists() and not parent.is_dir()):
+                raise ValueError("unsafe Linux157 patch payload parent: " + str(parent))
+        parent.mkdir(parents=True, exist_ok=True)
+        target = src / TSGO_PATCH_PATH
+        with target.open("xb") as output:
+            output.write(TSGO_PATCH)
+        source.hashes(src, {TSGO_PATCH_PATH: TSGO_PATCH_SHA256})
+        restored.append(TSGO_PATCH_PATH)
+    return {"checked": sorted(manifest["toolchain_inputs"]), "restored": restored,
+            "recoverable_missing": missing, "payload_sha256": TSGO_PATCH_SHA256}
+
+
 def prepare(src: Path, arch: str, repo: Path = source.ROOT) -> dict:
     if platform.system() != "Linux" or platform.machine() not in ("x86_64", "AMD64"):
         raise ValueError("Linux157 official host tools require Linux x64; ARM64 targets need a native runtime gate")
@@ -158,7 +253,7 @@ def prepare(src: Path, arch: str, repo: Path = source.ROOT) -> dict:
             if not binary.is_relative_to(src.resolve()) or file_hash(binary) != expected:
                 raise ValueError("changed Linux157 tool binary: " + relative)
         return receipt
-    source.hashes(src, manifest["toolchain_inputs"])
+    preflight = preflight_inputs(src, manifest)
     cache = src.parent / "download_cache" / "linux157-tools"
     cache.mkdir(parents=True, exist_ok=True)
     downloads = manifest["downloads"]
@@ -166,7 +261,7 @@ def prepare(src: Path, arch: str, repo: Path = source.ROOT) -> dict:
     bundles.append(install_bundle(src, cache, downloads["node"], "node", "third_party/node/linux"))
     bundles.append(install_bundle(src, cache, downloads["node_modules"], "node-modules", "third_party/node/node_modules"))
     bundles.append(install_bundle(src, cache, downloads["tsgo"], "tsgo", "third_party/typescript/linux-amd64/src",
-                                  strip="package/", patch=src / "third_party/typescript/linux-amd64/3pp/patches/typescript_native_preview.patch"))
+                                  strip="package/", patch=src / TSGO_PATCH_PATH))
     with tempfile.TemporaryDirectory(prefix="linux157-esbuild-", dir=cache) as temporary:
         stage = Path(temporary) / "esbuild"
         unpack(download(downloads["esbuild"], cache / "esbuild.tar.gz"), stage, "package/")
@@ -206,6 +301,7 @@ def prepare(src: Path, arch: str, repo: Path = source.ROOT) -> dict:
         binaries[binary.relative_to(src).as_posix()] = file_hash(binary)
     result = {"schema_version": 1, "recipe": source.recipe(repo), "target_arch": arch,
               "host_arch": "x64", "bundles": bundles, "commands": commands,
+              "preflight": preflight,
               "binaries": binaries, "runtime_verified": False, "upstream_cache": False}
     (src / ".chromix-linux157-toolchain.json").write_text(json.dumps(result, indent=2) + "\n")
     return result

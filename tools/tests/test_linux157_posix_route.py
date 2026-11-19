@@ -131,7 +131,7 @@ def test_recipe_binds_lite_payload_and_keeps_gitlink_override_separate():
     assert recipe['inputs'][source.LITE_PATH] == source.LITE_SHA256
     assert recipe['platform_core_gitlink'] != recipe['core_override']
     text = (ROOT / 'tools/linux157_source.py').read_text()
-    assert 'watched = set(load_manifest(repo)["final_outputs"]) | {lite_target}' in text
+    assert 'watched = set(load_manifest(repo)["final_outputs"]) | {lite_target, TSGO_PATCH_PATH}' in text
     assert 'get_platform(*paths, repo)' in text
     assert 'never rewrite the baseline gitlink' in text
 
@@ -147,6 +147,7 @@ def test_checkpoint_requires_exact_ready_selection_and_provenance(tmp_path):
     with mock.patch.object(source, 'validate_route', return_value=identity), \
             mock.patch.object(source, 'verify_receipt', return_value=receipt), \
             mock.patch.object(source, 'get_platform', return_value=identity) as origin, \
+            mock.patch.object(build.toolchain, 'preflight_inputs', return_value={'recoverable_missing': []}), \
             mock.patch.object(patch_selection, 'select', return_value=(selection, [])):
         result = source.checkpoint(tmp_path, 'arm64')
         assert result['runtime_verified'] is False
