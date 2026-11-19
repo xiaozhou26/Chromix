@@ -13,6 +13,7 @@ param(
   [switch]$FromArtifact,
   [switch]$FromSynced,
   [switch]$FreshNative,
+  [switch]$CrubitRecovery,
   [string]$MigrationReceipt = "",
   [string]$MigrationDonorRepo = "",
   [ValidateSet("stage7", "stage8", "stage8-api")] [string]$MigrationCheckpoint = "stage7",
@@ -25,6 +26,15 @@ param(
 $ErrorActionPreference = "Stop"
 if ($Arch -cnotin @("x64", "arm64")) { throw "Arch/CHROMIX_TARGET_ARCH must be x64 or arm64" }
 $Repo = (Resolve-Path "$PSScriptRoot\..\..").Path
+if ($CrubitRecovery) {
+  if (-not $FreshNative -or -not $FromSynced -or $FromArtifact -or $Arch -ne "x64") {
+    throw "Crubit recovery requires preserved x64 source, never first-source preparation"
+  }
+  $admission = Join-Path $env:RUNNER_TEMP ("crubit-continuation-" + [Guid]::NewGuid().ToString('N') + ".json")
+  python (Join-Path $Repo "tools\windows157_crubit_resume.py") --phase view --repo $Repo --workdir C:\c\chromix --report $admission
+  if ($LASTEXITCODE -ne 0) { throw "Fixed Crubit checkpoint admission failed" }
+  $Repo = "C:\c\windows157-crubit-recipe"
+}
 $Revisions = & "$PSScriptRoot\read-platform-pins.ps1" -Repo $Repo
 $BuildProfile = if ($env:CHROMIX_BUILD_PROFILE) { $env:CHROMIX_BUILD_PROFILE } else { "native" }
 if ($BuildProfile -notin @("native", "fast", "release")) { throw "invalid CHROMIX_BUILD_PROFILE" }
@@ -42,7 +52,8 @@ $Fresh157 = $FreshNative -and $Revisions.ChromiumVersion -eq "157.0.8103.78" -an
 $FreshSource = $Fresh156 -or $Fresh157
 if ($Fresh157 -and $env:GITHUB_ACTIONS -eq "true" -and
     ($env:GITHUB_EVENT_NAME -ne "workflow_dispatch" -or
-     $env:GITHUB_WORKFLOW_REF -notmatch '/[.]github/workflows/build-win-x64-157-fresh[.]yml@refs/heads/')) {
+     ($env:GITHUB_WORKFLOW_REF -notmatch '/[.]github/workflows/build-win-x64-157-fresh[.]yml@refs/heads/' -and
+      -not $CrubitRecovery))) {
   throw "Windows157 fresh requires its explicitly authorized workflow; historical fresh entries cannot change versions"
 }
 $FreshHelper = if ($Fresh157) { "tools\windows157_fresh.py" } else { "tools\windows156_fresh.py" }

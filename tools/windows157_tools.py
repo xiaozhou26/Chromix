@@ -25,6 +25,9 @@ CORE = "8c886dffc6ade39d8f7df5d64ace5a8824b455e1"
 WINDOWS = "20e9a348fc616bd73a366fbd5d8881613d6c5cb0"
 CRUBIT = "20dc640430bd60ff2f7f8dbf69c311c5f807adde"
 CRUBIT_ROOT = "third_party/rust-toolchain/crubit"
+HOST_TRIPLE = "x86_64-pc-windows-msvc"
+CRUBIT_BIN_MANIFEST = "cargo/cc_bindings_from_rs/cc_bindings_from_rs/Cargo.toml"
+CRUBIT_BIN_SHA256 = "b236a5902e6eada4433b14dfadd472e50f8a972166a5ea1286cf34a54ac1c543"
 CRUBIT_INPUTS = {
     "Cargo.toml": "6858ed7e72c061faaa0251205dd38068deedec0573398513a54e3d722d8b1615",
     "Cargo.lock": "c296d483ba3a46ab228d51af4445e84c02180128d88d8ac472e6fc055b9efbfc",
@@ -126,6 +129,42 @@ def restored_fingerprint(src: Path) -> dict:
     return result
 
 
+def cargo_environment(rust: Path, target: Path) -> dict:
+    environment = dict(os.environ)
+    for key in tuple(environment):
+        if key.startswith(("CARGO_BUILD_", "CARGO_TARGET_")) or key in (
+                "RUSTFLAGS", "CARGO_ENCODED_RUSTFLAGS", "RUSTC_WRAPPER", "RUSTC_WORKSPACE_WRAPPER"):
+            del environment[key]
+    environment.update(RUSTC=str(rust / "rustc.exe"), CARGO_HOME=str(target / "cargo_home"),
+                       RUSTFLAGS="-Ctarget-feature=+crt-static")
+    return environment
+
+
+def cargo_output(stdout: str, src: Path, target: Path) -> Path:
+    expected = target / HOST_TRIPLE / "release/cc_bindings_from_rs.exe"
+    manifest = src / CRUBIT_ROOT / "lib/third_party/crubit" / CRUBIT_BIN_MANIFEST
+    matches = []
+    finished = []
+    for line in stdout.splitlines():
+        message = json.loads(line)
+        if message.get("reason") == "build-finished":
+            finished.append(message.get("success"))
+        if message.get("reason") != "compiler-artifact" or message.get("target", {}).get("name") != "cc_bindings_from_rs":
+            continue
+        if (message["target"].get("kind") != ["bin"]
+                or message.get("profile", {}).get("test") is not False
+                or not message.get("executable") or not message.get("manifest_path")
+                or Path(message["manifest_path"]).resolve() != manifest.resolve()
+                or Path(message["executable"]).resolve() != expected.resolve()
+                or str(message["executable"]) not in message.get("filenames", [])):
+            raise ValueError("unverified Crubit Cargo compiler-artifact")
+        matches.append(expected)
+    if finished != [True] or len(matches) != 1:
+        raise ValueError("Crubit Cargo build lacks one authenticated host binary result")
+    pe_executable(expected)
+    return expected
+
+
 def prepare(src: Path, work: Path) -> None:
     metagen.validate_runtime(metagen.runtime_info())
     if metagen.source_contract(src, src / "out/Chromix", VERSION) != "x64":
@@ -150,14 +189,21 @@ def prepare(src: Path, work: Path) -> None:
         for name in ("cargo.exe", "rustc.exe"):
             pe_executable(rust / name)
         target = src / "out/crubit"
-        environment = dict(os.environ, RUSTC=str(rust / "rustc.exe"), CARGO_HOME=str(target / "cargo_home"),
-                           RUSTFLAGS="-Ctarget-feature=+crt-static")
-        subprocess.run([str(rust / "cargo.exe"), "build", "--release", "--locked", "-p", "cc_bindings_from_rs",
-                        "--bin", "cc_bindings_from_rs", "--manifest-path", str(root / "lib/third_party/crubit/Cargo.toml"),
-                        "--target-dir", str(target)], cwd=src, env=environment, check=True, timeout=3600)
-        pe_executable(target / "release/cc_bindings_from_rs.exe")
+        if sha(root / "lib/third_party/crubit" / CRUBIT_BIN_MANIFEST) != CRUBIT_BIN_SHA256:
+            raise ValueError("Crubit binary Cargo manifest SHA256 mismatch")
+        environment = cargo_environment(rust, target)
+        result = subprocess.run([str(rust / "cargo.exe"), "build", "--release", "--locked",
+                        "--target", HOST_TRIPLE, "--message-format=json-render-diagnostics",
+                        "-p", "cc_bindings_from_rs", "--bin", "cc_bindings_from_rs",
+                        "--manifest-path", str(root / "lib/third_party/crubit/Cargo.toml"),
+                        "--target-dir", str(target)], cwd=src, env=environment, check=True,
+                        stdout=subprocess.PIPE, text=True, timeout=3600)
+        built = cargo_output(result.stdout, src, target)
+        digest = sha(built)
         executable.parent.mkdir(parents=True, exist_ok=True)
-        shutil.copy2(target / "release/cc_bindings_from_rs.exe", executable)
+        shutil.copy2(built, executable)
+        if sha(executable) != digest or sha(built) != digest:
+            raise ValueError("Crubit compiler output changed during installation")
         for dll in rust.glob("*.dll"):
             metagen.validate_library(file(dll))
             shutil.copy2(dll, executable.parent / dll.name)
