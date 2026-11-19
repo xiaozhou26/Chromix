@@ -74,8 +74,8 @@ def test_locale_patch_chain_preserves_source_behavior(tmp_path, platform, substi
     replacements = {entry["original"]: entry for entry in review["overrides"]}
     selected = [replacements.get(entry["path"], entry) for entry in review["base_patches"]]
     selected += review["additions"][platform]
-    assert [entry["path"] for entry in selected[-2:]] == list(PATCHES)
-    assert len(selected) == {"linux": 228, "macos": 230, "windows": 234}[platform]
+    assert [entry["path"] for entry in selected[-3:-1]] == list(PATCHES)
+    assert len(selected) == {"linux": 229, "macos": 231, "windows": 235}[platform]
     listed = set(data["domain_lists"][platform].splitlines()) if substituted else set()
     rules = verify.arp._rules(data["domain_regex"].encode()) if substituted else []
     for name in (HEADER, SOURCE):
@@ -134,7 +134,7 @@ def test_historical_patch_bytes_and_157_only_selection():
         for patch in entry["additions"]:
             assert selection.digest((ROOT / patch["path"]).read_bytes()) == patch["sha256"]
         identity, patches = selection.select(ROOT, platform)
-        assert [name for name, _ in patches][-2:] == list(PATCHES)
+        assert [name for name, _ in patches][-3:-1] == list(PATCHES)
         assert len(patches) == selection.PATCH_COUNTS157[platform]
         assert identity["selection"]["version"] == selection.VERSION157
     assert "0236-timezone" not in (ROOT / selection.MANIFEST156).read_text()

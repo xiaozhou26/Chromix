@@ -5,14 +5,14 @@
   "core_tag_object": "33eece1eb0b5286bf71e732fbbad7a46faface5a",
   "core_peeled_commit": "8c886dffc6ade39d8f7df5d64ace5a8824b455e1",
   "chromium_commit": "4b3d0dabb8250b6f152d2d85d79e7706e309d087",
-  "scope": "Append exact157 locale API repairs 0236/0237 to every platform; preserve all prior root224, 156, 157 overrides and additions byte-for-byte. Update selector fixed hashes and source replay evidence; donor migration remains separate.",
+  "scope": "Append exact157 direct base/version.h include repair0238 to every platform; preserve root224,156 and all prior157 patch bytes, including0236/0237. Update fixed selector hashes and replay evidence; latest228-to229 donor migration remains separate.",
   "verification_limits": [
     "Full Linux downstream platform sequence is replayed, nine patches covering all36 target files. Core replay is the exact intersecting-file subset, not all827 core sections.",
-    "Linux x64 complete timezone_controller.cc, default_icu_locale.cc and icu4c_tag_converter.cc compile with the restored official commands; relocatable link resolves new setter/converter symbols. No full browser link or runtime execution.",
+    "Linux x64 complete timezone_controller.cc, default_icu_locale.cc and icu4c_tag_converter.cc compile with the restored official commands; relocatable link resolves new setter/converter symbols. No full browser link or runtime execution. Complete user_agent_utils.cc additionally verified before/after0238 with exact run44630942999 donor command.",
     "x64/arm64 share source patches; this is not six native builds.",
     "Linux uses authorized156 platform configuration baseline plus explicit157 core override and pinned downstream recipe, not an official portablelinux157 tag.",
     "No core-only diagnostic cases count toward success.",
-    "Windows/macOS preserve previous source scope and overlay intersections; ten exact157 API/initialization source files added for locale review.",
+    "Windows/macOS preserve previous source scope and overlay intersections; ten exact157 API/initialization source files added for locale review. Two exact157 Version declaration headers added for0238 audit.",
     "No push or workflow dispatch."
   ],
   "final_overrides": {
@@ -59,9 +59,10 @@
     "0078": "Retain qualified CanvasRenderingContext::ValidateRectForCanvas and original RecordBridgeOp calls.",
     "0149": "Retain157 Skia includes and add SkBitmap; clipped opaque copy unchanged.",
     "0150": "Keep upstream strengthened CHECK(thread_checker_.CalledOnValidThread()); do not regress to156 DCHECK. All added bounds/stride checks identical.",
-    "all": "Every existing override/addition preserves the previously reviewed bytes and added-line multiset; only new0236/0237 adapt the removed locale setter.",
+    "all": "All previously reviewed patch bytes are unchanged. New0238 adds only the direct base/version.h include; no source behavior changes.",
     "0236": "Forward-declare and friend only blink::TimeZoneController in DefaultIcuLocaleSetterKey. Constructor remains private; existing authorized callers unchanged.",
-    "0237": "Keep first-language parsing, ICU validity guards and initialization order. Convert validated ICU locale through IcuLocaleConverter and call SetDefaultIcuLocale to update both holder and ICU. No DevTools override acquisition or timezone policy changes."
+    "0237": "Keep first-language parsing, ICU validity guards and initialization order. Convert validated ICU locale through IcuLocaleConverter and call SetDefaultIcuLocale to update both holder and ICU. No DevTools override acquisition or timezone policy changes.",
+    "0238": "user_agent_utils.cc constructs base::Version but its transitive version_info.h only forward-declares the class. Include its defining base/version.h directly; preserve all UA normalization and override behavior."
   },
   "upstream_duplicate_checks": {
     "managed_profile": "Exact157 core still removes managed_profile_creation_controller sources;0225 remains needed. Verified exactly one final .cc entry.",
@@ -71,9 +72,9 @@
     "canvas": "Upstream157 initialization CHECK and shuffle call retained; no duplicate helper definition introduced."
   },
   "platform_patch_counts": {
-    "linux": 228,
-    "macos": 230,
-    "windows": 234
+    "linux": 229,
+    "macos": 231,
+    "windows": 235
   },
   "additions": {
     "linux": [
@@ -98,6 +99,11 @@
         "path": "patches/chromium157-additions/0237-timezone-default-locale-api.patch",
         "sha256": "e2ea0e503ad413a5a7ded2e06d3f9d49d48dc56b78d48937ad275e03aa3a9d1e",
         "kind": "locale-api-compatibility"
+      },
+      {
+        "path": "patches/chromium157-additions/0238-user-agent-version-header.patch",
+        "sha256": "dd22d5decfdb675477ce8d1379b7b1eaf2153f5cd0fb6dbb2de47135fc8a9561",
+        "kind": "direct-header-compatibility"
       }
     ],
     "windows": [
@@ -158,6 +164,11 @@
         "path": "patches/chromium157-additions/0237-timezone-default-locale-api.patch",
         "sha256": "e2ea0e503ad413a5a7ded2e06d3f9d49d48dc56b78d48937ad275e03aa3a9d1e",
         "kind": "locale-api-compatibility"
+      },
+      {
+        "path": "patches/chromium157-additions/0238-user-agent-version-header.patch",
+        "sha256": "dd22d5decfdb675477ce8d1379b7b1eaf2153f5cd0fb6dbb2de47135fc8a9561",
+        "kind": "direct-header-compatibility"
       }
     ],
     "macos": [
@@ -194,6 +205,11 @@
         "path": "patches/chromium157-additions/0237-timezone-default-locale-api.patch",
         "sha256": "e2ea0e503ad413a5a7ded2e06d3f9d49d48dc56b78d48937ad275e03aa3a9d1e",
         "kind": "locale-api-compatibility"
+      },
+      {
+        "path": "patches/chromium157-additions/0238-user-agent-version-header.patch",
+        "sha256": "dd22d5decfdb675477ce8d1379b7b1eaf2153f5cd0fb6dbb2de47135fc8a9561",
+        "kind": "direct-header-compatibility"
       }
     ]
   },
@@ -238,34 +254,38 @@
     "recipe_sha256": "42d788d91c0ec2345c253044665af7f623501a73c8bdb627a94d1739790aeb11",
     "qualification": "Authorized old platform baseline plus exact157 core override and all nine downstream replacements; not an official portablelinux157 tag."
   },
-  "review_manifest_sha256": "f1afcd08e19590b9740316f9ff69f6347c786be9a7117c06c9ce9236757b38e8",
+  "review_manifest_sha256": "5a2676ef54db9a90064fb45018d2c4420ed142a0ff9a694f1a45d1165cc15bf3",
   "linux_full_platform_coverage": {
-    "raw_source_files": 202,
+    "raw_source_files": 204,
     "platform_files": 36,
     "core_sections": 43,
     "platform_patches": 9,
     "platform_sections": 36,
-    "chromix_patches": 228,
-    "combined_roundtrip_patches": 237,
+    "chromix_patches": 229,
+    "combined_roundtrip_patches": 238,
     "domain_modes": [
       "raw",
       "substituted"
     ],
     "post_core_preimages": "Every36 platform source bytes must equal independently audited fixture before any replacement.",
-    "sequential_checks": "Each of9 exact pre/post SHA256 maps plus final_outputs checked; all9 platform reverse/forward and combined237 reverse/forward verified.",
+    "sequential_checks": "Each of9 exact pre/post SHA256 maps plus final_outputs checked; all9 platform reverse/forward and combined238 reverse/forward verified.",
     "policy": "Retains157 native WebBundle/IFT and Rust/Crubit assertions, Node version check and native TypeScript recipe. Full GN/link compatibility remains unverified."
   },
   "regression_tests": {
-    "passed": 627,
-    "skipped": 2,
-    "native_separate_passed": 1,
-    "skip_reason": "Optional native tree absent in host regression; native test separately passed in restored Linux tree. Chromium155 macOS was not supported by the historical baseline.",
+    "passed": 723,
+    "skipped": 10,
+    "groups": {
+      "157_selector_locale_and_ua": "333 passed, 2 skipped",
+      "historical156_old_locale_and_ua_behavior": "390 passed, 8 skipped"
+    },
+    "skip_reason": "Optional native/source/donor inputs and historical unsupported macOS155 cases; native UA is verified separately on the actual donor.",
     "negative_checks": [
-      "modified downstream platform patch rejected",
-      "reordered downstream recipe rejected by audit binding",
-      "old226 donor selection cannot silently admit228 patches",
-      "platform-specific addition replacement rejected even after reauthentication"
-    ]
+      "old228 patch prefix and bytes preserved",
+      "old226-to228 locale migration rejects229 target",
+      "platform-specific addition replacement rejected after reauthentication",
+      "UA behavior bytes unchanged after removing only new direct include"
+    ],
+    "native_separate_passed": 1
   },
   "locale_api_evidence": {
     "baseline_commit": "38f35ce29d6e1d02dde1d041f5a745d84cfbba9b",
@@ -335,5 +355,104 @@
     },
     "api_call_audit": "All added i18n/ICU locale calls found in selected157 patches are covered by the complete timezone object and real-header LanguageTagConverter/ICU probe; no additional removed locale API found.",
     "runtime_verified": false
+  },
+  "ua_header_evidence": {
+    "baseline_commit": "35e2db1b0687a4525017f5ec8fd3820823aef8ff",
+    "source_run": 44630942999,
+    "artifact_id": 14584551831,
+    "artifact_sha256": "e4120c00740d549f4111f959f3ad0e6b85d0d2ff3cf78c790ec65f75372b3d5b",
+    "compile_command_sha256": "9cb9b9a0a57f5c513842f069658456ff8cc694c2e37454c3d46a0abdac79aa0b",
+    "files": {
+      "linux": {
+        "components/embedder_support/user_agent_utils.cc": {
+          "pre_sha256": "0d8fa98a2620ebee4be45eb9490b71fa0863fbeef5eefb0d2463c5dc18b9bdce",
+          "post_sha256": "e57250a03c34a9abc8b63f74bb85cf82d5b3ec8c5c9402aa4a1145f639ca5b87"
+        }
+      },
+      "macos": {
+        "components/embedder_support/user_agent_utils.cc": {
+          "pre_sha256": "0d8fa98a2620ebee4be45eb9490b71fa0863fbeef5eefb0d2463c5dc18b9bdce",
+          "post_sha256": "e57250a03c34a9abc8b63f74bb85cf82d5b3ec8c5c9402aa4a1145f639ca5b87"
+        }
+      },
+      "windows": {
+        "components/embedder_support/user_agent_utils.cc": {
+          "pre_sha256": "0d8fa98a2620ebee4be45eb9490b71fa0863fbeef5eefb0d2463c5dc18b9bdce",
+          "post_sha256": "e57250a03c34a9abc8b63f74bb85cf82d5b3ec8c5c9402aa4a1145f639ca5b87"
+        }
+      }
+    },
+    "counted_identity_sha256": {
+      "linux": "307897eab990521fd7539af5b35cd3ff97a15ec01e8897cba6d7b9b5ca6df15e",
+      "macos": "9fe1aad51d9b61fa48724f323c18e5a4cb3cdbc1b753beba41512da003ce5c8c",
+      "windows": "811f02bda2ecc849241f9867abb1363ebb0123d46ccd588be14a196d664eedae"
+    },
+    "version_call_audit": {
+      "linux": [
+        {
+          "patch": "patches/chromium157/0004-components-embedder_support-user_agent_utils-cc.patch",
+          "targets": [
+            "components/embedder_support/user_agent_utils.cc"
+          ],
+          "added_uses": [
+            "    base::Version parsed_version(override_version);",
+            "  const base::Version parsed(version);",
+            "    base::Version version(GetEffectiveUserAgentFullVersion());",
+            "            ? full : base::NumberToString(base::Version(full).components()[0]);"
+          ]
+        }
+      ],
+      "windows": [
+        {
+          "patch": "patches/chromium157/0004-components-embedder_support-user_agent_utils-cc.patch",
+          "targets": [
+            "components/embedder_support/user_agent_utils.cc"
+          ],
+          "added_uses": [
+            "    base::Version parsed_version(override_version);",
+            "  const base::Version parsed(version);",
+            "    base::Version version(GetEffectiveUserAgentFullVersion());",
+            "            ? full : base::NumberToString(base::Version(full).components()[0]);"
+          ]
+        }
+      ],
+      "macos": [
+        {
+          "patch": "patches/chromium157/0004-components-embedder_support-user_agent_utils-cc.patch",
+          "targets": [
+            "components/embedder_support/user_agent_utils.cc"
+          ],
+          "added_uses": [
+            "    base::Version parsed_version(override_version);",
+            "  const base::Version parsed(version);",
+            "    base::Version version(GetEffectiveUserAgentFullVersion());",
+            "            ? full : base::NumberToString(base::Version(full).components()[0]);"
+          ]
+        }
+      ]
+    },
+    "runtime_verified": false,
+    "native_compile": {
+      "before_returncode": 1,
+      "after_returncode": 0,
+      "compile_command_sha256": "9cb9b9a0a57f5c513842f069658456ff8cc694c2e37454c3d46a0abdac79aa0b",
+      "object_sha256": "bde9625e20114364df227bb0ad6e968db36763821f19a2c711ad56560f5ffad5",
+      "object_size": 124760,
+      "files": {
+        "components/embedder_support/user_agent_utils.cc": "e57250a03c34a9abc8b63f74bb85cf82d5b3ec8c5c9402aa4a1145f639ca5b87",
+        "base/version.h": "fe050e9b11620e79c89c435b44cf99a8c0873c1632a24153774c01b611feab06",
+        "out/Chromix/args.gn": "2368fb9594bcebf1f5f74ffcd49bb0684d6e479d4e5f010a46f47f555b588027",
+        "out/Chromix/build.ninja": "33c17bf17684286919900be9416aceda0b222e803e70cc70ac9e1b7d2d6f3761",
+        "third_party/llvm-build/Release+Asserts/bin/clang": "8091a95554f24a2affa32c80e884c3d36960c5d971560d3410391ffc36af19a7"
+      },
+      "allowed_command_changes": [
+        "-o output path",
+        "-MF depfile path"
+      ],
+      "added_include_flags": []
+    },
+    "before_diagnostics": "../../components/embedder_support/user_agent_utils.cc:166:19: error: variable has incomplete type 'base::Version'\n  166 |     base::Version parsed_version(override_version);\n      |                   ^\n../../base/version_info/version_info.h:18:7: note: forward declaration of 'base::Version'\n   18 | class Version;\n      |       ^\n../../components/embedder_support/user_agent_utils.cc:181:23: error: variable has incomplete type 'const base::Version'\n  181 |   const base::Version parsed(version);\n      |                       ^\n../../base/version_info/version_info.h:18:7: note: forward declaration of 'base::Version'\n   18 | class Version;\n      |       ^\n../../components/embedder_support/user_agent_utils.cc:197:19: error: variable has incomplete type 'base::Version'\n  197 |     base::Version version(GetEffectiveUserAgentFullVersion());\n      |                   ^\n../../base/version_info/version_info.h:18:7: note: forward declaration of 'base::Version'\n   18 | class Version;\n      |       ^\n../../components/embedder_support/user_agent_utils.cc:259:43: error: 'base::Version' is an incomplete type\n  259 |             ? full : base::NumberToString(base::Version(full).components()[0]);\n      |                                           ^\n../../base/version_info/version_info.h:18:7: note: forward declaration of 'base::Version'\n   18 | class Version;\n      |       ^\n../../components/embedder_support/user_agent_utils.cc:259:62: error: member access into incomplete type 'base::Version'\n  259 |             ? full : base::NumberToString(base::Version(full).components()[0]);\n      |                                                              ^\n../../base/version_info/version_info.h:18:7: note: forward declaration of 'base::Version'\n   18 | class Version;\n      |       ^\n5 errors generated.\n",
+    "native_pytest": "1 passed, 8 deselected",
+    "scope": "Complete user_agent_utils.cc compiled twice with the latest donor command, failing before and passing after0238; only output/depfile redirected. No added -I or fake headers; no full browser link/runtime claim."
   }
 }

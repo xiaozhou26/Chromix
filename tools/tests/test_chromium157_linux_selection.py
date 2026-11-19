@@ -70,7 +70,7 @@ def test_integrated_linux_selection_matches_real_recipe_and_parser():
     identity, patches = selection.select(ROOT, "linux")
     assert pins["ChromiumVersion"] == selection.VERSION157
     assert pins["UngoogledLinuxVersion"] == selection.VERSION156 + "-1"
-    assert len(patches) == 228
+    assert len(patches) == 229
     assert identity["selection"]["downstream"]["recipe"] == linux157_source.recipe(ROOT)
     assert identity["selection"]["core_gitlink"] == selection.CORE156
     assert identity["selection"]["effective_core_commit"] == selection.CORE157
@@ -135,7 +135,7 @@ def test_gn_recovery_binds_exact_new_inputs_and_preserves_donor_patch_identity(l
         with pytest.raises(ValueError, match="delta"):
             checkpoint.validate_recipe_delta(donor["source_receipt"]["recipe"], DOWNSTREAM["recipe"])
         original = donor["source_receipt"]["chromix_selection"]
-        assert original["patches"] == selected["patches"][:-2]
+        assert original["patches"] == selected["patches"][:-3]
         with pytest.raises(ValueError, match="cannot change the 226 patches"):
             checkpoint.compatible_selection(original, selected)
         assert delta["gn_args"]["identities"][arch]["original_sha256"] == donor["files"]["src/out/Chromix/args.gn"]
@@ -195,7 +195,7 @@ def test_libclang_scope_and_latest_postgn_donors_are_exact(linux_repo):
         with pytest.raises(ValueError, match="only"):
             postgn.delta(donor["source_receipt"]["recipe"], DOWNSTREAM["recipe"])
         original = donor["source_receipt"]["chromix_selection"]
-        assert original["patches"] == selected["patches"][:-2]
+        assert original["patches"] == selected["patches"][:-3]
         with pytest.raises(ValueError, match="cannot change the 226 patches"):
             prior.compatible_selection(original, selected)
         assert delta["donors"][arch]["artifact"] == donor["artifact"]
@@ -243,10 +243,10 @@ def test_locale_review_preserves_old_prefix_and_rejects_generic_restore(linux_re
     delta = DOWNSTREAM["validation"]["recipe_integration"]["locale_recovery"]
     old = donor["source_receipt"]["chromix_selection"]
     locale.recipe_delta(donor["source_receipt"]["recipe"], DOWNSTREAM["recipe"])
-    assert selected["patches"][:-2] == old["patches"]
-    assert selected["series_sha256"] == delta["series_sha256"]["linux"]
+    assert selected["patches"][:-3] == old["patches"]
+    assert selected["series_sha256"] != delta["series_sha256"]["linux"]
     assert selected["series_sha256"] != old["series_sha256"]
-    assert selected["patches"][-2:] == [
+    assert selected["patches"][-3:-1] == [
         {"path": pin["patch"], "sha256": pin["sha256"]}
         for pin in donor["migration"]["additions"]]
     assert delta["source_migration"] == donor["migration"]
@@ -254,13 +254,14 @@ def test_locale_review_preserves_old_prefix_and_rejects_generic_restore(linux_re
         prior.compatible_selection(old, selected)
     with pytest.raises(ValueError, match="only"):
         postgn.delta(donor["source_receipt"]["recipe"], DOWNSTREAM["recipe"])
-    assert len(raw) == 228
+    assert len(raw) == 229
 
 
-def test_actual_locale_preflight_accepts_only_real_new_target():
+def test_old_locale_preflight_rejects_unmigrated_ua_addition():
     from tools import linux157_locale as locale
     selected, raw = selection.select(ROOT, "linux")
-    assert locale.validate_additions(selected, raw, locale.load(ROOT)) == locale.load(ROOT)["migration"]["additions"]
+    with pytest.raises(ValueError, match="require unchanged old226 plus exact two additions"):
+        locale.validate_additions(selected, raw, locale.load(ROOT))
 
 
 @pytest.mark.parametrize("mutation", ["source-target", "patch-sha", "donor", "old-series", "extra-helper"])
@@ -290,14 +291,15 @@ def test_real_selector_authenticates_only_exact_locale_profiles(arch, run, stage
     from tools import linux157_locale as locale
     selected, raw = selection.select(ROOT, "linux")
     donor = locale.load(ROOT, arch)
-    assert locale.validate_additions(selected, raw, donor, ROOT) == donor["migration"]["additions"]
+    with pytest.raises(ValueError, match="require unchanged old226 plus exact two additions"):
+        locale.validate_additions(selected, raw, donor, ROOT)
     locale.recipe_delta(donor["source_receipt"]["recipe"], DOWNSTREAM["recipe"])
     expected = locale.expected(arch, ROOT)
     assert (expected["run_id"], expected["stage"], expected["artifacts"][0]["id"]) == (run, stage, artifact)
     assert locale.load(ROOT) == locale.load(ROOT, "x64")
     if arch == "arm64":
         assert donor["continuation_stage"] == 3
-        assert selected["patches"][:-2] == donor["source_receipt"]["chromix_selection"]["patches"]
+        assert selected["patches"][:-3] == donor["source_receipt"]["chromix_selection"]["patches"]
 
 
 @pytest.mark.parametrize("arch", ["aarch64", "ARM64", "x86", "linux", "", None])
@@ -337,7 +339,7 @@ def test_reviewed_activation_preserves_real_origin_and_effective_core(linux_repo
     activate(linux_repo, monkeypatch)
     identity, patches = selection.select(linux_repo, "linux")
     chosen = identity["selection"]
-    assert len(patches) == 228
+    assert len(patches) == 229
     assert chosen["core_commit"] == chosen["effective_core_commit"] == selection.CORE157
     assert chosen["core_gitlink"] == selection.CORE156 != selection.CORE157
     assert chosen["platform_version"] == "156.0.8078.79-1"

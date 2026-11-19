@@ -112,6 +112,7 @@ def invariants(src, platform):
     png = text("third_party/blink/renderer/core/html/canvas/canvas_async_blob_creator.cc")
     assert "mime_type_ == kMimeTypePng &&" in png
     ua = text("components/embedder_support/user_agent_utils.cc")
+    assert ua.count('#include "base/version.h"') == 1
     assert ua.count("std::string GetUserAgentInternal() {") == 1
     assert ua.count("std::string BuildUserAgentFromProduct(const std::string& product) {") == 1
     if platform == "linux":
@@ -181,6 +182,12 @@ def verify():
                 "patches/chromium157-additions/0237-timezone-default-locale-api.patch",
             }
             continue
+        if entry.get("kind") == "direct-header-compatibility":
+            assert entry["path"] == "patches/chromium157-additions/0238-user-agent-version-header.patch"
+            assert added(raw) == Counter({'+#include "base/version.h"': 1})
+            assert not any(line.startswith("-") and not line.startswith("---")
+                           for line in raw.decode().splitlines())
+            continue
         predecessor = (ROOT / entry["predecessor"]).read_bytes()
         assert digest(predecessor) == entry["predecessor_sha256"]
         assert added(predecessor) == added(raw), entry["path"]
@@ -215,7 +222,7 @@ def verify():
                           "domain_substituted": substituted, "status": "failed",
                           "overlay_mode": "downstream-nine-patch-recipe" if platform == "linux" else "actual-platform",
                           "build_verified": False, "runtime_verified": False,
-                          "expected_patch_count": {"linux": 228, "windows": 234, "macos": 230}[platform],
+                          "expected_patch_count": {"linux": 229, "windows": 235, "macos": 231}[platform],
                           "patches": [], "predecessors": []}
                 results.append(result)
                 try:
@@ -316,7 +323,7 @@ def verify():
                     result.update(status="verified", patch_count=len(prepared),
                                   roundtrip={"status": "verified", "method": "reverse-forward-exact-bytes",
                                              "patch_count": len(roundtrip_patches),
-                                             "scope": "platform9-plus-chromix228" if platform == "linux" else "chromix-stack",
+                                             "scope": "platform9-plus-chromix229" if platform == "linux" else "chromix-stack",
                                              "initial": roundtrip_initial, "final": final})
                     for key in ("stage", "current_patch", "current_file"):
                         del result[key]

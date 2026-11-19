@@ -1188,6 +1188,11 @@
         "path": "patches/chromium157-additions/0237-timezone-default-locale-api.patch",
         "sha256": "e2ea0e503ad413a5a7ded2e06d3f9d49d48dc56b78d48937ad275e03aa3a9d1e",
         "kind": "locale-api-compatibility"
+      },
+      {
+        "path": "patches/chromium157-additions/0238-user-agent-version-header.patch",
+        "sha256": "dd22d5decfdb675477ce8d1379b7b1eaf2153f5cd0fb6dbb2de47135fc8a9561",
+        "kind": "direct-header-compatibility"
       }
     ],
     "windows": [
@@ -1248,6 +1253,11 @@
         "path": "patches/chromium157-additions/0237-timezone-default-locale-api.patch",
         "sha256": "e2ea0e503ad413a5a7ded2e06d3f9d49d48dc56b78d48937ad275e03aa3a9d1e",
         "kind": "locale-api-compatibility"
+      },
+      {
+        "path": "patches/chromium157-additions/0238-user-agent-version-header.patch",
+        "sha256": "dd22d5decfdb675477ce8d1379b7b1eaf2153f5cd0fb6dbb2de47135fc8a9561",
+        "kind": "direct-header-compatibility"
       }
     ],
     "macos": [
@@ -1284,12 +1294,17 @@
         "path": "patches/chromium157-additions/0237-timezone-default-locale-api.patch",
         "sha256": "e2ea0e503ad413a5a7ded2e06d3f9d49d48dc56b78d48937ad275e03aa3a9d1e",
         "kind": "locale-api-compatibility"
+      },
+      {
+        "path": "patches/chromium157-additions/0238-user-agent-version-header.patch",
+        "sha256": "dd22d5decfdb675477ce8d1379b7b1eaf2153f5cd0fb6dbb2de47135fc8a9561",
+        "kind": "direct-header-compatibility"
       }
     ]
   },
   "fixture": {
     "path": "tools/tests/fixtures/chromium157_patch_sources.json.gz",
-    "sha256": "50dee2d547ae0049cd4653ef16502e0d5bd60fed00c5938252564cd7660acd31"
+    "sha256": "6687b61d4b1b4de11df44013e8eb70872d80f0051644bab577ce299ac826e999"
   },
   "historical_files": [
     {

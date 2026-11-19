@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
   "status": "verified",
-  "manifest_sha256": "f1afcd08e19590b9740316f9ff69f6347c786be9a7117c06c9ce9236757b38e8",
+  "manifest_sha256": "5a2676ef54db9a90064fb45018d2c4420ed142a0ff9a694f1a45d1165cc15bf3",
   "qualification": "Exact-source structural replay; all nine Linux downstream platform replacements and complete Chromix stacks. Core is intersecting-file subset only. No compilation/runtime, full GN/link or production selector/helper integration is claimed.",
   "historical_root224_and156_bytes_unchanged": true,
   "added_lines_preserved": [
@@ -47,7 +47,7 @@
     "patches/chromium157-additions/0234-macos-empty-angle-native-default.patch",
     "patches/chromium157-additions/0235-macos-hevc-recorder-mime.patch"
   ],
-  "source_file_count": 202,
+  "source_file_count": 204,
   "overlay_coverage": {
     "core": {
       "omitted": [
@@ -6957,7 +6957,7 @@
       "overlay_mode": "downstream-nine-patch-recipe",
       "build_verified": false,
       "runtime_verified": false,
-      "expected_patch_count": 228,
+      "expected_patch_count": 229,
       "patches": [
         {
           "path": "patches/0001-base-BUILD-gn.patch",
@@ -9466,6 +9466,17 @@
           "postimages": {
             "third_party/blink/renderer/core/timezone/timezone_controller.cc": "9896389d368df46e5fb27b18f2a18783e177eb454bc9d3fe18bf10fa09b10374"
           }
+        },
+        {
+          "path": "patches/chromium157-additions/0238-user-agent-version-header.patch",
+          "sha256": "dd22d5decfdb675477ce8d1379b7b1eaf2153f5cd0fb6dbb2de47135fc8a9561",
+          "status": "applied",
+          "preimages": {
+            "components/embedder_support/user_agent_utils.cc": "0d8fa98a2620ebee4be45eb9490b71fa0863fbeef5eefb0d2463c5dc18b9bdce"
+          },
+          "postimages": {
+            "components/embedder_support/user_agent_utils.cc": "e57250a03c34a9abc8b63f74bb85cf82d5b3ec8c5c9402aa4a1145f639ca5b87"
+          }
         }
       ],
       "predecessors": [
@@ -9980,12 +9991,12 @@
           "sha256": "d338adf0c712319a3b8efa666f57d378c6cef3bb31a027681a87e97694346417"
         }
       },
-      "patch_count": 228,
+      "patch_count": 229,
       "roundtrip": {
         "status": "verified",
         "method": "reverse-forward-exact-bytes",
-        "patch_count": 237,
-        "scope": "platform9-plus-chromix228",
+        "patch_count": 238,
+        "scope": "platform9-plus-chromix229",
         "initial": {
           "base/BUILD.gn": "2619e16bd05092597a911f7b0f9e51c3363d7a7267527d79150165fb873aa9aa",
           "base/i18n/icubridge/default_icu_locale.h": "f415c2354ec91b6a69bdda447a6fc160d744cf1cfa2ed15b82d759c30080c04b",
@@ -10221,7 +10232,7 @@
           "components/BUILD.gn": "1093640ec8acdd06e3f51c94c73d3741d7f880847cb9a03f7c622d8d46ca9d0b",
           "components/component_updater/installer_policies/BUILD.gn": "faee4a7e1c95129623d80ebdee1e87d25cdb20944963055b36cfe70d84486edc",
           "components/content_settings/core/browser/cookie_settings.cc": "a6b7dfa433807fa8154ad708fe7bbd08e226bb5a5f2664d049f38c171ad73e86",
-          "components/embedder_support/user_agent_utils.cc": "0d8fa98a2620ebee4be45eb9490b71fa0863fbeef5eefb0d2463c5dc18b9bdce",
+          "components/embedder_support/user_agent_utils.cc": "e57250a03c34a9abc8b63f74bb85cf82d5b3ec8c5c9402aa4a1145f639ca5b87",
           "components/ungoogled/BUILD.gn": "0c0bb5fa28b0e302871167bb2ac6f5d8efd6a9459c059ce88d2062f96bea0c3e",
           "components/ungoogled/farble_seed.cc": "501bb3df649b26ec8894d721b721f32d65a99713c69836ec26b9c54ddda91d21",
           "components/ungoogled/farble_seed.h": "fdf00efd9473692b3bf0a487f1a1f1b6000f3cea5794c8ad8cb21e274e433cb4",
@@ -10411,7 +10422,7 @@
       "overlay_mode": "downstream-nine-patch-recipe",
       "build_verified": false,
       "runtime_verified": false,
-      "expected_patch_count": 228,
+      "expected_patch_count": 229,
       "patches": [
         {
           "path": "patches/0001-base-BUILD-gn.patch",
@@ -12920,6 +12931,17 @@
           "postimages": {
             "third_party/blink/renderer/core/timezone/timezone_controller.cc": "9896389d368df46e5fb27b18f2a18783e177eb454bc9d3fe18bf10fa09b10374"
           }
+        },
+        {
+          "path": "patches/chromium157-additions/0238-user-agent-version-header.patch",
+          "sha256": "dd22d5decfdb675477ce8d1379b7b1eaf2153f5cd0fb6dbb2de47135fc8a9561",
+          "status": "applied",
+          "preimages": {
+            "components/embedder_support/user_agent_utils.cc": "0d8fa98a2620ebee4be45eb9490b71fa0863fbeef5eefb0d2463c5dc18b9bdce"
+          },
+          "postimages": {
+            "components/embedder_support/user_agent_utils.cc": "e57250a03c34a9abc8b63f74bb85cf82d5b3ec8c5c9402aa4a1145f639ca5b87"
+          }
         }
       ],
       "predecessors": [
@@ -13434,12 +13456,12 @@
           "sha256": "d338adf0c712319a3b8efa666f57d378c6cef3bb31a027681a87e97694346417"
         }
       },
-      "patch_count": 228,
+      "patch_count": 229,
       "roundtrip": {
         "status": "verified",
         "method": "reverse-forward-exact-bytes",
-        "patch_count": 237,
-        "scope": "platform9-plus-chromix228",
+        "patch_count": 238,
+        "scope": "platform9-plus-chromix229",
         "initial": {
           "base/BUILD.gn": "a4a7c9b2663f2fe6fe529329fb60b523e73ace09363b7b4c4e27b196eb2a5b0d",
           "base/i18n/icubridge/default_icu_locale.h": "f415c2354ec91b6a69bdda447a6fc160d744cf1cfa2ed15b82d759c30080c04b",
@@ -13675,7 +13697,7 @@
           "components/BUILD.gn": "05c1a915ffaad451687e613020c4454ee12c9993d396028b44ad369abf072fab",
           "components/component_updater/installer_policies/BUILD.gn": "faee4a7e1c95129623d80ebdee1e87d25cdb20944963055b36cfe70d84486edc",
           "components/content_settings/core/browser/cookie_settings.cc": "a6b7dfa433807fa8154ad708fe7bbd08e226bb5a5f2664d049f38c171ad73e86",
-          "components/embedder_support/user_agent_utils.cc": "0d8fa98a2620ebee4be45eb9490b71fa0863fbeef5eefb0d2463c5dc18b9bdce",
+          "components/embedder_support/user_agent_utils.cc": "e57250a03c34a9abc8b63f74bb85cf82d5b3ec8c5c9402aa4a1145f639ca5b87",
           "components/ungoogled/BUILD.gn": "0c0bb5fa28b0e302871167bb2ac6f5d8efd6a9459c059ce88d2062f96bea0c3e",
           "components/ungoogled/farble_seed.cc": "501bb3df649b26ec8894d721b721f32d65a99713c69836ec26b9c54ddda91d21",
           "components/ungoogled/farble_seed.h": "fdf00efd9473692b3bf0a487f1a1f1b6000f3cea5794c8ad8cb21e274e433cb4",
@@ -13865,7 +13887,7 @@
       "overlay_mode": "actual-platform",
       "build_verified": false,
       "runtime_verified": false,
-      "expected_patch_count": 234,
+      "expected_patch_count": 235,
       "patches": [
         {
           "path": "patches/0001-base-BUILD-gn.patch",
@@ -16440,6 +16462,17 @@
           "postimages": {
             "third_party/blink/renderer/core/timezone/timezone_controller.cc": "7e5a1ff00ee73a0fa4ba5b3ef1fda2ec9e11dd703ca253692e931b5105d2ef84"
           }
+        },
+        {
+          "path": "patches/chromium157-additions/0238-user-agent-version-header.patch",
+          "sha256": "dd22d5decfdb675477ce8d1379b7b1eaf2153f5cd0fb6dbb2de47135fc8a9561",
+          "status": "applied",
+          "preimages": {
+            "components/embedder_support/user_agent_utils.cc": "0d8fa98a2620ebee4be45eb9490b71fa0863fbeef5eefb0d2463c5dc18b9bdce"
+          },
+          "postimages": {
+            "components/embedder_support/user_agent_utils.cc": "e57250a03c34a9abc8b63f74bb85cf82d5b3ec8c5c9402aa4a1145f639ca5b87"
+          }
         }
       ],
       "predecessors": [
@@ -16588,11 +16621,11 @@
           "target": "content/browser/renderer_host/render_process_host_impl.cc"
         }
       ],
-      "patch_count": 234,
+      "patch_count": 235,
       "roundtrip": {
         "status": "verified",
         "method": "reverse-forward-exact-bytes",
-        "patch_count": 234,
+        "patch_count": 235,
         "scope": "chromix-stack",
         "initial": {
           "base/BUILD.gn": "2619e16bd05092597a911f7b0f9e51c3363d7a7267527d79150165fb873aa9aa",
@@ -16779,7 +16812,7 @@
           "chrome/browser/component_updater/widevine_cdm_component_installer.cc": "62869c5366c8b3384a827bb3c9f81b12a79f69c77dccf22ffd47813bfcd71da6",
           "chrome/browser/enterprise/BUILD.gn": "e29618e07d6f85a6c5676a2c8456b1a05c1d59ee6d2634474bcfc77a1711ddef",
           "components/content_settings/core/browser/cookie_settings.cc": "a6b7dfa433807fa8154ad708fe7bbd08e226bb5a5f2664d049f38c171ad73e86",
-          "components/embedder_support/user_agent_utils.cc": "0d8fa98a2620ebee4be45eb9490b71fa0863fbeef5eefb0d2463c5dc18b9bdce",
+          "components/embedder_support/user_agent_utils.cc": "e57250a03c34a9abc8b63f74bb85cf82d5b3ec8c5c9402aa4a1145f639ca5b87",
           "components/ungoogled/BUILD.gn": "0c0bb5fa28b0e302871167bb2ac6f5d8efd6a9459c059ce88d2062f96bea0c3e",
           "components/ungoogled/farble_seed.cc": "501bb3df649b26ec8894d721b721f32d65a99713c69836ec26b9c54ddda91d21",
           "components/ungoogled/farble_seed.h": "fdf00efd9473692b3bf0a487f1a1f1b6000f3cea5794c8ad8cb21e274e433cb4",
@@ -16955,7 +16988,7 @@
       "overlay_mode": "actual-platform",
       "build_verified": false,
       "runtime_verified": false,
-      "expected_patch_count": 234,
+      "expected_patch_count": 235,
       "patches": [
         {
           "path": "patches/0001-base-BUILD-gn.patch",
@@ -19530,6 +19563,17 @@
           "postimages": {
             "third_party/blink/renderer/core/timezone/timezone_controller.cc": "7e5a1ff00ee73a0fa4ba5b3ef1fda2ec9e11dd703ca253692e931b5105d2ef84"
           }
+        },
+        {
+          "path": "patches/chromium157-additions/0238-user-agent-version-header.patch",
+          "sha256": "dd22d5decfdb675477ce8d1379b7b1eaf2153f5cd0fb6dbb2de47135fc8a9561",
+          "status": "applied",
+          "preimages": {
+            "components/embedder_support/user_agent_utils.cc": "0d8fa98a2620ebee4be45eb9490b71fa0863fbeef5eefb0d2463c5dc18b9bdce"
+          },
+          "postimages": {
+            "components/embedder_support/user_agent_utils.cc": "e57250a03c34a9abc8b63f74bb85cf82d5b3ec8c5c9402aa4a1145f639ca5b87"
+          }
         }
       ],
       "predecessors": [
@@ -19678,11 +19722,11 @@
           "target": "content/browser/renderer_host/render_process_host_impl.cc"
         }
       ],
-      "patch_count": 234,
+      "patch_count": 235,
       "roundtrip": {
         "status": "verified",
         "method": "reverse-forward-exact-bytes",
-        "patch_count": 234,
+        "patch_count": 235,
         "scope": "chromix-stack",
         "initial": {
           "base/BUILD.gn": "a4a7c9b2663f2fe6fe529329fb60b523e73ace09363b7b4c4e27b196eb2a5b0d",
@@ -19869,7 +19913,7 @@
           "chrome/browser/component_updater/widevine_cdm_component_installer.cc": "62869c5366c8b3384a827bb3c9f81b12a79f69c77dccf22ffd47813bfcd71da6",
           "chrome/browser/enterprise/BUILD.gn": "e29618e07d6f85a6c5676a2c8456b1a05c1d59ee6d2634474bcfc77a1711ddef",
           "components/content_settings/core/browser/cookie_settings.cc": "a6b7dfa433807fa8154ad708fe7bbd08e226bb5a5f2664d049f38c171ad73e86",
-          "components/embedder_support/user_agent_utils.cc": "0d8fa98a2620ebee4be45eb9490b71fa0863fbeef5eefb0d2463c5dc18b9bdce",
+          "components/embedder_support/user_agent_utils.cc": "e57250a03c34a9abc8b63f74bb85cf82d5b3ec8c5c9402aa4a1145f639ca5b87",
           "components/ungoogled/BUILD.gn": "0c0bb5fa28b0e302871167bb2ac6f5d8efd6a9459c059ce88d2062f96bea0c3e",
           "components/ungoogled/farble_seed.cc": "501bb3df649b26ec8894d721b721f32d65a99713c69836ec26b9c54ddda91d21",
           "components/ungoogled/farble_seed.h": "fdf00efd9473692b3bf0a487f1a1f1b6000f3cea5794c8ad8cb21e274e433cb4",
@@ -20045,7 +20089,7 @@
       "overlay_mode": "actual-platform",
       "build_verified": false,
       "runtime_verified": false,
-      "expected_patch_count": 230,
+      "expected_patch_count": 231,
       "patches": [
         {
           "path": "patches/0001-base-BUILD-gn.patch",
@@ -22576,6 +22620,17 @@
           "postimages": {
             "third_party/blink/renderer/core/timezone/timezone_controller.cc": "9896389d368df46e5fb27b18f2a18783e177eb454bc9d3fe18bf10fa09b10374"
           }
+        },
+        {
+          "path": "patches/chromium157-additions/0238-user-agent-version-header.patch",
+          "sha256": "dd22d5decfdb675477ce8d1379b7b1eaf2153f5cd0fb6dbb2de47135fc8a9561",
+          "status": "applied",
+          "preimages": {
+            "components/embedder_support/user_agent_utils.cc": "0d8fa98a2620ebee4be45eb9490b71fa0863fbeef5eefb0d2463c5dc18b9bdce"
+          },
+          "postimages": {
+            "components/embedder_support/user_agent_utils.cc": "e57250a03c34a9abc8b63f74bb85cf82d5b3ec8c5c9402aa4a1145f639ca5b87"
+          }
         }
       ],
       "predecessors": [
@@ -22724,11 +22779,11 @@
           "target": "content/browser/renderer_host/render_process_host_impl.cc"
         }
       ],
-      "patch_count": 230,
+      "patch_count": 231,
       "roundtrip": {
         "status": "verified",
         "method": "reverse-forward-exact-bytes",
-        "patch_count": 230,
+        "patch_count": 231,
         "scope": "chromix-stack",
         "initial": {
           "base/BUILD.gn": "2619e16bd05092597a911f7b0f9e51c3363d7a7267527d79150165fb873aa9aa",
@@ -22913,7 +22968,7 @@
           "chrome/browser/component_updater/widevine_cdm_component_installer.cc": "62869c5366c8b3384a827bb3c9f81b12a79f69c77dccf22ffd47813bfcd71da6",
           "chrome/browser/enterprise/BUILD.gn": "e29618e07d6f85a6c5676a2c8456b1a05c1d59ee6d2634474bcfc77a1711ddef",
           "components/content_settings/core/browser/cookie_settings.cc": "a6b7dfa433807fa8154ad708fe7bbd08e226bb5a5f2664d049f38c171ad73e86",
-          "components/embedder_support/user_agent_utils.cc": "0d8fa98a2620ebee4be45eb9490b71fa0863fbeef5eefb0d2463c5dc18b9bdce",
+          "components/embedder_support/user_agent_utils.cc": "e57250a03c34a9abc8b63f74bb85cf82d5b3ec8c5c9402aa4a1145f639ca5b87",
           "components/ungoogled/BUILD.gn": "0c0bb5fa28b0e302871167bb2ac6f5d8efd6a9459c059ce88d2062f96bea0c3e",
           "components/ungoogled/farble_seed.cc": "501bb3df649b26ec8894d721b721f32d65a99713c69836ec26b9c54ddda91d21",
           "components/ungoogled/farble_seed.h": "fdf00efd9473692b3bf0a487f1a1f1b6000f3cea5794c8ad8cb21e274e433cb4",
@@ -23087,7 +23142,7 @@
       "overlay_mode": "actual-platform",
       "build_verified": false,
       "runtime_verified": false,
-      "expected_patch_count": 230,
+      "expected_patch_count": 231,
       "patches": [
         {
           "path": "patches/0001-base-BUILD-gn.patch",
@@ -25618,6 +25673,17 @@
           "postimages": {
             "third_party/blink/renderer/core/timezone/timezone_controller.cc": "9896389d368df46e5fb27b18f2a18783e177eb454bc9d3fe18bf10fa09b10374"
           }
+        },
+        {
+          "path": "patches/chromium157-additions/0238-user-agent-version-header.patch",
+          "sha256": "dd22d5decfdb675477ce8d1379b7b1eaf2153f5cd0fb6dbb2de47135fc8a9561",
+          "status": "applied",
+          "preimages": {
+            "components/embedder_support/user_agent_utils.cc": "0d8fa98a2620ebee4be45eb9490b71fa0863fbeef5eefb0d2463c5dc18b9bdce"
+          },
+          "postimages": {
+            "components/embedder_support/user_agent_utils.cc": "e57250a03c34a9abc8b63f74bb85cf82d5b3ec8c5c9402aa4a1145f639ca5b87"
+          }
         }
       ],
       "predecessors": [
@@ -25766,11 +25832,11 @@
           "target": "content/browser/renderer_host/render_process_host_impl.cc"
         }
       ],
-      "patch_count": 230,
+      "patch_count": 231,
       "roundtrip": {
         "status": "verified",
         "method": "reverse-forward-exact-bytes",
-        "patch_count": 230,
+        "patch_count": 231,
         "scope": "chromix-stack",
         "initial": {
           "base/BUILD.gn": "a4a7c9b2663f2fe6fe529329fb60b523e73ace09363b7b4c4e27b196eb2a5b0d",
@@ -25955,7 +26021,7 @@
           "chrome/browser/component_updater/widevine_cdm_component_installer.cc": "62869c5366c8b3384a827bb3c9f81b12a79f69c77dccf22ffd47813bfcd71da6",
           "chrome/browser/enterprise/BUILD.gn": "e29618e07d6f85a6c5676a2c8456b1a05c1d59ee6d2634474bcfc77a1711ddef",
           "components/content_settings/core/browser/cookie_settings.cc": "a6b7dfa433807fa8154ad708fe7bbd08e226bb5a5f2664d049f38c171ad73e86",
-          "components/embedder_support/user_agent_utils.cc": "0d8fa98a2620ebee4be45eb9490b71fa0863fbeef5eefb0d2463c5dc18b9bdce",
+          "components/embedder_support/user_agent_utils.cc": "e57250a03c34a9abc8b63f74bb85cf82d5b3ec8c5c9402aa4a1145f639ca5b87",
           "components/ungoogled/BUILD.gn": "0c0bb5fa28b0e302871167bb2ac6f5d8efd6a9459c059ce88d2062f96bea0c3e",
           "components/ungoogled/farble_seed.cc": "501bb3df649b26ec8894d721b721f32d65a99713c69836ec26b9c54ddda91d21",
           "components/ungoogled/farble_seed.h": "fdf00efd9473692b3bf0a487f1a1f1b6000f3cea5794c8ad8cb21e274e433cb4",

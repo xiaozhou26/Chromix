@@ -369,17 +369,17 @@ def test_real_agent_additions_are_read_only_and_full228_replay(tmp_path):
     for p,state in patch_states.items():assert (p.read_bytes(),p.stat().st_mtime_ns)==state
 
 
-def test_real_integrated_selector_has_new_effective_series_but_same_root():
-    # Use the real selector and reviewed repository, never an injected selection.
-    repo = Path(os.environ.get('CHROMIX_LOCALE_CANONICAL_REPO', ROOT))
-    selected, raw = locale.patch_selection.select(repo, 'linux')
-    manifest = locale.load(repo)
+def test_real_integrated_selector_requires_separate_ua_migration():
+    selected, raw = locale.patch_selection.select(ROOT, 'linux')
+    manifest = locale.load(ROOT)
     old = manifest['source_receipt']['chromix_selection']
     assert selected['series_sha256'] != old['series_sha256']
     assert selected['selection']['base_series_sha256'] == old['selection']['base_series_sha256']
-    locale.validate_additions(selected, raw, manifest, repo)
-    assert selected['patches'][:-2] == old['patches']
-    assert [name for name, _ in raw[-2:]] == [p['patch'] for p in manifest['migration']['additions']]
+    with pytest.raises(ValueError, match='require unchanged old226 plus exact two additions'):
+        locale.validate_additions(selected, raw, manifest, ROOT)
+    assert selected['patches'][:-3] == old['patches']
+    assert [name for name, _ in raw[-3:-1]] == [p['patch'] for p in manifest['migration']['additions']]
+    assert raw[-1][0] == 'patches/chromium157-additions/0238-user-agent-version-header.patch'
 
 
 def test_real_selector_onephase_private_donor_migration():

@@ -252,7 +252,7 @@ def test_linux_records_real_156_gitlink_but_fails_closed(repo157, monkeypatch):
     assert linux["version"] == selection.VERSION156 + "-1"
     assert linux["commit"] == selection.PLATFORM156_COMMITS["linux"]
     assert linux["core_gitlink"] == selection.CORE156 != selection.CORE157
-    assert len(linux["additions"]) + 224 == 228
+    assert len(linux["additions"]) + 224 == 229
     set_platform_pins(repo, "linux", selection.VERSION157, selection.CORE157, linux["commit"])
     historical = subprocess.check_output(["git", "-C", str(ROOT), "show",
         "63dd0fc5934b7c27d4a1e3439a024a96ad96bba0:" + selection.REVIEW157])

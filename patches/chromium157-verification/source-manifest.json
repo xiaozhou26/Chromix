@@ -1418,6 +1418,20 @@
       "revision": "4b3d0dabb8250b6f152d2d85d79e7706e309d087",
       "sha256": "5ef8d145ac8779a0357457972844be1112d4e8676acadf0ab52d9fb527748c50",
       "url": "https://chromium.googlesource.com/chromium/src/+/4b3d0dabb8250b6f152d2d85d79e7706e309d087/third_party/blink/renderer/core/inspector/locale_controller.h?format=TEXT"
+    },
+    "base/version.h": {
+      "bytes": 2748,
+      "git_blob": "dc1e3c73d4e4b0ecd196c8fa98a7692e450532c5",
+      "revision": "4b3d0dabb8250b6f152d2d85d79e7706e309d087",
+      "sha256": "fe050e9b11620e79c89c435b44cf99a8c0873c1632a24153774c01b611feab06",
+      "url": "https://chromium.googlesource.com/chromium/src/+/4b3d0dabb8250b6f152d2d85d79e7706e309d087/base/version.h?format=TEXT"
+    },
+    "base/version_info/version_info.h": {
+      "bytes": 2820,
+      "git_blob": "3d83451f3ac8a16b93bec51f2df2d0fc54222006",
+      "revision": "4b3d0dabb8250b6f152d2d85d79e7706e309d087",
+      "sha256": "e4e286ddc4b778a11161381eb60be02ba6bb049566d7023852a6620816010959",
+      "url": "https://chromium.googlesource.com/chromium/src/+/4b3d0dabb8250b6f152d2d85d79e7706e309d087/base/version_info/version_info.h?format=TEXT"
     }
   },
   "linux_downstream": {
@@ -8387,6 +8401,8 @@
       "base/i18n/rtl.h",
       "base/i18n/tag_converters.cc",
       "base/i18n/tag_converters.h",
+      "base/version.h",
+      "base/version_info/version_info.h",
       "build/toolchain/linux/BUILD.gn",
       "chrome/VERSION",
       "chrome/app/chrome_main.cc",
@@ -8590,6 +8606,8 @@
       "base/i18n/rtl.h",
       "base/i18n/tag_converters.cc",
       "base/i18n/tag_converters.h",
+      "base/version.h",
+      "base/version_info/version_info.h",
       "chrome/VERSION",
       "chrome/app/chrome_main.cc",
       "chrome/browser/chrome_browser_main.cc",
@@ -8759,6 +8777,8 @@
       "base/i18n/rtl.h",
       "base/i18n/tag_converters.cc",
       "base/i18n/tag_converters.h",
+      "base/version.h",
+      "base/version_info/version_info.h",
       "chrome/VERSION",
       "chrome/app/chrome_main.cc",
       "chrome/browser/chrome_browser_main.cc",
