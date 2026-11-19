@@ -1138,7 +1138,97 @@
           "path": "patches/chromium157-additions/0227-opaque-png-export-consistency.patch",
           "sha256": "4c048a50930c3541a3bb9e4442ad7f18e94c04ebccf86c0cfbfc286b15a70751"
         }
-      ]
+      ],
+      "downstream": {
+        "recipe": {
+          "kind": "linux157-downstream-fresh",
+          "chromium_version": "157.0.8103.78",
+          "core_commit": "8c886dffc6ade39d8f7df5d64ace5a8824b455e1",
+          "platform_commit": "6f0aa178c2394fc0a177edc0fd64e41f402a0418",
+          "platform_ref": "156.0.8078.79-1",
+          "platform_core_gitlink": "28a211ab4ab6b83d919966a4f58a6df23cf4fb29",
+          "core_override": "8c886dffc6ade39d8f7df5d64ace5a8824b455e1",
+          "official_platform_tag": null,
+          "inputs": {
+            "build/linux/157.0.8103.78/source.json": "5ad5898d9442cc31b6ed571702f9e88510e9eea144ed544f60187e66e5c948d8",
+            "tools/linux157_source.py": "342b7c98f191280bc23e9c988b1ffe1f39cdc514f460f0b186ab026bb2d4a9d9",
+            "tools/linux157_toolchain.py": "0d5d2bfeaccfea5cf75f874e0f52831773f77419e89ec45b0a36d1cfee324d04",
+            "tools/linux157_build.py": "048e644354c26812c5b0db71e272c53066eb6f1b7d19d68821bb4329cfdb6503",
+            "build/linux/157.0.8103.78/patches/use-oauth2-client-switches-as-default.patch": "9564c36390f1ca1d08ffe42a81a1088aaba7eec8249ba6ff66a85f0592a282ef",
+            "build/linux/157.0.8103.78/patches/fix-compiling-on-arm64.patch": "a2932c2ea04e4822e5d5c3e94f39b779134990c9d417a707a1652702239705a6",
+            "build/linux/157.0.8103.78/patches/chromium-138-drop-nodejs-version-check.patch": "48172278ee8bf7c00402c2db3ef37b5514a65fa3403b9b0a028d63ca317a409f",
+            "build/linux/157.0.8103.78/patches/chromium-153-revert-hermetic-python.patch": "f224514a21dcd53f444398055a24a46e43af71e71dc6292dd86c0d9c09001d88",
+            "build/linux/157.0.8103.78/patches/chromium-154-use-system-tsc.patch": "23fcfaeb3a719ec355a38a28e632b846cc7a24993851b82d4c142fd332b46e88",
+            "build/linux/157.0.8103.78/patches/chromium-155-use-system-esbuild.patch": "3cb7ea96ca9dfde0d038c5f97739eec27eb092ff6d4bf3d77c3c8d896980d834",
+            "build/linux/157.0.8103.78/patches/chromium-156-remove-private-verification-tokens.patch": "e95993ab3fd758b71aabbe329a9b6a50360082c70c6610749f76e66f3a37a1b3",
+            "build/linux/157.0.8103.78/patches/chromium-156-revert-crubit-changes.patch": "70c63c2d028c5b4069c16b13152e97ce42785752cf9837cc63bbc0243d3e20d0",
+            "build/linux/157.0.8103.78/patches/chromium-156-revert-use-typescript-go.patch": "e1f21b386321371bf76fc0dd5d14c5f142f54f495685e6e7b67313a1d3a0ce6f"
+          },
+          "sha256": "42d788d91c0ec2345c253044665af7f623501a73c8bdb627a94d1739790aeb11"
+        },
+        "source_manifest": {
+          "path": "build/linux/157.0.8103.78/source.json",
+          "sha256": "5ad5898d9442cc31b6ed571702f9e88510e9eea144ed544f60187e66e5c948d8"
+        },
+        "upstream_series_sha256": "e3b2768f491e88ebf4edda2a3b02ba9c629ef060a0d4f6ee87eb66472dba6706",
+        "platform_overrides": [
+          {
+            "upstream_path": "ungoogled-chromium/portablelinux/use-oauth2-client-switches-as-default.patch",
+            "upstream_sha256": "9343afa1a4308a7cfb3317229f5aff7778688debcc03c4a74a85908aa1d0cc3a",
+            "path": "build/linux/157.0.8103.78/patches/use-oauth2-client-switches-as-default.patch",
+            "sha256": "9564c36390f1ca1d08ffe42a81a1088aaba7eec8249ba6ff66a85f0592a282ef"
+          },
+          {
+            "upstream_path": "ungoogled-chromium/portablelinux/fix-compiling-on-arm64.patch",
+            "upstream_sha256": "4a848abdacb9b677b3d309a8a8b6597250aeaf4c1b4a009f16faf490e55103ad",
+            "path": "build/linux/157.0.8103.78/patches/fix-compiling-on-arm64.patch",
+            "sha256": "a2932c2ea04e4822e5d5c3e94f39b779134990c9d417a707a1652702239705a6"
+          },
+          {
+            "upstream_path": "ungoogled-chromium/portablelinux/chromium-138-drop-nodejs-version-check.patch",
+            "upstream_sha256": "aa515c022a4f3dfb6d9d7558da84721c8f95ed2b58986a08c696f5e8c4a33c4c",
+            "path": "build/linux/157.0.8103.78/patches/chromium-138-drop-nodejs-version-check.patch",
+            "sha256": "48172278ee8bf7c00402c2db3ef37b5514a65fa3403b9b0a028d63ca317a409f"
+          },
+          {
+            "upstream_path": "ungoogled-chromium/portablelinux/chromium-153-revert-hermetic-python.patch",
+            "upstream_sha256": "d80c0f8f4addb386f94a1b46276bf2129ce9a39390471f3b66f46d544d73eb3c",
+            "path": "build/linux/157.0.8103.78/patches/chromium-153-revert-hermetic-python.patch",
+            "sha256": "f224514a21dcd53f444398055a24a46e43af71e71dc6292dd86c0d9c09001d88"
+          },
+          {
+            "upstream_path": "ungoogled-chromium/portablelinux/chromium-154-use-system-tsc.patch",
+            "upstream_sha256": "d061cf4aeba21b1d2edabc28afd38106246b99aa5ec699e1b9ee5ca8b76d8a23",
+            "path": "build/linux/157.0.8103.78/patches/chromium-154-use-system-tsc.patch",
+            "sha256": "23fcfaeb3a719ec355a38a28e632b846cc7a24993851b82d4c142fd332b46e88"
+          },
+          {
+            "upstream_path": "ungoogled-chromium/portablelinux/chromium-155-use-system-esbuild.patch",
+            "upstream_sha256": "2967a232275b453f6ab28f63f9a5d79327e37c01f27bbe790bea0d254850824f",
+            "path": "build/linux/157.0.8103.78/patches/chromium-155-use-system-esbuild.patch",
+            "sha256": "3cb7ea96ca9dfde0d038c5f97739eec27eb092ff6d4bf3d77c3c8d896980d834"
+          },
+          {
+            "upstream_path": "ungoogled-chromium/portablelinux/chromium-156-remove-private-verification-tokens.patch",
+            "upstream_sha256": "b45161f3dcf8fa9fdd6c02609e7e73e7104babfc25a083354f8d7b10e5ca8cfa",
+            "path": "build/linux/157.0.8103.78/patches/chromium-156-remove-private-verification-tokens.patch",
+            "sha256": "e95993ab3fd758b71aabbe329a9b6a50360082c70c6610749f76e66f3a37a1b3"
+          },
+          {
+            "upstream_path": "ungoogled-chromium/portablelinux/chromium-156-revert-crubit-changes.patch",
+            "upstream_sha256": "9ef88b2efc6ef0ee0d593c02a459919d2da7e73c4975eda9020a2c5161572e95",
+            "path": "build/linux/157.0.8103.78/patches/chromium-156-revert-crubit-changes.patch",
+            "sha256": "70c63c2d028c5b4069c16b13152e97ce42785752cf9837cc63bbc0243d3e20d0"
+          },
+          {
+            "upstream_path": "ungoogled-chromium/portablelinux/chromium-156-revert-use-typescript-go.patch",
+            "upstream_sha256": "18ca8dc99ec5124803ca255fdcf408e34e22c95d2b576fc57c87e7a443cfed7a",
+            "path": "build/linux/157.0.8103.78/patches/chromium-156-revert-use-typescript-go.patch",
+            "sha256": "e1f21b386321371bf76fc0dd5d14c5f142f54f495685e6e7b67313a1d3a0ce6f"
+          }
+        ],
+        "platform_override_group_sha256": "de72dde4ab150cd1f8805ec1f36d2f0eff4fd5509d0835584ef8e5145ff7d22b"
+      }
     }
   }
 }

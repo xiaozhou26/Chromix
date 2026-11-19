@@ -145,9 +145,13 @@ PATCH_COUNTS157 = {"windows": 232, "macos": 228, "linux": 226}
 OVERRIDE157_ROOT = "patches/chromium157"
 ADDITIONS157_ROOT = "patches/chromium157-additions"
 MANIFEST157 = "build/patch-selection-157.json"
-MANIFEST157_SHA256 = "8e6f9ed5b7c8a3c21b5d6f6e4c4092211108f04ebccca23c5e6f329ea99187c7"
+MANIFEST157_SHA256 = "a47dd9da8c0e6f822c477615794fe4ccc11510bc6944352f3f164388b9d6d551"
 REVIEW157 = "patches/chromium157/manifest.json"
 REVIEW157_SHA256 = "41cb3473ae99ea99156996c4cc8fb1f23e3952c9c631d183bf4e8e98a5964695"
+
+LINUX157_DOWNSTREAM_SHA256 = "6919b745bcb4cc9a7943032ab54696a1193f7e74f204ef98222cec82d4215778"
+# Activation requires the final patch review, not just successful platform preparation.
+LINUX157_VALIDATED_REVIEW_SHA256: str | None = None
 
 
 MACOS152_VERSION = "152.0.7977.82"
@@ -434,6 +438,69 @@ def select156(repo: Path, platform: str, series: bytes, names: list[str]) -> tup
             [entry["path"] for entry in additions], selection)
 
 
+def canonical_digest(value: object) -> str:
+    return digest(json.dumps(value, sort_keys=True, separators=(",", ":")).encode())
+
+
+def validate_linux157_downstream(value: object) -> dict:
+    """Bind the complete fresh recipe and ordered nine-patch platform replacement group."""
+    if (not isinstance(value, dict) or set(value) != {
+            "recipe", "source_manifest", "upstream_series_sha256", "platform_overrides",
+            "platform_override_group_sha256"}
+            or canonical_digest(value) != LINUX157_DOWNSTREAM_SHA256):
+        raise SelectionError("unreviewed Linux157 downstream recipe or platform override group")
+    recipe = value["recipe"]
+    if (recipe["kind"] != "linux157-downstream-fresh"
+            or recipe["chromium_version"] != VERSION157
+            or recipe["core_commit"] != CORE157 or recipe["core_override"] != CORE157
+            or recipe["platform_commit"] != PLATFORM157_COMMITS["linux"]
+            or recipe["platform_ref"] != PLATFORM157_VERSIONS["linux"]
+            or recipe["platform_core_gitlink"] != CORE156
+            or recipe["official_platform_tag"] is not None
+            or digest(json.dumps(recipe["inputs"], sort_keys=True).encode()) != recipe["sha256"]
+            or len(value["platform_overrides"]) != 9
+            or canonical_digest(value["platform_overrides"]) != value["platform_override_group_sha256"]):
+        raise SelectionError("invalid Linux157 origin/effective core composition")
+    return value
+
+
+def authenticate_linux157_downstream(repo: Path, downstream: dict, review: dict) -> None:
+    """Authenticate data only; never execute recipe helpers from the selected repository."""
+    validate_linux157_downstream(downstream)
+    if (LINUX157_VALIDATED_REVIEW_SHA256 is None
+            or LINUX157_VALIDATED_REVIEW_SHA256 != REVIEW157_SHA256):
+        raise SelectionError("Chromium 157 Linux blocked: final downstream patch review is pending")
+    expected_review = {
+        "status": "validated", "scope": "source-replay",
+        "recipe_sha256": downstream["recipe"]["sha256"],
+        "source_manifest": downstream["source_manifest"],
+        "platform_override_group_sha256": downstream["platform_override_group_sha256"],
+        "patch_count": 226, "architectures": ["x64", "arm64"],
+    }
+    if (review.get("linux_downstream_validation") != expected_review
+            or PLATFORM157_STATUS["linux"] != "reviewed-downstream-patches"):
+        raise SelectionError("Chromium 157 Linux blocked: review does not validate the exact downstream stack")
+    recipe = downstream["recipe"]
+    for name, expected in recipe["inputs"].items():
+        if digest(read(repo, name)) != expected:
+            raise SelectionError("changed Linux157 recipe input: " + name)
+    source = json.loads(read(repo, downstream["source_manifest"]["path"]))
+    for field in ("chromium_version", "core_commit", "platform_commit", "platform_ref",
+                  "platform_core_gitlink", "official_platform_tag"):
+        if source[field] != recipe[field]:
+            raise SelectionError("Linux157 source manifest disagrees with recipe identity")
+    group = [{key: patch[key] for key in ("upstream_path", "upstream_sha256", "path", "sha256")}
+             for patch in source["patches"]]
+    if (group != downstream["platform_overrides"]
+            or source["upstream_series_sha256"] != downstream["upstream_series_sha256"]):
+        raise SelectionError("Linux157 source manifest platform coverage/order mismatch")
+    root = "build/linux/157.0.8103.78/patches"
+    directory = repo / root
+    if (directory.is_symlink() or not directory.is_dir()
+            or {path.name for path in directory.iterdir()} != {Path(patch["path"]).name for patch in group}):
+        raise SelectionError("partial or unexpected Linux157 platform override inventory")
+
+
 def validate_manifest157(manifest: object) -> dict:
     """Validate isolated 157 schema, retaining the blocked Linux platform's real identity."""
     def fields(value, expected, label):
@@ -483,7 +550,10 @@ def validate_manifest157(manifest: object) -> dict:
     shared = {}
     for platform, commit in PLATFORM157_COMMITS.items():
         entry = manifest["platforms"][platform]
-        fields(entry, ("version", "commit", "core_gitlink", "selection_status", "additions"), platform)
+        fields(entry, ("version", "commit", "core_gitlink", "selection_status", "additions",
+                       *(("downstream",) if platform == "linux" else ())), platform)
+        if platform == "linux":
+            validate_linux157_downstream(entry["downstream"])
         if (entry["version"] != PLATFORM157_VERSIONS[platform] or entry["commit"] != commit
                 or entry["core_gitlink"] != PLATFORM157_GITLINKS[platform]
                 or entry["selection_status"] != PLATFORM157_STATUS[platform]):
@@ -504,8 +574,8 @@ def select157(repo: Path, platform: str, series: bytes, names: list[str]) -> tup
     """Authenticate the fixed manifest before consuming any of its patch paths."""
     if platform not in PLATFORM157_COMMITS:
         raise SelectionError("Chromium 157 requires an explicit supported platform")
-    if platform == "linux":
-        raise SelectionError("Chromium 157 Linux blocked: full downstream platform overlay is not reviewed")
+    if platform == "linux" and LINUX157_VALIDATED_REVIEW_SHA256 is None:
+        raise SelectionError("Chromium 157 Linux blocked: final downstream patch review is pending")
     if MANIFEST157_SHA256 is None:
         raise SelectionError("Chromium 157 requires a reviewed pinned manifest SHA256")
     raw = read(repo, MANIFEST157)
@@ -546,6 +616,8 @@ def select157(repo: Path, platform: str, series: bytes, names: list[str]) -> tup
     review_identity = {"path": REVIEW157, "sha256": REVIEW157_SHA256}
     inventory(OVERRIDE157_ROOT, [*manifest["overrides"], review_identity])
     review = json.loads(read(repo, REVIEW157))
+    if platform == "linux":
+        authenticate_linux157_downstream(repo, manifest["platforms"]["linux"]["downstream"], review)
     if (manifest["base_patches"] != review["base_patches"]
             or manifest["overrides"] != [
                 {key: entry[key] for key in ("path", "original_sha256", "sha256")}
@@ -576,6 +648,10 @@ def select157(repo: Path, platform: str, series: bytes, names: list[str]) -> tup
         "additions": {"schema_version": 1, "kind": manifest["kind"],
                       "manifest": manifest_identity, "patches": additions},
     }
+    if platform == "linux":
+        selection["downstream"] = manifest["platforms"]["linux"]["downstream"]
+        selection["platform_version"] = PLATFORM157_VERSIONS["linux"]
+        selection["effective_core_commit"] = CORE157
     return ([overrides.get(Path(name).name, name) for name in names],
             [entry["path"] for entry in additions], selection)
 
@@ -681,8 +757,8 @@ def select(repo: Path, platform: str | None = None, *, src: Path | None = None,
     elif version == VERSION157:
         if platform not in PLATFORM157_COMMITS:
             raise SelectionError("Chromium 157 overrides require Windows, Linux, or macOS")
-        if platform == "linux":
-            raise SelectionError("Chromium 157 Linux blocked: full downstream platform overlay is not reviewed")
+        if platform == "linux" and LINUX157_VALIDATED_REVIEW_SHA256 is None:
+            raise SelectionError("Chromium 157 Linux blocked: final downstream patch review is pending")
         prefix = "Ungoogled" + PLATFORMS[platform]
         if (pins["UngoogledCommit"] != CORE157 or pins["UngoogledVersion"] != VERSION157 + "-1"
                 or pins[prefix + "Commit"] != PLATFORM157_COMMITS[platform]
