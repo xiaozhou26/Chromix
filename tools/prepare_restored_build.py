@@ -994,7 +994,7 @@ def _prepare(workdir: Path, platform: str, arch: str, *, phase: str, repo: Path,
         data["operation"] = "inspect_linux_typescript"
         generators["typescript"] = prepare_linux_typescript(src, host_arch=inspection["host"]["arch"], repo=repo)
     if platform == "macos" and load_pins(repo, platform)["ChromiumVersion"] in (
-            "154.0.8037.97", "155.0.8059.39", "156.0.8078.79"):
+            "154.0.8037.97", "155.0.8059.39", "156.0.8078.79", "157.0.8103.78"):
         try:
             from . import macos_restored_generators as mac154
         except ImportError:

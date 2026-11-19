@@ -336,7 +336,7 @@ if __name__ == '__main__':
 
 
 def wrapper_fixture(src, version="152.0.7977.82"):
-    data = (PINNED_154_BINDGEN_WRAPPER if version in ("154.0.8037.97", "155.0.8059.39", "156.0.8078.79")
+    data = (PINNED_154_BINDGEN_WRAPPER if version in ("154.0.8037.97", "155.0.8059.39", "156.0.8078.79", "157.0.8103.78")
             else PINNED_BINDGEN_WRAPPER).encode()
     assert hashlib.sha256(data).hexdigest() == runtime.BINDGEN_REPAIRS[version]["original_sha256"]
     path = src / runtime.BINDGEN_WRAPPER
@@ -838,11 +838,11 @@ class MacOSRuntimeTest(unittest.TestCase):
                 mock.patch("tools.macos_restored_generators.prepare",
                            side_effect=lambda *a, **kw: {"probe": {}} if kw.get("repair") else {}), \
                 mock.patch.object(prepare.subprocess, "run", side_effect=run):
-            initial = prepare.prepare(fixture.work, "macos", "arm64", phase="inspect")
+            initial = fixture.prepare(fixture.work, "macos", "arm64", phase="inspect")
             runtime.prepare_runtime_loader(fixture.src, "arm64")
             runtime.repair_bindgen_wrapper(fixture.src, "arm64")
-            finished = prepare.prepare(fixture.work, "macos", "arm64")
-            resumed = prepare.prepare(fixture.work, "macos", "arm64")
+            finished = fixture.prepare(fixture.work, "macos", "arm64")
+            resumed = fixture.prepare(fixture.work, "macos", "arm64")
         self.assertEqual(hashlib.sha256(wrapper.read_bytes()).hexdigest(), runtime.BINDGEN_PATCHED_SHA256)
         self.assertEqual(len(views), 3)
         self.assertTrue(all(not view.exists() for view in views))

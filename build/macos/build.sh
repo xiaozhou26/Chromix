@@ -17,9 +17,10 @@ case "$ARCH" in arm64|x64) ;; *) echo "unsupported macOS architecture: $ARCH" >&
 if [ "$(uname -s)" != Darwin ] || [ "$HOST_ARCH" != "$ARCH" ]; then
   echo "a native macOS $ARCH host is required" >&2; exit 2
 fi
-if [ "$(cat "$REPO/CHROMIUM_MACOS_VERSION")" = 156.0.8078.79 ] &&
+if [[ "$(cat "$REPO/CHROMIUM_MACOS_VERSION")" = 156.0.8078.79 ||
+      "$(cat "$REPO/CHROMIUM_MACOS_VERSION")" = 157.0.8103.78 ]] &&
     [ ! -f "$WORK/src/.chromix-upstream-restored.json" ]; then
-  echo "macOS156 requires a verified full upstream restore; cold fallback forbidden" >&2
+  echo "macOS156/157 requires a verified full upstream restore; cold fallback forbidden" >&2
   exit 1
 fi
 source "$REPO/build/macos/select-xcode.sh"

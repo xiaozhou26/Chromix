@@ -26,6 +26,42 @@ FIXTURE = json.loads((Path(__file__).parent / "fixtures/macos156_generators.json
 NOW = datetime(2026, 11, 8, tzinfo=timezone.utc)
 
 
+@pytest.fixture(autouse=True)
+def historical_mac156_repository(tmp_path, monkeypatch):
+    from tools import import_upstream_cache as importer
+    root = tmp_path / "historical-repo"
+    for name in ("CHROMIUM_VERSION", "CHROMIUM_LINUX_VERSION", "CHROMIUM_MACOS_VERSION",
+                 "CHROMIUM_WINDOWS_VERSION", "build/ungoogled-revisions.psd1", "build/upstream-cache.json",
+                 "build/prepare-ungoogled.sh", "build/macos/build.sh", "build/posix/prepare-restored-tools.sh",
+                 "build/posix/upstream-cache.sh", "tools/platform_pins.py"):
+        path = root / name
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_bytes((ROOT / name).read_bytes())
+    (root / "CHROMIUM_MACOS_VERSION").write_text(gen.PINS156[0] + "\n")
+    path = root / "build/ungoogled-revisions.psd1"
+    text = path.read_text()
+    for field, value in (("MacOSChromiumVersion", gen.PINS156[0]),
+                         ("MacOSUngoogledVersion", gen.PINS156[0] + "-1"),
+                         ("MacOSUngoogledCommit", gen.PINS156[1]),
+                         ("UngoogledMacOSVersion", gen.PINS156[0] + "-1.1"),
+                         ("UngoogledMacOSCommit", gen.PINS156[2])):
+        text = re.sub(r'(?m)^  ' + field + r' = "[^"]+"', f'  {field} = "{value}"', text)
+    path.write_text(text)
+    path = root / "build/upstream-cache.json"
+    manifest = json.loads(path.read_text())
+    source = dict(restore.MAC156_ESBUILD_IDENTITY)
+    source.pop("platform")
+    source["source_roots"] = ["src"]
+    source["artifacts"] = {arch: {key: artifact[key] for key in
+        ("id", "name", "size_in_bytes", "digest", "expires_at")} | {"inner_archive": "build_src.tar.zst"}
+        for arch, artifact in FIXTURE["artifacts"].items()}
+    manifest["sources"]["macos"] = source
+    path.write_text(json.dumps(manifest))
+    monkeypatch.setattr(restore, "REPO", root)
+    monkeypatch.setattr(importer, "REPO", root)
+    monkeypatch.setitem(globals(), "ROOT", root)
+
+
 @pytest.mark.parametrize("arch,artifact,size", [("x64", 13284623799, 12645326109),
                                                ("arm64", 13269271368, 11005392438)])
 def test_exact_attempt_three_successful_donor(arch, artifact, size):

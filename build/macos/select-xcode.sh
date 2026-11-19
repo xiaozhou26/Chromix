@@ -5,7 +5,8 @@ select_macos_xcode() {
   # launch_mac.cc uses posix_spawn_file_actions_addchdir, declared in SDK 26.
   local minimum_sdk=26 minimum_minor=0
   local repo="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
-  if [ "$(cat "$repo/CHROMIUM_MACOS_VERSION")" = 156.0.8078.79 ]; then
+  if [[ "$(cat "$repo/CHROMIUM_MACOS_VERSION")" = 156.0.8078.79 ||
+        "$(cat "$repo/CHROMIUM_MACOS_VERSION")" = 157.0.8103.78 ]]; then
     minimum_sdk=26.5
     minimum_minor=5
   fi

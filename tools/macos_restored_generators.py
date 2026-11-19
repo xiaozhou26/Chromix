@@ -27,6 +27,8 @@ PINS155 = ("155.0.8059.39", "ffeb45a2bb88bc56a1dfed31410aeb10e9efcd5a",
            "b1238bb72b02cd36219991d9029c1c65183ea295")
 PINS156 = ("156.0.8078.79", "28a211ab4ab6b83d919966a4f58a6df23cf4fb29",
            "31f01756a43d55b2c4211e73ca329bfab4ebfcb2")
+PINS157 = ("157.0.8103.78", "8c886dffc6ade39d8f7df5d64ace5a8824b455e1",
+           "84768e74ece113d9e68e5d774808afe6c3a8fbe6")
 DEVTOOLS = "third_party/devtools-frontend/src"
 PACKAGES = DEVTOOLS + "/third_party/chromix-macos/node_modules"
 # npm integrity plus SHA256 of the archive and sorted JSON [path, mode, SHA256] file inventory.
@@ -172,6 +174,85 @@ SOURCE156_REPAIRS = {
 }
 
 
+# DevTools 6f9a57d502c857e2412a57fe03c96286d7877479 after the exact core/mac series.
+SOURCE157_HASHES = {'scripts/build/esbuild.js': ('c10b89b1e642911227984b1cf60a731a1ca0bfac5813b5a33bfcc55e67c8b40d',
+                              'af9ad24f819a4f92db714eaf768a1584806b9ede35e596fab48aec1c5617a5ed'),
+ 'scripts/build/ninja/bundle.gni': ('b5aabea6c7deccd38a2c05fcc317be8903c0d791915b3ca2993763c5524aa96c',
+                                    'e5f1a574effb1fd3ceae6eba3a097b830c41ae6198ef006dcea8f242680e75ef'),
+ 'scripts/build/typescript/typescript.gni': ('657c6592457401347c9de1d3577e03231c54e826a176826430da35e07c790f77',
+                                             '657c6592457401347c9de1d3577e03231c54e826a176826430da35e07c790f77'),
+ 'scripts/build/typescript/typescript_vars.gni': ('bf07c7fbfd162c020baf5f0fb6dba9c7f15a978b99f9614f529b1b35c0ce289c',
+                                                  '1b0ee52b040f3079e0a0653086e86f575845a8e9c9c18cb4954feaef007308be'),
+ 'scripts/devtools_paths.py': ('45ff53ad956151b62fa3b8695c95cf66c471fdd1f2d01b2e98b96b7914d6ba45',
+                               '37081ce1f0222710902807cc8c3e4eacfd4df147c649dd6049e5aa24f2e343e1'),
+ 'third_party/typescript/typescript.py': ('10f70e5ec0770a757e1aab9679ad0e0cb19516c832a4271922bcca38db5f93d5',
+                                          '816346e33d16e17e5a9313bfd2043707c19db6b55704742a48c40d17403d5b75')}
+SOURCE157_REPAIRS = {
+    name: (*hashes, () if name == "scripts/build/typescript/typescript.gni"
+           else SOURCE_REPAIRS[name][2])
+    for name, hashes in SOURCE157_HASHES.items()
+}
+# WebUI uses the Node lock's JS compiler; DevTools still requires native TypeScript 7.
+# Installed bytes include the exact core domain substitutions, unlike the npm archive.
+NODE_TYPESCRIPT157 = {'package': 'typescript',
+ 'version': '6.0.2',
+ 'url': 'https://registry.npmjs.org/typescript/-/typescript-6.0.2.tgz',
+ 'integrity': 'sha512-bGdAIrZ0wiGDo5l8c++HWtbaNCWTS4UTv7RaTH/ThVIgjkveJt83m74bBHMJkuCbslY8ixgLBVZJIOiQlQTjfQ==',
+ 'sha256': '0ae5c188a2f5db22df72fe5e74dcbc122afb52031a86dbac33e78a86db39c65e',
+ 'tree_sha256': '93438d91501816eec202f2a8aa6d8fde14fae70d8931bc88c13b6b5d0070b2fa',
+ 'files': 140,
+ 'installed_tree_sha256': '88425dbef50472215438dc22c49714a5b90a7062c6b6220fea3656366b93821c',
+ 'domain_repairs': {'lib/_tsc.js': {'before': '2cf94b017788761cff62c0f58d6fa3c299afd0c51f6576ca5786f5762b172962',
+                                    'after': 'a0830d427fa0faa4e466e72900b41d15503d7d1cfdc7929458da490883aa6f22',
+                                    'replacements': [['chromium.org', 'ch40m1um.qjz9zk'],
+                                                     ['mozilla.org', 'm0z111a.qjz9zk']]},
+                    'lib/typescript.js': {'before': '630f808ac32d968a49a392c42cc06fd72abd939aaa7edfe3302810c067934653',
+                                          'after': 'b8cf3558d136d4b851d11ed61929f6244a8b92542deed5bf59d1b2551713504c',
+                                          'replacements': [['chromium.org', 'ch40m1um.qjz9zk'],
+                                                           ['mozilla.org', 'm0z111a.qjz9zk']]},
+                    'lib/lib.dom.d.ts': {'before': 'd6b1eba8496bdd0eed6fc8a685768fe01b2da4a0388b5fe7df558290bffcf32f',
+                                         'after': '8f94946b666574f23ae405f192dce40df552fc49bc048fdfdaeb44ff6203ac41',
+                                         'replacements': [['mozilla.org', 'm0z111a.qjz9zk']]},
+                    'lib/lib.es2016.intl.d.ts': {'before': 'fca4cdcb6d6c5ef18a869003d02c9f0fd95df8cfaf6eb431cd3376bc034cad36',
+                                                 'after': '16c3ce214b0016bfd49496cf57ef7bd83e16f137e2f3d2fd9e90ac9c4919b4bd',
+                                                 'replacements': [['mozilla.org', 'm0z111a.qjz9zk']]},
+                    'lib/lib.es2020.bigint.d.ts': {'before': 'bc21cc8b6fee4f4c2440d08035b7ea3c06b3511314c8bab6bef7a92de58a2593',
+                                                   'after': 'f61286ee5fb2d37508cd98fc6126bad173ead4ee2b8d052185759b7e5f06ddfe',
+                                                   'replacements': [['mozilla.org', 'm0z111a.qjz9zk']]},
+                    'lib/lib.es2020.intl.d.ts': {'before': '48915f327cd1dea4d7bd358d9dc7732f58f9e1626a29cc0c05c8c692419d9bb7',
+                                                 'after': '718b25ce8ce9c7857d94bdee1af824c9222ec5992003d86cfc11b0f7452d4544',
+                                                 'replacements': [['mozilla.org', 'm0z111a.qjz9zk']]},
+                    'lib/lib.es2021.intl.d.ts': {'before': 'a917a49ac94cd26b754ab84e113369a75d1a47a710661d7cd25e961cc797065f',
+                                                 'after': '34abe1ab58c58c5b81456eb89df245dc88e645556e58aaecd404f90999f3633f',
+                                                 'replacements': [['mozilla.org', 'm0z111a.qjz9zk']]},
+                    'lib/lib.es2022.intl.d.ts': {'before': '8b11e4285cd2bb164a4dc09248bdec69e9842517db4ca47c1ba913011e44ff2f',
+                                                 'after': '7cd1707984eda8558f39841d488b1fb483e85cd2b3659aecfecbac5e8169272c',
+                                                 'replacements': [['mozilla.org', 'm0z111a.qjz9zk']]},
+                    'lib/lib.es2024.arraybuffer.d.ts': {'before': 'bc238c3f81c2984751932b6aab223cd5b830e0ac6cad76389e5e9d2ffc03287d',
+                                                        'after': '20b63347da0165bdd340a8000b181d06bbafc6f4038140fe59a1c1ed4e5a4a03',
+                                                        'replacements': [['mozilla.org', 'm0z111a.qjz9zk']]},
+                    'lib/lib.es2024.sharedmemory.d.ts': {'before': 'd63dba625b108316a40c95a4425f8d4294e0deeccfd6c7e59d819efa19e23409',
+                                                         'after': '610b3fdb89f2815c4e8bd4110459030c1211c942eff1149bcc09e85f9c0b3235',
+                                                         'replacements': [['mozilla.org', 'm0z111a.qjz9zk']]},
+                    'lib/lib.es2025.intl.d.ts': {'before': 'ffbe6d7b295306b2ba88030f65b74c107d8d99bdcf596ea99c62a02f606108b0',
+                                                 'after': 'd34cf31e644d311817a48c1a5e6bffb7ec02d4bbd423a98fcb9ee3f3b4088da2',
+                                                 'replacements': [['mozilla.org', 'm0z111a.qjz9zk']]},
+                    'lib/lib.esnext.intl.d.ts': {'before': '379bc41580c2d774f82e828c70308f24a005b490c25ba34d679d84bcf05c3d9d',
+                                                 'after': 'ee997ac55b5bd0d36b3a55a770553afef05aefbfce848e6fb897c0511914e450',
+                                                 'replacements': [['mozilla.org', 'm0z111a.qjz9zk']]},
+                    'lib/lib.webworker.d.ts': {'before': 'd52ed68e7eb5881768a55713c9b5c7c443e6b46de15c04e348928b8efd20b110',
+                                               'after': 'a774c2b1879cb16f5d9ee4ea5e3b283b1c956a26fb86b9e66ecc1acd6f064dc3',
+                                               'replacements': [['mozilla.org', 'm0z111a.qjz9zk']]}}}
+NODE_TYPESCRIPT157_SOURCES = {'third_party/node/package-lock.json': '1b55dfde6cf55cba43bbc7615d106afe865948d71721a336d18f7231d21a2001',
+ 'third_party/node/package.json': '18b5a393ff6af6e5b1cffb076562401ec6847929a68402e847574d35ad647523',
+ 'third_party/node/node_modules.py': 'ea173da3702749cc21fecaa9edddaad4ed8f6209b603553f223a9a5d7f4b61a1',
+ 'tools/typescript/ts_definitions.gni': 'b0bbe3563d1db30178681e49161d52147199b894e2d2f35b1c3a7d52e9d8182f',
+ 'tools/typescript/ts_definitions.py': '81b90da53b500995fa7854ceee49ea5b3a1253935c969a6764b59f5fe3da6463',
+ 'tools/typescript/ts_library.py': '73870e124346e37566aa10d942274975568576c717695e89f4051903b9768811',
+ 'tools/typescript/ts_library.gni': '0b3a2f9a2ba95d7f83ebedbf406f8f85416e588287d49e159df11cf54eba2584',
+ 'ui/webui/webui_features.gni': '8464840f48fb8d083c1b8a266f6030ccfdacc113b218a43eea57ea9881230560'}
+
+
 def sha256(data: bytes) -> str:
     return hashlib.sha256(data).hexdigest()
 
@@ -180,6 +261,8 @@ def manifest_digest(pins=PINS) -> str:
     repairs = source_repairs(pins)
     value = {"pins": pins, "archives": ARCHIVES,
              "sources": {name: entry[:2] for name, entry in repairs.items()}}
+    if pins == PINS157:
+        value.update(node_typescript=NODE_TYPESCRIPT157, node_sources=NODE_TYPESCRIPT157_SOURCES)
     return sha256(json.dumps(value, sort_keys=True, separators=(",", ":")).encode())
 
 
@@ -190,6 +273,8 @@ def source_repairs(pins):
         return SOURCE155_REPAIRS
     if pins == PINS156:
         return SOURCE156_REPAIRS
+    if pins == PINS157:
+        return SOURCE157_REPAIRS
     raise ValueError("macOS generators require exact reviewed pins")
 
 
@@ -204,13 +289,21 @@ def check_pins(repo: Path) -> tuple:
     return identity
 
 
-def package_keys(host_arch: str) -> tuple[str, ...]:
+def package_keys(host_arch: str, pins=PINS) -> tuple[str, ...]:
     if host_arch not in ("x64", "arm64"):
         raise ValueError("unsupported macOS generator host")
-    return "esbuild", "typescript", "esbuild-" + host_arch, "typescript-" + host_arch
+    source_repairs(pins)
+    keys = ("esbuild", "typescript", "esbuild-" + host_arch, "typescript-" + host_arch)
+    return keys + (("node-typescript157",) if pins == PINS157 else ())
+
+
+def archive_entry(key: str) -> dict:
+    return NODE_TYPESCRIPT157 if key == "node-typescript157" else ARCHIVES[key]
 
 
 def package_path(key: str) -> str:
+    if key == "node-typescript157":
+        return "third_party/node/node_modules/typescript"
     return PACKAGES + "/" + ARCHIVES[key]["package"]
 
 
@@ -219,7 +312,7 @@ def tree_digest(records: list) -> str:
 
 
 def archive_files(data: bytes, key: str) -> dict[str, tuple[bytes, int]]:
-    entry = ARCHIVES[key]
+    entry = archive_entry(key)
     if (len(data) > 32 * 1024**2 or sha256(data) != entry["sha256"]
             or "sha512-" + base64.b64encode(hashlib.sha512(data).digest()).decode() != entry["integrity"]):
         raise ValueError("macOS generator archive integrity mismatch")
@@ -248,6 +341,19 @@ def archive_files(data: bytes, key: str) -> dict[str, tuple[bytes, int]]:
     metadata = json.loads(files["package.json"][0])
     if (metadata.get("name"), metadata.get("version")) != (entry["package"], entry["version"]):
         raise ValueError("macOS generator package metadata mismatch")
+    if key == "node-typescript157":
+        for name, repair in entry["domain_repairs"].items():
+            data, mode = files[name]
+            if sha256(data) != repair["before"]:
+                raise ValueError("unknown Node TypeScript domain preimage")
+            for old, new in repair["replacements"]:
+                data = data.replace(old.encode(), new.encode())
+            if sha256(data) != repair["after"]:
+                raise ValueError("Node TypeScript domain repair digest mismatch")
+            files[name] = data, mode
+        records = [[name, mode, sha256(data)] for name, (data, mode) in files.items()]
+        if tree_digest(records) != entry["installed_tree_sha256"]:
+            raise ValueError("Node TypeScript substituted inventory mismatch")
     return files
 
 
@@ -273,11 +379,12 @@ def package_identity(src: Path, key: str, *, relative: str | None = None) -> dic
             records.append([path.relative_to(root).as_posix(), stat.S_IMODE(metadata[2]), sha256(data)])
     expected_dirs = {p.as_posix() for name, _, _ in records for p in PurePosixPath(name).parents
                      if p.as_posix() != "."}
-    entry = ARCHIVES[key]
+    entry = archive_entry(key)
+    expected_tree = entry.get("installed_tree_sha256", entry["tree_sha256"])
     if (directories != expected_dirs or len(records) != entry["files"]
-            or tree_digest(records) != entry["tree_sha256"]):
+            or tree_digest(records) != expected_tree):
         raise ValueError(f"unknown macOS generator package bytes/inventory: {key}")
-    return {"path": relative, "tree_sha256": entry["tree_sha256"],
+    return {"path": relative, "tree_sha256": expected_tree,
             "archive_sha256": entry["sha256"], "version": entry["version"]}
 
 
@@ -404,7 +511,7 @@ def native_paths(host_arch: str) -> dict[str, str]:
             "tsc": package_path("typescript-" + host_arch) + "/lib/tsc"}
 
 
-def smoke(src: Path, host_arch: str) -> dict:
+def smoke(src: Path, host_arch: str, *, pins=PINS) -> dict:
     try:
         from .prepare_restored_build import binary_architectures, host_identity
     except ImportError:
@@ -438,6 +545,12 @@ def smoke(src: Path, host_arch: str) -> dict:
     identities["node"]["version"] = run([node, "--version"], src)
     identities["esbuild"]["version"] = versions["esbuild"]
     identities["tsc"]["version"] = versions["typescript_native"]
+    node_tsc = None
+    if pins == PINS157:
+        node_tsc = str(safe.regular(src, package_path("node-typescript157") + "/bin/tsc"))
+        versions["node_typescript"] = run([node, node_tsc, "--version"], src)
+        if versions["node_typescript"] != "Version 6.0.2":
+            raise ValueError("unexpected Node TypeScript version")
     with tempfile.TemporaryDirectory(prefix="chromix-mac154-smoke-") as temporary:
         root = Path(temporary).resolve()
         (root / "sample.ts").write_text('const answer: number = 42; console.log(answer);\n')
@@ -447,6 +560,10 @@ def smoke(src: Path, host_arch: str) -> dict:
         run([native_tsc, "sample.ts", "--outDir", "native-compiled", "--target", "es2023"], root)
         if run([node, str(root / "native-compiled/sample.js")], root) != "42":
             raise ValueError("TypeScript direct native compilation probe mismatch")
+        if node_tsc:
+            run([node, node_tsc, "sample.ts", "--outDir", "webui-compiled", "--target", "es2023"], root)
+            if run([node, str(root / "webui-compiled/sample.js")], root) != "42":
+                raise ValueError("Node TypeScript compilation probe mismatch")
         module = str(src / package_path("esbuild") / "lib/main.js")
         script = "require(process.argv[1]).buildSync({entryPoints:['sample.ts'],bundle:true,outfile:'bundle.js'});"
         run([node, "-e", script, module], root)
@@ -461,8 +578,14 @@ def smoke(src: Path, host_arch: str) -> dict:
 
 def prepare(src: Path, *, host_arch: str, repo: Path, repair=False, before_publish=None) -> dict:
     pins = check_pins(repo)
-    keys = package_keys(host_arch)
+    keys = package_keys(host_arch, pins)
     sources, changes = source_plan(src, pins)
+    if pins == PINS157:
+        for name, expected in NODE_TYPESCRIPT157_SOURCES.items():
+            digest = sha256(safe.read_verified(src, name))
+            if digest != expected:
+                raise ValueError(f"unknown macOS157 Node TypeScript source: {name}")
+            sources[name] = {"sha256": digest, "original_sha256": expected, "repaired_sha256": expected}
     packages = {key: package_identity(src, key) for key in keys}
     missing = any(value is None for value in packages.values())
     result = {"manifest_sha256": manifest_digest(pins), "pins": list(pins), "host_arch": host_arch,
@@ -472,10 +595,14 @@ def prepare(src: Path, *, host_arch: str, repo: Path, repair=False, before_publi
         return result
     if missing:
         raise ValueError("pinned macOS generator packages must be installed before finish")
-    probe = smoke(src, host_arch)
+    probe = smoke(src, host_arch, pins=pins) if pins == PINS157 else smoke(src, host_arch)
     for name, original, repaired, metadata in changes:
         atomic_replace(src, name, original, repaired, expected_metadata=metadata, before_publish=before_publish)
-    sources, changes = source_plan(src, pins)
+    repaired_sources, changes = source_plan(src, pins)
+    sources.update(repaired_sources)
+    if pins == PINS157 and any(sha256(safe.read_verified(src, name)) != expected
+                              for name, expected in NODE_TYPESCRIPT157_SOURCES.items()):
+        raise ValueError("macOS157 Node TypeScript sources changed during preparation")
     if changes or {key: package_identity(src, key) for key in keys} != packages:
         raise ValueError("macOS generator inputs changed during preparation")
     result = dict(result, sources=sources, repair_needed=False)

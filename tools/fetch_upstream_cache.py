@@ -184,7 +184,7 @@ def load_manifest(platform, arch, run_id=None, root=ROOT):
             require(type(source["repository_id"]) is int and source["repository_id"] > 0, "manifest_id")
             if not available:
                 continue
-            if target == "macos" and target_version == "156.0.8078.79":
+            if target == "macos" and target_version in ("156.0.8078.79", "157.0.8103.78"):
                 require("run_attempt" in source, "manifest_run_attempt")
             source_checkpoint = CHECKPOINT_FIELDS.intersection(source)
             require(not source_checkpoint or (target == "macos"

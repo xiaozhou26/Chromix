@@ -497,8 +497,10 @@ class FetchUpstreamCacheTest(unittest.TestCase):
                 self.assertEqual(result["download_bytes"], 0)
                 client.download.assert_not_called()
 
-    def test_checked_in_macos156_cache_matches_exact_two_arch_metadata(self):
-        manifest = json.loads(cache.MANIFEST.read_text())
+    def test_historical_macos156_cache_matches_exact_two_arch_metadata(self):
+        from tools.tests.macos156_historical import recipe_repo
+        historical = recipe_repo()
+        manifest = json.loads((historical / "build/upstream-cache.json").read_text())
         self.assertEqual(manifest["schema_version"], 1)
         self.assertEqual(manifest["chromium_version"], "156.0.8078.79")
         self.assertEqual(manifest["ungoogled_commit"], "28a211ab4ab6b83d919966a4f58a6df23cf4fb29")
@@ -529,7 +531,7 @@ class FetchUpstreamCacheTest(unittest.TestCase):
         })
         for arch in ("x64", "arm64"):
             with self.subTest(arch=arch):
-                pin, identity = cache.load_manifest("macos", arch, 41595328070, root=cache.ROOT)
+                pin, identity = cache.load_manifest("macos", arch, 41595328070, root=historical)
                 self.assertIs(pin.get("available", True), True)
                 self.assertEqual(identity["run_attempt"], 3)
                 self.assertEqual(pin, {
@@ -546,13 +548,13 @@ class FetchUpstreamCacheTest(unittest.TestCase):
                 self.assert_metadata_provenance(pin, datetime(2026, 11, 8, tzinfo=timezone.utc))
                 run, _ = metadata(pin)
                 other_pin, _ = cache.load_manifest(
-                    "macos", "arm64" if arch == "x64" else "x64", root=cache.ROOT)
+                    "macos", "arm64" if arch == "x64" else "x64", root=historical)
                 _, other_artifact = metadata(other_pin)
                 with self.assertRaisesRegex(cache.CacheMiss, "artifact_mismatch"):
                     cache.validate_metadata(pin, run, other_artifact, NOW)
                 client = mock.Mock()
                 result = cache.fetch("macos", arch, self.destination, 34033879808,
-                                     root=cache.ROOT, client=client)
+                                     root=historical, client=client)
                 self.assertEqual(result["reason"], "run_id_mismatch")
                 self.assertEqual(result["download_bytes"], 0)
                 self.assertEqual(client.mock_calls, [])
@@ -641,10 +643,10 @@ class FetchUpstreamCacheTest(unittest.TestCase):
                     self.assertEqual(list(self.destination.iterdir()), [self.destination / "result.json"])
                     self.assertEqual(json.loads((self.destination / "result.json").read_text()), result)
 
-    def test_macos_identity_requires_explicit_156_source_under_shared_153(self):
+    def test_macos_identity_requires_explicit_157_source_under_shared_153(self):
         self.shared153_fixture()
         pin, _ = cache.load_manifest("macos", "x64", root=self.root)
-        self.assertEqual(pin["chromium_version"], "156.0.8078.79")
+        self.assertEqual(pin["chromium_version"], "157.0.8103.78")
         for field in ("chromium_version", "ungoogled_commit"):
             value = self.manifest["sources"]["macos"].pop(field)
             self.save_manifest()

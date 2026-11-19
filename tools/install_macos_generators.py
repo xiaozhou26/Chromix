@@ -23,7 +23,7 @@ except ImportError:
 
 
 def ensure_archive(downloads: Path, key: str, *, download=False) -> Path:
-    entry = generators.ARCHIVES[key]
+    entry = generators.archive_entry(key)
     package, version = entry["package"], entry["version"]
     filename = package.rsplit("/", 1)[-1] + "-" + version + ".tgz"
     if entry["url"] != f"https://registry.npmjs.org/{package}/-/{filename}":
@@ -61,7 +61,7 @@ def install(workdir: Path, arch: str, downloads: Path, *, repo: Path = prepare.R
     if not state["install_needed"]:
         return {"status": "already_installed", "source_identity": receipt["identity"], "generators": state}
     files = {}
-    for key in generators.package_keys(host):
+    for key in state["packages"]:
         if state["packages"][key] is None:
             path = ensure_archive(downloads, key, download=download)
             data = generators.safe.read_verified(path.parent, path.name)
