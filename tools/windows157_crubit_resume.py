@@ -38,7 +38,7 @@ MAIN_KEYS = {'3b6073b94a7b07cf58da510254c3709e46cc6af39da45ccca17672859dc6edcf',
 HELPER = "tools/windows157_tools.py"
 HELPER_TUPLE = (
     "e559adae485f3043400890f12c8869a0f7a75c107ec1f0d7017ecc7f0021a5ca",
-    "33757549e33f88834483989540bfdf8eff73c6b1cab0658083beb397676b4317",
+    "69fd17ac1c27c089e54a238d8f9a9264dd8854f49a82ed1d38652da7106ff211",
 )
 PROOF = "build/windows/windows157-crubit-source.json"
 PROOF_SHA256 = "3cf8be13ba9af51e87894f904a38f3186a9d60255842c3f51d704871439f4eb2"
@@ -54,12 +54,16 @@ RECOVERY_FILES = frozenset({HELPER, PROOF, "build/windows/ci-stage.ps1", "tools/
     "tools/tests/fixtures/windows157_crubit_retry2.json.gz", "tools/tests/test_windows157_crubit_hardlinks.py",
     "tools/windows157_handle_probe.py", "tools/tests/test_windows157_handle_probe.py",
     "tools/tests/fixtures/windows157_handle_native.json.gz",
+    "tools/tests/fixtures/windows157_alias_delete_native.json.gz",
     f".github/workflows/{WORKFLOW}.yml"})
 # Platform changes through this exact main base are reviewed; later deltas require new tuples.
 REVIEWED_PLATFORM_INPUTS = {}
 
 VIEW = "windows157-crubit-recipe"
 RECOVERY_CODE = {
+    "tools/windows157_handle_probe.py": "f3a95621c402892b4fc154f30628b4259b1b2cba4e389cd105e825e213d1527b",
+    "tools/tests/test_windows157_handle_probe.py": "bcb2a7ebfa836bdaa3b87fc0cb730e3d4ede52cd580ed65f956b44a6887903a3",
+    "tools/tests/fixtures/windows157_alias_delete_native.json.gz": "cd513667a888897ebd7ba927b92709a7f817929008cc2b3c166f999236284b52",
     "build/windows/ci-stage.ps1": "73ade18522a3336f3ff2a7df28283ed6c54d37ab51920c983e04f329f4b8ffb9",
     "tools/gen_windows_arm64_workflow.py": "db6f83852ba4892d234092851eef665e189027bcd3849498e70637eadceab38d",
     ".github/workflows/build-win-x64-157-crubit-resume.yml": "47b6eeb9833b6c758d1d68e03d9ff23222b7154fdbdb45d0441c0087604a1d35"

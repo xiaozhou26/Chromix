@@ -95,6 +95,9 @@ def test_native_probe_identity_private_copy_and_mutation_denial(tmp_path):
     assert data['production_private_copy']['status'] == 'passed'
     assert data['production_atomic_install']['status'] == 'published'
     assert len(data['negative_cases']) == 3
+    assert data['locked_paths'] == [data['paths']['source'], data['paths']['alias']]
+    assert data['unlocked_delete']['python']['blocked'] is False
+    assert data['unlocked_win32_delete']['blocked'] is False
 
 
 def test_real_native_failed_reports_confirm_same_api_identity_and_crt_errno_loss():
@@ -123,9 +126,33 @@ def test_real_native_failed_reports_confirm_same_api_identity_and_crt_errno_loss
 def test_production_uses_same_api_for_held_path_and_alias():
     import inspect
     source = inspect.getsource(probe.production.private_cargo_output)
-    assert 'stream_identity(source)' in source
-    assert 'validate_locked_identity(source, path, aliases, before)' in source
+    assert 'with locked_cargo_output(path)' in source
+    locks = inspect.getsource(probe.production.locked_cargo_output)
+    assert 'with ExitStack() as locks:' in locks
+    assert 'stream_identity(source)' in locks
+    assert 'validate_locked_identity(source, path, aliases, before)' in locks
+    assert 'locks.enter_context(locked_file(alias)) for alias in aliases' in locks
+    assert 'with production.locked_cargo_output(source)' in inspect.getsource(probe.probe)
     assert 'file_identity(path.stat())' not in source
     assert 'file_identity(os.fstat' not in source
     assert probe.handle_info is probe.production.windows_handle_info
     assert probe.stable_identity is probe.production.windows_stable_identity
+
+
+def test_native_alias_deletion_is_a_real_lock_gap_not_an_allowed_denial():
+    import gzip
+    import hashlib
+    data = json.loads(gzip.decompress((ROOT / 'tools/tests/fixtures/windows157_alias_delete_native.json.gz').read_bytes()))
+    assert data['run_id'] == 44590344275 and len(data['reports']) == 3
+    for entry in data['reports'].values():
+        assert hashlib.sha256(entry['text'].encode()).hexdigest() == entry['sha256']
+        report = json.loads(entry['text'])
+        assert report['status'] == 'failed'
+        assert report['production_private_copy']['status'] == 'passed'
+        assert report['production_atomic_install']['status'] == 'published'
+        assert len(report['mutations']) == 4
+        assert all(probe.denial_verified(item) for item in report['mutations'][:3])
+        deletion = report['mutations'][3]
+        assert deletion['python']['operation'] == 'delete' and deletion['python']['blocked'] is False
+        assert deletion['win32']['winerror'] == 2
+        assert not probe.denial_verified(deletion)

@@ -248,3 +248,70 @@ def test_latest_parent_receipt_requires_intact_original_ancestor(tmp_path):
     (work / '.chromix-windows157-crubit-resume.json').write_bytes(b'{}')
     with pytest.raises(ValueError, match='original source admission bytes'):
         resume.previous_admission(work)
+
+
+def test_all_owned_alias_handles_stay_open_for_production_copy(tmp_path):
+    from contextlib import contextmanager
+    from unittest import mock
+    root = tmp_path.resolve()
+    _, alias, source = linked_output(root)
+    original = tools.locked_file
+    live = {}
+    closed = []
+    @contextmanager
+    def observed(path):
+        with original(path) as stream:
+            live.setdefault(path, []).append(stream)
+            try:
+                yield stream
+            finally:
+                live[path].remove(stream)
+                if not live[path]:
+                    del live[path]
+                closed.append(path)
+    with mock.patch.object(tools, 'locked_file', side_effect=observed):
+        with tools.private_cargo_output(source) as private:
+            assert set(live) == {source, alias}
+            assert all(not stream.closed for handles in live.values() for stream in handles)
+            assert private.read_bytes() == source.read_bytes()
+        assert not live and closed[-2:] == [alias, source]
+
+
+def test_failed_alias_lock_releases_source_and_never_yields(tmp_path):
+    from contextlib import contextmanager
+    from unittest import mock
+    _, alias, source = linked_output(tmp_path.resolve())
+    original = tools.locked_file
+    opened = []
+    @contextmanager
+    def refused(path):
+        if path == alias:
+            raise PermissionError('alias cannot be locked')
+        with original(path) as stream:
+            opened.append(stream)
+            yield stream
+    with mock.patch.object(tools, 'locked_file', side_effect=refused):
+        with pytest.raises(PermissionError, match='alias cannot be locked'):
+            with tools.locked_cargo_output(source):
+                pytest.fail('partial lock set admitted')
+    assert len(opened) == 1 and opened[0].closed
+
+
+def test_alias_replacement_during_lock_acquisition_is_rejected(tmp_path):
+    from contextlib import contextmanager
+    from unittest import mock
+    if os.name == 'nt':
+        pytest.skip('native deny semantics are exercised by the workflow')
+    _, alias, source = linked_output(tmp_path.resolve())
+    original = tools.locked_file
+    @contextmanager
+    def replaced(path):
+        if path == alias:
+            alias.unlink()
+            alias.write_bytes(source.read_bytes())
+        with original(path) as stream:
+            yield stream
+    with mock.patch.object(tools, 'locked_file', side_effect=replaced):
+        with pytest.raises(ValueError):
+            with tools.locked_cargo_output(source):
+                pytest.fail('replaced alias admitted')

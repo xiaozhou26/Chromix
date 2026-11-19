@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import argparse
-from contextlib import contextmanager
+from contextlib import ExitStack, contextmanager
 import ctypes
 from ctypes import wintypes
 import hashlib
@@ -300,13 +300,31 @@ def validate_locked_identity(source, path: Path, aliases: list[Path], expected: 
 
 
 @contextmanager
-def private_cargo_output(path: Path):
+def locked_cargo_output(path: Path):
+    """Keep every authenticated Cargo filename open without write/delete sharing."""
     aliases = cargo_aliases(path)
-    with locked_file(path) as source:
+    with ExitStack() as locks:
+        source = locks.enter_context(locked_file(path))
         before = stream_identity(source)
         if not stat.S_ISREG(os.fstat(source.fileno()).st_mode):
             raise ValueError("locked Cargo output is not a regular file")
-        validate_locked_identity(source, path, aliases, before)
+        alias_handles = [locks.enter_context(locked_file(alias)) for alias in aliases]
+
+        def validate():
+            validate_locked_identity(source, path, aliases, before)
+            if any(stream_identity(handle) != before for handle in alias_handles):
+                raise ValueError("held Cargo alias identity changed while locked")
+
+        validate()
+        try:
+            yield source, aliases, before
+        finally:
+            validate()
+
+
+@contextmanager
+def private_cargo_output(path: Path):
+    with locked_cargo_output(path) as (source, aliases, before):
         with tempfile.TemporaryDirectory(prefix=".chromix-crubit-private-", dir=path.parent) as temporary:
             private = Path(temporary) / "cc_bindings_from_rs.exe"
             hasher = hashlib.sha256()

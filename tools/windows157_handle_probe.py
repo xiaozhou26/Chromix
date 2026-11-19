@@ -164,7 +164,7 @@ def probe(root: Path, report: dict) -> None:
         outside.unlink()
         os.link(source, alias)
     private = root / "private-copy.exe"
-    with production.locked_file(source) as held:
+    with production.locked_cargo_output(source) as (held, locked_aliases, locked_identity):
         path_stat = stat_info(source.stat())
         handle_stat = stat_info(os.fstat(held.fileno()))
         before = handle_info(held)
@@ -173,6 +173,9 @@ def probe(root: Path, report: dict) -> None:
                                                    for k in STAT_FIELDS if path_stat[k] != handle_stat[k]},
                             "held_win32": before, "path_win32": path_info(source), "alias_win32": path_info(alias)}
         identity = stable_identity(before)
+        require(locked_aliases == [alias] and locked_identity == identity,
+                "probe did not hold the complete production Cargo lock set")
+        report["locked_paths"] = [str(source), *[str(path) for path in locked_aliases]]
         require(before["links"] == 2, "Win32 link count differs from Cargo dual-link contract")
         for name in ("path_win32", "alias_win32"):
             require(stable_identity(report["before"][name]) == identity, "same-API file identity mismatch: " + name)
@@ -229,6 +232,16 @@ def probe(root: Path, report: dict) -> None:
                     "existing-writer failure was not sharing violation")
     report["negative_cases"].append({"case": "unlocked_source_tamper", "detected": True,
                                       "installed_copy_unchanged": file_hash(installed) == expected_hash})
+    deleted = attempt_mutation(alias, "delete")
+    report["unlocked_delete"] = deleted
+    require(deleted["python"]["blocked"] is False and not alias.exists()
+            and deleted["win32"]["winerror"] == 2 and source.stat().st_nlink == 1,
+            "unlocked alias deletion did not remove its name")
+    os.link(source, alias)
+    raw_delete = win32_mutation(alias, "delete")
+    report["unlocked_win32_delete"] = raw_delete
+    require(raw_delete["blocked"] is False and not alias.exists() and source.stat().st_nlink == 1,
+            "unlocked raw Win32 alias deletion was not possible")
     report["same_api_comparison"] = "passed"
 
 
