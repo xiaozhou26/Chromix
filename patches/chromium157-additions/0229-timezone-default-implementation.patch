@@ -1,0 +1,49 @@
+diff --git a/third_party/blink/renderer/core/timezone/timezone_controller.cc b/third_party/blink/renderer/core/timezone/timezone_controller.cc
+--- a/third_party/blink/renderer/core/timezone/timezone_controller.cc
++++ b/third_party/blink/renderer/core/timezone/timezone_controller.cc
+@@ -266,10 +266,29 @@
+   return true;
+ }
+ 
++// static
++bool TimeZoneController::SetDefaultTimeZone(const String& timezone_id) {
++  DCHECK(IsMainThread());
++  if (timezone_id.empty())
++    return false;
++
++  base::AutoLock locker(instance().lock_);
++  if (HasTimeZoneOverride()) {
++    // Validate the restore target without disturbing the active override.
++    std::unique_ptr<icu::TimeZone> timezone(icu::TimeZone::createTimeZone(
++        icu::UnicodeString(timezone_id.Ascii().data(), -1, US_INV)));
++    CHECK(timezone);
++    if (*timezone == icu::TimeZone::getUnknown())
++      return false;
++  } else if (!SetIcuTimeZoneAndNotifyV8(timezone_id)) {
++    return false;
++  }
++  instance().host_timezone_id_ = timezone_id;
++  return true;
++}
++
+ void TimeZoneController::OnTimeZoneChange(const String& timezone_id) {
+   DCHECK(IsMainThread());
+-
+-  base::AutoLock locker(instance().lock_);
+ 
+   // UXR Layer 2: pin the persona timezone. The browser TimeZoneMonitor pushes
+   // the HOST tz here; substituting the persona lets the configured choice (tz
+@@ -284,12 +303,7 @@
+     }
+   }
+ 
+-  // Remember requested timezone id so we can set it when timezone
+-  // override is removed.
+-  instance().host_timezone_id_ = effective_id;
+-
+-  if (!HasTimeZoneOverride())
+-    SetIcuTimeZoneAndNotifyV8(effective_id);
++  SetDefaultTimeZone(effective_id);
+ }
+ 
+ const String& TimeZoneController::GetHostTimezoneId() {

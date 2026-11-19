@@ -1,0 +1,594 @@
+diff --git a/third_party/blink/renderer/core/frame/web_frame_widget_test.cc b/third_party/blink/renderer/core/frame/web_frame_widget_test.cc
+--- a/third_party/blink/renderer/core/frame/web_frame_widget_test.cc
++++ b/third_party/blink/renderer/core/frame/web_frame_widget_test.cc
+@@ -18,10 +18,16 @@
+ #include "cc/test/property_tree_test_utils.h"
+ #include "cc/trees/scroll_source_type.h"
+ #include "components/viz/common/surfaces/parent_local_surface_id_allocator.h"
++#include "mojo/public/cpp/test_support/test_utils.h"
+ #include "testing/gmock/include/gmock/gmock.h"
+ #include "third_party/blink/public/common/features.h"
++#include "third_party/blink/public/common/frame/frame_visual_properties_mojom_traits.h"
+ #include "third_party/blink/public/common/input/synthetic_web_input_event_builders.h"
++#include "third_party/blink/public/common/page/page_zoom.h"
++#include "third_party/blink/public/common/widget/visual_properties_mojom_traits.h"
++#include "third_party/blink/public/mojom/frame/frame_visual_properties.mojom-blink.h"
+ #include "third_party/blink/public/mojom/page/widget.mojom-shared.h"
++#include "third_party/blink/public/mojom/widget/visual_properties.mojom-blink.h"
+ #include "third_party/blink/public/web/web_plugin_params.h"
+ #include "third_party/blink/public/web/web_script_source.h"
+ #include "third_party/blink/renderer/core/css/properties/css_property_ref.h"
+@@ -93,6 +99,25 @@
+   bool invoked_ = false;
+ };
+ 
++class DisplayOrientationEventListener final : public NativeEventListener {
++ public:
++  explicit DisplayOrientationEventListener(base::OnceClosure callback)
++      : callback_(std::move(callback)) {}
++
++  void Invoke(ExecutionContext*, Event*) override {
++    ++count_;
++    if (callback_) {
++      std::move(callback_).Run();
++    }
++  }
++
++  int Count() const { return count_; }
++
++ private:
++  base::OnceClosure callback_;
++  int count_ = 0;
++};
++
+ }  // namespace
+ 
+ class WebFrameWidgetSimTest : public SimTest {
+@@ -552,6 +577,497 @@
+   visual_properties.is_pinch_gesture_active = false;
+   LocalFrameRootWidget()->ApplyVisualProperties(visual_properties);
+   EXPECT_FALSE(layer_tree_host->is_external_pinch_gesture_active_for_testing());
++}
++
++TEST_F(WebFrameWidgetImplRemoteFrameSimTest,
++       EmulatedScreenPreservesNativeLayoutAndInputScale) {
++  auto* widget = LocalFrameRootWidget();
++  display::ScreenInfo native_screen;
++  native_screen.rect = gfx::Rect(800, 600);
++  native_screen.available_rect = native_screen.rect;
++  VisualProperties properties;
++  properties.screen_infos = display::ScreenInfos(native_screen);
++  display::ScreenInfo emulated_screen = native_screen;
++  emulated_screen.rect = gfx::Rect(1920, 1080);
++  emulated_screen.available_rect = gfx::Rect(1920, 1040);
++  emulated_screen.device_scale_factor = 1.25f;
++  emulated_screen.orientation_type =
++      display::mojom::ScreenOrientation::kPortraitPrimary;
++  emulated_screen.orientation_angle = 90;
++  properties.emulated_screen_infos = display::ScreenInfos(emulated_screen);
++  properties.new_size_device_px = gfx::Size(300, 150);
++  properties.visible_viewport_size_device_px = gfx::Size(800, 600);
++  properties.compositor_viewport_pixel_rect = gfx::Rect(300, 150);
++  auto check = [&](int width, int height, float dpr, float native_dsf) {
++    widget->ApplyVisualProperties(properties);
++    widget->UpdateAllLifecyclePhases(DocumentUpdateReason::kTest);
++    auto* window = LocalFrameRoot().GetFrame()->DomWindow();
++    EXPECT_EQ(width, window->innerWidth());
++    EXPECT_EQ(height, window->innerHeight());
++    EXPECT_FLOAT_EQ(dpr, window->devicePixelRatio());
++    EXPECT_FLOAT_EQ(native_dsf,
++                    widget->LayerTreeHostForTesting()->device_scale_factor());
++    EXPECT_EQ(properties.screen_infos, widget->GetOriginalScreenInfos());
++    EXPECT_EQ(properties.emulated_screen_infos,
++              widget->GetEmulatedScreenInfos());
++    const gfx::PointF point(37, 19);
++    EXPECT_EQ(gfx::PointF(37 * native_dsf, 19 * native_dsf),
++              widget->DIPsToBlinkSpace(point));
++    EXPECT_EQ(
++        gfx::RectF(37, 19, 50, 20),
++        widget->BlinkSpaceToDIPs(gfx::RectF(37 * native_dsf, 19 * native_dsf,
++                                            50 * native_dsf, 20 * native_dsf)));
++  };
++  check(300, 150, 1.25f, 1.f);
++  EXPECT_EQ(emulated_screen.rect, widget->GetScreenInfo().rect);
++  EXPECT_EQ(emulated_screen.available_rect,
++            widget->GetScreenInfo().available_rect);
++  EXPECT_EQ(emulated_screen.orientation_type,
++            widget->GetScreenInfo().orientation_type);
++  EXPECT_EQ(emulated_screen.orientation_angle,
++            widget->GetScreenInfo().orientation_angle);
++
++  properties.emulated_screen_infos->mutable_current().device_scale_factor = 2.f;
++  check(300, 150, 2.f, 1.f);
++  properties.new_size_device_px = gfx::Size(420, 210);
++  properties.compositor_viewport_pixel_rect = gfx::Rect(420, 210);
++  check(420, 210, 2.f, 1.f);
++  properties.zoom_level = ZoomFactorToZoomLevel(2.f);
++  check(210, 105, 4.f, 1.f);
++  properties.zoom_level = 0;
++
++  properties.page_scale_factor = 1.5f;
++  properties.is_pinch_gesture_active = true;
++  check(420, 210, 2.f, 1.f);
++  EXPECT_TRUE(widget->LayerTreeHostForTesting()
++                  ->is_external_pinch_gesture_active_for_testing());
++  properties.css_zoom_factor = 2.f;
++  properties.new_size_device_px = gfx::Size(840, 420);
++  properties.compositor_viewport_pixel_rect = gfx::Rect(840, 420);
++  check(420, 210, 4.f, 1.f);
++
++  properties.css_zoom_factor = 1.f;
++  properties.screen_infos.mutable_current().device_scale_factor = 2.f;
++  properties.emulated_screen_infos->mutable_current().device_scale_factor =
++      1.25f;
++  check(420, 210, 1.25f, 2.f);
++  properties.emulated_screen_infos.reset();
++  check(420, 210, 2.f, 2.f);
++  EXPECT_EQ(properties.screen_infos, widget->GetScreenInfos());
++}
++
++TEST_F(WebFrameWidgetImplRemoteFrameSimTest,
++       EmulatedScreenMojoRoundTripAndClear) {
++  display::ScreenInfo native_screen;
++  display::ScreenInfo emulated_screen;
++  emulated_screen.device_scale_factor = 1.25f;
++  emulated_screen.rect = gfx::Rect(1920, 1080);
++  FrameVisualProperties frame;
++  viz::ParentLocalSurfaceIdAllocator allocator;
++  allocator.GenerateId();
++  frame.local_surface_id = allocator.GetCurrentLocalSurfaceId();
++  frame.screen_infos = display::ScreenInfos(native_screen);
++  frame.emulated_screen_infos = display::ScreenInfos(emulated_screen);
++  FrameVisualProperties frame_copy(frame);
++  EXPECT_EQ(frame.emulated_screen_infos, frame_copy.emulated_screen_infos);
++  FrameVisualProperties empty_frame;
++  FrameVisualProperties empty_copy(empty_frame);
++  EXPECT_FALSE(empty_copy.emulated_screen_infos);
++  empty_copy = frame;
++  EXPECT_EQ(frame.emulated_screen_infos, empty_copy.emulated_screen_infos);
++  frame.emulated_screen_infos->mutable_current().device_scale_factor = 2.f;
++  EXPECT_FLOAT_EQ(
++      1.25f, frame_copy.emulated_screen_infos->current().device_scale_factor);
++  frame_copy = frame;
++  EXPECT_EQ(frame.emulated_screen_infos, frame_copy.emulated_screen_infos);
++  empty_copy = empty_frame;
++  EXPECT_FALSE(empty_copy.emulated_screen_infos);
++  EXPECT_EQ(empty_frame.screen_infos, empty_copy.screen_infos);
++  FrameVisualProperties decoded_frame;
++  ASSERT_TRUE(
++      mojo::test::SerializeAndDeserialize<mojom::blink::FrameVisualProperties>(
++          frame_copy, decoded_frame));
++  EXPECT_EQ(frame.screen_infos, decoded_frame.screen_infos);
++  EXPECT_EQ(frame.emulated_screen_infos, decoded_frame.emulated_screen_infos);
++
++  VisualProperties widget;
++  widget.screen_infos = decoded_frame.screen_infos;
++  widget.emulated_screen_infos = decoded_frame.emulated_screen_infos;
++  VisualProperties widget_copy(widget);
++  EXPECT_EQ(widget, widget_copy);
++  widget.emulated_screen_infos->mutable_current().device_scale_factor = 3.f;
++  EXPECT_FALSE(widget == widget_copy);
++  widget_copy = widget;
++  EXPECT_EQ(widget, widget_copy);
++  VisualProperties empty_widget;
++  widget_copy = empty_widget;
++  EXPECT_FALSE(widget_copy.emulated_screen_infos);
++  VisualProperties decoded_widget;
++  ASSERT_TRUE(
++      mojo::test::SerializeAndDeserialize<mojom::blink::VisualProperties>(
++          widget, decoded_widget));
++  EXPECT_EQ(widget, decoded_widget);
++  widget.emulated_screen_infos.reset();
++  EXPECT_FALSE(widget == decoded_widget);
++  ASSERT_TRUE(
++      mojo::test::SerializeAndDeserialize<mojom::blink::VisualProperties>(
++          widget, decoded_widget));
++  EXPECT_FALSE(decoded_widget.emulated_screen_infos);
++  frame.emulated_screen_infos.reset();
++  ASSERT_TRUE(
++      mojo::test::SerializeAndDeserialize<mojom::blink::FrameVisualProperties>(
++          frame, decoded_frame));
++  EXPECT_FALSE(decoded_frame.emulated_screen_infos);
++}
++
++TEST_F(WebFrameWidgetImplRemoteFrameSimTest,
++       EmulatedScreenOrientationRefreshPreservesNativeState) {
++  auto* widget = LocalFrameRootWidget();
++  display::ScreenInfo native_screen;
++  native_screen.rect = gfx::Rect(800, 600);
++  native_screen.orientation_type =
++      display::mojom::ScreenOrientation::kLandscapePrimary;
++  display::ScreenInfo effective = native_screen;
++  effective.device_scale_factor = 1.25f;
++  effective.rect = gfx::Rect(1920, 1080);
++  effective.orientation_type =
++      display::mojom::ScreenOrientation::kPortraitPrimary;
++  VisualProperties properties;
++  properties.screen_infos = display::ScreenInfos(native_screen);
++  properties.emulated_screen_infos = display::ScreenInfos(effective);
++  properties.new_size_device_px = gfx::Size(300, 150);
++  properties.visible_viewport_size_device_px = gfx::Size(800, 600);
++  widget->ApplyVisualProperties(properties);
++  for (auto override :
++       {display::mojom::blink::ScreenOrientation::kLandscapePrimary,
++        display::mojom::blink::ScreenOrientation::kPortraitSecondary}) {
++    WebView().SetScreenOrientationOverrideForTesting(override);
++    EXPECT_EQ(properties.screen_infos, widget->GetOriginalScreenInfos());
++    EXPECT_FLOAT_EQ(1.f,
++                    widget->LayerTreeHostForTesting()->device_scale_factor());
++    EXPECT_EQ(gfx::PointF(37, 19),
++              widget->DIPsToBlinkSpace(gfx::PointF(37, 19)));
++    EXPECT_EQ(override, widget->GetScreenInfo().orientation_type);
++    EXPECT_FLOAT_EQ(1.25f, widget->GetScreenInfo().device_scale_factor);
++    EXPECT_EQ(300, LocalFrameRoot().GetFrame()->DomWindow()->innerWidth());
++  }
++  effective.orientation_angle = 270;
++  properties.emulated_screen_infos = display::ScreenInfos(effective);
++  widget->ApplyVisualProperties(properties);
++  WebView().SetScreenOrientationOverrideForTesting(std::nullopt);
++  EXPECT_EQ(effective, widget->GetScreenInfo());
++  EXPECT_EQ(properties.screen_infos, widget->GetOriginalScreenInfos());
++}
++
++TEST_F(WebFrameWidgetImplRemoteFrameSimTest,
++       EmulatedScreenOrientationOnlyHostRotationAndClear) {
++  ScopedOrientationEventForTest orientation_events(true);
++  auto* widget = LocalFrameRootWidget();
++  auto& frame = LocalFrameRoot();
++  display::ScreenInfo native;
++  native.orientation_type =
++      display::mojom::ScreenOrientation::kLandscapePrimary;
++  native.orientation_angle = 90;
++  VisualProperties properties;
++  properties.screen_infos = display::ScreenInfos(native);
++  properties.new_size_device_px = gfx::Size(300, 150);
++  properties.visible_viewport_size_device_px = gfx::Size(800, 600);
++  widget->ApplyVisualProperties(properties);
++  auto* listener = MakeGarbageCollected<DisplayOrientationEventListener>(
++      base::OnceClosure());
++  frame.GetFrame()->DomWindow()->addEventListener(
++      event_type_names::kOrientationchange, listener, false);
++  display::ScreenInfo effective = native;
++  effective.device_scale_factor = 1.25f;
++  effective.orientation_type =
++      display::mojom::ScreenOrientation::kPortraitPrimary;
++  effective.orientation_angle = 0;
++  properties.emulated_screen_infos = display::ScreenInfos(effective);
++  auto check = [&](int count) {
++    widget->ApplyVisualProperties(properties);
++    test::RunPendingTasks();
++    EXPECT_EQ(count, listener->Count());
++  };
++  check(1);
++  check(1);
++  properties.screen_infos.mutable_current().orientation_type =
++      display::mojom::ScreenOrientation::kPortraitSecondary;
++  properties.screen_infos.mutable_current().orientation_angle = 180;
++  check(1);
++  effective.orientation_type =
++      display::mojom::ScreenOrientation::kLandscapeSecondary;
++  effective.orientation_angle = 270;
++  properties.emulated_screen_infos = display::ScreenInfos(effective);
++  check(2);
++  properties.emulated_screen_infos.reset();
++  check(3);
++  check(3);
++  properties.emulated_screen_infos = properties.screen_infos;
++  check(3);
++  properties.emulated_screen_infos.reset();
++  check(3);
++  EXPECT_EQ(180, frame.GetFrame()->DomWindow()->orientation());
++}
++
++TEST_F(WebFrameWidgetImplRemoteFrameSimTest,
++       EmulatedScreenOrientationReentryKeepsLatestSize) {
++  ScopedOrientationEventForTest orientation_events(true);
++  auto* widget = LocalFrameRootWidget();
++  display::ScreenInfo native;
++  native.orientation_type =
++      display::mojom::ScreenOrientation::kLandscapePrimary;
++  native.orientation_angle = 90;
++  VisualProperties initial;
++  initial.screen_infos = display::ScreenInfos(native);
++  initial.new_size_device_px = gfx::Size(300, 150);
++  initial.visible_viewport_size_device_px = gfx::Size(800, 600);
++  widget->ApplyVisualProperties(initial);
++  VisualProperties latest = initial;
++  latest.new_size_device_px = gfx::Size(420, 210);
++  auto* listener = MakeGarbageCollected<DisplayOrientationEventListener>(
++      base::BindLambdaForTesting(
++          [&] { widget->ApplyVisualProperties(latest); }));
++  LocalFrameRoot().GetFrame()->DomWindow()->addEventListener(
++      event_type_names::kOrientationchange, listener, false);
++  VisualProperties outer = initial;
++  outer.emulated_screen_infos = display::ScreenInfos(native);
++  outer.emulated_screen_infos->mutable_current().orientation_type =
++      display::mojom::ScreenOrientation::kPortraitPrimary;
++  outer.emulated_screen_infos->mutable_current().orientation_angle = 0;
++  widget->ApplyVisualProperties(outer);
++  EXPECT_EQ(2, listener->Count());
++  EXPECT_FALSE(widget->GetEmulatedScreenInfos());
++  EXPECT_EQ(native, widget->GetScreenInfo());
++  EXPECT_EQ(gfx::Size(420, 210), widget->Size());
++  EXPECT_EQ(420, LocalFrameRoot().GetFrame()->DomWindow()->innerWidth());
++  widget->ApplyVisualProperties(latest);
++  EXPECT_EQ(2, listener->Count());
++}
++
++TEST_F(WebFrameWidgetImplRemoteFrameSimTest,
++       EmulatedScreenOrientationDetachDuringNotification) {
++  ScopedOrientationEventForTest orientation_events(true);
++  auto* widget = LocalFrameRootWidget();
++  auto& frame = LocalFrameRoot();
++  display::ScreenInfo native;
++  native.orientation_type =
++      display::mojom::ScreenOrientation::kLandscapePrimary;
++  native.orientation_angle = 90;
++  VisualProperties properties;
++  properties.screen_infos = display::ScreenInfos(native);
++  properties.new_size_device_px = gfx::Size(300, 150);
++  properties.visible_viewport_size_device_px = gfx::Size(800, 600);
++  widget->ApplyVisualProperties(properties);
++  auto* listener = MakeGarbageCollected<DisplayOrientationEventListener>(
++      base::BindLambdaForTesting([&] { frame.Detach(); }));
++  frame.GetFrame()->DomWindow()->addEventListener(
++      event_type_names::kOrientationchange, listener, false);
++  properties.emulated_screen_infos = display::ScreenInfos(native);
++  properties.emulated_screen_infos->mutable_current().orientation_type =
++      display::mojom::ScreenOrientation::kPortraitPrimary;
++  properties.emulated_screen_infos->mutable_current().orientation_angle = 0;
++  widget->ApplyVisualProperties(properties);
++  EXPECT_EQ(1, listener->Count());
++  EXPECT_FALSE(widget->LocalRootImpl());
++  test::RunPendingTasks();
++}
++
++TEST_F(WebFrameWidgetSimTest, EmulatedScreenOrientationEventsAndOwnOverride) {
++  ScopedOrientationEventForTest orientation_events(true);
++  auto* widget = WebView().MainFrameViewWidget();
++  auto* listener = MakeGarbageCollected<DisplayOrientationEventListener>(
++      base::OnceClosure());
++  auto events_are = [&](int count) {
++    test::RunPendingTasks();
++    EXPECT_EQ(count, listener->Count());
++  };
++  display::ScreenInfo initial_screen = widget->GetOriginalScreenInfo();
++  initial_screen.orientation_type =
++      display::mojom::ScreenOrientation::kLandscapePrimary;
++  initial_screen.orientation_angle = 90;
++  widget->UpdateScreenInfo(display::ScreenInfos(initial_screen));
++  test::RunPendingTasks();
++  WebView().SetScreenOrientationOverrideForTesting(
++      display::mojom::blink::ScreenOrientation::kPortraitPrimary);
++  test::RunPendingTasks();
++  Window().addEventListener(event_type_names::kOrientationchange, listener,
++                            false);
++  const auto native = widget->GetOriginalScreenInfos();
++  DeviceEmulationParams params;
++  params.screen_size = gfx::Size(1920, 1080);
++  params.view_size = gfx::Size(800, 600);
++  params.device_scale_factor = 1.25f;
++  params.screen_orientation_type =
++      display::mojom::ScreenOrientation::kPortraitSecondary;
++  params.screen_orientation_angle = 180;
++  widget->EnableDeviceEmulation(
++      params, mojom::blink::DeviceEmulationCacheBehavior::kClearCache);
++  events_are(0);
++  WebView().SetScreenOrientationOverrideForTesting(std::nullopt);
++  events_are(1);
++  widget->RefreshScreenInfo();
++  events_are(1);
++  EXPECT_EQ(native, widget->GetOriginalScreenInfos());
++  EXPECT_FLOAT_EQ(1.25f, widget->GetScreenInfo().device_scale_factor);
++  EXPECT_EQ(gfx::Rect(1920, 1080), widget->GetScreenInfo().rect);
++  params.screen_orientation_angle = 0;
++  params.screen_orientation_type =
++      display::mojom::ScreenOrientation::kPortraitPrimary;
++  widget->EnableDeviceEmulation(
++      params, mojom::blink::DeviceEmulationCacheBehavior::kClearCache);
++  events_are(2);
++  widget->DisableDeviceEmulation();
++  events_are(3);
++  widget->RefreshScreenInfo();
++  events_are(3);
++}
++
++TEST_F(WebFrameWidgetSimTest, EmulatedScreenOwnOrientationReentry) {
++  ScopedOrientationEventForTest orientation_events(true);
++  auto* widget = WebView().MainFrameViewWidget();
++  auto native = widget->GetOriginalScreenInfos();
++  native.mutable_current().orientation_type =
++      display::mojom::ScreenOrientation::kLandscapePrimary;
++  native.mutable_current().orientation_angle = 90;
++  widget->UpdateScreenInfo(native);
++  DeviceEmulationParams own;
++  own.view_size = gfx::Size(300, 150);
++  own.device_scale_factor = 1.25f;
++  own.screen_orientation_type =
++      display::mojom::ScreenOrientation::kPortraitPrimary;
++  own.screen_orientation_angle = 0;
++  widget->EnableDeviceEmulation(
++      own, mojom::blink::DeviceEmulationCacheBehavior::kClearCache);
++  auto* listener = MakeGarbageCollected<DisplayOrientationEventListener>(
++      base::BindLambdaForTesting([&] { widget->DisableDeviceEmulation(); }));
++  Window().addEventListener(event_type_names::kOrientationchange, listener,
++                            false);
++  own.screen_orientation_type =
++      display::mojom::ScreenOrientation::kPortraitSecondary;
++  own.screen_orientation_angle = 180;
++  widget->EnableDeviceEmulation(
++      own, mojom::blink::DeviceEmulationCacheBehavior::kClearCache);
++  EXPECT_EQ(2, listener->Count());
++  EXPECT_FALSE(widget->DeviceEmulator());
++  EXPECT_FALSE(widget->GetEmulatedScreenInfos());
++  EXPECT_EQ(native, widget->GetOriginalScreenInfos());
++  EXPECT_EQ(native, widget->GetScreenInfos());
++  const auto restored_size = widget->Size();
++  widget->RefreshScreenInfo();
++  EXPECT_EQ(restored_size, widget->Size());
++  EXPECT_EQ(2, listener->Count());
++}
++
++TEST_F(WebFrameWidgetSimTest, EmulatedScreenOwnVisualPropertiesReentry) {
++  ScopedOrientationEventForTest orientation_events(true);
++  auto* widget = WebView().MainFrameViewWidget();
++  display::ScreenInfo native;
++  native.orientation_type =
++      display::mojom::ScreenOrientation::kLandscapePrimary;
++  native.orientation_angle = 90;
++  VisualProperties properties;
++  properties.screen_infos = display::ScreenInfos(native);
++  properties.new_size_device_px = gfx::Size(300, 150);
++  properties.visible_viewport_size_device_px = gfx::Size(300, 150);
++  properties.compositor_viewport_pixel_rect = gfx::Rect(300, 150);
++  widget->ApplyVisualProperties(properties);
++  DeviceEmulationParams own;
++  own.view_size = gfx::Size(300, 150);
++  own.device_scale_factor = 1.25f;
++  widget->EnableDeviceEmulation(
++      own, mojom::blink::DeviceEmulationCacheBehavior::kClearCache);
++  VisualProperties latest = properties;
++  latest.new_size_device_px = gfx::Size(420, 210);
++  latest.visible_viewport_size_device_px = gfx::Size(420, 210);
++  latest.compositor_viewport_pixel_rect = gfx::Rect(420, 210);
++  auto* listener = MakeGarbageCollected<DisplayOrientationEventListener>(
++      base::BindLambdaForTesting([&] {
++        widget->DisableDeviceEmulation();
++        widget->ApplyVisualProperties(latest);
++      }));
++  Window().addEventListener(event_type_names::kOrientationchange, listener,
++                            false);
++  properties.screen_infos.mutable_current().orientation_type =
++      display::mojom::ScreenOrientation::kPortraitPrimary;
++  properties.screen_infos.mutable_current().orientation_angle = 0;
++  widget->ApplyVisualProperties(properties);
++  EXPECT_EQ(2, listener->Count());
++  EXPECT_FALSE(widget->DeviceEmulator());
++  EXPECT_EQ(gfx::Size(420, 210), widget->Size());
++  EXPECT_EQ(gfx::Rect(420, 210),
++            widget->LayerTreeHostForTesting()->device_viewport_rect());
++  EXPECT_EQ(latest.screen_infos, widget->GetScreenInfos());
++}
++
++class NestedMainDisplaySimTest : public SimTest {
++ public:
++  frame_test_helpers::TestWebFrameWidget* CreateWebFrameWidget(
++      base::PassKey<WebLocalFrame> pass_key,
++      CrossVariantMojoAssociatedRemote<
++          mojom::blink::FrameWidgetHostInterfaceBase> frame_widget_host,
++      CrossVariantMojoAssociatedReceiver<mojom::blink::FrameWidgetInterfaceBase>
++          frame_widget,
++      CrossVariantMojoAssociatedRemote<mojom::blink::WidgetHostInterfaceBase>
++          widget_host,
++      CrossVariantMojoAssociatedReceiver<mojom::blink::WidgetInterfaceBase>
++          widget,
++      scoped_refptr<base::SingleThreadTaskRunner> task_runner,
++      const viz::FrameSinkId& frame_sink_id,
++      bool hidden,
++      bool never_composited,
++      bool is_for_child_local_root,
++      bool is_for_nested_main_frame,
++      bool is_for_scalable_page) override {
++    return MakeGarbageCollected<frame_test_helpers::TestWebFrameWidget>(
++        pass_key, std::move(frame_widget_host), std::move(frame_widget),
++        std::move(widget_host), std::move(widget), std::move(task_runner),
++        frame_sink_id, hidden, never_composited, is_for_child_local_root,
++        is_for_nested_main_frame || !is_for_child_local_root,
++        is_for_scalable_page);
++  }
++};
++
++TEST_F(NestedMainDisplaySimTest, EmulatedScreenInheritanceAndOwnPriority) {
++  auto* widget = WebView().MainFrameViewWidget();
++  ASSERT_TRUE(widget->ForMainFrame());
++  ASSERT_FALSE(widget->ForTopMostMainFrame());
++  display::ScreenInfo native;
++  native.rect = gfx::Rect(800, 600);
++  display::ScreenInfo parent = native;
++  parent.rect = gfx::Rect(1920, 1080);
++  parent.device_scale_factor = 1.25f;
++  VisualProperties properties;
++  properties.screen_infos = display::ScreenInfos(native);
++  properties.emulated_screen_infos = display::ScreenInfos(parent);
++  properties.new_size_device_px = gfx::Size(300, 150);
++  properties.visible_viewport_size_device_px = gfx::Size(300, 150);
++  widget->ApplyVisualProperties(properties);
++  EXPECT_EQ(properties.emulated_screen_infos, widget->GetEmulatedScreenInfos());
++  EXPECT_EQ(properties.screen_infos, widget->GetOriginalScreenInfos());
++  EXPECT_EQ(300, Window().innerWidth());
++  EXPECT_FLOAT_EQ(1.25f, Window().devicePixelRatio());
++  DeviceEmulationParams own;
++  own.screen_size = gfx::Size(1440, 900);
++  own.view_size = gfx::Size(300, 150);
++  own.device_scale_factor = 2.f;
++  widget->EnableDeviceEmulation(
++      own, mojom::blink::DeviceEmulationCacheBehavior::kClearCache);
++  parent.rect = gfx::Rect(2560, 1440);
++  parent.device_scale_factor = 1.5f;
++  properties.emulated_screen_infos = display::ScreenInfos(parent);
++  widget->ApplyVisualProperties(properties);
++  EXPECT_EQ(gfx::Rect(1440, 900), widget->GetScreenInfo().rect);
++  EXPECT_FLOAT_EQ(2.f, Window().devicePixelRatio());
++  widget->DisableDeviceEmulation();
++  EXPECT_EQ(properties.emulated_screen_infos, widget->GetEmulatedScreenInfos());
++  EXPECT_EQ(parent, widget->GetScreenInfo());
++  EXPECT_FLOAT_EQ(1.5f, Window().devicePixelRatio());
++  EXPECT_EQ(300, Window().innerWidth());
++  properties.emulated_screen_infos.reset();
++  widget->ApplyVisualProperties(properties);
++  EXPECT_FALSE(widget->GetEmulatedScreenInfos());
++  EXPECT_EQ(native, widget->GetScreenInfo());
++  EXPECT_FLOAT_EQ(1.f, Window().devicePixelRatio());
+ }
+ 
+ // Since std::unique_ptr<InputHandlerProxy::DidOverscrollParams> isn't copyable
+@@ -1843,6 +2359,49 @@
+   EXPECT_FALSE(listener->GetInvokedStateAndReset());
+ }
+ 
++TEST_F(WebFrameWidgetSimTest, EmulatedScreenInitialNestedPropagationAndClear) {
++  SimRequest request("https://example.com/test.html", "text/html");
++  LoadURL("https://example.com/test.html");
++  request.Complete(R"HTML(
++      <iframe srcdoc='<iframe srcdoc="plain text"></iframe>'></iframe>
++      )HTML");
++  base::RunLoop().RunUntilIdle();
++  auto* widget = WebView().MainFrameViewWidget();
++  const auto native_screens = widget->GetOriginalScreenInfos();
++  DeviceEmulationParams params;
++  params.screen_size = gfx::Size(1920, 1080);
++  params.view_size = gfx::Size(800, 600);
++  params.device_scale_factor = 1.25f;
++  widget->EnableDeviceEmulation(
++      params, mojom::blink::DeviceEmulationCacheBehavior::kClearCache);
++  auto* grandchild = WebView().MainFrame()->FirstChild()->FirstChild();
++  ASSERT_TRUE(grandchild);
++  frame_test_helpers::SwapRemoteFrame(grandchild,
++                                      frame_test_helpers::CreateRemote());
++  auto* remote =
++      To<WebRemoteFrameImpl>(WebView().MainFrame()->FirstChild()->FirstChild());
++  auto check = [&](bool emulated) {
++    const auto& properties =
++        remote->GetFrame()->GetPendingVisualPropertiesForTesting();
++    EXPECT_EQ(native_screens, properties.screen_infos);
++    EXPECT_EQ(emulated, properties.emulated_screen_infos.has_value());
++    if (emulated) {
++      EXPECT_EQ(widget->GetScreenInfos(), *properties.emulated_screen_infos);
++    }
++  };
++  check(true);
++  params.device_scale_factor = 2.f;
++  widget->EnableDeviceEmulation(
++      params, mojom::blink::DeviceEmulationCacheBehavior::kClearCache);
++  check(true);
++  widget->DisableDeviceEmulation();
++  check(false);
++  widget->EnableDeviceEmulation(
++      params, mojom::blink::DeviceEmulationCacheBehavior::kClearCache);
++  check(true);
++  remote->Detach();
++}
++
+ // Tests that page scale is propagated to all remote frames controlled
+ // by a widget.
+ TEST_F(WebFrameWidgetSimTest, PropagateScaleToRemoteFrames) {

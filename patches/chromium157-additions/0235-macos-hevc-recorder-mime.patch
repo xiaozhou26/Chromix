@@ -1,0 +1,82 @@
+diff --git a/third_party/blink/renderer/modules/mediarecorder/media_recorder_handler.cc b/third_party/blink/renderer/modules/mediarecorder/media_recorder_handler.cc
+--- a/third_party/blink/renderer/modules/mediarecorder/media_recorder_handler.cc
++++ b/third_party/blink/renderer/modules/mediarecorder/media_recorder_handler.cc
+@@ -63,6 +63,11 @@
+ #include "third_party/blink/renderer/platform/wtf/functional.h"
+ #include "third_party/blink/renderer/platform/wtf/text/string_builder.h"
+ 
++#if BUILDFLAG(IS_MAC) && BUILDFLAG(ENABLE_HEVC_PARSER_AND_HW_DECODER)
++#include "base/strings/stringprintf.h"
++#include "media/formats/mp4/hevc.h"
++#endif
++
+ #if BUILDFLAG(IS_WIN)
+ #include "media/gpu/windows/mf_audio_encoder.h"
+ #endif
+@@ -109,6 +114,35 @@
+     }
+   }
+   return codec_profile;
++}
++#endif
++
++#if BUILDFLAG(IS_MAC) && BUILDFLAG(ENABLE_HEVC_PARSER_AND_HW_DECODER)
++std::string HEVCCodecSuffix(
++    const media::mp4::HEVCDecoderConfigurationRecord& config) {
++  std::string suffix = ".";
++  if (config.general_profile_space)
++    suffix += 'A' + config.general_profile_space - 1;
++  suffix += std::to_string(config.general_profile_idc);
++  uint32_t compatibility = 0;
++  for (int bit = 0; bit < 32; ++bit) {
++    compatibility = (compatibility << 1) |
++                    ((config.general_profile_compatibility_flags >> bit) & 1);
++  }
++  suffix += base::StringPrintf(".%X.%c%u", compatibility,
++                               config.general_tier_flag ? 'H' : 'L',
++                               config.general_level_idc);
++  // ISO/IEC 14496-15 omits trailing zero constraint bytes, not leading ones.
++  for (int shift = 40; shift >= 0; shift -= 8) {
++    if (!(config.general_constraint_indicator_flags &
++          ((uint64_t{1} << (shift + 8)) - 1)))
++      break;
++    suffix += base::StringPrintf(
++        ".%02X",
++        static_cast<unsigned>(
++            (config.general_constraint_indicator_flags >> shift) & 0xff));
++  }
++  return suffix;
+ }
+ #endif
+ 
+@@ -876,9 +910,16 @@
+         mime_type.Append("av01");
+         break;
+ #if BUILDFLAG(ENABLE_HEVC_PARSER_AND_HW_DECODER)
+-      case media::VideoCodec::kHEVC:
++      case media::VideoCodec::kHEVC: {
+         mime_type.Append(add_parameter_sets_in_bitstream_ ? "hev1" : "hvc1");
+-        break;
++#if BUILDFLAG(IS_MAC)
++        // Describe the encoded profile and level, not the requested upper bound.
++        media::mp4::HEVCDecoderConfigurationRecord config;
++        if (config.Parse(last_seen_codec_description_))
++          mime_type.Append(HEVCCodecSuffix(config).c_str());
++#endif
++        break;
++      }
+ #endif
+       default:
+         break;
+@@ -998,6 +1039,11 @@
+   }
+ #endif
+ 
++#if BUILDFLAG(IS_MAC) && BUILDFLAG(ENABLE_HEVC_PARSER_AND_HW_DECODER)
++  if (video_codec_profile_.codec == media::VideoCodec::kHEVC && codec_description)
++    last_seen_codec_description_ = *codec_description;
++#endif
++
+   auto params_with_codec = params;
+   params_with_codec.codec = video_codec_profile_.codec;
+   if (!params_with_codec.frame_rate) {

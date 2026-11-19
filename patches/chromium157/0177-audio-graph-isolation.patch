@@ -1,0 +1,64 @@
+diff --git a/third_party/blink/renderer/modules/webaudio/audio_handler.cc b/third_party/blink/renderer/modules/webaudio/audio_handler.cc
+--- a/third_party/blink/renderer/modules/webaudio/audio_handler.cc
++++ b/third_party/blink/renderer/modules/webaudio/audio_handler.cc
+@@ -5,8 +5,10 @@
+ #include "third_party/blink/renderer/modules/webaudio/audio_handler.h"
+ 
+ #include <inttypes.h>
++#include <cmath>
+ 
+ #include "base/trace_event/trace_event.h"
++#include "base/uxr_config.h"
+ #include "third_party/blink/public/platform/modules/webrtc/webrtc_logging.h"
+ #include "third_party/blink/renderer/modules/webaudio/audio_node_input.h"
+ #include "third_party/blink/renderer/modules/webaudio/audio_node_output.h"
+@@ -22,6 +24,37 @@
+ #endif
+ 
+ namespace blink {
++
++namespace {
++
++void ApplyUxrAudioIsolation(AudioBus* bus, uint32_t frames, uint64_t seed) {
++  if (!seed || bus->IsSilent())
++    return;
++  // A launch-stable rounding threshold on a 20-bit sample grid. Apply to the
++  // graph's actual bus, before its consumers run: playback, OfflineAudioContext,
++  // Analyser and AudioWorklet then receive the same samples. Never mutate
++  // AudioBuffer getters or fabricate sample rates, latencies or device data.
++  seed ^= seed >> 30;
++  seed *= uint64_t{0xbf58476d1ce4e5b9};
++  seed ^= seed >> 27;
++  seed *= uint64_t{0x94d049bb133111eb};
++  seed ^= seed >> 31;
++  const double threshold = 0.25 + static_cast<double>(seed >> 11) * 0x1.0p-54;
++  constexpr double kScale = 0x1.0p20;
++  for (unsigned channel = 0; channel < bus->NumberOfChannels(); ++channel) {
++    for (float& sample : bus->Channel(channel)->MutableSpan().first(frames)) {
++      if (sample == 0 || !std::isfinite(sample) || std::abs(sample) >= 16)
++        continue;
++      // Signed zero, silence and exceptional values retain their native bits.
++      // Exact grid samples are fixed points, including in-place fanout buses.
++      const double magnitude = std::floor(std::abs(static_cast<double>(sample)) *
++                                          kScale + threshold) / kScale;
++      sample = std::copysign(static_cast<float>(magnitude), sample);
++    }
++  }
++}
++
++}  // namespace
+ 
+ AudioHandler::AudioHandler(NodeType node_type,
+                            AudioNode& node,
+@@ -333,6 +366,11 @@
+       UnsilenceOutputs();
+       base::TimeTicks process_start_time = base::TimeTicks::Now();
+       Process(frames_to_process);
++      const uint64_t isolation_seed = base::UxrConfig::GetInstance().AudioIsolationSeed();
++      if (isolation_seed) {
++        for (auto& output : outputs_)
++          ApplyUxrAudioIsolation(output->Bus(), frames_to_process, isolation_seed);
++      }
+       base::TimeDelta process_duration =
+           base::TimeTicks::Now() - process_start_time;
+       uma_reporter_->AddProcessDuration(process_duration, frames_to_process);

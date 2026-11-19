@@ -1,0 +1,13 @@
+diff --git a/third_party/blink/renderer/core/timezone/timezone_controller.h b/third_party/blink/renderer/core/timezone/timezone_controller.h
+--- a/third_party/blink/renderer/core/timezone/timezone_controller.h
++++ b/third_party/blink/renderer/core/timezone/timezone_controller.h
+@@ -30,6 +30,9 @@
+   ~TimeZoneController() override;
+ 
+   static void Init();
++
++  // Updates the default without acquiring or replacing a DevTools override.
++  static bool SetDefaultTimeZone(const String& timezone_id);
+ 
+   enum class TimeZoneOverrideStatus {
+     kSuccess,

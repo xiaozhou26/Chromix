@@ -1,0 +1,104 @@
+diff --git a/third_party/blink/renderer/modules/canvas/canvas2d/base_rendering_context_2d.cc b/third_party/blink/renderer/modules/canvas/canvas2d/base_rendering_context_2d.cc
+--- a/third_party/blink/renderer/modules/canvas/canvas2d/base_rendering_context_2d.cc
++++ b/third_party/blink/renderer/modules/canvas/canvas2d/base_rendering_context_2d.cc
+@@ -8,6 +8,8 @@
+ #include "base/strings/string_number_conversions.h"
+ #include "base/uxr_config.h"
+ 
++#include <array>
++#include <bit>
+ #include <cmath>
+ #include <cstring>
+ #include <cstdint>
+@@ -136,6 +138,7 @@
+ #include "third_party/skia/include/core/SkColorSpace.h"
+ #include "third_party/skia/include/core/SkImageInfo.h"
+ #include "third_party/skia/include/core/SkSurface.h"
++#include "third_party/skia/include/core/SkBitmap.h"
+ #include "ui/gfx/geometry/skia_conversions.h"
+ #include "ui/gfx/geometry/vector2d_f.h"
+ #include "ui/gfx/skia_span_util.h"
+@@ -152,6 +155,63 @@
+ class MemoryManagedPaintCanvas;
+ 
+ namespace {
++
++// Opaque canvas uploads must contain opaque alpha bytes, not merely carry
++// kOpaque metadata. Otherwise native CPU/GPU/export paths can reinterpret
++// untouched ImageData alpha as premultiplication and corrupt the same pixels.
++// Copy only the clipped dirty rectangle; never modify script-owned ImageData.
++bool UxrCopyOpaqueImageData(const SkPixmap& source,
++                            const gfx::Rect& source_rect,
++                            SkBitmap& owned_copy) {
++  std::array<uint8_t, 4> alpha_bytes{};
++  size_t component_bytes = 0;
++  switch (source.colorType()) {
++    case kRGBA_8888_SkColorType:
++    case kBGRA_8888_SkColorType:
++      alpha_bytes[0] = 255;
++      component_bytes = 1;
++      break;
++    case kRGBA_F16_SkColorType: {
++      const auto one = std::bit_cast<std::array<uint8_t, 2>>(uint16_t{0x3c00});
++      alpha_bytes[0] = one[0];
++      alpha_bytes[1] = one[1];
++      component_bytes = 2;
++      break;
++    }
++    case kRGBA_F32_SkColorType:
++      alpha_bytes = std::bit_cast<std::array<uint8_t, 4>>(1.0f);
++      component_bytes = 4;
++      break;
++    default:
++      return false;
++  }
++  SkPixmap clipped;
++  if (!source.extractSubset(&clipped, gfx::RectToSkIRect(source_rect)) ||
++      !owned_copy.tryAllocPixels(clipped.info())) {
++    return false;
++  }
++  const SkPixmap& copy = owned_copy.pixmap();
++  const auto source_bytes = gfx::SkPixmapToSpan(clipped);
++  auto bytes = gfx::SkPixmapToWritableSpan(copy);
++  const auto alpha = base::span(alpha_bytes).first(component_bytes);
++  for (int y = 0; y < copy.height(); ++y) {
++    auto row = bytes.subspan(static_cast<size_t>(y) * copy.rowBytes(),
++                             copy.info().minRowBytes());
++    // Copy components verbatim, including RGB at zero alpha and F16/F32 bit
++    // patterns. No color conversion or premultiplication belongs in this step.
++    row.copy_from(
++        source_bytes.subspan(static_cast<size_t>(y) * clipped.rowBytes(),
++                             clipped.info().minRowBytes()));
++    for (int x = 0; x < copy.width(); ++x) {
++      row.subspan(static_cast<size_t>(x) * component_bytes * 4,
++                  component_bytes * 4)
++          .last(component_bytes)
++          .copy_from(alpha);
++    }
++  }
++  return true;
++}
++
+ 
+ 
+ bool IsContextProviderValid() {
+@@ -1122,6 +1182,19 @@
+ 
+   SkPixmap data_pixmap = data->GetSkPixmap();
+ 
++  SkBitmap opaque_upload;
++  if (!HasAlpha()) {
++    if (!UxrCopyOpaqueImageData(data_pixmap, source_rect, opaque_upload)) {
++      exception_state.ThrowRangeError("Out of memory in putImageData");
++      return;
++    }
++    data_pixmap = opaque_upload.pixmap();
++    // The private pixmap starts at the clipped dirty rectangle's origin.
++    // Its destination is unchanged even for negative dx/dy or clipped input.
++    source_rect = gfx::Rect(source_rect.size());
++    dest_offset = gfx::Vector2d(dest_rect.x(), dest_rect.y());
++  }
++
+   // WritePixels (called by PutByteArray) requires that the source and
+   // destination pixel formats have the same bytes per pixel.
+   SkColorType dest_color_type =

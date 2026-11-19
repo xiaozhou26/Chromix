@@ -1,0 +1,29 @@
+diff --git a/content/browser/devtools/protocol/network_handler.cc b/content/browser/devtools/protocol/network_handler.cc
+--- a/content/browser/devtools/protocol/network_handler.cc
++++ b/content/browser/devtools/protocol/network_handler.cc
+@@ -222,20 +222,22 @@
+ 
+ std::unique_ptr<Network::Cookie> BuildCookie(
+     const net::CanonicalCookie& cookie) {
+-  DCHECK(cookie.ExpiryDate().is_null() || !cookie.ExpiryDate().is_inf());
++  const bool is_session = cookie.ExpiryDate().is_null() ||
++                          cookie.ExpiryDate().is_inf() ||
++                          !cookie.IsPersistent();
+   std::unique_ptr<Network::Cookie> devtools_cookie =
+       Network::Cookie::Create()
+           .SetName(cookie.Name())
+           .SetValue(cookie.Value())
+           .SetDomain(cookie.Domain())
+           .SetPath(cookie.Path())
+-          .SetExpires(cookie.ExpiryDate().is_null()
++          .SetExpires(is_session
+                           ? -1
+                           : cookie.ExpiryDate().InSecondsFSinceUnixEpoch())
+           .SetSize(net::cookie_util::NameValueSizeBytes(cookie))
+           .SetHttpOnly(cookie.IsHttpOnly())
+           .SetSecure(cookie.SecureAttribute())
+-          .SetSession(!cookie.IsPersistent())
++          .SetSession(is_session)
+           .SetPriority(BuildCookiePriority(cookie.Priority()))
+           .SetSourceScheme(BuildCookieSourceScheme(cookie.SourceScheme()))
+           .SetSourcePort(cookie.SourcePort())

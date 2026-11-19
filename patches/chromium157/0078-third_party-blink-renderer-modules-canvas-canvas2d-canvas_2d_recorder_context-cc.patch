@@ -1,0 +1,176 @@
+diff --git a/third_party/blink/renderer/modules/canvas/canvas2d/canvas_2d_recorder_context.cc b/third_party/blink/renderer/modules/canvas/canvas2d/canvas_2d_recorder_context.cc
+--- a/third_party/blink/renderer/modules/canvas/canvas2d/canvas_2d_recorder_context.cc
++++ b/third_party/blink/renderer/modules/canvas/canvas2d/canvas_2d_recorder_context.cc
+@@ -394,6 +394,7 @@
+ }
+ 
+ void Canvas2DRecorderContext::save() {
++  RecordBridgeOp(1u, std::string(), {});
+   if (isContextLost()) [[unlikely]] {
+     return;
+   }
+@@ -419,6 +420,7 @@
+ }
+ 
+ void Canvas2DRecorderContext::restore(ExceptionState& exception_state) {
++  RecordBridgeOp(2u, std::string(), {});
+   if (isContextLost()) [[unlikely]] {
+     return;
+   }
+@@ -926,6 +928,7 @@
+   // from the string is expensive) so we keep a map of string to color.
+   if (value->IsString()) {
+     v8::Local<v8::String> v8_string = value.As<v8::String>();
++    RecordBridgeOp(51u, ToCoreString(isolate, v8_string).Utf8(), {});
+     if (state.IsUnparsedStrokeColor(v8_string)) {
+       return;
+     }
+@@ -1050,6 +1053,7 @@
+   // details on this.
+   if (value->IsString()) {
+     v8::Local<v8::String> v8_string = value.As<v8::String>();
++    RecordBridgeOp(50u, ToCoreString(isolate, v8_string).Utf8(), {});
+     if (state.IsUnparsedFillColor(v8_string)) {
+       return;
+     }
+@@ -1107,6 +1111,7 @@
+ }
+ 
+ void Canvas2DRecorderContext::setLineWidth(double width) {
++  RecordBridgeOp(52u, std::string(), {width});
+   if (!std::isfinite(width) || width <= 0) {
+     return;
+   }
+@@ -1122,6 +1127,7 @@
+ }
+ 
+ void Canvas2DRecorderContext::setLineCap(const String& s) {
++  RecordBridgeOp(58u, s.Utf8(), {});
+   LineCap cap;
+   if (!ParseLineCap(s, cap)) {
+     return;
+@@ -1138,6 +1144,7 @@
+ }
+ 
+ void Canvas2DRecorderContext::setLineJoin(const String& s) {
++  RecordBridgeOp(59u, s.Utf8(), {});
+   LineJoin join;
+   if (!ParseLineJoin(s, join)) {
+     return;
+@@ -1269,6 +1276,7 @@
+ }
+ 
+ void Canvas2DRecorderContext::setGlobalAlpha(double alpha) {
++  RecordBridgeOp(56u, std::string(), {alpha});
+   if (!(alpha >= 0 && alpha <= 1)) {
+     return;
+   }
+@@ -1298,6 +1306,7 @@
+ 
+ void Canvas2DRecorderContext::setGlobalCompositeOperation(
+     const String& operation) {
++  RecordBridgeOp(57u, operation.Utf8(), {});
+   CompositeOperator op = kCompositeSourceOver;
+   BlendMode blend_mode = BlendMode::kNormal;
+   if (!ParseCanvasCompositeAndBlendMode(operation, op, blend_mode)) {
+@@ -1358,6 +1367,7 @@
+ }
+ 
+ void Canvas2DRecorderContext::scale(double sx, double sy) {
++  RecordBridgeOp(44u, std::string(), {sx, sy});
+   // TODO(crbug.com/40153853): Investigate the performance impact of simply
+   // calling the 3d version of this function
+   cc::PaintCanvas* c = GetOrCreatePaintCanvas();
+@@ -1388,6 +1398,7 @@
+ }
+ 
+ void Canvas2DRecorderContext::rotate(double angle_in_radians) {
++  RecordBridgeOp(43u, std::string(), {angle_in_radians});
+   cc::PaintCanvas* c = GetOrCreatePaintCanvas();
+   if (!c) {
+     return;
+@@ -1414,6 +1425,7 @@
+ }
+ 
+ void Canvas2DRecorderContext::translate(double tx, double ty) {
++  RecordBridgeOp(42u, std::string(), {tx, ty});
+   // TODO(crbug.com/40153853): Investigate the performance impact of simply
+   // calling the 3d version of this function
+   cc::PaintCanvas* c = GetOrCreatePaintCanvas();
+@@ -1453,6 +1465,7 @@
+                                         double m22,
+                                         double dx,
+                                         double dy) {
++  RecordBridgeOp(41u, std::string(), {m11, m12, m21, m22, dx, dy});
+   cc::PaintCanvas* c = GetOrCreatePaintCanvas();
+   if (!c) {
+     return;
+@@ -1495,6 +1508,7 @@
+ // |effective_zoom_| in resetTransform instead of setTransform, to avoid
+ // integrating it twice if we have resetTransform and setTransform API calls.
+ void Canvas2DRecorderContext::resetTransform() {
++  RecordBridgeOp(45u, std::string(), {});
+   cc::PaintCanvas* c = GetOrCreatePaintCanvas();
+   if (!c) {
+     return;
+@@ -1537,6 +1551,7 @@
+                                            double m22,
+                                            double dx,
+                                            double dy) {
++  RecordBridgeOp(40u, std::string(), {m11, m12, m21, m22, dx, dy});
+   if (!std::isfinite(m11) || !std::isfinite(m21) || !std::isfinite(dx) ||
+       !std::isfinite(m12) || !std::isfinite(m22) || !std::isfinite(dy)) {
+     return;
+@@ -1575,6 +1590,7 @@
+ }
+ 
+ void Canvas2DRecorderContext::beginPath() {
++  RecordBridgeOp(3u, std::string(), {});
+   Clear();
+ }
+ 
+@@ -1680,10 +1696,12 @@
+ }
+ 
+ void Canvas2DRecorderContext::fill() {
++  RecordBridgeOp(5u, std::string(), {});
+   FillImpl(SkPathFillType::kWinding);
+ }
+ 
+ void Canvas2DRecorderContext::fill(const V8CanvasFillRule& winding) {
++  RecordBridgeOp(5u, std::string(), {});
+   FillImpl(CanvasFillRuleToSkiaFillType(winding));
+ }
+ 
+@@ -1708,6 +1726,7 @@
+ }
+ 
+ void Canvas2DRecorderContext::stroke() {
++  RecordBridgeOp(6u, std::string(), {});
+   DrawPathInternal(*this, CanvasRenderingContext2DState::kStrokePaintType,
+                    SkPathFillType::kWinding, UsePaintCache::kDisabled);
+ }
+@@ -1721,6 +1740,7 @@
+                                        double y,
+                                        double width,
+                                        double height) {
++  RecordBridgeOp(10u, std::string(), {x, y, width, height});
+   if (!CanvasRenderingContext::ValidateRectForCanvas(x, y, width, height)) {
+     return;
+   }
+@@ -1784,6 +1804,7 @@
+                                          double y,
+                                          double width,
+                                          double height) {
++  RecordBridgeOp(11u, std::string(), {x, y, width, height});
+   if (!CanvasRenderingContext::ValidateRectForCanvas(x, y, width, height)) {
+     return;
+   }
+@@ -1942,6 +1963,7 @@
+                                         double y,
+                                         double width,
+                                         double height) {
++  RecordBridgeOp(12u, std::string(), {x, y, width, height});
+   if (!CanvasRenderingContext::ValidateRectForCanvas(x, y, width, height)) {
+     return;
+   }

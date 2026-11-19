@@ -1,0 +1,11 @@
+diff --git a/chrome/browser/enterprise/BUILD.gn b/chrome/browser/enterprise/BUILD.gn
+--- a/chrome/browser/enterprise/BUILD.gn
++++ b/chrome/browser/enterprise/BUILD.gn
+@@ -793,6 +793,7 @@
+       "signin/enterprise_signin_prefs.cc",
+       "signin/enterprise_signin_service.cc",
+       "signin/enterprise_signin_service_factory.cc",
++      "signin/managed_profile_creation_controller.cc",
+       "signin/managed_profile_creator.cc",
+       "signin/managed_profile_required_navigation_throttle.cc",
+       "signin/oidc_authentication_signin_interceptor.cc",

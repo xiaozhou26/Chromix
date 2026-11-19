@@ -1,0 +1,23 @@
+diff --git a/third_party/blink/renderer/controller/blink_initializer.cc b/third_party/blink/renderer/controller/blink_initializer.cc
+--- a/third_party/blink/renderer/controller/blink_initializer.cc
++++ b/third_party/blink/renderer/controller/blink_initializer.cc
+@@ -61,6 +61,7 @@
+ #include "third_party/blink/renderer/core/frame/display_cutout_client_impl.h"
+ #include "third_party/blink/renderer/core/frame/local_frame.h"
+ #include "third_party/blink/renderer/core/loader/loader_factory_for_frame.h"
++#include "third_party/blink/renderer/core/timezone/timezone_controller.h"
+ #include "third_party/blink/renderer/modules/ml/webnn/webnn_introspection_impl.h"
+ #include "third_party/blink/renderer/platform/bindings/v8_per_isolate_data.h"
+ #include "third_party/blink/renderer/platform/disk_data_allocator.h"
+@@ -216,6 +217,11 @@
+ }
+ 
+ // Function defined in third_party/blink/public/web/blink.h.
++bool SetRendererDefaultTimeZone(const WebString& timezone_id) {
++  return TimeZoneController::SetDefaultTimeZone(timezone_id);
++}
++
++// Function defined in third_party/blink/public/web/blink.h.
+ void SetIsWebSecurityDisabled(bool value) {
+   Agent::SetIsWebSecurityDisabled(value);
+ }

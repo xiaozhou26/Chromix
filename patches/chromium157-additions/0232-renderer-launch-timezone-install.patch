@@ -1,0 +1,15 @@
+diff --git a/content/renderer/render_thread_impl.cc b/content/renderer/render_thread_impl.cc
+--- a/content/renderer/render_thread_impl.cc
++++ b/content/renderer/render_thread_impl.cc
+@@ -858,6 +858,11 @@
+   // appears in /proc/<renderer>/cmdline. Stored once in the process-global.
+   auto& snapshot = base::UxrConfig::GetInstance();
+   CHECK(snapshot.SetAll(config, schema_version)) << snapshot.ValidationError();
++  const std::string timezone = snapshot.Get("uxr-timezone");
++  if (!timezone.empty()) {
++    CHECK(blink::SetRendererDefaultTimeZone(blink::WebString::FromUTF8(timezone)))
++        << "Invalid launch timezone: " << timezone;
++  }
+ }
+ 
+ void RenderThreadImpl::InitializeRenderer(

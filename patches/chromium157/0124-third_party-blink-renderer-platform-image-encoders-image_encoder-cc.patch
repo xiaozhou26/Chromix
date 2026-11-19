@@ -1,0 +1,23 @@
+diff --git a/third_party/blink/renderer/platform/image-encoders/image_encoder.cc b/third_party/blink/renderer/platform/image-encoders/image_encoder.cc
+--- a/third_party/blink/renderer/platform/image-encoders/image_encoder.cc
++++ b/third_party/blink/renderer/platform/image-encoders/image_encoder.cc
+@@ -13,8 +13,6 @@
+ #include <stdio.h>  // Needed by jpeglib.h
+ 
+ #include "jpeglib.h"  // for JPEG_MAX_DIMENSION
+-#include "third_party/blink/renderer/platform/graphics/static_bitmap_image.h"
+-#include "third_party/blink/renderer/platform/runtime_enabled_features.h"
+ #include "third_party/libwebp/src/src/webp/encode.h"  // for WEBP_MAX_DIMENSION
+ 
+ namespace blink {
+@@ -46,10 +44,6 @@
+                           const SkPixmap& src,
+                           ImageEncodingMimeType mime_type,
+                           double quality) {
+-  if (RuntimeEnabledFeatures::FingerprintingCanvasImageDataNoiseEnabled()) {
+-    // shuffle subchannel color data within the pixmap
+-    StaticBitmapImage::ShuffleSubchannelColorData(src.writable_addr(), src.info());
+-  }
+   switch (mime_type) {
+     case kMimeTypeJpeg: {
+       SkJpegEncoder::Options options;

@@ -1,0 +1,19 @@
+diff --git a/third_party/blink/renderer/platform/BUILD.gn b/third_party/blink/renderer/platform/BUILD.gn
+--- a/third_party/blink/renderer/platform/BUILD.gn
++++ b/third_party/blink/renderer/platform/BUILD.gn
+@@ -1845,6 +1845,7 @@
+     ":character_property_data",
+     ":font_rust_support",
+     "//third_party/blink/renderer/platform/blob",
++    "//third_party/blink/renderer/platform/canvas_bridge",
+     "//third_party/blink/renderer/platform/heap:heap",
+     "//third_party/blink/renderer/platform/instrumentation",
+     "//third_party/blink/renderer/platform/loader:loader",
+@@ -1868,6 +1869,7 @@
+     "//third_party/blink/public/mojom:color_scheme_mojo_bindings",
+     "//third_party/blink/public/mojom:embedded_frame_sink_mojo_bindings_blink",
+     "//third_party/blink/renderer/platform/blob",
++    "//third_party/blink/renderer/platform/canvas_bridge",
+     "//third_party/blink/renderer/platform/heap",
+     "//third_party/blink/renderer/platform/image-decoders:image_decoders",
+     "//third_party/blink/renderer/platform/instrumentation",

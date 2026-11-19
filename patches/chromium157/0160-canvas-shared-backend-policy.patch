@@ -1,0 +1,32 @@
+diff --git a/third_party/blink/renderer/modules/canvas/canvas2d/base_rendering_context_2d.cc b/third_party/blink/renderer/modules/canvas/canvas2d/base_rendering_context_2d.cc
+--- a/third_party/blink/renderer/modules/canvas/canvas2d/base_rendering_context_2d.cc
++++ b/third_party/blink/renderer/modules/canvas/canvas2d/base_rendering_context_2d.cc
+@@ -691,8 +691,7 @@
+         noise_seed_text.find_first_not_of("0123456789") == std::string::npos &&
+         base::StringToUint64(noise_seed_text, &noise_seed) && noise_seed != 0u;
+     if (read_pixels_successful &&
+-        noise_config.Get("uxr-synthetic-device-tests") == "true" &&
+-        !noise_config.Has("uxr-disable-fingerprint-noise") && !persona_noise &&
++        noise_config.GpuBackendPolicy().canvas_pixel_noise && !persona_noise &&
+         RuntimeEnabledFeatures::FingerprintingCanvasImageDataNoiseEnabled()) {
+       StaticBitmapImage::ShuffleSubchannelColorData(image_data_pixmap.addr(), image_data_pixmap.info());
+     }
+@@ -701,8 +700,7 @@
+   const auto& ph_config = base::UxrConfig::GetInstance();
+   const auto ph_seed_text = ph_config.Get("uxr-canvas-seed");
+   uint64_t ph_seed64 = 0u;
+-  if (!ph_config.Has("uxr-disable-fingerprint-noise") && !ph_seed_text.empty() &&
+-      ph_config.Get("uxr-synthetic-device-tests") == "true" &&
++  if (ph_config.GpuBackendPolicy().canvas_pixel_noise && !ph_seed_text.empty() &&
+       ph_seed_text.find_first_not_of("0123456789") == std::string::npos &&
+       base::StringToUint64(ph_seed_text, &ph_seed64) && ph_seed64 != 0u) {
+     // SplitMix64's finalizer folds high bits without changing legacy 32-bit seeds.
+@@ -1469,7 +1467,7 @@
+   }
+ 
+   // Scale text metrics if enabled
+-  if (!base::UxrConfig::GetInstance().Has("uxr-disable-fingerprint-noise") &&
++  if (base::UxrConfig::GetInstance().GpuBackendPolicy().canvas_text_noise &&
+       RuntimeEnabledFeatures::FingerprintingCanvasMeasureTextNoiseEnabled()) {
+     if (HostAsOffscreenCanvas()) {
+       if (auto* window = DynamicTo<LocalDOMWindow>(GetTopExecutionContext())) {

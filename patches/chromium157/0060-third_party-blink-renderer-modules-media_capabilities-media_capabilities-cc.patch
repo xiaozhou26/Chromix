@@ -1,0 +1,193 @@
+diff --git a/third_party/blink/renderer/modules/media_capabilities/media_capabilities.cc b/third_party/blink/renderer/modules/media_capabilities/media_capabilities.cc
+--- a/third_party/blink/renderer/modules/media_capabilities/media_capabilities.cc
++++ b/third_party/blink/renderer/modules/media_capabilities/media_capabilities.cc
+@@ -14,7 +14,9 @@
+ #include "base/metrics/histogram_functions.h"
+ #include "base/metrics/histogram_macros.h"
+ #include "base/numerics/safe_conversions.h"
++#include "base/strings/string_split.h"
+ #include "base/task/single_thread_task_runner.h"
++#include "base/uxr_config.h"
+ #include "media/base/media_switches.h"
+ #include "media/base/media_util.h"
+ #include "media/base/mime_util.h"
+@@ -109,6 +111,76 @@
+       kWebrtcEncodeSmoothIfPowerEfficientDefault);
+ }
+ 
++struct UxrCodecCapabilities {
++  bool supported = false;
++  bool smooth = false;
++  bool power_efficient = false;
++};
++
++// A present codec key maps that family. Values are exact comma-separated
++// tokens: supported,smooth,power-efficient. Unknown tokens are ignored.
++bool GetUxrCodecCapabilities(media::VideoCodec codec,
++                             UxrCodecCapabilities* out) {
++  const char* key = nullptr;
++  switch (codec) {
++    case media::VideoCodec::kH264:
++      key = "uxr-codec-h264";
++      break;
++    case media::VideoCodec::kVP8:
++      key = "uxr-codec-vp8";
++      break;
++    case media::VideoCodec::kVP9:
++      key = "uxr-codec-vp9";
++      break;
++    case media::VideoCodec::kAV1:
++      key = "uxr-codec-av1";
++      break;
++    case media::VideoCodec::kHEVC:
++      key = "uxr-codec-hevc";
++      break;
++    default:
++      return false;
++  }
++
++  const base::UxrConfig& config = base::UxrConfig::GetInstance();
++  if (!config.Has(key)) {
++    return false;
++  }
++
++  UxrCodecCapabilities capabilities;
++  for (const std::string& token :
++       base::SplitString(config.Get(key), ",", base::KEEP_WHITESPACE,
++                         base::SPLIT_WANT_NONEMPTY)) {
++    if (token == "supported") {
++      capabilities.supported = true;
++    } else if (token == "smooth") {
++      capabilities.smooth = true;
++    } else if (token == "power-efficient") {
++      capabilities.power_efficient = true;
++    }
++  }
++
++  capabilities.smooth &= capabilities.supported;
++  capabilities.power_efficient &= capabilities.supported;
++  *out = capabilities;
++  return true;
++}
++
++template <typename InfoType>
++void ApplyUxrCodecCapabilities(media::VideoCodec codec, InfoType* info) {
++  UxrCodecCapabilities capabilities;
++  if (!GetUxrCodecCapabilities(codec, &capabilities)) {
++    return;
++  }
++
++  // Never promote capabilities beyond Chromium's native result.
++  const bool supported = info->supported() && capabilities.supported;
++  info->setSupported(supported);
++  info->setSmooth(supported && info->smooth() && capabilities.smooth);
++  info->setPowerEfficient(supported && info->powerEfficient() &&
++                          capabilities.power_efficient);
++}
++
+ // static
+ bool UseGpuFactoriesForPowerEfficient(
+     ExecutionContext* execution_context,
+@@ -870,6 +942,8 @@
+         // Additional information needed for lookup in WebrtcVideoPerfHistory.
+         codec_profile =
+             WebRtcVideoFormatToMediaVideoCodecProfile(*sdp_video_format);
++        pending_cb_map_.at(callback_id)->video_codec =
++            media::VideoCodecProfileToVideoCodec(codec_profile);
+         frames_per_second = base::ClampRound(config->video()->framerate());
+         video_resolution =
+             gfx::Size(config->video()->width(), config->video()->height());
+@@ -1107,6 +1181,8 @@
+         // Additional information needed for lookup in WebrtcVideoPerfHistory.
+         codec_profile =
+             WebRtcVideoFormatToMediaVideoCodecProfile(*sdp_video_format);
++        pending_cb_map_.at(callback_id)->video_codec =
++            media::VideoCodecProfileToVideoCodec(codec_profile);
+         video_pixels = config->video()->width() * config->video()->height();
+         frames_per_second = base::ClampRound(config->video()->framerate());
+         video_resolution =
+@@ -1147,10 +1223,22 @@
+       TaskType::kInternalMediaRealTime);
+   if (auto* handler = MakeGarbageCollected<MediaRecorderHandler>(
+           task_runner, KeyFrameRequestProcessor::Configuration())) {
++    auto web_configuration = ToWebMediaConfiguration(config);
++    // EncodingInfo checks only video when both tracks are specified.
++    if (web_configuration.video_configuration &&
++        web_configuration.audio_configuration &&
++        !handler->CanSupportMimeType(
++            web_configuration.audio_configuration->mime_type,
++            web_configuration.audio_configuration->codec,
++            MediaRecorderHandler::CanSupportMimeTypeCaller::kEncodingInfo)) {
++      resolver->Resolve(CreateEncodingInfoWith(false));
++      return promise;
++    }
++
+     task_runner->PostTask(
+         FROM_HERE, blink::BindOnce(&MediaRecorderHandler::EncodingInfo,
+                                    WrapPersistent(handler),
+-                                   ToWebMediaConfiguration(config),
++                                   std::move(web_configuration),
+                                    BindOnce(&OnMediaCapabilitiesEncodingInfo,
+                                             WrapPersistent(resolver))));
+ 
+@@ -1394,12 +1482,15 @@
+ 
+   if (!EnsurePerfHistoryService(execution_context)) {
+     MediaCapabilitiesDecodingInfo* info = CreateDecodingInfoWith(true);
++    info->setKeySystemAccess(access);
++    ApplyUxrCodecCapabilities(video_codec, info);
+     resolver->Resolve(WrapPersistent(info));
+     return;
+   }
+ 
+   const int callback_id = InsertCallbackAndScheduleTimeout(
+       resolver, access, request_time, QueryType::kDecoding);
++  pending_cb_map_.at(callback_id)->video_codec = video_codec;
+ 
+   media::mojom::blink::PredictionFeaturesPtr features =
+       media::mojom::blink::PredictionFeatures::New(
+@@ -1538,6 +1629,7 @@
+   }
+ 
+   info->setSmooth(*pending_cb->db_is_smooth);
++  ApplyUxrCodecCapabilities(pending_cb->video_codec, info);
+ 
+   const base::TimeDelta process_time =
+       base::TimeTicks::Now() - pending_cb->request_time;
+@@ -1600,6 +1692,12 @@
+     return;
+   }
+   PendingCallbackState* pending_cb = pending_cb_map_.at(callback_id);
++  ExecutionContext* execution_context =
++      pending_cb->resolver->GetExecutionContext();
++  if (!execution_context || execution_context->IsContextDestroyed()) {
++    pending_cb_map_.erase(callback_id);
++    return;
++  }
+ 
+   // Special treatment if the config is not supported, or if only audio was
+   // specified which is indicated by the fact that `video_pixels` equals 0,
+@@ -1672,6 +1770,7 @@
+     info->setSupported(is_supported);
+     info->setPowerEfficient(is_power_efficient);
+     info->setSmooth(is_smooth);
++    ApplyUxrCodecCapabilities(pending_cb->video_codec, info);
+     pending_cb->resolver->DowncastTo<MediaCapabilitiesInfo>()->Resolve(info);
+   } else {
+     CHECK_EQ(pending_cb->query_type, QueryType::kWebrtcDecoding);
+@@ -1679,6 +1778,7 @@
+     info->setSupported(is_supported);
+     info->setPowerEfficient(is_power_efficient);
+     info->setSmooth(is_smooth);
++    ApplyUxrCodecCapabilities(pending_cb->video_codec, info);
+     pending_cb->resolver->DowncastTo<MediaCapabilitiesDecodingInfo>()->Resolve(
+         info);
+   }
+@@ -1735,6 +1835,7 @@
+ 
+   info->setSupported(supported);
+   info->setSmooth(pending_cb->db_is_smooth.value_or(false));
++  ApplyUxrCodecCapabilities(pending_cb->video_codec, info);
+ 
+   pending_cb->resolver->DowncastTo<MediaCapabilitiesDecodingInfo>()->Resolve(
+       info);

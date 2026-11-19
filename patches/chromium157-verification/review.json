@@ -1,0 +1,187 @@
+{
+  "schema_version": 1,
+  "version": "157.0.8103.78",
+  "base_commit": "248e340a05acf30a15e3bf50b604a99ae93ac93b",
+  "core_tag_object": "33eece1eb0b5286bf71e732fbbad7a46faface5a",
+  "core_peeled_commit": "8c886dffc6ade39d8f7df5d64ace5a8824b455e1",
+  "chromium_commit": "4b3d0dabb8250b6f152d2d85d79e7706e309d087",
+  "scope": "New157 patches, additions, verification and exact source fixture only. Historical root224 and156, pins and selector unchanged.",
+  "verification_limits": [
+    "Exact-source overlapping file sections only, not full upstream overlay/tree application.",
+    "No compilation, GN generation, browser runtime or architecture execution.",
+    "x64/arm64 share source patches; this is not six native builds.",
+    "Linux157 portablelinux tag/gitlink absent; actual156 overlay conflicts and is not production eligible.",
+    "Linux core-only diagnostic deliberately omits the incompatible platform overlay and cannot certify Linux production.",
+    "No push or workflow dispatch."
+  ],
+  "final_overrides": {
+    "count": 31,
+    "rebased": [
+      "patches/chromium157/0004-components-embedder_support-user_agent_utils-cc.patch",
+      "patches/chromium157/0005-content-browser-renderer_host-render_process_host_impl-cc.patch",
+      "patches/chromium157/0020-third_party-blink-renderer-modules-canvas-canvas2d-base_rendering_context_2d-cc.patch",
+      "patches/chromium157/0031-third_party-blink-renderer-platform-graphics-image_data_buffer-cc.patch",
+      "patches/chromium157/0057-content-browser-devtools-protocol-network_handler-cc.patch",
+      "patches/chromium157/0066-content-browser-renderer_host-render_process_host_impl-cc.patch",
+      "patches/chromium157/0067-third_party-blink-renderer-platform-BUILD-gn.patch",
+      "patches/chromium157/0076-third_party-blink-renderer-modules-canvas-canvas2d-base_rendering_context_2d-cc.patch",
+      "patches/chromium157/0078-third_party-blink-renderer-modules-canvas-canvas2d-canvas_2d_recorder_context-cc.patch",
+      "patches/chromium157/0149-canvas-opaque-image-data-upload.patch",
+      "patches/chromium157/0150-canvas-mailbox-readback-geometry.patch",
+      "patches/chromium157/0222-canvas-readback-shared-noise.patch"
+    ],
+    "reused156_byte_identical": [
+      "patches/chromium157/0024-third_party-blink-renderer-modules-peerconnection-peer_connection_dependency_factory-cc.patch",
+      "patches/chromium157/0044-third_party-blink-renderer-modules-peerconnection-rtc_peer_connection-cc.patch",
+      "patches/chromium157/0049-third_party-blink-renderer-modules-plugins-dom_plugin_array-cc.patch",
+      "patches/chromium157/0060-third_party-blink-renderer-modules-media_capabilities-media_capabilities-cc.patch",
+      "patches/chromium157/0061-third_party-blink-renderer-modules-media_capabilities-media_capabilities-h.patch",
+      "patches/chromium157/0074-third_party-blink-renderer-core-html-canvas-html_canvas_element-cc.patch",
+      "patches/chromium157/0077-third_party-blink-renderer-modules-canvas-canvas2d-base_rendering_context_2d-h.patch",
+      "patches/chromium157/0082-third_party-blink-renderer-modules-webgl-webgl_rendering_context_base-cc.patch",
+      "patches/chromium157/0111-global-privacy-control.patch",
+      "patches/chromium157/0124-third_party-blink-renderer-platform-image-encoders-image_encoder-cc.patch",
+      "patches/chromium157/0140-webrtc-ip-stats.patch",
+      "patches/chromium157/0141-webrtc-ip-offer-promises.patch",
+      "patches/chromium157/0142-webrtc-ip-offer-callbacks.patch",
+      "patches/chromium157/0152-devtools-font-provenance-implementation.patch",
+      "patches/chromium157/0160-canvas-shared-backend-policy.patch",
+      "patches/chromium157/0167-pdf-backend-capability.patch",
+      "patches/chromium157/0177-audio-graph-isolation.patch",
+      "patches/chromium157/0184-webrtc-codec-negotiation-policy.patch",
+      "patches/chromium157/0209-display-native-screen-regressions.patch"
+    ]
+  },
+  "semantic_review": {
+    "0004": "157 moved GetUserAgentInternal and BuildUserAgentFromProduct; preserve their new locations and apply unchanged persona/version/brand policy exactly once.",
+    "0020": "Retain upstream inttypes include alongside unchanged noise helpers and zero-initialization CHECK.",
+    "0078": "Retain qualified CanvasRenderingContext::ValidateRectForCanvas and original RecordBridgeOp calls.",
+    "0149": "Retain157 Skia includes and add SkBitmap; clipped opaque copy unchanged.",
+    "0150": "Keep upstream strengthened CHECK(thread_checker_.CalledOnValidThread()); do not regress to156 DCHECK. All added bounds/stride checks identical.",
+    "all": "Every override/addition preserves the multiset of nonempty added lines against effective156 predecessor. Other rebases only context/location. Runtime gates unchanged."
+  },
+  "upstream_duplicate_checks": {
+    "managed_profile": "Exact157 core still removes managed_profile_creation_controller sources;0225 remains needed. Verified exactly one final .cc entry.",
+    "macos_angle": "Exact157 gl_display_initializer lacks requested_renderer.empty();0234 still required with IS_MAC guard.",
+    "macos_hevc": "Exact157 media_recorder_handler lacks HEVCCodecSuffix;0235 still required, retaining macOS/HEVC guards.",
+    "mailbox": "Upstream157 already provides one readPixels implementation and shared_image size argument; patch only adds bounds safety and retains upstream CHECK.",
+    "canvas": "Upstream157 initialization CHECK and shuffle call retained; no duplicate helper definition introduced."
+  },
+  "platform_patch_counts": {
+    "linux": 226,
+    "windows": 232,
+    "macos": 228
+  },
+  "additions": {
+    "linux": [
+      {
+        "path": "patches/chromium157-additions/0225-managed-profile-controller-link.patch",
+        "sha256": "350b333232d5865d9dff93a32b1e7b9c2e16a0c1fd31479809a0fd9106db700a",
+        "predecessor": "patches/chromium156-additions/0225-managed-profile-controller-link.patch",
+        "predecessor_sha256": "350b333232d5865d9dff93a32b1e7b9c2e16a0c1fd31479809a0fd9106db700a"
+      },
+      {
+        "path": "patches/chromium157-additions/0227-opaque-png-export-consistency.patch",
+        "sha256": "4c048a50930c3541a3bb9e4442ad7f18e94c04ebccf86c0cfbfc286b15a70751",
+        "predecessor": "patches/chromium156-additions/0227-opaque-png-export-consistency.patch",
+        "predecessor_sha256": "4c048a50930c3541a3bb9e4442ad7f18e94c04ebccf86c0cfbfc286b15a70751"
+      }
+    ],
+    "windows": [
+      {
+        "path": "patches/chromium157-additions/0225-managed-profile-controller-link.patch",
+        "sha256": "350b333232d5865d9dff93a32b1e7b9c2e16a0c1fd31479809a0fd9106db700a",
+        "predecessor": "patches/chromium156-additions/0225-managed-profile-controller-link.patch",
+        "predecessor_sha256": "350b333232d5865d9dff93a32b1e7b9c2e16a0c1fd31479809a0fd9106db700a"
+      },
+      {
+        "path": "patches/chromium157-additions/0227-opaque-png-export-consistency.patch",
+        "sha256": "4c048a50930c3541a3bb9e4442ad7f18e94c04ebccf86c0cfbfc286b15a70751",
+        "predecessor": "patches/chromium156-additions/0227-opaque-png-export-consistency.patch",
+        "predecessor_sha256": "4c048a50930c3541a3bb9e4442ad7f18e94c04ebccf86c0cfbfc286b15a70751"
+      },
+      {
+        "path": "patches/chromium157-additions/0228-timezone-default-declaration.patch",
+        "sha256": "c750f8888d986d6fbbaea16f3ca37d1543625a1281f5bd1562563d496f0daf7d",
+        "predecessor": "patches/chromium156-additions/0228-timezone-default-declaration.patch",
+        "predecessor_sha256": "c750f8888d986d6fbbaea16f3ca37d1543625a1281f5bd1562563d496f0daf7d"
+      },
+      {
+        "path": "patches/chromium157-additions/0229-timezone-default-implementation.patch",
+        "sha256": "3d6dd6aa4d02ff005886f27e3312c083d5385511d3303b0184a520ca3e3f3006",
+        "predecessor": "patches/chromium156-additions/0229-timezone-default-implementation.patch",
+        "predecessor_sha256": "3d6dd6aa4d02ff005886f27e3312c083d5385511d3303b0184a520ca3e3f3006"
+      },
+      {
+        "path": "patches/chromium157-additions/0230-blink-default-timezone-api.patch",
+        "sha256": "0495c11554fc2dd6b2e1b0e2d058ee2e9995ba6f8ccec64c149b6fe62ebcbd43",
+        "predecessor": "patches/chromium156-additions/0230-blink-default-timezone-api.patch",
+        "predecessor_sha256": "0495c11554fc2dd6b2e1b0e2d058ee2e9995ba6f8ccec64c149b6fe62ebcbd43"
+      },
+      {
+        "path": "patches/chromium157-additions/0231-blink-default-timezone-bridge.patch",
+        "sha256": "00274260ba64724d5cae1222ff981dd45c177bad07a9ad7fbd675c7b08426836",
+        "predecessor": "patches/chromium156-additions/0231-blink-default-timezone-bridge.patch",
+        "predecessor_sha256": "00274260ba64724d5cae1222ff981dd45c177bad07a9ad7fbd675c7b08426836"
+      },
+      {
+        "path": "patches/chromium157-additions/0232-renderer-launch-timezone-install.patch",
+        "sha256": "345ef39c9cc6d987f59c44f3f4a46099391d6c629058f10c1151e02a654796a7",
+        "predecessor": "patches/chromium156-additions/0232-renderer-launch-timezone-install.patch",
+        "predecessor_sha256": "345ef39c9cc6d987f59c44f3f4a46099391d6c629058f10c1151e02a654796a7"
+      },
+      {
+        "path": "patches/chromium157-additions/0233-renderer-timezone-webstring-api.patch",
+        "sha256": "7f7f691f2d744715e0d48a25dab5ff1e8ac793122657beacd0f99a3e7e8ba908",
+        "predecessor": "patches/chromium156-additions/0233-renderer-timezone-webstring-api.patch",
+        "predecessor_sha256": "7f7f691f2d744715e0d48a25dab5ff1e8ac793122657beacd0f99a3e7e8ba908"
+      }
+    ],
+    "macos": [
+      {
+        "path": "patches/chromium157-additions/0225-managed-profile-controller-link.patch",
+        "sha256": "350b333232d5865d9dff93a32b1e7b9c2e16a0c1fd31479809a0fd9106db700a",
+        "predecessor": "patches/chromium156-additions/0225-managed-profile-controller-link.patch",
+        "predecessor_sha256": "350b333232d5865d9dff93a32b1e7b9c2e16a0c1fd31479809a0fd9106db700a"
+      },
+      {
+        "path": "patches/chromium157-additions/0227-opaque-png-export-consistency.patch",
+        "sha256": "4c048a50930c3541a3bb9e4442ad7f18e94c04ebccf86c0cfbfc286b15a70751",
+        "predecessor": "patches/chromium156-additions/0227-opaque-png-export-consistency.patch",
+        "predecessor_sha256": "4c048a50930c3541a3bb9e4442ad7f18e94c04ebccf86c0cfbfc286b15a70751"
+      },
+      {
+        "path": "patches/chromium157-additions/0234-macos-empty-angle-native-default.patch",
+        "sha256": "4180de95a9097d230faaa29006cd959437279bdd8251a6eebf6b07e89ff7e944",
+        "predecessor": "patches/chromium156-additions/0234-macos-empty-angle-native-default.patch",
+        "predecessor_sha256": "4180de95a9097d230faaa29006cd959437279bdd8251a6eebf6b07e89ff7e944"
+      },
+      {
+        "path": "patches/chromium157-additions/0235-macos-hevc-recorder-mime.patch",
+        "sha256": "b9f895112210e0753abe0ff4c8a065db0b26f006ba763819b2530969584eb961",
+        "predecessor": "patches/chromium156-additions/0235-macos-hevc-recorder-mime.patch",
+        "predecessor_sha256": "b9f895112210e0753abe0ff4c8a065db0b26f006ba763819b2530969584eb961"
+      }
+    ]
+  },
+  "platform_identities": {
+    "windows": {
+      "version": "157.0.8103.78-1.1",
+      "commit": "20e9a348fc616bd73a366fbd5d8881613d6c5cb0",
+      "core_gitlink": "8c886dffc6ade39d8f7df5d64ace5a8824b455e1",
+      "target_version_available": true
+    },
+    "macos": {
+      "version": "157.0.8103.78-1.1",
+      "commit": "84768e74ece113d9e68e5d774808afe6c3a8fbe6",
+      "core_gitlink": "8c886dffc6ade39d8f7df5d64ace5a8824b455e1",
+      "target_version_available": true
+    },
+    "linux": {
+      "version": "156.0.8078.79-1",
+      "commit": "6f0aa178c2394fc0a177edc0fd64e41f402a0418",
+      "core_gitlink": "28a211ab4ab6b83d919966a4f58a6df23cf4fb29",
+      "target_version_available": false
+    }
+  }
+}

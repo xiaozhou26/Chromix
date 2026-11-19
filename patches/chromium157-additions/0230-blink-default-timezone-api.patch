@@ -1,0 +1,15 @@
+diff --git a/third_party/blink/public/web/blink.h b/third_party/blink/public/web/blink.h
+--- a/third_party/blink/public/web/blink.h
++++ b/third_party/blink/public/web/blink.h
+@@ -84,6 +84,11 @@
+ // must be called before this.
+ BLINK_EXPORT v8::Isolate* CreateMainThreadIsolate();
+ 
++// Applies the renderer default timezone on the main thread after Initialize().
++// An active DevTools override is preserved; clearing it restores this default.
++// Returns false for an invalid timezone without changing the current default.
++BLINK_EXPORT bool SetRendererDefaultTimeZone(const WebString& timezone_id);
++
+ // Alters the rendering of content to conform to a fixed set of rules.
+ BLINK_EXPORT void SetWebTestMode(bool);
+ BLINK_EXPORT bool WebTestMode();
