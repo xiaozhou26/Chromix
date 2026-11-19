@@ -450,11 +450,14 @@ cd "$DEST_DIST"
 ASSET="chromix-linux-$ARCH.zip"
 [ "$PLATFORM" = macos ] && ASSET="chromix-mac-$ARCH.zip"
 [ -s "$ASSET" ] || die "packaging did not produce $ASSET in $DEST_DIST"
-grep -E "^[0-9a-fA-F]{64}  $ASSET\$" SHA256SUMS >/dev/null ||
-  die "SHA256SUMS is missing the entry for $ASSET"
+# Compare the basename literally; a checksum for another file cannot qualify this bundle.
+awk -v asset="$ASSET" '
+  NR == 1 && length($0) == 66 + length(asset) &&
+    substr($0, 1, 64) !~ /[^0-9a-fA-F]/ && substr($0, 65, 2) == "  " &&
+    substr($0, 67) == asset { valid = 1 }
+  END { exit !(NR == 1 && valid) }
+' SHA256SUMS || die "SHA256SUMS must contain exactly one entry for $ASSET"
 if [ "$PLATFORM" = linux ]; then
-  [ "$(grep -Ec "^[0-9a-fA-F]{64}  chromix-linux-$ARCH\\.zip\$" SHA256SUMS)" -eq 1 ] ||
-    die "SHA256SUMS must contain exactly one entry for $ASSET"
   sha256sum --check --strict SHA256SUMS || die "bundle checksum verification failed"
 else
   shasum -a 256 -c SHA256SUMS || die "bundle checksum verification failed"

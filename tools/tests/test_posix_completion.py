@@ -941,5 +941,44 @@ class MacOSCompileReleaseTest(unittest.TestCase):
                              "${{ inputs.platform == 'macos' && inputs.macos_compile_release && '1' || '0' }}")
 
 
+class PosixChecksumContractTest(unittest.TestCase):
+    def test_exact_single_target_and_digest_on_both_platforms(self):
+        source = (REPO / "build/posix/ci-stage.sh").read_text()
+        checksum = source.split('cd "$DEST_DIST"\n', 1)[1].split('\nSMOKE_DIR=', 1)[0]
+        for platform in ("linux", "macos"):
+            for arch in ("x64", "arm64"):
+                with tempfile.TemporaryDirectory(prefix="checksum contract ") as temp:
+                    root = Path(temp)
+                    asset = f"chromix-{'mac' if platform == 'macos' else 'linux'}-{arch}.zip"
+                    payload = b"target archive bytes"
+                    (root / asset).write_bytes(payload)
+                    digest = hashlib.sha256(payload).hexdigest()
+                    valid = f"{digest}  {asset}\n"
+                    other = asset.replace(".zip", "Xzip")
+                    (root / other).write_bytes(payload)
+                    cases = {
+                        "valid": (valid, True),
+                        "wrong_name": (f"{digest}  {other}\n", False),
+                        "path_alias": (f"{digest}  ./{asset}\n", False),
+                        "duplicate": (valid + valid, False),
+                        "extra_valid_file": (valid + f"{digest}  {other}\n", False),
+                        "extra_malformed": (valid + "invalid\n", False),
+                        "blank_line": (valid + "\n", False),
+                        "wrong_digest": ("0" * 64 + f"  {asset}\n", False),
+                        "short_digest": (digest[:-1] + f"  {asset}\n", False),
+                        "invalid_digest": ("g" * 64 + f"  {asset}\n", False),
+                        "trailing_space": (valid.rstrip("\n") + " \n", False),
+                        "empty": ("", False),
+                    }
+                    for name, (manifest, passes) in cases.items():
+                        with self.subTest(platform=platform, arch=arch, case=name):
+                            (root / "SHA256SUMS").write_text(manifest)
+                            script = 'set -euo pipefail\ndie() { echo "$*" >&2; exit 1; }\n' + checksum
+                            result = subprocess.run(["/bin/bash", "-c", script], cwd=root,
+                                                    env={**os.environ, "PLATFORM": platform, "ARCH": arch},
+                                                    capture_output=True, text=True, timeout=10)
+                            self.assertEqual(result.returncode == 0, passes, result.stdout + result.stderr)
+
+
 if __name__ == "__main__":
     unittest.main()
