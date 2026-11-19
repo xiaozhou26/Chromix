@@ -253,6 +253,21 @@ NODE_TYPESCRIPT157_SOURCES = {'third_party/node/package-lock.json': '1b55dfde6cf
  'ui/webui/webui_features.gni': '8464840f48fb8d083c1b8a266f6030ccfdacc113b218a43eea57ea9881230560'}
 
 
+# Chromium applies its DOM patch and npm filters before core domain substitution.
+NODE_TYPESCRIPT157_OFFICIAL = {'version': '6.0.2',
+ 'files': 118,
+ 'tree_sha256': '6373ac2859408f6aa5f704a710ee55c21bac175809d25da04d5559ce9be50b1e',
+ 'archive_sha256': 'f7d15a9ba38b018602496cde9b094c34c5876c75723d3a5497682fd2e71fcdf3',
+ 'archive_url': 'https://storage.googleapis.com/chromium-nodejs/605b17899d6503df7f2ce96d5458976b36c5e456?generation=1791258586019361',
+ 'archive_size': 11492257,
+ 'official_tree_sha256': 'f7211bd10cc99a9f2f47972827acf41e96b6f30289399cf58208522610257b8b',
+ 'recipe_sha256': {'update_npm_deps': '5b92078734969c94d59dd131afe48796cd018b4e524d5a487609303aabd95bb6',
+                   'npm_include.txt': 'c571d06a4031cb4c1ce61e404f35ceea3e99c13098d0207b70714ab3fc7506c4',
+                   'npm_exclude.txt': 'a62e4d0583bec328f37d2e9c058984c4d73865cb032f7bf7512190b22bd33c84',
+                   'clean_json_attrs.py': '7d992a787a5349ee7ddb0e1216cd220a17641602374f7762f61cfd260910e525',
+                   'typescript.patch': '894efe30aaadf1d482a9560e41026c9c63a3707d14f667b83a594ab8fb1d5916'}}
+
+
 def sha256(data: bytes) -> str:
     return hashlib.sha256(data).hexdigest()
 
@@ -262,7 +277,8 @@ def manifest_digest(pins=PINS) -> str:
     value = {"pins": pins, "archives": ARCHIVES,
              "sources": {name: entry[:2] for name, entry in repairs.items()}}
     if pins == PINS157:
-        value.update(node_typescript=NODE_TYPESCRIPT157, node_sources=NODE_TYPESCRIPT157_SOURCES)
+        value.update(node_typescript=NODE_TYPESCRIPT157, node_sources=NODE_TYPESCRIPT157_SOURCES,
+                     node_typescript_official=NODE_TYPESCRIPT157_OFFICIAL)
     return sha256(json.dumps(value, sort_keys=True, separators=(",", ":")).encode())
 
 
@@ -380,9 +396,17 @@ def package_identity(src: Path, key: str, *, relative: str | None = None) -> dic
     expected_dirs = {p.as_posix() for name, _, _ in records for p in PurePosixPath(name).parents
                      if p.as_posix() != "."}
     entry = archive_entry(key)
+    actual_tree = tree_digest(records)
+    if directories != expected_dirs:
+        raise ValueError(f"unknown macOS generator package bytes/inventory: {key}")
+    official = NODE_TYPESCRIPT157_OFFICIAL
+    if (key == "node-typescript157" and len(records) == official["files"]
+            and actual_tree == official["tree_sha256"]):
+        return {"path": relative, "tree_sha256": actual_tree,
+                "archive_sha256": official["archive_sha256"], "version": official["version"],
+                "variant": "chromium157-official-patched-pruned-domains"}
     expected_tree = entry.get("installed_tree_sha256", entry["tree_sha256"])
-    if (directories != expected_dirs or len(records) != entry["files"]
-            or tree_digest(records) != expected_tree):
+    if len(records) != entry["files"] or actual_tree != expected_tree:
         raise ValueError(f"unknown macOS generator package bytes/inventory: {key}")
     return {"path": relative, "tree_sha256": expected_tree,
             "archive_sha256": entry["sha256"], "version": entry["version"]}
