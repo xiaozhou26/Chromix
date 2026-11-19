@@ -1097,6 +1097,14 @@
         {
           "path": "patches/chromium157-additions/0233-renderer-timezone-webstring-api.patch",
           "sha256": "7f7f691f2d744715e0d48a25dab5ff1e8ac793122657beacd0f99a3e7e8ba908"
+        },
+        {
+          "path": "patches/chromium157-additions/0236-timezone-default-locale-setter-key.patch",
+          "sha256": "aff87c11adaabdd3d3f832e7e175e878f416e60dce7390c6655d9314f7139b5a"
+        },
+        {
+          "path": "patches/chromium157-additions/0237-timezone-default-locale-api.patch",
+          "sha256": "e2ea0e503ad413a5a7ded2e06d3f9d49d48dc56b78d48937ad275e03aa3a9d1e"
         }
       ]
     },
@@ -1121,6 +1129,14 @@
         {
           "path": "patches/chromium157-additions/0235-macos-hevc-recorder-mime.patch",
           "sha256": "b9f895112210e0753abe0ff4c8a065db0b26f006ba763819b2530969584eb961"
+        },
+        {
+          "path": "patches/chromium157-additions/0236-timezone-default-locale-setter-key.patch",
+          "sha256": "aff87c11adaabdd3d3f832e7e175e878f416e60dce7390c6655d9314f7139b5a"
+        },
+        {
+          "path": "patches/chromium157-additions/0237-timezone-default-locale-api.patch",
+          "sha256": "e2ea0e503ad413a5a7ded2e06d3f9d49d48dc56b78d48937ad275e03aa3a9d1e"
         }
       ]
     },
@@ -1137,6 +1153,14 @@
         {
           "path": "patches/chromium157-additions/0227-opaque-png-export-consistency.patch",
           "sha256": "4c048a50930c3541a3bb9e4442ad7f18e94c04ebccf86c0cfbfc286b15a70751"
+        },
+        {
+          "path": "patches/chromium157-additions/0236-timezone-default-locale-setter-key.patch",
+          "sha256": "aff87c11adaabdd3d3f832e7e175e878f416e60dce7390c6655d9314f7139b5a"
+        },
+        {
+          "path": "patches/chromium157-additions/0237-timezone-default-locale-api.patch",
+          "sha256": "e2ea0e503ad413a5a7ded2e06d3f9d49d48dc56b78d48937ad275e03aa3a9d1e"
         }
       ],
       "downstream": {
@@ -1245,11 +1269,11 @@
           "scope": "source-replay",
           "review_manifest": {
             "path": "patches/chromium157/manifest.json",
-            "sha256": "8e25b19e957f3c96d2a308b0d519fd35efbdfefe15d3156bb7540d08dd25abac"
+            "sha256": "f1afcd08e19590b9740316f9ff69f6347c786be9a7117c06c9ce9236757b38e8"
           },
           "report": {
             "path": "patches/chromium157-verification/verified.json",
-            "sha256": "2bdc45ea1c0d3152fdde5fc984abb7722413a702e319a5e6fced36228c7fe32d"
+            "sha256": "aae35d57cade53b06552206e88296f4833866aec5cb5392411a2a4312d8a1a07"
           },
           "replayed_recipe_sha256": "42d788d91c0ec2345c253044665af7f623501a73c8bdb627a94d1739790aeb11",
           "recipe_integration": {

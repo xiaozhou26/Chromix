@@ -141,15 +141,15 @@ PLATFORM157_STATUS = {
     platform: "reviewed-downstream-patches" if platform == "linux" else "reviewed-patches"
     for platform in PLATFORM157_COMMITS
 }
-PATCH_COUNTS157 = {"windows": 232, "macos": 228, "linux": 226}
+PATCH_COUNTS157 = {"windows": 234, "macos": 230, "linux": 228}
 OVERRIDE157_ROOT = "patches/chromium157"
 ADDITIONS157_ROOT = "patches/chromium157-additions"
 MANIFEST157 = "build/patch-selection-157.json"
-MANIFEST157_SHA256 = "a7cc0c1426d5610e88c16183f657232a33b0a3f67e8d503b4e8fb14f4f0dcd07"
+MANIFEST157_SHA256 = "a583d11c8fcd500442a52a74a11346c2491ebb10dbd550157aadff0a1f0a123c"
 REVIEW157 = "patches/chromium157/manifest.json"
-REVIEW157_SHA256 = "8e25b19e957f3c96d2a308b0d519fd35efbdfefe15d3156bb7540d08dd25abac"
+REVIEW157_SHA256 = "f1afcd08e19590b9740316f9ff69f6347c786be9a7117c06c9ce9236757b38e8"
 
-LINUX157_DOWNSTREAM_SHA256 = "1cea7b9af264f4a11a9d9b282450c9227d4029bf84c8f15215506a59a69ab2a2"
+LINUX157_DOWNSTREAM_SHA256 = "2d0de88b3ef556e4b397c0c25e830732a4718e9eaf0ea6720051796158a82507"
 # Activation requires the final patch review, not just successful platform preparation.
 LINUX157_VALIDATED_REVIEW_SHA256: str | None = REVIEW157_SHA256
 
@@ -500,10 +500,10 @@ def authenticate_linux157_downstream(repo: Path, downstream: dict, review: dict)
         roundtrip = case["roundtrip"]
         if (case["status"] != "verified" or case["architectures"] != ["x64", "arm64"]
                 or case["overlay_mode"] != "downstream-nine-patch-recipe"
-                or case["patch_count"] != 226 or replay["patch_count"] != 9
+                or case["patch_count"] != PATCH_COUNTS157["linux"] or replay["patch_count"] != 9
                 or replay["status"] != "verified" or replay["source_manifest"] != downstream["source_manifest"]
-                or roundtrip["status"] != "verified" or roundtrip["patch_count"] != 235
-                or roundtrip["scope"] != "platform9-plus-chromix226"
+                or roundtrip["status"] != "verified" or roundtrip["patch_count"] != 9 + PATCH_COUNTS157["linux"]
+                or roundtrip["scope"] != "platform9-plus-chromix228"
                 or case["build_verified"] is not False or case["runtime_verified"] is not False
                 or [{key: entry[key] for key in ("path", "sha256")} for entry in case["patches"]] != expected
                 or [{key: entry[key] for key in ("path", "sha256")} for entry in case["predecessors"]

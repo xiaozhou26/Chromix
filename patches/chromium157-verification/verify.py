@@ -82,6 +82,19 @@ def linux_recipe(manifest):
 def invariants(src, platform):
     def text(name):
         return (src / name).read_text()
+    timezone = text("third_party/blink/renderer/core/timezone/timezone_controller.cc")
+    locale_key = text("base/i18n/icubridge/default_icu_locale.h")
+    assert "friend class ::blink::TimeZoneController;" in locale_key
+    assert "SetICUDefaultLocale" not in timezone
+    assert "SetLocaleOverride" not in timezone
+    assert "base::i18n::IcuLocaleConverter::GetInstance().ToLanguageTag(locale)" in timezone
+    assert timezone.index("base::i18n::SetDefaultIcuLocale(") < timezone.index("blink::switches::kTopChromeWebUI")
+    assert "U_SUCCESS(status) && !locale.isBogus() && *locale.getLanguage()" in timezone
+    if platform == "windows":
+        assert "SetDefaultTimeZone(effective_id);" in timezone
+        assert "if (!HasTimeZoneOverride()) {" in timezone
+    else:
+        assert "if (!HasTimeZoneOverride())\n    SetIcuTimeZoneAndNotifyV8(effective_id);" in timezone
     mailbox = text("third_party/blink/renderer/platform/graphics/mailbox_texture_backing.cc")
     assert mailbox.count("bool MailboxTextureBacking::readPixels(") == 1
     assert "CHECK(thread_checker_.CalledOnValidThread());" in mailbox
@@ -161,10 +174,16 @@ def verify():
     preservation = []
     for entry in list(overrides.values()) + list(additions.values()):
         raw = checked(entry)
+        assert len(arp.transform_patch(raw, set(), [])[1]) == 1, entry["path"]
+        if entry.get("kind") == "locale-api-compatibility":
+            assert entry["path"] in {
+                "patches/chromium157-additions/0236-timezone-default-locale-setter-key.patch",
+                "patches/chromium157-additions/0237-timezone-default-locale-api.patch",
+            }
+            continue
         predecessor = (ROOT / entry["predecessor"]).read_bytes()
         assert digest(predecessor) == entry["predecessor_sha256"]
         assert added(predecessor) == added(raw), entry["path"]
-        assert len(arp.transform_patch(raw, set(), [])[1]) == 1, entry["path"]
         if "original" in entry:
             assert digest((ROOT / entry["original"]).read_bytes()) == entry["original_sha256"]
         preservation.append(entry["path"])
@@ -196,7 +215,7 @@ def verify():
                           "domain_substituted": substituted, "status": "failed",
                           "overlay_mode": "downstream-nine-patch-recipe" if platform == "linux" else "actual-platform",
                           "build_verified": False, "runtime_verified": False,
-                          "expected_patch_count": {"linux": 226, "windows": 232, "macos": 228}[platform],
+                          "expected_patch_count": {"linux": 228, "windows": 234, "macos": 230}[platform],
                           "patches": [], "predecessors": []}
                 results.append(result)
                 try:
@@ -297,7 +316,7 @@ def verify():
                     result.update(status="verified", patch_count=len(prepared),
                                   roundtrip={"status": "verified", "method": "reverse-forward-exact-bytes",
                                              "patch_count": len(roundtrip_patches),
-                                             "scope": "platform9-plus-chromix226" if platform == "linux" else "chromix-stack",
+                                             "scope": "platform9-plus-chromix228" if platform == "linux" else "chromix-stack",
                                              "initial": roundtrip_initial, "final": final})
                     for key in ("stage", "current_patch", "current_file"):
                         del result[key]

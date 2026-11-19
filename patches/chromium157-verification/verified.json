@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
   "status": "verified",
-  "manifest_sha256": "8e25b19e957f3c96d2a308b0d519fd35efbdfefe15d3156bb7540d08dd25abac",
+  "manifest_sha256": "f1afcd08e19590b9740316f9ff69f6347c786be9a7117c06c9ce9236757b38e8",
   "qualification": "Exact-source structural replay; all nine Linux downstream platform replacements and complete Chromix stacks. Core is intersecting-file subset only. No compilation/runtime, full GN/link or production selector/helper integration is claimed.",
   "historical_root224_and156_bytes_unchanged": true,
   "added_lines_preserved": [
@@ -47,7 +47,7 @@
     "patches/chromium157-additions/0234-macos-empty-angle-native-default.patch",
     "patches/chromium157-additions/0235-macos-hevc-recorder-mime.patch"
   ],
-  "source_file_count": 192,
+  "source_file_count": 202,
   "overlay_coverage": {
     "core": {
       "omitted": [
@@ -6957,7 +6957,7 @@
       "overlay_mode": "downstream-nine-patch-recipe",
       "build_verified": false,
       "runtime_verified": false,
-      "expected_patch_count": 226,
+      "expected_patch_count": 228,
       "patches": [
         {
           "path": "patches/0001-base-BUILD-gn.patch",
@@ -9444,6 +9444,28 @@
           "postimages": {
             "third_party/blink/renderer/core/html/canvas/canvas_async_blob_creator.cc": "7d78a117324c383003bcda13cd61161cc336d8f498e246f621019ed2f7406945"
           }
+        },
+        {
+          "path": "patches/chromium157-additions/0236-timezone-default-locale-setter-key.patch",
+          "sha256": "aff87c11adaabdd3d3f832e7e175e878f416e60dce7390c6655d9314f7139b5a",
+          "status": "applied",
+          "preimages": {
+            "base/i18n/icubridge/default_icu_locale.h": "f415c2354ec91b6a69bdda447a6fc160d744cf1cfa2ed15b82d759c30080c04b"
+          },
+          "postimages": {
+            "base/i18n/icubridge/default_icu_locale.h": "e264e1484db3e05693c766132f5190bb717cb822dcc741a9601dba9530531663"
+          }
+        },
+        {
+          "path": "patches/chromium157-additions/0237-timezone-default-locale-api.patch",
+          "sha256": "e2ea0e503ad413a5a7ded2e06d3f9d49d48dc56b78d48937ad275e03aa3a9d1e",
+          "status": "applied",
+          "preimages": {
+            "third_party/blink/renderer/core/timezone/timezone_controller.cc": "fd6f3e033c2f3c0ebc7055ad18aa47f2e8ced2e9c6185bf516313c5bcfe53837"
+          },
+          "postimages": {
+            "third_party/blink/renderer/core/timezone/timezone_controller.cc": "9896389d368df46e5fb27b18f2a18783e177eb454bc9d3fe18bf10fa09b10374"
+          }
         }
       ],
       "predecessors": [
@@ -9958,14 +9980,15 @@
           "sha256": "d338adf0c712319a3b8efa666f57d378c6cef3bb31a027681a87e97694346417"
         }
       },
-      "patch_count": 226,
+      "patch_count": 228,
       "roundtrip": {
         "status": "verified",
         "method": "reverse-forward-exact-bytes",
-        "patch_count": 235,
-        "scope": "platform9-plus-chromix226",
+        "patch_count": 237,
+        "scope": "platform9-plus-chromix228",
         "initial": {
           "base/BUILD.gn": "2619e16bd05092597a911f7b0f9e51c3363d7a7267527d79150165fb873aa9aa",
+          "base/i18n/icubridge/default_icu_locale.h": "f415c2354ec91b6a69bdda447a6fc160d744cf1cfa2ed15b82d759c30080c04b",
           "base/uxr_config.cc": null,
           "base/uxr_config.h": null,
           "base/uxr_pixel_noise.h": null,
@@ -10172,6 +10195,7 @@
         "final": {
           ".gn": "e58bbfd0dbff85cbeb254d9cba347955cb6fc560109a6138b1d5210f8cdeb947",
           "base/BUILD.gn": "09b94c37a82ac4dc4d10703289b8bfc86642a6bb762da94227785c69c5896edc",
+          "base/i18n/icubridge/default_icu_locale.h": "e264e1484db3e05693c766132f5190bb717cb822dcc741a9601dba9530531663",
           "base/uxr_config.cc": "80221aa412502c12e71df2f1c4d168931b85d207e24fbec9138610362ed97e9d",
           "base/uxr_config.h": "38bf2c23188a7190772703783fd99233804b5bfe2056767d33820a0b98c2d293",
           "base/uxr_pixel_noise.h": "e6be9f458da759f69c3d9d108141621507f48f69afd22c4be9f2cd4b5de294c7",
@@ -10268,7 +10292,7 @@
           "third_party/blink/renderer/core/inspector/inspector_css_agent.cc": "57a8d6c799849fd411491c323528a9048cf0e53b8cdc2c81e3abba36cf4e93ca",
           "third_party/blink/renderer/core/inspector/inspector_css_agent.h": "1f1a985420a111b289db598eb922d30253d3210004577685ed1c43a535152474",
           "third_party/blink/renderer/core/layout/layout_theme_font_provider_default.cc": "06d4e778633950fd04de52c1ee900ce86e7553709c41c3aca00fb35ad4f80701",
-          "third_party/blink/renderer/core/timezone/timezone_controller.cc": "fd6f3e033c2f3c0ebc7055ad18aa47f2e8ced2e9c6185bf516313c5bcfe53837",
+          "third_party/blink/renderer/core/timezone/timezone_controller.cc": "9896389d368df46e5fb27b18f2a18783e177eb454bc9d3fe18bf10fa09b10374",
           "third_party/blink/renderer/core/timing/memory_info.h": "a88788c89b4b1c432bae0eb369edd1f863003ddbce98f2ae45f57248e945a7a1",
           "third_party/blink/renderer/core/timing/performance_resource_timing.cc": "0bf4bfee26e9a6e9695bb9d49da8238818fc539ae0cfdcbf8f8c2b9ad8ad9566",
           "third_party/blink/renderer/core/timing/time_clamper.cc": "ec31faa9825d2880f0f950d131dda1c18d426ebf93d6965acaf45383aa63fcd1",
@@ -10387,7 +10411,7 @@
       "overlay_mode": "downstream-nine-patch-recipe",
       "build_verified": false,
       "runtime_verified": false,
-      "expected_patch_count": 226,
+      "expected_patch_count": 228,
       "patches": [
         {
           "path": "patches/0001-base-BUILD-gn.patch",
@@ -12874,6 +12898,28 @@
           "postimages": {
             "third_party/blink/renderer/core/html/canvas/canvas_async_blob_creator.cc": "7d78a117324c383003bcda13cd61161cc336d8f498e246f621019ed2f7406945"
           }
+        },
+        {
+          "path": "patches/chromium157-additions/0236-timezone-default-locale-setter-key.patch",
+          "sha256": "aff87c11adaabdd3d3f832e7e175e878f416e60dce7390c6655d9314f7139b5a",
+          "status": "applied",
+          "preimages": {
+            "base/i18n/icubridge/default_icu_locale.h": "f415c2354ec91b6a69bdda447a6fc160d744cf1cfa2ed15b82d759c30080c04b"
+          },
+          "postimages": {
+            "base/i18n/icubridge/default_icu_locale.h": "e264e1484db3e05693c766132f5190bb717cb822dcc741a9601dba9530531663"
+          }
+        },
+        {
+          "path": "patches/chromium157-additions/0237-timezone-default-locale-api.patch",
+          "sha256": "e2ea0e503ad413a5a7ded2e06d3f9d49d48dc56b78d48937ad275e03aa3a9d1e",
+          "status": "applied",
+          "preimages": {
+            "third_party/blink/renderer/core/timezone/timezone_controller.cc": "fd6f3e033c2f3c0ebc7055ad18aa47f2e8ced2e9c6185bf516313c5bcfe53837"
+          },
+          "postimages": {
+            "third_party/blink/renderer/core/timezone/timezone_controller.cc": "9896389d368df46e5fb27b18f2a18783e177eb454bc9d3fe18bf10fa09b10374"
+          }
         }
       ],
       "predecessors": [
@@ -13388,14 +13434,15 @@
           "sha256": "d338adf0c712319a3b8efa666f57d378c6cef3bb31a027681a87e97694346417"
         }
       },
-      "patch_count": 226,
+      "patch_count": 228,
       "roundtrip": {
         "status": "verified",
         "method": "reverse-forward-exact-bytes",
-        "patch_count": 235,
-        "scope": "platform9-plus-chromix226",
+        "patch_count": 237,
+        "scope": "platform9-plus-chromix228",
         "initial": {
           "base/BUILD.gn": "a4a7c9b2663f2fe6fe529329fb60b523e73ace09363b7b4c4e27b196eb2a5b0d",
+          "base/i18n/icubridge/default_icu_locale.h": "f415c2354ec91b6a69bdda447a6fc160d744cf1cfa2ed15b82d759c30080c04b",
           "base/uxr_config.cc": null,
           "base/uxr_config.h": null,
           "base/uxr_pixel_noise.h": null,
@@ -13602,6 +13649,7 @@
         "final": {
           ".gn": "e58bbfd0dbff85cbeb254d9cba347955cb6fc560109a6138b1d5210f8cdeb947",
           "base/BUILD.gn": "8e909a7be9c74000daade788d3f75e986ffd0a81a1c357d667b1474a29cbe648",
+          "base/i18n/icubridge/default_icu_locale.h": "e264e1484db3e05693c766132f5190bb717cb822dcc741a9601dba9530531663",
           "base/uxr_config.cc": "80221aa412502c12e71df2f1c4d168931b85d207e24fbec9138610362ed97e9d",
           "base/uxr_config.h": "38bf2c23188a7190772703783fd99233804b5bfe2056767d33820a0b98c2d293",
           "base/uxr_pixel_noise.h": "e6be9f458da759f69c3d9d108141621507f48f69afd22c4be9f2cd4b5de294c7",
@@ -13698,7 +13746,7 @@
           "third_party/blink/renderer/core/inspector/inspector_css_agent.cc": "57a8d6c799849fd411491c323528a9048cf0e53b8cdc2c81e3abba36cf4e93ca",
           "third_party/blink/renderer/core/inspector/inspector_css_agent.h": "1f1a985420a111b289db598eb922d30253d3210004577685ed1c43a535152474",
           "third_party/blink/renderer/core/layout/layout_theme_font_provider_default.cc": "06d4e778633950fd04de52c1ee900ce86e7553709c41c3aca00fb35ad4f80701",
-          "third_party/blink/renderer/core/timezone/timezone_controller.cc": "fd6f3e033c2f3c0ebc7055ad18aa47f2e8ced2e9c6185bf516313c5bcfe53837",
+          "third_party/blink/renderer/core/timezone/timezone_controller.cc": "9896389d368df46e5fb27b18f2a18783e177eb454bc9d3fe18bf10fa09b10374",
           "third_party/blink/renderer/core/timing/memory_info.h": "a88788c89b4b1c432bae0eb369edd1f863003ddbce98f2ae45f57248e945a7a1",
           "third_party/blink/renderer/core/timing/performance_resource_timing.cc": "0bf4bfee26e9a6e9695bb9d49da8238818fc539ae0cfdcbf8f8c2b9ad8ad9566",
           "third_party/blink/renderer/core/timing/time_clamper.cc": "ec31faa9825d2880f0f950d131dda1c18d426ebf93d6965acaf45383aa63fcd1",
@@ -13817,7 +13865,7 @@
       "overlay_mode": "actual-platform",
       "build_verified": false,
       "runtime_verified": false,
-      "expected_patch_count": 232,
+      "expected_patch_count": 234,
       "patches": [
         {
           "path": "patches/0001-base-BUILD-gn.patch",
@@ -16370,6 +16418,28 @@
           "postimages": {
             "content/renderer/render_thread_impl.cc": "e05a1589bbdeeb1b9ed3659d2cb1c2ac0e1247ed8a4d46e5000617dc5a95c9bb"
           }
+        },
+        {
+          "path": "patches/chromium157-additions/0236-timezone-default-locale-setter-key.patch",
+          "sha256": "aff87c11adaabdd3d3f832e7e175e878f416e60dce7390c6655d9314f7139b5a",
+          "status": "applied",
+          "preimages": {
+            "base/i18n/icubridge/default_icu_locale.h": "f415c2354ec91b6a69bdda447a6fc160d744cf1cfa2ed15b82d759c30080c04b"
+          },
+          "postimages": {
+            "base/i18n/icubridge/default_icu_locale.h": "e264e1484db3e05693c766132f5190bb717cb822dcc741a9601dba9530531663"
+          }
+        },
+        {
+          "path": "patches/chromium157-additions/0237-timezone-default-locale-api.patch",
+          "sha256": "e2ea0e503ad413a5a7ded2e06d3f9d49d48dc56b78d48937ad275e03aa3a9d1e",
+          "status": "applied",
+          "preimages": {
+            "third_party/blink/renderer/core/timezone/timezone_controller.cc": "40225baef1c45eb180cb9b026af5278bfb27676e47995a162556765faaae4538"
+          },
+          "postimages": {
+            "third_party/blink/renderer/core/timezone/timezone_controller.cc": "7e5a1ff00ee73a0fa4ba5b3ef1fda2ec9e11dd703ca253692e931b5105d2ef84"
+          }
         }
       ],
       "predecessors": [
@@ -16518,14 +16588,15 @@
           "target": "content/browser/renderer_host/render_process_host_impl.cc"
         }
       ],
-      "patch_count": 232,
+      "patch_count": 234,
       "roundtrip": {
         "status": "verified",
         "method": "reverse-forward-exact-bytes",
-        "patch_count": 232,
+        "patch_count": 234,
         "scope": "chromix-stack",
         "initial": {
           "base/BUILD.gn": "2619e16bd05092597a911f7b0f9e51c3363d7a7267527d79150165fb873aa9aa",
+          "base/i18n/icubridge/default_icu_locale.h": "f415c2354ec91b6a69bdda447a6fc160d744cf1cfa2ed15b82d759c30080c04b",
           "base/uxr_config.cc": null,
           "base/uxr_config.h": null,
           "base/uxr_pixel_noise.h": null,
@@ -16699,6 +16770,7 @@
         },
         "final": {
           "base/BUILD.gn": "09b94c37a82ac4dc4d10703289b8bfc86642a6bb762da94227785c69c5896edc",
+          "base/i18n/icubridge/default_icu_locale.h": "e264e1484db3e05693c766132f5190bb717cb822dcc741a9601dba9530531663",
           "base/uxr_config.cc": "80221aa412502c12e71df2f1c4d168931b85d207e24fbec9138610362ed97e9d",
           "base/uxr_config.h": "38bf2c23188a7190772703783fd99233804b5bfe2056767d33820a0b98c2d293",
           "base/uxr_pixel_noise.h": "e6be9f458da759f69c3d9d108141621507f48f69afd22c4be9f2cd4b5de294c7",
@@ -16778,7 +16850,7 @@
           "third_party/blink/renderer/core/inspector/inspector_css_agent.cc": "57a8d6c799849fd411491c323528a9048cf0e53b8cdc2c81e3abba36cf4e93ca",
           "third_party/blink/renderer/core/inspector/inspector_css_agent.h": "1f1a985420a111b289db598eb922d30253d3210004577685ed1c43a535152474",
           "third_party/blink/renderer/core/layout/layout_theme_font_provider_default.cc": "06d4e778633950fd04de52c1ee900ce86e7553709c41c3aca00fb35ad4f80701",
-          "third_party/blink/renderer/core/timezone/timezone_controller.cc": "40225baef1c45eb180cb9b026af5278bfb27676e47995a162556765faaae4538",
+          "third_party/blink/renderer/core/timezone/timezone_controller.cc": "7e5a1ff00ee73a0fa4ba5b3ef1fda2ec9e11dd703ca253692e931b5105d2ef84",
           "third_party/blink/renderer/core/timezone/timezone_controller.h": "43a97ac69759278df48b657e45c5c3963cb4fba0563038162497a11de370c701",
           "third_party/blink/renderer/core/timing/memory_info.h": "a88788c89b4b1c432bae0eb369edd1f863003ddbce98f2ae45f57248e945a7a1",
           "third_party/blink/renderer/core/timing/performance_resource_timing.cc": "0bf4bfee26e9a6e9695bb9d49da8238818fc539ae0cfdcbf8f8c2b9ad8ad9566",
@@ -16883,7 +16955,7 @@
       "overlay_mode": "actual-platform",
       "build_verified": false,
       "runtime_verified": false,
-      "expected_patch_count": 232,
+      "expected_patch_count": 234,
       "patches": [
         {
           "path": "patches/0001-base-BUILD-gn.patch",
@@ -19436,6 +19508,28 @@
           "postimages": {
             "content/renderer/render_thread_impl.cc": "9c498c3e6263b0268b270a78d4b4d67610cc46c3da33b0775a006d43637d491c"
           }
+        },
+        {
+          "path": "patches/chromium157-additions/0236-timezone-default-locale-setter-key.patch",
+          "sha256": "aff87c11adaabdd3d3f832e7e175e878f416e60dce7390c6655d9314f7139b5a",
+          "status": "applied",
+          "preimages": {
+            "base/i18n/icubridge/default_icu_locale.h": "f415c2354ec91b6a69bdda447a6fc160d744cf1cfa2ed15b82d759c30080c04b"
+          },
+          "postimages": {
+            "base/i18n/icubridge/default_icu_locale.h": "e264e1484db3e05693c766132f5190bb717cb822dcc741a9601dba9530531663"
+          }
+        },
+        {
+          "path": "patches/chromium157-additions/0237-timezone-default-locale-api.patch",
+          "sha256": "e2ea0e503ad413a5a7ded2e06d3f9d49d48dc56b78d48937ad275e03aa3a9d1e",
+          "status": "applied",
+          "preimages": {
+            "third_party/blink/renderer/core/timezone/timezone_controller.cc": "40225baef1c45eb180cb9b026af5278bfb27676e47995a162556765faaae4538"
+          },
+          "postimages": {
+            "third_party/blink/renderer/core/timezone/timezone_controller.cc": "7e5a1ff00ee73a0fa4ba5b3ef1fda2ec9e11dd703ca253692e931b5105d2ef84"
+          }
         }
       ],
       "predecessors": [
@@ -19584,14 +19678,15 @@
           "target": "content/browser/renderer_host/render_process_host_impl.cc"
         }
       ],
-      "patch_count": 232,
+      "patch_count": 234,
       "roundtrip": {
         "status": "verified",
         "method": "reverse-forward-exact-bytes",
-        "patch_count": 232,
+        "patch_count": 234,
         "scope": "chromix-stack",
         "initial": {
           "base/BUILD.gn": "a4a7c9b2663f2fe6fe529329fb60b523e73ace09363b7b4c4e27b196eb2a5b0d",
+          "base/i18n/icubridge/default_icu_locale.h": "f415c2354ec91b6a69bdda447a6fc160d744cf1cfa2ed15b82d759c30080c04b",
           "base/uxr_config.cc": null,
           "base/uxr_config.h": null,
           "base/uxr_pixel_noise.h": null,
@@ -19765,6 +19860,7 @@
         },
         "final": {
           "base/BUILD.gn": "8e909a7be9c74000daade788d3f75e986ffd0a81a1c357d667b1474a29cbe648",
+          "base/i18n/icubridge/default_icu_locale.h": "e264e1484db3e05693c766132f5190bb717cb822dcc741a9601dba9530531663",
           "base/uxr_config.cc": "80221aa412502c12e71df2f1c4d168931b85d207e24fbec9138610362ed97e9d",
           "base/uxr_config.h": "38bf2c23188a7190772703783fd99233804b5bfe2056767d33820a0b98c2d293",
           "base/uxr_pixel_noise.h": "e6be9f458da759f69c3d9d108141621507f48f69afd22c4be9f2cd4b5de294c7",
@@ -19844,7 +19940,7 @@
           "third_party/blink/renderer/core/inspector/inspector_css_agent.cc": "57a8d6c799849fd411491c323528a9048cf0e53b8cdc2c81e3abba36cf4e93ca",
           "third_party/blink/renderer/core/inspector/inspector_css_agent.h": "1f1a985420a111b289db598eb922d30253d3210004577685ed1c43a535152474",
           "third_party/blink/renderer/core/layout/layout_theme_font_provider_default.cc": "06d4e778633950fd04de52c1ee900ce86e7553709c41c3aca00fb35ad4f80701",
-          "third_party/blink/renderer/core/timezone/timezone_controller.cc": "40225baef1c45eb180cb9b026af5278bfb27676e47995a162556765faaae4538",
+          "third_party/blink/renderer/core/timezone/timezone_controller.cc": "7e5a1ff00ee73a0fa4ba5b3ef1fda2ec9e11dd703ca253692e931b5105d2ef84",
           "third_party/blink/renderer/core/timezone/timezone_controller.h": "43a97ac69759278df48b657e45c5c3963cb4fba0563038162497a11de370c701",
           "third_party/blink/renderer/core/timing/memory_info.h": "a88788c89b4b1c432bae0eb369edd1f863003ddbce98f2ae45f57248e945a7a1",
           "third_party/blink/renderer/core/timing/performance_resource_timing.cc": "0bf4bfee26e9a6e9695bb9d49da8238818fc539ae0cfdcbf8f8c2b9ad8ad9566",
@@ -19949,7 +20045,7 @@
       "overlay_mode": "actual-platform",
       "build_verified": false,
       "runtime_verified": false,
-      "expected_patch_count": 228,
+      "expected_patch_count": 230,
       "patches": [
         {
           "path": "patches/0001-base-BUILD-gn.patch",
@@ -22458,6 +22554,28 @@
           "postimages": {
             "third_party/blink/renderer/modules/mediarecorder/media_recorder_handler.cc": "7907b48f0d6167f2ee5666fa04f0e54981746728c00aa3e76d846419fb2fd40c"
           }
+        },
+        {
+          "path": "patches/chromium157-additions/0236-timezone-default-locale-setter-key.patch",
+          "sha256": "aff87c11adaabdd3d3f832e7e175e878f416e60dce7390c6655d9314f7139b5a",
+          "status": "applied",
+          "preimages": {
+            "base/i18n/icubridge/default_icu_locale.h": "f415c2354ec91b6a69bdda447a6fc160d744cf1cfa2ed15b82d759c30080c04b"
+          },
+          "postimages": {
+            "base/i18n/icubridge/default_icu_locale.h": "e264e1484db3e05693c766132f5190bb717cb822dcc741a9601dba9530531663"
+          }
+        },
+        {
+          "path": "patches/chromium157-additions/0237-timezone-default-locale-api.patch",
+          "sha256": "e2ea0e503ad413a5a7ded2e06d3f9d49d48dc56b78d48937ad275e03aa3a9d1e",
+          "status": "applied",
+          "preimages": {
+            "third_party/blink/renderer/core/timezone/timezone_controller.cc": "fd6f3e033c2f3c0ebc7055ad18aa47f2e8ced2e9c6185bf516313c5bcfe53837"
+          },
+          "postimages": {
+            "third_party/blink/renderer/core/timezone/timezone_controller.cc": "9896389d368df46e5fb27b18f2a18783e177eb454bc9d3fe18bf10fa09b10374"
+          }
         }
       ],
       "predecessors": [
@@ -22606,14 +22724,15 @@
           "target": "content/browser/renderer_host/render_process_host_impl.cc"
         }
       ],
-      "patch_count": 228,
+      "patch_count": 230,
       "roundtrip": {
         "status": "verified",
         "method": "reverse-forward-exact-bytes",
-        "patch_count": 228,
+        "patch_count": 230,
         "scope": "chromix-stack",
         "initial": {
           "base/BUILD.gn": "2619e16bd05092597a911f7b0f9e51c3363d7a7267527d79150165fb873aa9aa",
+          "base/i18n/icubridge/default_icu_locale.h": "f415c2354ec91b6a69bdda447a6fc160d744cf1cfa2ed15b82d759c30080c04b",
           "base/uxr_config.cc": null,
           "base/uxr_config.h": null,
           "base/uxr_pixel_noise.h": null,
@@ -22785,6 +22904,7 @@
         },
         "final": {
           "base/BUILD.gn": "09b94c37a82ac4dc4d10703289b8bfc86642a6bb762da94227785c69c5896edc",
+          "base/i18n/icubridge/default_icu_locale.h": "e264e1484db3e05693c766132f5190bb717cb822dcc741a9601dba9530531663",
           "base/uxr_config.cc": "80221aa412502c12e71df2f1c4d168931b85d207e24fbec9138610362ed97e9d",
           "base/uxr_config.h": "38bf2c23188a7190772703783fd99233804b5bfe2056767d33820a0b98c2d293",
           "base/uxr_pixel_noise.h": "e6be9f458da759f69c3d9d108141621507f48f69afd22c4be9f2cd4b5de294c7",
@@ -22862,7 +22982,7 @@
           "third_party/blink/renderer/core/inspector/inspector_css_agent.cc": "57a8d6c799849fd411491c323528a9048cf0e53b8cdc2c81e3abba36cf4e93ca",
           "third_party/blink/renderer/core/inspector/inspector_css_agent.h": "1f1a985420a111b289db598eb922d30253d3210004577685ed1c43a535152474",
           "third_party/blink/renderer/core/layout/layout_theme_font_provider_default.cc": "06d4e778633950fd04de52c1ee900ce86e7553709c41c3aca00fb35ad4f80701",
-          "third_party/blink/renderer/core/timezone/timezone_controller.cc": "fd6f3e033c2f3c0ebc7055ad18aa47f2e8ced2e9c6185bf516313c5bcfe53837",
+          "third_party/blink/renderer/core/timezone/timezone_controller.cc": "9896389d368df46e5fb27b18f2a18783e177eb454bc9d3fe18bf10fa09b10374",
           "third_party/blink/renderer/core/timing/memory_info.h": "a88788c89b4b1c432bae0eb369edd1f863003ddbce98f2ae45f57248e945a7a1",
           "third_party/blink/renderer/core/timing/performance_resource_timing.cc": "0bf4bfee26e9a6e9695bb9d49da8238818fc539ae0cfdcbf8f8c2b9ad8ad9566",
           "third_party/blink/renderer/core/timing/time_clamper.cc": "ec31faa9825d2880f0f950d131dda1c18d426ebf93d6965acaf45383aa63fcd1",
@@ -22967,7 +23087,7 @@
       "overlay_mode": "actual-platform",
       "build_verified": false,
       "runtime_verified": false,
-      "expected_patch_count": 228,
+      "expected_patch_count": 230,
       "patches": [
         {
           "path": "patches/0001-base-BUILD-gn.patch",
@@ -25476,6 +25596,28 @@
           "postimages": {
             "third_party/blink/renderer/modules/mediarecorder/media_recorder_handler.cc": "7907b48f0d6167f2ee5666fa04f0e54981746728c00aa3e76d846419fb2fd40c"
           }
+        },
+        {
+          "path": "patches/chromium157-additions/0236-timezone-default-locale-setter-key.patch",
+          "sha256": "aff87c11adaabdd3d3f832e7e175e878f416e60dce7390c6655d9314f7139b5a",
+          "status": "applied",
+          "preimages": {
+            "base/i18n/icubridge/default_icu_locale.h": "f415c2354ec91b6a69bdda447a6fc160d744cf1cfa2ed15b82d759c30080c04b"
+          },
+          "postimages": {
+            "base/i18n/icubridge/default_icu_locale.h": "e264e1484db3e05693c766132f5190bb717cb822dcc741a9601dba9530531663"
+          }
+        },
+        {
+          "path": "patches/chromium157-additions/0237-timezone-default-locale-api.patch",
+          "sha256": "e2ea0e503ad413a5a7ded2e06d3f9d49d48dc56b78d48937ad275e03aa3a9d1e",
+          "status": "applied",
+          "preimages": {
+            "third_party/blink/renderer/core/timezone/timezone_controller.cc": "fd6f3e033c2f3c0ebc7055ad18aa47f2e8ced2e9c6185bf516313c5bcfe53837"
+          },
+          "postimages": {
+            "third_party/blink/renderer/core/timezone/timezone_controller.cc": "9896389d368df46e5fb27b18f2a18783e177eb454bc9d3fe18bf10fa09b10374"
+          }
         }
       ],
       "predecessors": [
@@ -25624,14 +25766,15 @@
           "target": "content/browser/renderer_host/render_process_host_impl.cc"
         }
       ],
-      "patch_count": 228,
+      "patch_count": 230,
       "roundtrip": {
         "status": "verified",
         "method": "reverse-forward-exact-bytes",
-        "patch_count": 228,
+        "patch_count": 230,
         "scope": "chromix-stack",
         "initial": {
           "base/BUILD.gn": "a4a7c9b2663f2fe6fe529329fb60b523e73ace09363b7b4c4e27b196eb2a5b0d",
+          "base/i18n/icubridge/default_icu_locale.h": "f415c2354ec91b6a69bdda447a6fc160d744cf1cfa2ed15b82d759c30080c04b",
           "base/uxr_config.cc": null,
           "base/uxr_config.h": null,
           "base/uxr_pixel_noise.h": null,
@@ -25803,6 +25946,7 @@
         },
         "final": {
           "base/BUILD.gn": "8e909a7be9c74000daade788d3f75e986ffd0a81a1c357d667b1474a29cbe648",
+          "base/i18n/icubridge/default_icu_locale.h": "e264e1484db3e05693c766132f5190bb717cb822dcc741a9601dba9530531663",
           "base/uxr_config.cc": "80221aa412502c12e71df2f1c4d168931b85d207e24fbec9138610362ed97e9d",
           "base/uxr_config.h": "38bf2c23188a7190772703783fd99233804b5bfe2056767d33820a0b98c2d293",
           "base/uxr_pixel_noise.h": "e6be9f458da759f69c3d9d108141621507f48f69afd22c4be9f2cd4b5de294c7",
@@ -25880,7 +26024,7 @@
           "third_party/blink/renderer/core/inspector/inspector_css_agent.cc": "57a8d6c799849fd411491c323528a9048cf0e53b8cdc2c81e3abba36cf4e93ca",
           "third_party/blink/renderer/core/inspector/inspector_css_agent.h": "1f1a985420a111b289db598eb922d30253d3210004577685ed1c43a535152474",
           "third_party/blink/renderer/core/layout/layout_theme_font_provider_default.cc": "06d4e778633950fd04de52c1ee900ce86e7553709c41c3aca00fb35ad4f80701",
-          "third_party/blink/renderer/core/timezone/timezone_controller.cc": "fd6f3e033c2f3c0ebc7055ad18aa47f2e8ced2e9c6185bf516313c5bcfe53837",
+          "third_party/blink/renderer/core/timezone/timezone_controller.cc": "9896389d368df46e5fb27b18f2a18783e177eb454bc9d3fe18bf10fa09b10374",
           "third_party/blink/renderer/core/timing/memory_info.h": "a88788c89b4b1c432bae0eb369edd1f863003ddbce98f2ae45f57248e945a7a1",
           "third_party/blink/renderer/core/timing/performance_resource_timing.cc": "0bf4bfee26e9a6e9695bb9d49da8238818fc539ae0cfdcbf8f8c2b9ad8ad9566",
           "third_party/blink/renderer/core/timing/time_clamper.cc": "ec31faa9825d2880f0f950d131dda1c18d426ebf93d6965acaf45383aa63fcd1",

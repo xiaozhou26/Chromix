@@ -5,14 +5,14 @@
   "core_tag_object": "33eece1eb0b5286bf71e732fbbad7a46faface5a",
   "core_peeled_commit": "8c886dffc6ade39d8f7df5d64ace5a8824b455e1",
   "chromium_commit": "4b3d0dabb8250b6f152d2d85d79e7706e309d087",
-  "scope": "157 evidence update plus exact Linux recipe/nine platform replacements imported from d1edf19. Historical224/156 and all Chromix157 patch bytes unchanged. No pins, selector or production helper changes.",
+  "scope": "Append exact157 locale API repairs 0236/0237 to every platform; preserve all prior root224, 156, 157 overrides and additions byte-for-byte. Update selector fixed hashes and source replay evidence; donor migration remains separate.",
   "verification_limits": [
     "Full Linux downstream platform sequence is replayed, nine patches covering all36 target files. Core replay is the exact intersecting-file subset, not all827 core sections.",
-    "No compilation, GN generation, full GN/link, browser runtime or architecture execution.",
+    "Linux x64 complete timezone_controller.cc, default_icu_locale.cc and icu4c_tag_converter.cc compile with the restored official commands; relocatable link resolves new setter/converter symbols. No full browser link or runtime execution.",
     "x64/arm64 share source patches; this is not six native builds.",
     "Linux uses authorized156 platform configuration baseline plus explicit157 core override and pinned downstream recipe, not an official portablelinux157 tag.",
     "No core-only diagnostic cases count toward success.",
-    "Windows/macOS retain original157 source scope and actual overlay intersection audit.",
+    "Windows/macOS preserve previous source scope and overlay intersections; ten exact157 API/initialization source files added for locale review.",
     "No push or workflow dispatch."
   ],
   "final_overrides": {
@@ -59,7 +59,9 @@
     "0078": "Retain qualified CanvasRenderingContext::ValidateRectForCanvas and original RecordBridgeOp calls.",
     "0149": "Retain157 Skia includes and add SkBitmap; clipped opaque copy unchanged.",
     "0150": "Keep upstream strengthened CHECK(thread_checker_.CalledOnValidThread()); do not regress to156 DCHECK. All added bounds/stride checks identical.",
-    "all": "Every override/addition preserves the multiset of nonempty added lines against effective156 predecessor. Other rebases only context/location. Runtime gates unchanged."
+    "all": "Every existing override/addition preserves the previously reviewed bytes and added-line multiset; only new0236/0237 adapt the removed locale setter.",
+    "0236": "Forward-declare and friend only blink::TimeZoneController in DefaultIcuLocaleSetterKey. Constructor remains private; existing authorized callers unchanged.",
+    "0237": "Keep first-language parsing, ICU validity guards and initialization order. Convert validated ICU locale through IcuLocaleConverter and call SetDefaultIcuLocale to update both holder and ICU. No DevTools override acquisition or timezone policy changes."
   },
   "upstream_duplicate_checks": {
     "managed_profile": "Exact157 core still removes managed_profile_creation_controller sources;0225 remains needed. Verified exactly one final .cc entry.",
@@ -69,9 +71,9 @@
     "canvas": "Upstream157 initialization CHECK and shuffle call retained; no duplicate helper definition introduced."
   },
   "platform_patch_counts": {
-    "linux": 226,
-    "windows": 232,
-    "macos": 228
+    "linux": 228,
+    "macos": 230,
+    "windows": 234
   },
   "additions": {
     "linux": [
@@ -86,6 +88,16 @@
         "sha256": "4c048a50930c3541a3bb9e4442ad7f18e94c04ebccf86c0cfbfc286b15a70751",
         "predecessor": "patches/chromium156-additions/0227-opaque-png-export-consistency.patch",
         "predecessor_sha256": "4c048a50930c3541a3bb9e4442ad7f18e94c04ebccf86c0cfbfc286b15a70751"
+      },
+      {
+        "path": "patches/chromium157-additions/0236-timezone-default-locale-setter-key.patch",
+        "sha256": "aff87c11adaabdd3d3f832e7e175e878f416e60dce7390c6655d9314f7139b5a",
+        "kind": "locale-api-compatibility"
+      },
+      {
+        "path": "patches/chromium157-additions/0237-timezone-default-locale-api.patch",
+        "sha256": "e2ea0e503ad413a5a7ded2e06d3f9d49d48dc56b78d48937ad275e03aa3a9d1e",
+        "kind": "locale-api-compatibility"
       }
     ],
     "windows": [
@@ -136,6 +148,16 @@
         "sha256": "7f7f691f2d744715e0d48a25dab5ff1e8ac793122657beacd0f99a3e7e8ba908",
         "predecessor": "patches/chromium156-additions/0233-renderer-timezone-webstring-api.patch",
         "predecessor_sha256": "7f7f691f2d744715e0d48a25dab5ff1e8ac793122657beacd0f99a3e7e8ba908"
+      },
+      {
+        "path": "patches/chromium157-additions/0236-timezone-default-locale-setter-key.patch",
+        "sha256": "aff87c11adaabdd3d3f832e7e175e878f416e60dce7390c6655d9314f7139b5a",
+        "kind": "locale-api-compatibility"
+      },
+      {
+        "path": "patches/chromium157-additions/0237-timezone-default-locale-api.patch",
+        "sha256": "e2ea0e503ad413a5a7ded2e06d3f9d49d48dc56b78d48937ad275e03aa3a9d1e",
+        "kind": "locale-api-compatibility"
       }
     ],
     "macos": [
@@ -162,6 +184,16 @@
         "sha256": "b9f895112210e0753abe0ff4c8a065db0b26f006ba763819b2530969584eb961",
         "predecessor": "patches/chromium156-additions/0235-macos-hevc-recorder-mime.patch",
         "predecessor_sha256": "b9f895112210e0753abe0ff4c8a065db0b26f006ba763819b2530969584eb961"
+      },
+      {
+        "path": "patches/chromium157-additions/0236-timezone-default-locale-setter-key.patch",
+        "sha256": "aff87c11adaabdd3d3f832e7e175e878f416e60dce7390c6655d9314f7139b5a",
+        "kind": "locale-api-compatibility"
+      },
+      {
+        "path": "patches/chromium157-additions/0237-timezone-default-locale-api.patch",
+        "sha256": "e2ea0e503ad413a5a7ded2e06d3f9d49d48dc56b78d48937ad275e03aa3a9d1e",
+        "kind": "locale-api-compatibility"
       }
     ]
   },
@@ -206,30 +238,102 @@
     "recipe_sha256": "42d788d91c0ec2345c253044665af7f623501a73c8bdb627a94d1739790aeb11",
     "qualification": "Authorized old platform baseline plus exact157 core override and all nine downstream replacements; not an official portablelinux157 tag."
   },
-  "review_manifest_sha256": "8e25b19e957f3c96d2a308b0d519fd35efbdfefe15d3156bb7540d08dd25abac",
+  "review_manifest_sha256": "f1afcd08e19590b9740316f9ff69f6347c786be9a7117c06c9ce9236757b38e8",
   "linux_full_platform_coverage": {
-    "raw_source_files": 192,
+    "raw_source_files": 202,
     "platform_files": 36,
     "core_sections": 43,
     "platform_patches": 9,
     "platform_sections": 36,
-    "chromix_patches": 226,
-    "combined_roundtrip_patches": 235,
+    "chromix_patches": 228,
+    "combined_roundtrip_patches": 237,
     "domain_modes": [
       "raw",
       "substituted"
     ],
     "post_core_preimages": "Every36 platform source bytes must equal independently audited fixture before any replacement.",
-    "sequential_checks": "Each of9 exact pre/post SHA256 maps plus final_outputs checked; all9 platform reverse/forward and combined235 reverse/forward verified.",
+    "sequential_checks": "Each of9 exact pre/post SHA256 maps plus final_outputs checked; all9 platform reverse/forward and combined237 reverse/forward verified.",
     "policy": "Retains157 native WebBundle/IFT and Rust/Crubit assertions, Node version check and native TypeScript recipe. Full GN/link compatibility remains unverified."
   },
   "regression_tests": {
-    "passed": 151,
-    "skipped": 7,
-    "skip_reason": "PowerShell is required",
+    "passed": 627,
+    "skipped": 2,
+    "native_separate_passed": 1,
+    "skip_reason": "Optional native tree absent in host regression; native test separately passed in restored Linux tree. Chromium155 macOS was not supported by the historical baseline.",
     "negative_checks": [
       "modified downstream platform patch rejected",
-      "reordered downstream recipe rejected by audit binding"
+      "reordered downstream recipe rejected by audit binding",
+      "old226 donor selection cannot silently admit228 patches",
+      "platform-specific addition replacement rejected even after reauthentication"
     ]
+  },
+  "locale_api_evidence": {
+    "baseline_commit": "38f35ce29d6e1d02dde1d041f5a745d84cfbba9b",
+    "chromium_commit": "4b3d0dabb8250b6f152d2d85d79e7706e309d087",
+    "source_run": 44578881741,
+    "artifact_id": 14575703787,
+    "artifact_sha256": "4931d64445290b10d8c7d0c4e5fb223228f5b9172e66cb1e09d9d6d93c152c49",
+    "args_sha256": "2368fb9594bcebf1f5f74ffcd49bb0684d6e479d4e5f010a46f47f555b588027",
+    "clang_sha256": "8091a95554f24a2affa32c80e884c3d36960c5d971560d3410391ffc36af19a7",
+    "build_ninja_sha256": "33c17bf17684286919900be9416aceda0b222e803e70cc70ac9e1b7d2d6f3761",
+    "compile_command_sha256": "2c3ebeb7fc7b4b7b03dfbe713355e529e91981c07b7e8712e0d8751e9ba92185",
+    "original_compile_error": "\u001b[1m../../third_party/blink/renderer/core/timezone/timezone_controller.cc:122:19: \u001b[0m\u001b[0;1;31merror: \u001b[0m\u001b[1mno member named 'SetICUDefaultLocale' in namespace 'base::i18n'\u001b[0m\n  122 |       base::i18n::SetICUDefaultLocale(locale.getName());\u001b[0m\n      | \u001b[0;1;32m                  ^~~~~~~~~~~~~~~~~~~\n\u001b[0m1 error generated.\n",
+    "patched_compile_returncode": 0,
+    "object_sha256": {
+      "default_icu_locale.o": "d71271bc621ad48e820063df087fc8955defe2af78a54ace2150e55c57c0b619",
+      "timezone_controller.o": "5dc622fc2b2e395f33f31dd5dc8d11cb909c22208133d36e5ed2e9d186ca4ef4",
+      "timezone-locale-linked.o": "959e7e943b7711bff3cbb5c61d55fd24d214938952ae9ce50bf8f90397ac65ba",
+      "icu4c_tag_converter.o": "f5c62129a2961ac652ad03bc44939660f951fe35182b342f69f52e9306fbc70b"
+    },
+    "link_scope": "Relocatable link of complete timezone_controller, real default_icu_locale and real icu4c_tag_converter objects. New setter/converter references resolved; not a full browser link or runtime test.",
+    "symbols": [
+      "                 U base::i18n::IcuLocaleConverter::GetInstance()",
+      "                 U base::i18n::SetDefaultIcuLocale(base::i18n::DefaultIcuLocaleSetterKey, base::i18n::LanguageTag const&)",
+      "                 U base::i18n::IcuLocaleConverter::ToLanguageTag(icu_78::Locale const&) const",
+      "0000000000000000 B guard variable for base::i18n::IcuLocaleConverter::GetInstance()::instance (.llvm.13064358053664680675)",
+      "0000000000000000 T base::i18n::IcuLocaleConverter::GetInstance()",
+      "0000000000000000 T base::i18n::SetDefaultIcuLocale(base::i18n::DefaultIcuLocaleSetterKey, base::i18n::LanguageTag const&)",
+      "0000000000000000 T base::i18n::IcuLocaleConverter::ToLanguageTag(icu_78::Locale const&) const",
+      "0000000000000000 B base::i18n::IcuLocaleConverter::GetInstance()::instance (.llvm.13064358053664680675)"
+    ],
+    "files": {
+      "linux": {
+        "base/i18n/icubridge/default_icu_locale.h": {
+          "pre_sha256": "f415c2354ec91b6a69bdda447a6fc160d744cf1cfa2ed15b82d759c30080c04b",
+          "post_sha256": "e264e1484db3e05693c766132f5190bb717cb822dcc741a9601dba9530531663"
+        },
+        "third_party/blink/renderer/core/timezone/timezone_controller.cc": {
+          "pre_sha256": "fd6f3e033c2f3c0ebc7055ad18aa47f2e8ced2e9c6185bf516313c5bcfe53837",
+          "post_sha256": "9896389d368df46e5fb27b18f2a18783e177eb454bc9d3fe18bf10fa09b10374"
+        }
+      },
+      "macos": {
+        "base/i18n/icubridge/default_icu_locale.h": {
+          "pre_sha256": "f415c2354ec91b6a69bdda447a6fc160d744cf1cfa2ed15b82d759c30080c04b",
+          "post_sha256": "e264e1484db3e05693c766132f5190bb717cb822dcc741a9601dba9530531663"
+        },
+        "third_party/blink/renderer/core/timezone/timezone_controller.cc": {
+          "pre_sha256": "fd6f3e033c2f3c0ebc7055ad18aa47f2e8ced2e9c6185bf516313c5bcfe53837",
+          "post_sha256": "9896389d368df46e5fb27b18f2a18783e177eb454bc9d3fe18bf10fa09b10374"
+        }
+      },
+      "windows": {
+        "base/i18n/icubridge/default_icu_locale.h": {
+          "pre_sha256": "f415c2354ec91b6a69bdda447a6fc160d744cf1cfa2ed15b82d759c30080c04b",
+          "post_sha256": "e264e1484db3e05693c766132f5190bb717cb822dcc741a9601dba9530531663"
+        },
+        "third_party/blink/renderer/core/timezone/timezone_controller.cc": {
+          "pre_sha256": "40225baef1c45eb180cb9b026af5278bfb27676e47995a162556765faaae4538",
+          "post_sha256": "7e5a1ff00ee73a0fa4ba5b3ef1fda2ec9e11dd703ca253692e931b5105d2ef84"
+        }
+      }
+    },
+    "counted_identity_sha256": {
+      "linux": "4c37c10825a83b67888275b217805706d24445f9392e4eca5511fe7c5581fbbc",
+      "macos": "9ef95e97f7e5081a8ae91745d6e4aff453faa8b8aed94c52089dd0aa37fe3f4f",
+      "windows": "c54e44cb36388d89582ffaf500634194cee837a87fe599a44f1cbb18b4b3439f"
+    },
+    "api_call_audit": "All added i18n/ICU locale calls found in selected157 patches are covered by the complete timezone object and real-header LanguageTagConverter/ICU probe; no additional removed locale API found.",
+    "runtime_verified": false
   }
 }

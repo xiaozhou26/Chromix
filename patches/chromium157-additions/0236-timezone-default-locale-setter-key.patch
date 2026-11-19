@@ -1,0 +1,19 @@
+diff --git a/base/i18n/icubridge/default_icu_locale.h b/base/i18n/icubridge/default_icu_locale.h
+--- a/base/i18n/icubridge/default_icu_locale.h
++++ b/base/i18n/icubridge/default_icu_locale.h
+@@ -43,6 +43,7 @@
+ 
+ namespace blink {
+ class LocaleController;
++class TimeZoneController;
+ }
+ 
+ namespace content {
+@@ -73,6 +74,7 @@
+  private:
+   friend class ScopedDefaultIcuLocale;
+   friend class ::blink::LocaleController;
++  friend class ::blink::TimeZoneController;
+   friend class ::android_webview::AwMainDelegate;
+   friend void ::android_webview::InitIcuAndResourceBundleBrowserSide();
+   friend class ::WebEngineMainDelegate;

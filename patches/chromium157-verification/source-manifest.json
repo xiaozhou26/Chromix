@@ -1348,6 +1348,76 @@
       "revision": "307108153d1e35e6e74528ee55f97b0cd59bf182",
       "sha256": "0111eb9aeef7f912fb0468fd854cc529d18e8d73f790570ad1e0990906ed008b",
       "url": "https://chromium.googlesource.com/v8/v8/+/307108153d1e35e6e74528ee55f97b0cd59bf182/src/inspector/v8-runtime-agent-impl.h?format=TEXT"
+    },
+    "base/i18n/icu4c_tag_converter.cc": {
+      "bytes": 2226,
+      "git_blob": "258c60aca438fd6f1eff69c248f127ad1b9201c3",
+      "revision": "4b3d0dabb8250b6f152d2d85d79e7706e309d087",
+      "sha256": "cb6b9b25754225552f6402b6e4cb01b21a17f252cfb4b13f68ff576cd3544e5f",
+      "url": "https://chromium.googlesource.com/chromium/src/+/4b3d0dabb8250b6f152d2d85d79e7706e309d087/base/i18n/icu4c_tag_converter.cc?format=TEXT"
+    },
+    "base/i18n/icu4c_tag_converter.h": {
+      "bytes": 1766,
+      "git_blob": "04478e587354e220da94308838c659cf2da2407e",
+      "revision": "4b3d0dabb8250b6f152d2d85d79e7706e309d087",
+      "sha256": "b8ca886350f50fdc8decc6683fde65aeb3a356aceacb102e1741c4b1b115fe9e",
+      "url": "https://chromium.googlesource.com/chromium/src/+/4b3d0dabb8250b6f152d2d85d79e7706e309d087/base/i18n/icu4c_tag_converter.h?format=TEXT"
+    },
+    "base/i18n/icubridge/default_icu_locale.cc": {
+      "bytes": 2182,
+      "git_blob": "72d0c393261fdc4008574426b3d2b2ae8f71db26",
+      "revision": "4b3d0dabb8250b6f152d2d85d79e7706e309d087",
+      "sha256": "32060690394729336a78fdcd06dab2a25211019a18bfddf18f8125fe406f475c",
+      "url": "https://chromium.googlesource.com/chromium/src/+/4b3d0dabb8250b6f152d2d85d79e7706e309d087/base/i18n/icubridge/default_icu_locale.cc?format=TEXT"
+    },
+    "base/i18n/icubridge/default_icu_locale.h": {
+      "bytes": 2721,
+      "git_blob": "0dfdca46cdb20088cdfa6f044bff79d0af7c65da",
+      "revision": "4b3d0dabb8250b6f152d2d85d79e7706e309d087",
+      "sha256": "f415c2354ec91b6a69bdda447a6fc160d744cf1cfa2ed15b82d759c30080c04b",
+      "url": "https://chromium.googlesource.com/chromium/src/+/4b3d0dabb8250b6f152d2d85d79e7706e309d087/base/i18n/icubridge/default_icu_locale.h?format=TEXT"
+    },
+    "base/i18n/rtl.h": {
+      "bytes": 6862,
+      "git_blob": "6afc306d80748c011825cda99bfe4bfb3f6d180a",
+      "revision": "4b3d0dabb8250b6f152d2d85d79e7706e309d087",
+      "sha256": "c08cc45fedf49f1facefa45edb5ed29d780588b0f8d440eabe29aef927861567",
+      "url": "https://chromium.googlesource.com/chromium/src/+/4b3d0dabb8250b6f152d2d85d79e7706e309d087/base/i18n/rtl.h?format=TEXT"
+    },
+    "base/i18n/tag_converters.cc": {
+      "bytes": 3988,
+      "git_blob": "fc7ed4bf6183acf22ecd616ca7ad8628c7fd3829",
+      "revision": "4b3d0dabb8250b6f152d2d85d79e7706e309d087",
+      "sha256": "f7be918dcc3bef98901f20157546436e853ad1b8ec1ba8b4646c4155db2d1b86",
+      "url": "https://chromium.googlesource.com/chromium/src/+/4b3d0dabb8250b6f152d2d85d79e7706e309d087/base/i18n/tag_converters.cc?format=TEXT"
+    },
+    "base/i18n/tag_converters.h": {
+      "bytes": 2261,
+      "git_blob": "e3d05c595cf1bc9cbe318312c3765af3292ef0b5",
+      "revision": "4b3d0dabb8250b6f152d2d85d79e7706e309d087",
+      "sha256": "3937b4bf93446e0cb63e82bac29043f397c80a5faf4267aafb85119f7bec416d",
+      "url": "https://chromium.googlesource.com/chromium/src/+/4b3d0dabb8250b6f152d2d85d79e7706e309d087/base/i18n/tag_converters.h?format=TEXT"
+    },
+    "third_party/blink/renderer/core/core_initializer.cc": {
+      "bytes": 8086,
+      "git_blob": "2e293d4b493fe17f209fedb6b6133bfb68889b15",
+      "revision": "4b3d0dabb8250b6f152d2d85d79e7706e309d087",
+      "sha256": "60868d55d8291862c7e091537911c11bdae283cef872acb85d9f070d2568b757",
+      "url": "https://chromium.googlesource.com/chromium/src/+/4b3d0dabb8250b6f152d2d85d79e7706e309d087/third_party/blink/renderer/core/core_initializer.cc?format=TEXT"
+    },
+    "third_party/blink/renderer/core/inspector/locale_controller.cc": {
+      "bytes": 3142,
+      "git_blob": "5aab8bc930d8265f59ffbd94fd70e581c3b45e25",
+      "revision": "4b3d0dabb8250b6f152d2d85d79e7706e309d087",
+      "sha256": "78db7722703ba0a9ccf308a2d8fa8f74cec718788ee97c63333ae6ad55c126f1",
+      "url": "https://chromium.googlesource.com/chromium/src/+/4b3d0dabb8250b6f152d2d85d79e7706e309d087/third_party/blink/renderer/core/inspector/locale_controller.cc?format=TEXT"
+    },
+    "third_party/blink/renderer/core/inspector/locale_controller.h": {
+      "bytes": 1061,
+      "git_blob": "92f53136cfa9aeb95e975d294789d4a21266f259",
+      "revision": "4b3d0dabb8250b6f152d2d85d79e7706e309d087",
+      "sha256": "5ef8d145ac8779a0357457972844be1112d4e8676acadf0ab52d9fb527748c50",
+      "url": "https://chromium.googlesource.com/chromium/src/+/4b3d0dabb8250b6f152d2d85d79e7706e309d087/third_party/blink/renderer/core/inspector/locale_controller.h?format=TEXT"
     }
   },
   "linux_downstream": {
@@ -8310,6 +8380,13 @@
       ".gn",
       "DEPS",
       "base/BUILD.gn",
+      "base/i18n/icu4c_tag_converter.cc",
+      "base/i18n/icu4c_tag_converter.h",
+      "base/i18n/icubridge/default_icu_locale.cc",
+      "base/i18n/icubridge/default_icu_locale.h",
+      "base/i18n/rtl.h",
+      "base/i18n/tag_converters.cc",
+      "base/i18n/tag_converters.h",
       "build/toolchain/linux/BUILD.gn",
       "chrome/VERSION",
       "chrome/app/chrome_main.cc",
@@ -8371,6 +8448,7 @@
       "third_party/blink/renderer/controller/blink_initializer.cc",
       "third_party/blink/renderer/core/animation/animation_clock.cc",
       "third_party/blink/renderer/core/animation/document_timeline.cc",
+      "third_party/blink/renderer/core/core_initializer.cc",
       "third_party/blink/renderer/core/css/media_values.cc",
       "third_party/blink/renderer/core/dom/element.cc",
       "third_party/blink/renderer/core/dom/element.h",
@@ -8401,6 +8479,8 @@
       "third_party/blink/renderer/core/input/pointer_event_manager.cc",
       "third_party/blink/renderer/core/inspector/inspector_css_agent.cc",
       "third_party/blink/renderer/core/inspector/inspector_css_agent.h",
+      "third_party/blink/renderer/core/inspector/locale_controller.cc",
+      "third_party/blink/renderer/core/inspector/locale_controller.h",
       "third_party/blink/renderer/core/layout/layout_theme_font_provider_default.cc",
       "third_party/blink/renderer/core/timezone/timezone_controller.cc",
       "third_party/blink/renderer/core/timezone/timezone_controller.h",
@@ -8503,6 +8583,13 @@
     "windows": [
       "DEPS",
       "base/BUILD.gn",
+      "base/i18n/icu4c_tag_converter.cc",
+      "base/i18n/icu4c_tag_converter.h",
+      "base/i18n/icubridge/default_icu_locale.cc",
+      "base/i18n/icubridge/default_icu_locale.h",
+      "base/i18n/rtl.h",
+      "base/i18n/tag_converters.cc",
+      "base/i18n/tag_converters.h",
       "chrome/VERSION",
       "chrome/app/chrome_main.cc",
       "chrome/browser/chrome_browser_main.cc",
@@ -8545,6 +8632,7 @@
       "third_party/blink/renderer/controller/blink_initializer.cc",
       "third_party/blink/renderer/core/animation/animation_clock.cc",
       "third_party/blink/renderer/core/animation/document_timeline.cc",
+      "third_party/blink/renderer/core/core_initializer.cc",
       "third_party/blink/renderer/core/css/media_values.cc",
       "third_party/blink/renderer/core/dom/element.cc",
       "third_party/blink/renderer/core/dom/element.h",
@@ -8575,6 +8663,8 @@
       "third_party/blink/renderer/core/input/pointer_event_manager.cc",
       "third_party/blink/renderer/core/inspector/inspector_css_agent.cc",
       "third_party/blink/renderer/core/inspector/inspector_css_agent.h",
+      "third_party/blink/renderer/core/inspector/locale_controller.cc",
+      "third_party/blink/renderer/core/inspector/locale_controller.h",
       "third_party/blink/renderer/core/layout/layout_theme_font_provider_default.cc",
       "third_party/blink/renderer/core/timezone/timezone_controller.cc",
       "third_party/blink/renderer/core/timezone/timezone_controller.h",
@@ -8662,6 +8752,13 @@
     "macos": [
       "DEPS",
       "base/BUILD.gn",
+      "base/i18n/icu4c_tag_converter.cc",
+      "base/i18n/icu4c_tag_converter.h",
+      "base/i18n/icubridge/default_icu_locale.cc",
+      "base/i18n/icubridge/default_icu_locale.h",
+      "base/i18n/rtl.h",
+      "base/i18n/tag_converters.cc",
+      "base/i18n/tag_converters.h",
       "chrome/VERSION",
       "chrome/app/chrome_main.cc",
       "chrome/browser/chrome_browser_main.cc",
@@ -8704,6 +8801,7 @@
       "third_party/blink/renderer/controller/blink_initializer.cc",
       "third_party/blink/renderer/core/animation/animation_clock.cc",
       "third_party/blink/renderer/core/animation/document_timeline.cc",
+      "third_party/blink/renderer/core/core_initializer.cc",
       "third_party/blink/renderer/core/css/media_values.cc",
       "third_party/blink/renderer/core/dom/element.cc",
       "third_party/blink/renderer/core/dom/element.h",
@@ -8734,6 +8832,8 @@
       "third_party/blink/renderer/core/input/pointer_event_manager.cc",
       "third_party/blink/renderer/core/inspector/inspector_css_agent.cc",
       "third_party/blink/renderer/core/inspector/inspector_css_agent.h",
+      "third_party/blink/renderer/core/inspector/locale_controller.cc",
+      "third_party/blink/renderer/core/inspector/locale_controller.h",
       "third_party/blink/renderer/core/layout/layout_theme_font_provider_default.cc",
       "third_party/blink/renderer/core/timezone/timezone_controller.cc",
       "third_party/blink/renderer/core/timezone/timezone_controller.h",

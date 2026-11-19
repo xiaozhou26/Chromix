@@ -177,9 +177,11 @@ def test_even_reauthenticated_manifest_cannot_disagree_with_review(repo157, monk
     if mutation == "addition-order":
         entry["additions"].reverse()
     elif mutation == "addition-swap":
-        entry["additions"][-1] = copy.deepcopy(manifest["platforms"]["windows"]["additions"][2])
-        if platform == "windows":
-            entry["additions"][-1] = copy.deepcopy(manifest["platforms"]["macos"]["additions"][-1])
+        other = "macos" if platform == "windows" else "windows"
+        selected = {patch["path"] for patch in entry["additions"]}
+        replacement = next(patch for patch in manifest["platforms"][other]["additions"]
+                           if patch["path"] not in selected)
+        entry["additions"][-1] = copy.deepcopy(replacement)
     elif mutation == "override-hash":
         patch = manifest["overrides"][0]
         path = repo / patch["path"]
@@ -250,7 +252,7 @@ def test_linux_records_real_156_gitlink_but_fails_closed(repo157, monkeypatch):
     assert linux["version"] == selection.VERSION156 + "-1"
     assert linux["commit"] == selection.PLATFORM156_COMMITS["linux"]
     assert linux["core_gitlink"] == selection.CORE156 != selection.CORE157
-    assert len(linux["additions"]) + 224 == 226
+    assert len(linux["additions"]) + 224 == 228
     set_platform_pins(repo, "linux", selection.VERSION157, selection.CORE157, linux["commit"])
     historical = subprocess.check_output(["git", "-C", str(ROOT), "show",
         "63dd0fc5934b7c27d4a1e3439a024a96ad96bba0:" + selection.REVIEW157])

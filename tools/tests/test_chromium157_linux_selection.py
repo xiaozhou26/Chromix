@@ -70,7 +70,7 @@ def test_integrated_linux_selection_matches_real_recipe_and_parser():
     identity, patches = selection.select(ROOT, "linux")
     assert pins["ChromiumVersion"] == selection.VERSION157
     assert pins["UngoogledLinuxVersion"] == selection.VERSION156 + "-1"
-    assert len(patches) == 226
+    assert len(patches) == 228
     assert identity["selection"]["downstream"]["recipe"] == linux157_source.recipe(ROOT)
     assert identity["selection"]["core_gitlink"] == selection.CORE156
     assert identity["selection"]["effective_core_commit"] == selection.CORE157
@@ -134,7 +134,10 @@ def test_gn_recovery_binds_exact_new_inputs_and_preserves_donor_patch_identity(l
         checkpoint.validate_recipe_delta(donor["source_receipt"]["recipe"], historical)
         with pytest.raises(ValueError, match="delta"):
             checkpoint.validate_recipe_delta(donor["source_receipt"]["recipe"], DOWNSTREAM["recipe"])
-        checkpoint.compatible_selection(donor["source_receipt"]["chromix_selection"], selected)
+        original = donor["source_receipt"]["chromix_selection"]
+        assert original["patches"] == selected["patches"][:-2]
+        with pytest.raises(ValueError, match="cannot change the 226 patches"):
+            checkpoint.compatible_selection(original, selected)
         assert delta["gn_args"]["identities"][arch]["original_sha256"] == donor["files"]["src/out/Chromix/args.gn"]
         assert delta["donors"][arch]["artifact"] == donor["artifact"]
 
@@ -187,7 +190,10 @@ def test_libclang_scope_and_latest_postgn_donors_are_exact(linux_repo):
     selected, _ = selection.select(linux_repo, "linux")
     for arch, donor in postgn.load(linux_repo)["donors"].items():
         postgn.delta(donor["source_receipt"]["recipe"], DOWNSTREAM["recipe"])
-        prior.compatible_selection(donor["source_receipt"]["chromix_selection"], selected)
+        original = donor["source_receipt"]["chromix_selection"]
+        assert original["patches"] == selected["patches"][:-2]
+        with pytest.raises(ValueError, match="cannot change the 226 patches"):
+            prior.compatible_selection(original, selected)
         assert delta["donors"][arch]["artifact"] == donor["artifact"]
         assert delta["donors"][arch]["workflow_path"] == donor["workflow_path"]
         assert donor["files"]["src/out/Chromix/build.ninja"]
@@ -228,7 +234,7 @@ def test_reviewed_activation_preserves_real_origin_and_effective_core(linux_repo
     activate(linux_repo, monkeypatch)
     identity, patches = selection.select(linux_repo, "linux")
     chosen = identity["selection"]
-    assert len(patches) == 226
+    assert len(patches) == 228
     assert chosen["core_commit"] == chosen["effective_core_commit"] == selection.CORE157
     assert chosen["core_gitlink"] == selection.CORE156 != selection.CORE157
     assert chosen["platform_version"] == "156.0.8078.79-1"

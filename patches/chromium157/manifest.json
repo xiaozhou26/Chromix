@@ -1178,6 +1178,16 @@
         "sha256": "4c048a50930c3541a3bb9e4442ad7f18e94c04ebccf86c0cfbfc286b15a70751",
         "predecessor": "patches/chromium156-additions/0227-opaque-png-export-consistency.patch",
         "predecessor_sha256": "4c048a50930c3541a3bb9e4442ad7f18e94c04ebccf86c0cfbfc286b15a70751"
+      },
+      {
+        "path": "patches/chromium157-additions/0236-timezone-default-locale-setter-key.patch",
+        "sha256": "aff87c11adaabdd3d3f832e7e175e878f416e60dce7390c6655d9314f7139b5a",
+        "kind": "locale-api-compatibility"
+      },
+      {
+        "path": "patches/chromium157-additions/0237-timezone-default-locale-api.patch",
+        "sha256": "e2ea0e503ad413a5a7ded2e06d3f9d49d48dc56b78d48937ad275e03aa3a9d1e",
+        "kind": "locale-api-compatibility"
       }
     ],
     "windows": [
@@ -1228,6 +1238,16 @@
         "sha256": "7f7f691f2d744715e0d48a25dab5ff1e8ac793122657beacd0f99a3e7e8ba908",
         "predecessor": "patches/chromium156-additions/0233-renderer-timezone-webstring-api.patch",
         "predecessor_sha256": "7f7f691f2d744715e0d48a25dab5ff1e8ac793122657beacd0f99a3e7e8ba908"
+      },
+      {
+        "path": "patches/chromium157-additions/0236-timezone-default-locale-setter-key.patch",
+        "sha256": "aff87c11adaabdd3d3f832e7e175e878f416e60dce7390c6655d9314f7139b5a",
+        "kind": "locale-api-compatibility"
+      },
+      {
+        "path": "patches/chromium157-additions/0237-timezone-default-locale-api.patch",
+        "sha256": "e2ea0e503ad413a5a7ded2e06d3f9d49d48dc56b78d48937ad275e03aa3a9d1e",
+        "kind": "locale-api-compatibility"
       }
     ],
     "macos": [
@@ -1254,12 +1274,22 @@
         "sha256": "b9f895112210e0753abe0ff4c8a065db0b26f006ba763819b2530969584eb961",
         "predecessor": "patches/chromium156-additions/0235-macos-hevc-recorder-mime.patch",
         "predecessor_sha256": "b9f895112210e0753abe0ff4c8a065db0b26f006ba763819b2530969584eb961"
+      },
+      {
+        "path": "patches/chromium157-additions/0236-timezone-default-locale-setter-key.patch",
+        "sha256": "aff87c11adaabdd3d3f832e7e175e878f416e60dce7390c6655d9314f7139b5a",
+        "kind": "locale-api-compatibility"
+      },
+      {
+        "path": "patches/chromium157-additions/0237-timezone-default-locale-api.patch",
+        "sha256": "e2ea0e503ad413a5a7ded2e06d3f9d49d48dc56b78d48937ad275e03aa3a9d1e",
+        "kind": "locale-api-compatibility"
       }
     ]
   },
   "fixture": {
     "path": "tools/tests/fixtures/chromium157_patch_sources.json.gz",
-    "sha256": "6b9a15d6b35004d7690323ef4ff1b282da5f03c8b7d276488dbb44e0be0155bf"
+    "sha256": "50dee2d547ae0049cd4653ef16502e0d5bd60fed00c5938252564cd7660acd31"
   },
   "historical_files": [
     {
