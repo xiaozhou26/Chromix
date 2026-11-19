@@ -14,6 +14,7 @@ import pytest
 from tools import linux157_source as source
 from tools import linux157_toolchain as tools
 from tools import linux157_build as build
+from tools import linux157_checkpoint as checkpoint
 
 
 def lite_inputs(tmp_path):
@@ -162,15 +163,13 @@ def test_real_lite_archive_inputs_and_official_tsgo_patch(tmp_path):
     assert "set src(url: string|TrustedScriptURL)" in dom
 
 
-def test_source_validates_before_prune_and_restores_before_ready():
+def test_recovery_only_source_never_prunes_or_downloads_again():
     text = (source.ROOT / "tools/linux157_source.py").read_text()
-    start = text.index("    apply_platform(src, tooling, repo, patch_bin)")
-    segment = text[start:]
-    assert segment.index("restore=False") < segment.index('str(core / "utils/prune_binaries.py")')
-    assert segment.index('str(core / "utils/prune_binaries.py")') < segment.index(
-        '    preflight_inputs(src, load_manifest(repo))')
-    assert segment.index('    preflight_inputs(src, load_manifest(repo))') < segment.index(
-        '    (src / ".chromix-source-ready").write_text')
+    assert "fresh preparation is disabled" in text
+    preparation = text.split("def prepare(", 1)[1].split("def validate_route", 1)[0]
+    assert "verify_migrated(work, arch, repo)" in preparation
+    assert "prune_binaries.py" not in preparation
+    assert "download(" not in preparation
 
 
 def test_toolchain_missing_inputs_stop_before_any_download(tmp_path):
@@ -195,7 +194,8 @@ def test_checkpoint_rejects_recoverable_but_not_yet_restored_inputs(tmp_path):
     identity = source.recipe()
     (src / ".chromix-source-ready").write_text("linux157-fresh|x64|" + identity["sha256"])
     receipt = {"stage": "chromix-applied", "target_arch": "x64", "chromix_selection": {}}
-    with mock.patch.object(source, "validate_route"), \
+    with mock.patch.object(checkpoint, "verify_migrated"), \
+            mock.patch.object(source, "validate_route"), \
             mock.patch.object(source, "verify_receipt", return_value=receipt), \
             mock.patch.object(source, "get_platform"), \
             mock.patch.object(patch_selection, "select", return_value=({}, [])), \

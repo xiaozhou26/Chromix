@@ -14,6 +14,7 @@ import yaml
 
 from tools import linux157_source as source
 from tools import linux157_build as build
+from tools import linux157_checkpoint as checkpoint
 
 ROOT = Path(__file__).resolve().parents[2]
 
@@ -56,6 +57,7 @@ raise SystemExit(17)
 
 
 def test_fresh_build_really_calls_prepare_then_official_toolchain(tmp_path):
+    (tmp_path / "src").mkdir()
     calls = []
     with mock.patch.object(build.toolchain.platform, 'system', return_value='Linux'), \
             mock.patch.object(build.toolchain.platform, 'machine', return_value='x86_64'), \
@@ -131,7 +133,7 @@ def test_recipe_binds_lite_payload_and_keeps_gitlink_override_separate():
     assert recipe['inputs'][source.LITE_PATH] == source.LITE_SHA256
     assert recipe['platform_core_gitlink'] != recipe['core_override']
     text = (ROOT / 'tools/linux157_source.py').read_text()
-    assert 'watched = set(load_manifest(repo)["final_outputs"]) | {lite_target, TSGO_PATCH_PATH}' in text
+    assert 'fresh preparation is disabled' in text
     assert 'get_platform(*paths, repo)' in text
     assert 'never rewrite the baseline gitlink' in text
 
@@ -144,7 +146,8 @@ def test_checkpoint_requires_exact_ready_selection_and_provenance(tmp_path):
     selection = {'selection': {'fixture': '157'}}
     receipt = {'stage': 'chromix-applied', 'target_arch': 'arm64', 'chromix_selection': selection}
     from tools import patch_selection
-    with mock.patch.object(source, 'validate_route', return_value=identity), \
+    with mock.patch.object(checkpoint, 'verify_migrated'), \
+            mock.patch.object(source, 'validate_route', return_value=identity), \
             mock.patch.object(source, 'verify_receipt', return_value=receipt), \
             mock.patch.object(source, 'get_platform', return_value=identity) as origin, \
             mock.patch.object(build.toolchain, 'preflight_inputs', return_value={'recoverable_missing': []}), \

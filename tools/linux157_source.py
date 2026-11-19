@@ -78,7 +78,8 @@ def validate_pins(pins: dict, repo: Path = ROOT) -> dict:
 def recipe(repo: Path = ROOT) -> dict:
     manifest = load_manifest(repo)
     files = [MANIFEST, "tools/linux157_source.py", "tools/linux157_toolchain.py",
-             "tools/linux157_build.py", LITE_PATH]
+             "tools/linux157_build.py", "tools/linux157_gn.py", "tools/linux157_checkpoint.py",
+             "build/linux/157.0.8103.78/pre-gn-checkpoints.json", LITE_PATH]
     if digest(regular(repo, LITE_PATH).read_bytes()) != LITE_SHA256:
         raise ValueError("changed Linux157 lite payload")
     files += [entry["path"] for entry in manifest["patches"]]
@@ -93,7 +94,7 @@ def recipe(repo: Path = ROOT) -> dict:
 
 def git(path: Path, *args: str) -> str:
     env = {k: v for k, v in os.environ.items() if not k.startswith("GIT_")}
-    env.update(GIT_CONFIG_NOSYSTEM="1", GIT_CONFIG_GLOBAL=os.devnull)
+    env.update(GIT_CONFIG_NOSYSTEM="1", GIT_CONFIG_GLOBAL=os.devnull, GIT_OPTIONAL_LOCKS="0")
     return subprocess.check_output(["git", "-C", str(path), *args], env=env, text=True).strip()
 
 
@@ -248,6 +249,11 @@ def prepare(work: Path, arch: str, repo: Path = ROOT) -> None:
     work = work.resolve()
     src = work / "src"
     if src.exists():
+        try:
+            from .linux157_checkpoint import verify_migrated
+        except ImportError:
+            from linux157_checkpoint import verify_migrated
+        verify_migrated(work, arch, repo)
         receipt = verify_receipt(src, repo)
         expected_ready = "linux157-fresh|" + arch + "|" + recipe(repo)["sha256"]
         if (regular(src, ".chromix-source-ready").read_text().strip() != expected_ready or
@@ -256,73 +262,7 @@ def prepare(work: Path, arch: str, repo: Path = ROOT) -> None:
         get_platform(work / "tooling/ungoogled-chromium",
                      work / "tooling/ungoogled-chromium-portablelinux", repo)
         return
-    core, tooling = init_subrepos(work, repo)
-    try:
-        from .linux157_toolchain import download
-    except ImportError:
-        from linux157_toolchain import download
-    archive = load_manifest(repo)["source_archive"]
-    cache = work / "download_cache"
-    cache.mkdir(exist_ok=True)
-    tarball = download(archive, cache / ("chromium-" + VERSION + "-lite.tar.xz"))
-    src.mkdir()
-    # Official archive hash is verified before unpacking with the pinned core utility.
-    subprocess.run([sys.executable, str(core / "utils/downloads.py"), "unpack", "-i",
-                    str(core / "downloads.ini"), "-c", str(cache), str(src)], check=True)
-    if not tarball.is_file():
-        raise ValueError("verified source download disappeared")
-    patch_bin = shutil.which("gpatch") or shutil.which("patch")
-    env = dict(os.environ, PATCH_BIN=patch_bin or "patch")
-    subprocess.run([sys.executable, str(core / "utils/patches.py"), "apply", str(src),
-                    str(core / "patches")], env=env, check=True)
-    apply_platform(src, tooling, repo, patch_bin)
-    try:
-        from .linux157_toolchain import preflight_inputs, TSGO_PATCH_PATH
-    except ImportError:
-        from linux157_toolchain import preflight_inputs, TSGO_PATCH_PATH
-    # Reject altered 3pp bytes before pruning could erase the evidence.
-    preflight_inputs(src, load_manifest(repo), restore=False)
-    (src / IN_PROGRESS).write_text("pruning-and-lite-inputs\n")
-    subprocess.run([sys.executable, str(core / "utils/prune_binaries.py"), str(src),
-                    str(core / "pruning.list")], check=True)
-    preflight_inputs(src, load_manifest(repo))
-    (src / IN_PROGRESS).write_text("chromix-patches\n")
-    lite = regular(repo, LITE_PATH).read_bytes()
-    if digest(lite) != LITE_SHA256:
-        raise ValueError("changed Linux157 lite payload")
-    lite_target = "v8/test/torque/test-torque.tq"
-    if (src / lite_target).exists():
-        if regular(src, lite_target).read_bytes() != lite:
-            raise ValueError("unexpected source archive Torque payload")
-    else:
-        parent = src
-        for part in lite_target.split("/")[:-1]:
-            parent = parent / part
-            if parent.is_symlink():
-                raise ValueError("linked source lite payload parent")
-        if (src / lite_target).is_symlink():
-            raise ValueError("linked source lite payload")
-        (src / lite_target).parent.mkdir(parents=True, exist_ok=True)
-        (src / lite_target).write_bytes(lite)
-    subprocess.run([str(repo / "build/apply-patches.sh"), str(src)],
-                   env=dict(env, CHROMIX_PATCH_PLATFORM="linux"), check=True)
-    receipt = json.loads(regular(src, RECEIPT).read_bytes())
-    watched = set(load_manifest(repo)["final_outputs"]) | {lite_target, TSGO_PATCH_PATH}
-    for _, raw in patch_selection.select(repo, "linux", src=src, core=core)[1]:
-        watched.update(re.findall(r"^diff --git a/\S+ b/(\S+)$", raw.decode(), re.M))
-    outputs = {}
-    for name in sorted(watched):
-        path = src / name
-        outputs[name] = digest(regular(src, name).read_bytes()) if path.exists() else None
-    receipt.update(stage="chromix-applied", chromix_selection=selection, target_arch=arch,
-                   prepared_outputs=outputs)
-    (src / RECEIPT).write_text(json.dumps(receipt, sort_keys=True, indent=2) + "\n")
-    (src / IN_PROGRESS).unlink()
-    for marker, value in ((".chromix-ungoogled-core", CORE),
-                          (".chromix-ungoogled-platform", PLATFORM),
-                          (".chromix-chromium-version", VERSION)):
-        (src / marker).write_text(value + "\n")
-    (src / ".chromix-source-ready").write_text("linux157-fresh|" + arch + "|" + recipe(repo)["sha256"] + "\n")
+    raise ValueError("Linux157 recovery requires the exact latest stage1 prepared snapshot; fresh preparation is disabled")
 
 
 def validate_route(repo: Path = ROOT, arch: str = "x64") -> dict:
@@ -347,6 +287,11 @@ def checkpoint(work: Path, arch: str, repo: Path = ROOT) -> dict:
     validate_route(repo, arch)
     work = work.resolve()
     src = work / "src"
+    try:
+        from .linux157_checkpoint import verify_migrated
+    except ImportError:
+        from linux157_checkpoint import verify_migrated
+    verify_migrated(work, arch, repo)
     receipt = verify_receipt(src, repo)
     selection, _ = patch_selection.select(repo, "linux", src=src)
     if (receipt.get("stage") != "chromix-applied" or receipt.get("target_arch") != arch

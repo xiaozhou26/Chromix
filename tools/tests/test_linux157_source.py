@@ -33,7 +33,8 @@ def clone_recipe(tmp_path):
     lite = root / source.LITE_PATH
     lite.parent.mkdir(parents=True, exist_ok=True)
     shutil.copy2(ROOT / source.LITE_PATH, lite)
-    for name in ("linux157_source.py", "linux157_toolchain.py", "linux157_build.py"):
+    for name in ("linux157_source.py", "linux157_toolchain.py", "linux157_build.py",
+                 "linux157_gn.py", "linux157_checkpoint.py"):
         shutil.copy2(ROOT / "tools" / name, root / "tools" / name)
     return root
 

@@ -15,9 +15,13 @@ import tempfile
 try:
     from . import linux157_source as source
     from . import linux157_toolchain as toolchain
+    from . import linux157_gn as host_gn
+    from . import linux157_checkpoint as checkpoint
 except ImportError:
     import linux157_source as source
     import linux157_toolchain as toolchain
+    import linux157_gn as host_gn
+    import linux157_checkpoint as checkpoint
 
 
 GO_VERSION = "go1.27.1"
@@ -110,6 +114,8 @@ def build(work: Path, arch: str, repo: Path = source.ROOT) -> None:
         raise ValueError("Linux157 fresh build requires a Linux x64 build host")
     if os.environ.get("CHROMIX_USE_UPSTREAM_CACHE", "0") != "0" or os.environ.get("CHROMIX_UPSTREAM_CACHE_DIR"):
         raise ValueError("Linux157 fresh builds cannot use a donor cache")
+    if not (work / "src").is_dir():
+        raise ValueError("Linux157 GN recovery requires the exact latest stage1 prepared checkpoint; fresh fallback forbidden")
     source.prepare(work, arch, repo)
     src = work / "src"
     toolchain.prepare(src, arch, repo)
@@ -162,18 +168,9 @@ def build(work: Path, arch: str, repo: Path = source.ROOT) -> None:
                     "--repo", str(repo), "--core", str(core), "--platform-tooling", str(tooling),
                     "--platform", "linux", "--output", str(report)], check=True, env=env)
     shutil.copy2(report, diagnostic / "source-final.json")
-    target_gn = work / "linux157-target.gn"
-    target_gn.write_text(f'target_cpu = "{arch}"\nv8_target_cpu = "{arch}"\n'
-                         'use_typescript_go = true\nuse_chromium_rust_toolchain = true\n'
-                         'rust_prebuilt_stdlib = false\n')
-    profile = os.environ.get("CHROMIX_BUILD_PROFILE", "release")
-    if profile not in ("release", "fast"):
-        raise ValueError("invalid Linux157 build profile")
-    subprocess.run([sys.executable, str(repo / "tools/merge_gn_args.py"), "--build-profile", profile,
-                    str(out / "args.gn"), str(core / "flags.gn"), str(tooling / "flags.linux.gn"),
-                    str(repo / "build/args.gn"), str(target_gn)], check=True, env=env)
-    subprocess.run([sys.executable, str(repo / "tools/bootstrap_gn.py"), "--src", str(src), "--out", str(out)],
-                   check=True, env=env)
+    checkpoint.prepare_args(work, arch, repo)
+    gn_identity = host_gn.prepare(src, out, env=env)
+    (diagnostic / "linux157-host-gn.json").write_text(json.dumps(gn_identity, indent=2) + "\n")
     subprocess.run([str(out / "gn"), "gen", str(out), "--fail-on-unused-args"], cwd=src, check=True, env=env)
     ninja = shutil.which("ninja")
     if not ninja:
