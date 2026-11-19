@@ -1155,9 +1155,9 @@
           },
           "inputs": {
             "build/linux/157.0.8103.78/source.json": "5ad5898d9442cc31b6ed571702f9e88510e9eea144ed544f60187e66e5c948d8",
-            "tools/linux157_source.py": "90de62dd14a7d1a4fac791653fb1535e3e2ea65ee6f32688a29a393e5a806d98",
-            "tools/linux157_toolchain.py": "0d5d2bfeaccfea5cf75f874e0f52831773f77419e89ec45b0a36d1cfee324d04",
-            "tools/linux157_build.py": "b7574ad8168193161c2b8283da43dad4104a55de18285c6cb9718c0504a28c18",
+            "tools/linux157_source.py": "c1e90fb1e718568766294544b937ae9f9d9b3b7cf4ba11206496612cc69c55ce",
+            "tools/linux157_toolchain.py": "539a28814632a79333adefe55d2f8bd6b8e37455aaf43f2b506175d3b733954a",
+            "tools/linux157_build.py": "884a738a1fee14534795076ebd97bf4c6a2705b2e4cb78059231d2968fc88361",
             "build/windows/lite-tarball-files/v8/test/torque/test-torque.tq": "502c92560d745fc94e93ec7b95a1c562a55167f58a2ce79e3d0e4881dfb928c5",
             "build/linux/157.0.8103.78/patches/use-oauth2-client-switches-as-default.patch": "9564c36390f1ca1d08ffe42a81a1088aaba7eec8249ba6ff66a85f0592a282ef",
             "build/linux/157.0.8103.78/patches/fix-compiling-on-arm64.patch": "a2932c2ea04e4822e5d5c3e94f39b779134990c9d417a707a1652702239705a6",
@@ -1169,7 +1169,7 @@
             "build/linux/157.0.8103.78/patches/chromium-156-revert-crubit-changes.patch": "70c63c2d028c5b4069c16b13152e97ce42785752cf9837cc63bbc0243d3e20d0",
             "build/linux/157.0.8103.78/patches/chromium-156-revert-use-typescript-go.patch": "e1f21b386321371bf76fc0dd5d14c5f142f54f495685e6e7b67313a1d3a0ce6f"
           },
-          "sha256": "14ccc007ff428b42887fbd15b22b2fdd58d3ab35cef5ae3249f92f1339cc1fd9"
+          "sha256": "0c7aa841f0fafff1e7d03a765c3693f00de1ccb2d40786f2bb5ecc425c20933c"
         },
         "source_manifest": {
           "path": "build/linux/157.0.8103.78/source.json",
@@ -1246,11 +1246,11 @@
           },
           "replayed_recipe_sha256": "42d788d91c0ec2345c253044665af7f623501a73c8bdb627a94d1739790aeb11",
           "recipe_integration": {
-            "recipe_sha256": "14ccc007ff428b42887fbd15b22b2fdd58d3ab35cef5ae3249f92f1339cc1fd9",
+            "recipe_sha256": "0c7aa841f0fafff1e7d03a765c3693f00de1ccb2d40786f2bb5ecc425c20933c",
             "changed_inputs": {
               "tools/linux157_source.py": {
                 "before_sha256": "342b7c98f191280bc23e9c988b1ffe1f39cdc514f460f0b186ab026bb2d4a9d9",
-                "sha256": "90de62dd14a7d1a4fac791653fb1535e3e2ea65ee6f32688a29a393e5a806d98"
+                "sha256": "c1e90fb1e718568766294544b937ae9f9d9b3b7cf4ba11206496612cc69c55ce"
               },
               "build/windows/lite-tarball-files/v8/test/torque/test-torque.tq": {
                 "before_sha256": null,
@@ -1258,11 +1258,51 @@
               },
               "tools/linux157_build.py": {
                 "before_sha256": "048e644354c26812c5b0db71e272c53066eb6f1b7d19d68821bb4329cfdb6503",
-                "sha256": "b7574ad8168193161c2b8283da43dad4104a55de18285c6cb9718c0504a28c18"
+                "sha256": "884a738a1fee14534795076ebd97bf4c6a2705b2e4cb78059231d2968fc88361"
+              },
+              "tools/linux157_toolchain.py": {
+                "before_sha256": "0d5d2bfeaccfea5cf75f874e0f52831773f77419e89ec45b0a36d1cfee324d04",
+                "sha256": "539a28814632a79333adefe55d2f8bd6b8e37455aaf43f2b506175d3b733954a"
               }
             },
-            "review": "Source helper adds exact lite Torque payload binding/copy, explicit source-manifest identity, and fail-closed fresh route/checkpoint validation. Build helper binds Linux amd64 host Go1.27.1 to its complete GOROOT, checks binary/compiler identity, and compiles/runs a standard-library probe using the copied Go executable before passing its bound environment to the build. Toolchain helper, source manifest, GN/source patches and all nine platform replacements are unchanged. This reviewed helper delta extends recipe identity, not the original patch replay or compilation/runtime evidence.",
-            "base_commit": "98f97fb23a97b41140c8a2d50e72ad7ad403a9b8"
+            "review": "Source helper adds exact lite Torque payload binding/copy, explicit source-manifest identity, and fail-closed fresh route/checkpoint validation. Build helper binds Linux amd64 host Go1.27.1 to its complete GOROOT, checks binary/compiler identity, and compiles/runs a standard-library probe using the copied Go executable before passing its bound environment to the build. The subsequent exact pruning-recovery delta below updates all three helpers. Source manifest, GN/source patches and all nine platform replacements remain unchanged. This reviewed helper delta extends recipe identity, not the original patch replay or compilation/runtime evidence.",
+            "base_commit": "98f97fb23a97b41140c8a2d50e72ad7ad403a9b8",
+            "pruning_recovery": {
+              "baseline_commit": "f2d0021993567111b0dd740d61b45bcf774a4f29",
+              "implementation_commit": "e57311afc6bf765b707da4f06e9c0488e564928a",
+              "previous_recipe_sha256": "14ccc007ff428b42887fbd15b22b2fdd58d3ab35cef5ae3249f92f1339cc1fd9",
+              "recipe_sha256": "0c7aa841f0fafff1e7d03a765c3693f00de1ccb2d40786f2bb5ecc425c20933c",
+              "changed_inputs": {
+                "tools/linux157_source.py": {
+                  "before_sha256": "90de62dd14a7d1a4fac791653fb1535e3e2ea65ee6f32688a29a393e5a806d98",
+                  "sha256": "c1e90fb1e718568766294544b937ae9f9d9b3b7cf4ba11206496612cc69c55ce"
+                },
+                "tools/linux157_toolchain.py": {
+                  "before_sha256": "0d5d2bfeaccfea5cf75f874e0f52831773f77419e89ec45b0a36d1cfee324d04",
+                  "sha256": "539a28814632a79333adefe55d2f8bd6b8e37455aaf43f2b506175d3b733954a"
+                },
+                "tools/linux157_build.py": {
+                  "before_sha256": "b7574ad8168193161c2b8283da43dad4104a55de18285c6cb9718c0504a28c18",
+                  "sha256": "884a738a1fee14534795076ebd97bf4c6a2705b2e4cb78059231d2968fc88361"
+                }
+              },
+              "tool_input": {
+                "path": "third_party/typescript/linux-amd64/3pp/patches/typescript_native_preview.patch",
+                "sha256": "00150dd2e4944be353977639bcd1313786d9f839e84f1564ca983d841dab00de",
+                "git_blob": "f43b2d7b72858c118777dfd394d9edc28f6e49fe",
+                "bytes": 2747
+              },
+              "archive_audit": {
+                "archive_sha256": "9fdce9d3c866f97f14f7a4250915e8e5b729dc952fcfb3a35507b126233f0660",
+                "archive_bytes": 2079860732,
+                "member_count": 692077,
+                "report_sha256": "50840b7d837d97e4abded4e589c07d0e8415c5a3821c7c0385715af1aa785cad",
+                "pruning_recovery_report_sha256": "f386570b63008c0777e087acde4b454ab2d120df4af43ecc69639e3d0c0dfe72",
+                "helper_review_sha256": "e174bbc8d8e855d3c2e6db87db82ac86fb0634134cae713c81a2b3ca7eeafd98",
+                "prune_script_sha256": "43e44d422196e23b2a6a72c0234863495226631fed5000e6c05e3963bd620bc8"
+              },
+              "review": "The official lite archive contains all 13 pinned toolchain inputs. Exact core CONTINGENT_PATHS pruning deletes only the native TypeScript 3pp patch among those inputs. Authenticate existing inputs before pruning; restore only the exact missing official patch with exclusive creation after all input checks; bind it in prepared source outputs. Checkpoint admission remains read-only and rejects missing inputs; failure metadata uses that same exact checkpoint gate rather than build.ninja existence. This is tool-input preimage recovery, not a source/platform patch change or migration of old ready snapshots."
+            }
           },
           "patch_count": 226,
           "platform_patch_count": 9,

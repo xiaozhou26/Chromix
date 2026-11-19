@@ -484,13 +484,29 @@ SNAPSHOT_ENSURE = """      - name: Verify handoff snapshot
         run: |
           set -euo pipefail
           SNAP="${RUNNER_TEMP}/chromix-build/.snapshot-stage-%(stage)d"
+          UPLOAD_IDENTITY="${RUNNER_TEMP}/chromix-logs/checkpoint-upload-identity-s%(stage)d.json"
+          LINUX157_UPLOAD=0
           if [ '${{ inputs.platform }}' = linux ]; then
-            python3 tools/verify_linux_checkpoint.py --workdir "${RUNNER_TEMP}/chromix-build" --arch '${{ inputs.arch }}' \\
-              > "${RUNNER_TEMP}/chromix-logs/checkpoint-upload-identity-s%(stage)d.json"
+            if [ "${CHROMIUM_VERSION:-}" = 157.0.8103.78 ]; then
+              CHROMIX_USE_UPSTREAM_CACHE=0 python3 tools/linux157_source.py --phase checkpoint \\
+                --workdir "${RUNNER_TEMP}/chromix-build" --arch '${{ inputs.arch }}' \\
+                > "${RUNNER_TEMP}/chromix-logs/checkpoint-upload-source-s%(stage)d.json"
+              CHROMIX_USE_UPSTREAM_CACHE=0 python3 tools/verify_linux157_upload.py \\
+                --workdir "${RUNNER_TEMP}/chromix-build" --arch '${{ inputs.arch }}' > "$UPLOAD_IDENTITY"
+              LINUX157_UPLOAD=1
+            else
+              python3 tools/verify_linux_checkpoint.py --workdir "${RUNNER_TEMP}/chromix-build" --arch '${{ inputs.arch }}' \\
+                > "$UPLOAD_IDENTITY"
+            fi
           fi
           test -d "$SNAP/p1"
-          python3 tools/snapshot_volumes.py "$SNAP" |
-            xargs -0 cat | zstd -d -T0 | python3 tools/verify_snapshot_tar.py
+          if [ "$LINUX157_UPLOAD" = 1 ]; then
+            python3 tools/snapshot_volumes.py "$SNAP" |
+              xargs -0 cat | zstd -d -T0 | python3 tools/verify_linux157_upload.py --archive-report "$UPLOAD_IDENTITY"
+          else
+            python3 tools/snapshot_volumes.py "$SNAP" |
+              xargs -0 cat | zstd -d -T0 | python3 tools/verify_snapshot_tar.py
+          fi
 """
 
 UPLOAD_PARTS = """      - name: Upload tree part 1

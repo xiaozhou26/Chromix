@@ -14,13 +14,13 @@ from tools import patch_selection as selection
 from tools.tests.test_patch_selection import clone_repo, set_platform_pins
 
 ROOT = Path(__file__).resolve().parents[2]
-LINUX_IMPLEMENTATION = "98f97fb23a97b41140c8a2d50e72ad7ad403a9b8"
+LINUX_IMPLEMENTATION = "e57311afc6bf765b707da4f06e9c0488e564928a"
 MANIFEST = json.loads((ROOT / selection.MANIFEST157).read_bytes())
 DOWNSTREAM = MANIFEST["platforms"]["linux"]["downstream"]
 
 
-def blob(name):
-    return subprocess.check_output(["git", "-C", str(ROOT), "show", LINUX_IMPLEMENTATION + ":" + name])
+def blob(name, ref=LINUX_IMPLEMENTATION):
+    return subprocess.check_output(["git", "-C", str(ROOT), "show", ref + ":" + name])
 
 
 def store(repo, name, raw):
@@ -34,7 +34,7 @@ def linux_repo(tmp_path, monkeypatch):
     repo = clone_repo(tmp_path)
     shutil.copy2(ROOT / selection.MANIFEST157, repo / selection.MANIFEST157)
     for name, expected in DOWNSTREAM["recipe"]["inputs"].items():
-        raw = (ROOT / name).read_bytes() if name == "tools/linux157_build.py" else blob(name)
+        raw = blob(name)
         assert selection.digest(raw) == expected
         store(repo, name, raw)
     set_platform_pins(repo, "linux", selection.VERSION157, selection.CORE157,
@@ -84,19 +84,32 @@ def test_exact_recipe_source_and_nine_override_group_match_actual_implementation
         for entry in source["patches"]]
     assert len(DOWNSTREAM["platform_overrides"]) == 9
     assert DOWNSTREAM["platform_override_group_sha256"] == selection.canonical_digest(DOWNSTREAM["platform_overrides"])
-    assert DOWNSTREAM["recipe"]["sha256"] == "14ccc007ff428b42887fbd15b22b2fdd58d3ab35cef5ae3249f92f1339cc1fd9"
+    assert DOWNSTREAM["recipe"]["sha256"] == "0c7aa841f0fafff1e7d03a765c3693f00de1ccb2d40786f2bb5ecc425c20933c"
 
 
 def test_precise_host_go_helper_and_previous_unbound_helper_rejected(linux_repo):
     helper = "tools/linux157_build.py"
-    assert DOWNSTREAM["recipe"]["inputs"][helper] == "b7574ad8168193161c2b8283da43dad4104a55de18285c6cb9718c0504a28c18"
+    assert DOWNSTREAM["recipe"]["inputs"][helper] == "884a738a1fee14534795076ebd97bf4c6a2705b2e4cb78059231d2968fc88361"
     delta = DOWNSTREAM["validation"]["recipe_integration"]["changed_inputs"][helper]
     assert delta == {
         "before_sha256": "048e644354c26812c5b0db71e272c53066eb6f1b7d19d68821bb4329cfdb6503",
         "sha256": DOWNSTREAM["recipe"]["inputs"][helper],
     }
-    old = blob(helper)
+    old = blob(helper, "98f97fb23a97b41140c8a2d50e72ad7ad403a9b8")
     assert selection.digest(old) == delta["before_sha256"]
+    store(linux_repo, helper, old)
+    with pytest.raises(selection.SelectionError, match="changed Linux157 recipe input"):
+        selection.select(linux_repo, "linux")
+
+
+@pytest.mark.parametrize("helper", ["tools/linux157_source.py", "tools/linux157_toolchain.py",
+                                    "tools/linux157_build.py"])
+def test_previous_pruning_recipe_helper_is_rejected(linux_repo, helper):
+    delta = DOWNSTREAM["validation"]["recipe_integration"]["pruning_recovery"]
+    assert delta["recipe_sha256"] == DOWNSTREAM["recipe"]["sha256"]
+    old = blob(helper, delta["baseline_commit"])
+    assert selection.digest(old) == delta["changed_inputs"][helper]["before_sha256"]
+    assert DOWNSTREAM["recipe"]["inputs"][helper] == delta["changed_inputs"][helper]["sha256"]
     store(linux_repo, helper, old)
     with pytest.raises(selection.SelectionError, match="changed Linux157 recipe input"):
         selection.select(linux_repo, "linux")
