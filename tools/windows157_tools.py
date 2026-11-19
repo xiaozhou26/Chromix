@@ -5,6 +5,7 @@ from __future__ import annotations
 import argparse
 from contextlib import contextmanager
 import ctypes
+from ctypes import wintypes
 import hashlib
 import json
 import os
@@ -227,20 +228,85 @@ def locked_file(path: Path):
         yield stream
 
 
+IDENTITY_FIELDS = ("volume_serial", "file_id", "size", "last_write", "creation", "links", "attributes")
+
+
+class FileTime(ctypes.Structure):
+    _fields_ = [("low", wintypes.DWORD), ("high", wintypes.DWORD)]
+
+
+class ByHandleFileInformation(ctypes.Structure):
+    _fields_ = [("attributes", wintypes.DWORD), ("creation", FileTime),
+                ("access", FileTime), ("write", FileTime), ("volume", wintypes.DWORD),
+                ("size_high", wintypes.DWORD), ("size_low", wintypes.DWORD),
+                ("links", wintypes.DWORD), ("index_high", wintypes.DWORD), ("index_low", wintypes.DWORD)]
+
+
+def combined(high: int, low: int) -> int:
+    return high << 32 | low
+
+
+def windows_handle_info(stream) -> dict:
+    import msvcrt
+    kernel = ctypes.WinDLL("kernel32", use_last_error=True)
+    query = kernel.GetFileInformationByHandle
+    query.argtypes = [wintypes.HANDLE, ctypes.POINTER(ByHandleFileInformation)]
+    query.restype = wintypes.BOOL
+    info = ByHandleFileInformation()
+    if not query(msvcrt.get_osfhandle(stream.fileno()), ctypes.byref(info)):
+        raise ctypes.WinError(ctypes.get_last_error())
+    return {"volume_serial": info.volume, "file_id": combined(info.index_high, info.index_low),
+            "size": combined(info.size_high, info.size_low),
+            "last_write": combined(info.write.high, info.write.low),
+            "creation": combined(info.creation.high, info.creation.low),
+            "links": info.links, "attributes": info.attributes,
+            "last_access": combined(info.access.high, info.access.low)}
+
+
+def windows_stable_identity(info: dict) -> tuple:
+    if (info["attributes"] & (0x400 | 0x10) or info["links"] not in (1, 2)
+            or info["size"] <= 0 or info["file_id"] == 0):
+        raise ValueError("not an ordinary bounded-link file handle")
+    return tuple(info[key] for key in IDENTITY_FIELDS)
+
+
+def windows_path_info(path: Path) -> dict:
+    with locked_file(path) as stream:
+        return windows_handle_info(stream)
+
+
 def file_identity(info) -> tuple:
     return (info.st_dev, info.st_ino, info.st_mode, info.st_nlink, info.st_size,
             info.st_mtime_ns, info.st_ctime_ns)
+
+
+def stream_identity(stream) -> tuple:
+    if os.name == "nt":
+        return windows_stable_identity(windows_handle_info(stream))
+    return file_identity(os.fstat(stream.fileno()))
+
+
+def path_identity(path: Path) -> tuple:
+    if os.name == "nt":
+        return windows_stable_identity(windows_path_info(path))
+    return file_identity(path.stat())
+
+
+def validate_locked_identity(source, path: Path, aliases: list[Path], expected: tuple) -> None:
+    if stream_identity(source) != expected or path_identity(path) != expected or cargo_aliases(path) != aliases:
+        raise ValueError("Cargo output identity changed while locked")
+    if any(path_identity(alias) != expected for alias in aliases):
+        raise ValueError("Cargo owned alias identity changed while locked")
 
 
 @contextmanager
 def private_cargo_output(path: Path):
     aliases = cargo_aliases(path)
     with locked_file(path) as source:
-        before = file_identity(os.fstat(source.fileno()))
+        before = stream_identity(source)
         if not stat.S_ISREG(os.fstat(source.fileno()).st_mode):
             raise ValueError("locked Cargo output is not a regular file")
-        if before != file_identity(path.stat()) or cargo_aliases(path) != aliases:
-            raise ValueError("Cargo output changed before private copy")
+        validate_locked_identity(source, path, aliases, before)
         with tempfile.TemporaryDirectory(prefix=".chromix-crubit-private-", dir=path.parent) as temporary:
             private = Path(temporary) / "cc_bindings_from_rs.exe"
             hasher = hashlib.sha256()
@@ -250,9 +316,7 @@ def private_cargo_output(path: Path):
                     output.write(chunk)
                 output.flush()
                 os.fsync(output.fileno())
-            if (file_identity(os.fstat(source.fileno())) != before or file_identity(path.stat()) != before
-                    or cargo_aliases(path) != aliases):
-                raise ValueError("Cargo output changed during private copy")
+            validate_locked_identity(source, path, aliases, before)
             pe_executable(private)
             print(json.dumps({"cargo_private_copy": file_evidence(private), "source": file_evidence(path),
                               "owned_aliases": [str(alias) for alias in aliases], "pe": "AMD64-PE32+",
@@ -260,8 +324,35 @@ def private_cargo_output(path: Path):
             if sha(private) != hasher.hexdigest() or private.stat().st_nlink != 1:
                 raise ValueError("private Cargo copy identity mismatch")
             yield private
-            if file_identity(os.fstat(source.fileno())) != before or file_identity(path.stat()) != before:
-                raise ValueError("Cargo output changed while publishing private copy")
+            validate_locked_identity(source, path, aliases, before)
+
+
+def publish_cargo_output(built: Path, executable: Path) -> dict:
+    metagen.local(executable)
+    if executable.exists():
+        raise ValueError("Crubit install destination already exists")
+    executable.parent.mkdir(parents=True, exist_ok=True)
+    with private_cargo_output(built) as private:
+        expected = sha(private)
+        with tempfile.TemporaryDirectory(prefix=".chromix-crubit-install-", dir=executable.parent) as temporary:
+            staged = Path(temporary) / executable.name
+            with private.open("rb") as source, staged.open("xb") as destination:
+                shutil.copyfileobj(source, destination)
+                destination.flush()
+                os.fsync(destination.fileno())
+            pe_executable(staged)
+            if sha(staged) != expected:
+                raise ValueError("Crubit staged output differs from private copy")
+            if os.name == "nt":
+                os.rename(staged, executable)  # Windows rename fails if destination already exists.
+            else:
+                os.link(staged, executable)
+                staged.unlink()
+            pe_executable(executable)
+            if sha(executable) != expected:
+                raise ValueError("Crubit published output differs from private copy")
+    return {"status": "published", "sha256": expected, "path": str(executable),
+            "nlink": executable.stat().st_nlink, "pe": "AMD64-PE32+"}
 
 
 def cargo_output(stdout: str, src: Path, target: Path) -> Path:
@@ -331,17 +422,7 @@ def prepare(src: Path, work: Path) -> None:
                                          mode="w", encoding="utf-8", delete=False) as report:
             report.write(result.stdout)
         built = cargo_output(result.stdout, src, target)
-        executable.parent.mkdir(parents=True, exist_ok=True)
-        if executable.exists():
-            raise ValueError("Crubit install destination appeared concurrently")
-        with private_cargo_output(built) as private:
-            digest = sha(private)
-            with private.open("rb") as source, executable.open("xb") as destination:
-                shutil.copyfileobj(source, destination)
-                destination.flush()
-                os.fsync(destination.fileno())
-            if sha(executable) != digest:
-                raise ValueError("Crubit private output changed during installation")
+        print(json.dumps({"cargo_install": publish_cargo_output(built, executable)}, sort_keys=True))
         for dll in rust.glob("*.dll"):
             metagen.validate_library(file(dll))
             shutil.copy2(dll, executable.parent / dll.name)

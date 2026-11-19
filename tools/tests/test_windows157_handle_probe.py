@@ -59,9 +59,11 @@ def test_actual_child_mutation_is_not_a_mock(tmp_path):
     path = tmp_path / 'probe.bin'
     path.write_bytes(b'a' * 100)
     result = probe.attempt_mutation(path, 'write')
-    assert result['blocked'] is False and path.read_bytes()[64:72] == b'MUTATION'
+    assert (result['python'] if sys.platform == 'win32' else result)['blocked'] is False
+    assert path.read_bytes()[64:72] == b'MUTATION'
     result = probe.attempt_mutation(path, 'delete')
-    assert result['blocked'] is False and not path.exists()
+    assert (result['python'] if sys.platform == 'win32' else result)['blocked'] is False
+    assert not path.exists()
 
 
 @pytest.mark.skipif(sys.platform == 'win32', reason='POSIX refusal contract')
@@ -85,8 +87,45 @@ def test_native_probe_identity_private_copy_and_mutation_denial(tmp_path):
     assert code == 0, data
     assert data['status'] == 'passed' and data['same_api_comparison'] == 'passed'
     assert len(data['mutations']) == 4
-    assert all(item['blocked'] and item['winerror'] == 32 for item in data['mutations'])
-    assert data['unlocked_write']['blocked'] is False
+    assert all(probe.denial_verified(item) and item['unchanged_after_attempt'] for item in data['mutations'])
+    assert data['unlocked_write']['python']['blocked'] is False
+    assert data['unlocked_write']['win32']['bytes_written'] == 8
     assert data['private_copy']['win32']['links'] == 1
     assert data['before']['held_win32']['links'] == 2
-    assert data['production_private_copy']['status'] in ('passed', 'failed')
+    assert data['production_private_copy']['status'] == 'passed'
+    assert data['production_atomic_install']['status'] == 'published'
+    assert len(data['negative_cases']) == 3
+
+
+def test_real_native_failed_reports_confirm_same_api_identity_and_crt_errno_loss():
+    import gzip
+    import hashlib
+    data = json.loads(gzip.decompress((ROOT / 'tools/tests/fixtures/windows157_handle_native.json.gz').read_bytes()))
+    assert len(data['native_reports']) == 3
+    for entry in data['native_reports'].values():
+        assert hashlib.sha256(entry['text'].encode()).hexdigest() == entry['sha256']
+        report = json.loads(entry['text'])
+        before = report['before']
+        assert before['path_stat']['st_mode'] == 33279
+        assert before['fstat']['st_mode'] == 33206
+        assert probe.stable_identity(before['held_win32']) == probe.stable_identity(before['path_win32'])
+        assert probe.stable_identity(before['held_win32']) == probe.stable_identity(before['alias_win32'])
+        mutation = report['mutations'][0]
+        assert mutation['blocked'] and mutation['errno'] == 13 and mutation['winerror'] is None
+        assert mutation['exception'] == 'PermissionError'
+        # Historical Python denial alone is not enough: require new raw Win32 corroboration.
+        raw = {'attempted': True, 'blocked': True, 'winerror': 32}
+        assert probe.denial_verified({'python': mutation, 'win32': raw})
+        assert not probe.denial_verified({'python': mutation, 'win32': dict(raw, winerror=5)})
+        assert not probe.denial_verified({'python': mutation, 'win32': dict(raw, blocked=False)})
+
+
+def test_production_uses_same_api_for_held_path_and_alias():
+    import inspect
+    source = inspect.getsource(probe.production.private_cargo_output)
+    assert 'stream_identity(source)' in source
+    assert 'validate_locked_identity(source, path, aliases, before)' in source
+    assert 'file_identity(path.stat())' not in source
+    assert 'file_identity(os.fstat' not in source
+    assert probe.handle_info is probe.production.windows_handle_info
+    assert probe.stable_identity is probe.production.windows_stable_identity

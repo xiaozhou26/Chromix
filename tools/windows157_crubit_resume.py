@@ -27,32 +27,33 @@ from verify_windows_snapshot_source import _inventory
 REPOSITORY = "xiaozhou26/Chromix"
 REPOSITORY_ID = 1342691290
 RECIPE_SHA = "f2d0021993567111b0dd740d61b45bcf774a4f29"
-DONOR_SHA = "1af0dd2028b3b516757230f285be8d20e730604c"
-MAIN_BASE = "1d9b9c89aecc4f6c33a6b0386dd179e8e7b27078"
-RUN = 44558456773
-JOB = 135680854604
+DONOR_SHA = "7bfbe01684f21f2e9655ba9c1b74d4b98491c94b"
+MAIN_BASE = "f80cfcc644cb3de026971e7585951649effbd877"
+RUN = 44576227466
+JOB = 135744348168
 WORKFLOW_ID = 424020464
 WORKFLOW = "build-win-x64-157-crubit-resume"
 PREPARE_KEY = "8e9638c040847fe4f70831ff2fbf7d26854d029b6a8305bbab0dbc5d8b4bd4dc"
-MAIN_KEYS = {"af0aa133c3fd4700f5a2673773467ae7a0c6b134b503ffecb337b8506e5676ff",
-             "aecca4734c230087f1ad61e669cd97a7da1bd8fbb8e9477ae55e42f48816f1d9"}
+MAIN_KEYS = {'3b6073b94a7b07cf58da510254c3709e46cc6af39da45ccca17672859dc6edcf', '201adb056a467e3ca5b884680e852aacdcaad8eb910aafe5ebcb99d0a80b373b'}
 HELPER = "tools/windows157_tools.py"
 HELPER_TUPLE = (
-    "464733ae07ca98c457ff8e6b1482a90185d8a2bc0639ac06eb433619a95b2e41",
     "e559adae485f3043400890f12c8869a0f7a75c107ec1f0d7017ecc7f0021a5ca",
+    "33757549e33f88834483989540bfdf8eff73c6b1cab0658083beb397676b4317",
 )
 PROOF = "build/windows/windows157-crubit-source.json"
 PROOF_SHA256 = "3cf8be13ba9af51e87894f904a38f3186a9d60255842c3f51d704871439f4eb2"
-RECEIPT = ".chromix-windows157-crubit-resume.json"
-ADMISSION = ".chromix-windows157-crubit-retry2-resume.json"
+RECEIPT = ".chromix-windows157-crubit-retry2-resume.json"
+ADMISSION = ".chromix-windows157-crubit-win32-resume.json"
 PARTS = (
-    (14554780574, 9663676664, "0ac32815cfd4379ff77880475ebb1ad7e2181f986bdd999f6d1167cc1fa3a9e7", "2026-12-03T16:43:26Z"),
-    (14554246738, 791753834, "6e2fa726f47411c36e1be84ca6d592194037c21adba95d270d570c0862171767", "2026-12-03T16:44:56Z"),
+    (14559964146, 9663676664, "841e13537c18a3554cbe8eb55a8ee45a97915b2566328020e03dc0cd09d0786c", "2026-12-03T18:21:31Z"),
+    (14561755654, 791750397, "d4cd478a2c48d1d6255a4a5b4ea8967642bd55fe46bba7f667dd143b3be17caf", "2026-12-03T18:22:43Z"),
 )
 RECOVERY_FILES = frozenset({HELPER, PROOF, "build/windows/ci-stage.ps1", "tools/windows157_crubit_resume.py",
     "tools/tests/test_windows157_crubit_resume.py", "tools/tests/fixtures/windows157_crubit_checkpoint.json.gz",
     "tools/tests/fixtures/windows157_crubit_source.json.gz", "tools/gen_windows_arm64_workflow.py",
     "tools/tests/fixtures/windows157_crubit_retry2.json.gz", "tools/tests/test_windows157_crubit_hardlinks.py",
+    "tools/windows157_handle_probe.py", "tools/tests/test_windows157_handle_probe.py",
+    "tools/tests/fixtures/windows157_handle_native.json.gz",
     f".github/workflows/{WORKFLOW}.yml"})
 # Platform changes through this exact main base are reviewed; later deltas require new tuples.
 REVIEWED_PLATFORM_INPUTS = {}
@@ -105,11 +106,11 @@ def metadata(client, now=None) -> dict:
         if len(found) != 1 or found[0].get("status") != "completed" or found[0].get("conclusion") != conclusion:
             raise ValueError("Crubit checkpoint producer step mismatch: " + name)
     listed = client.items(f"/actions/runs/{RUN}/artifacts", "artifacts")
-    admission = [a for a in listed if a.get("id") == 14554685965
+    admission = [a for a in listed if a.get("id") == 14559844166
                  or a.get("name") == "crubit-admission-build-1-attempt-1"]
-    admission_pin = dict(id=14554685965, name="crubit-admission-build-1-attempt-1", size_in_bytes=68018,
-                         digest="sha256:6394c1878d7babdfe1f5bd4261a9875bd9d379b57eec98652fa3aeff58a5966f",
-                         expired=False, expires_at="2026-12-03T16:45:06Z")
+    admission_pin = dict(id=14559844166, name="crubit-admission-build-1-attempt-1", size_in_bytes=117254,
+                         digest="sha256:5a389094d89494fb4812ecdea5af069f49570f910a240d183f42022e93bd5720",
+                         expired=False, expires_at="2026-12-03T18:22:52Z")
     if (len(admission) != 1 or any(admission[0].get(k) != v for k, v in admission_pin.items())
             or admission[0].get("workflow_run", {}).get("id") != RUN
             or admission[0].get("workflow_run", {}).get("head_sha") != DONOR_SHA):
@@ -396,21 +397,25 @@ def verify_source(repo: Path, view: Path, work: Path) -> dict:
 
 def previous_admission(work: Path) -> dict:
     raw = files._file(work, RECEIPT).read_bytes()
-    if digest(raw) != "5dcd767d891bdf0000b8477d28b4c78a25a0f3bb9c0db9f5d4fb5853b80f26c8":
-        raise ValueError("latest checkpoint parent receipt bytes changed")
-    # Artifact admission JSON is pretty-printed; the tree receipt is compact JSON.
     actual = json.loads(raw)
-    if (actual.get("target_sha") != DONOR_SHA or actual.get("consumer_run_id") != str(RUN)
-            or actual.get("consumer_attempt") != "1" or actual.get("donor_sha") != RECIPE_SHA
-            or actual.get("run_id") != 44541444866 or actual.get("job_id") != 135620566911
-            or actual.get("status") != "verified" or actual.get("preparation_key") != PREPARE_KEY):
-        raise ValueError("latest Crubit checkpoint parent admission mismatch")
     expected = json.loads(gzip.decompress(files._file(Path(__file__).resolve().parent,
-                        "tests/fixtures/windows157_crubit_retry2.json.gz").read_bytes()))["admission"]["crubit-source.json"]
-    if digest(expected["text"].encode()) != "f94adc6bcab1914ab0bb56acd1f7bcdbe92df28b3fced60001da5f257207c5c4":
-        raise ValueError("parent admission evidence changed")
+                        "tests/fixtures/windows157_handle_native.json.gz").read_bytes()))["parent_admission"]
+    if digest(expected["text"].encode()) != "1e4e8d721e679e0640fd5d60ac43f37971413a7428db359dfa0f481496b284c8":
+        raise ValueError("native-handle parent admission evidence changed")
     if actual != json.loads(expected["text"]):
-        raise ValueError("complete parent admission differs from uploaded proof")
+        raise ValueError("complete latest checkpoint parent admission changed")
+    if (actual.get("target_sha") != DONOR_SHA or actual.get("consumer_run_id") != str(RUN)
+            or actual.get("consumer_attempt") != "1" or actual.get("run_id") != 44558456773
+            or actual.get("job_id") != 135680854604 or actual.get("status") != "verified"
+            or actual.get("preparation_key") != PREPARE_KEY):
+        raise ValueError("latest native-handle checkpoint parent identity mismatch")
+    ancestor = files._file(work, ".chromix-windows157-crubit-resume.json").read_bytes()
+    if digest(ancestor) != "5dcd767d891bdf0000b8477d28b4c78a25a0f3bb9c0db9f5d4fb5853b80f26c8":
+        raise ValueError("original source admission bytes changed")
+    prior = actual.get("previous_admission", {})
+    if (prior.get("source_admission_sha256") != digest(ancestor)
+            or prior.get("full_source") != actual["full_source"] or prior.get("source") != actual["source"]):
+        raise ValueError("complete original source admission chain changed")
     return {"run_id": RUN, "head_sha": DONOR_SHA, "source_admission_sha256": digest(raw),
             "full_source": actual["full_source"], "source": actual["source"]}
 

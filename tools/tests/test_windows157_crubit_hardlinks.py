@@ -18,6 +18,7 @@ import windows157_crubit_resume as resume
 from test_windows157_crubit_resume import executable, message, cargo_json
 
 AUDIT = json.loads(gzip.decompress((ROOT / 'tools/tests/fixtures/windows157_crubit_retry2.json.gz').read_bytes()))
+NATIVE = json.loads(gzip.decompress((ROOT / 'tools/tests/fixtures/windows157_handle_native.json.gz').read_bytes()))
 
 
 def linked_output(root):
@@ -126,24 +127,25 @@ def test_fixed_cargo_source_documents_windows_link_not_mac_copy():
 
 def test_latest_parent_admission_complete_proof_not_just_markers(tmp_path):
     work = tmp_path.resolve()
-    value = json.loads(AUDIT['admission']['crubit-source.json']['text'])
+    value = json.loads(NATIVE['parent_admission']['text'])
     receipt = work / resume.RECEIPT
-    receipt.write_bytes(AUDIT['tree_parent_receipt']['text'].encode())
+    receipt.write_bytes(NATIVE['parent_admission']['text'].encode())
+    (work / '.chromix-windows157-crubit-resume.json').write_bytes(AUDIT['tree_parent_receipt']['text'].encode())
     result = resume.previous_admission(work)
-    assert result['run_id'] == 44558456773 and result['head_sha'] == resume.DONOR_SHA
+    assert result['run_id'] == 44576227466 and result['head_sha'] == resume.DONOR_SHA
     value['full_source'][next(iter(value['full_source']))] = '0' * 64
     receipt.write_text(json.dumps(value))
-    with pytest.raises(ValueError, match='parent receipt bytes changed'):
+    with pytest.raises(ValueError, match='complete latest checkpoint parent admission changed'):
         resume.previous_admission(work)
 
 
 def test_latest_metadata_and_old_checkpoint_rejected():
     class Client:
-        def get(self, path): return AUDIT['metadata']['run']
-        def items(self, path, key): return AUDIT['metadata'][key][key]
+        def get(self, path): return NATIVE['latest_checkpoint']['run']
+        def items(self, path, key): return NATIVE['latest_checkpoint'][key][key]
     result = resume.metadata(Client(), datetime(2026, 11, 19, 17, tzinfo=timezone.utc))
-    assert result['run_id'] == 44558456773
-    assert [p['id'] for p in result['artifacts']] == [14554780574, 14554246738]
+    assert result['run_id'] == 44576227466
+    assert [p['id'] for p in result['artifacts']] == [14559964146, 14561755654]
     old = json.loads(gzip.decompress((ROOT / 'tools/tests/fixtures/windows157_crubit_checkpoint.json.gz').read_bytes()))
     class Old(Client):
         def get(self, path): return old['run']
@@ -155,7 +157,7 @@ def test_real_hardlink_source_mutation_detected_on_non_windows(tmp_path):
     if os.name == 'nt':
         pytest.skip('Windows denies the write; covered by the native share-deny test')
     _, original, alias = linked_output(tmp_path.resolve())
-    with pytest.raises(ValueError, match='changed while publishing'):
+    with pytest.raises(ValueError, match='identity changed while locked'):
         with tools.private_cargo_output(alias):
             with original.open('r+b') as stream:
                 stream.seek(30)
@@ -173,8 +175,8 @@ def test_no_generic_hardlink_exemption(tmp_path):
 
 def test_latest_admission_artifact_tamper_rejected():
     import copy
-    data = copy.deepcopy(AUDIT['metadata'])
-    item = next(a for a in data['artifacts']['artifacts'] if a['id'] == 14554685965)
+    data = copy.deepcopy(NATIVE['latest_checkpoint'])
+    item = next(a for a in data['artifacts']['artifacts'] if a['id'] == 14559844166)
     item['digest'] = 'sha256:' + '0' * 64
     class Client:
         def get(self, path): return data['run']
@@ -220,3 +222,29 @@ def test_latest_admission_preserves_parent_receipt_and_has_new_scope():
     assert 'result["full_source"] != previous["full_source"]' in source
     assert 'result["source"] != previous["source"]' in source
     assert 'result.get("previous_admission") != previous' in source
+
+
+def test_production_atomic_publish_uses_private_file_and_refuses_existing_destination(tmp_path):
+    root = tmp_path.resolve()
+    _, original, alias = linked_output(root)
+    destination = root / 'installed/cc_bindings_from_rs.exe'
+    result = tools.publish_cargo_output(alias, destination)
+    assert result['status'] == 'published' and result['nlink'] == 1
+    assert not destination.samefile(alias)
+    assert destination.read_bytes() == alias.read_bytes()
+    before = destination.read_bytes()
+    with pytest.raises(ValueError, match='already exists'):
+        tools.publish_cargo_output(alias, destination)
+    with original.open('r+b') as stream:
+        stream.seek(64)
+        stream.write(b'changed')
+    assert destination.read_bytes() == before
+    assert not list(destination.parent.glob('.chromix-crubit-install-*'))
+
+
+def test_latest_parent_receipt_requires_intact_original_ancestor(tmp_path):
+    work = tmp_path.resolve()
+    (work / resume.RECEIPT).write_bytes(NATIVE['parent_admission']['text'].encode())
+    (work / '.chromix-windows157-crubit-resume.json').write_bytes(b'{}')
+    with pytest.raises(ValueError, match='original source admission bytes'):
+        resume.previous_admission(work)

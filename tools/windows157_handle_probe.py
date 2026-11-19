@@ -16,51 +16,12 @@ import sys
 import windows157_tools as production
 
 STAT_FIELDS = ("st_dev", "st_ino", "st_mode", "st_nlink", "st_size", "st_mtime_ns", "st_ctime_ns")
-IDENTITY_FIELDS = ("volume_serial", "file_id", "size", "last_write", "creation", "links", "attributes")
-
-
-class FileTime(ctypes.Structure):
-    _fields_ = [("low", wintypes.DWORD), ("high", wintypes.DWORD)]
-
-
-class ByHandleFileInformation(ctypes.Structure):
-    _fields_ = [("attributes", wintypes.DWORD), ("creation", FileTime),
-                ("access", FileTime), ("write", FileTime), ("volume", wintypes.DWORD),
-                ("size_high", wintypes.DWORD), ("size_low", wintypes.DWORD),
-                ("links", wintypes.DWORD), ("index_high", wintypes.DWORD), ("index_low", wintypes.DWORD)]
-
-
-def combined(high: int, low: int) -> int:
-    return high << 32 | low
-
-
-def handle_info(stream) -> dict:
-    import msvcrt
-    kernel = ctypes.WinDLL("kernel32", use_last_error=True)
-    query = kernel.GetFileInformationByHandle
-    query.argtypes = [wintypes.HANDLE, ctypes.POINTER(ByHandleFileInformation)]
-    query.restype = wintypes.BOOL
-    info = ByHandleFileInformation()
-    if not query(msvcrt.get_osfhandle(stream.fileno()), ctypes.byref(info)):
-        raise ctypes.WinError(ctypes.get_last_error())
-    return {"volume_serial": info.volume, "file_id": combined(info.index_high, info.index_low),
-            "size": combined(info.size_high, info.size_low),
-            "last_write": combined(info.write.high, info.write.low),
-            "creation": combined(info.creation.high, info.creation.low),
-            "links": info.links, "attributes": info.attributes,
-            "last_access": combined(info.access.high, info.access.low)}
-
-
-def stable_identity(info: dict) -> tuple:
-    if (info["attributes"] & (0x400 | 0x10) or info["links"] not in (1, 2)
-            or info["size"] <= 0 or info["file_id"] == 0):
-        raise ValueError("not an ordinary bounded-link file handle")
-    return tuple(info[key] for key in IDENTITY_FIELDS)
-
-
-def path_info(path: Path) -> dict:
-    with production.locked_file(path) as stream:
-        return handle_info(stream)
+IDENTITY_FIELDS = production.IDENTITY_FIELDS
+ByHandleFileInformation = production.ByHandleFileInformation
+combined = production.combined
+handle_info = production.windows_handle_info
+stable_identity = production.windows_stable_identity
+path_info = production.windows_path_info
 
 
 def stat_info(info) -> dict:
@@ -87,6 +48,52 @@ def mutation_child(path: Path, operation: str) -> dict:
         return {"operation": operation, "path": str(path), "blocked": True,
                 "winerror": getattr(error, "winerror", None), "errno": error.errno,
                 "exception": type(error).__name__, "message": str(error)}
+
+
+def win32_mutation(path: Path, operation: str) -> dict:
+    kernel = ctypes.WinDLL("kernel32", use_last_error=True)
+    result = {"operation": operation, "path": str(path), "api": "Win32", "attempted": True}
+    if operation == "delete":
+        delete = kernel.DeleteFileW
+        delete.argtypes = [wintypes.LPCWSTR]
+        delete.restype = wintypes.BOOL
+        success = bool(delete(str(path)))
+        return {**result, "blocked": not success, "winerror": None if success else ctypes.get_last_error()}
+    create = kernel.CreateFileW
+    create.argtypes = [wintypes.LPCWSTR, wintypes.DWORD, wintypes.DWORD, ctypes.c_void_p,
+                       wintypes.DWORD, wintypes.DWORD, wintypes.HANDLE]
+    create.restype = wintypes.HANDLE
+    handle = create(str(path), 0x40000000, 7, None, 3, 0, None)
+    if handle == ctypes.c_void_p(-1).value:
+        return {**result, "blocked": True, "winerror": ctypes.get_last_error(), "stage": "CreateFileW"}
+    close = kernel.CloseHandle
+    close.argtypes = [wintypes.HANDLE]
+    close.restype = wintypes.BOOL
+    try:
+        seek = kernel.SetFilePointerEx
+        seek.argtypes = [wintypes.HANDLE, ctypes.c_longlong, ctypes.c_void_p, wintypes.DWORD]
+        seek.restype = wintypes.BOOL
+        if not seek(handle, 64, None, 0):
+            raise ctypes.WinError(ctypes.get_last_error())
+        write = kernel.WriteFile
+        write.argtypes = [wintypes.HANDLE, ctypes.c_void_p, wintypes.DWORD,
+                          ctypes.POINTER(wintypes.DWORD), ctypes.c_void_p]
+        write.restype = wintypes.BOOL
+        payload = ctypes.create_string_buffer(b"MUTATION")
+        count = wintypes.DWORD()
+        success = bool(write(handle, payload, 8, ctypes.byref(count), None))
+        return {**result, "blocked": not success, "winerror": None if success else ctypes.get_last_error(),
+                "stage": "WriteFile", "bytes_written": count.value}
+    finally:
+        close(handle)
+
+
+def denial_verified(result: dict) -> bool:
+    python = result["python"]
+    raw = result["win32"]
+    return (python.get("blocked") is True and python.get("exception") == "PermissionError"
+            and python.get("errno") == 13 and python.get("winerror") in (None, 5, 32)
+            and raw.get("attempted") is True and raw.get("blocked") is True and raw.get("winerror") == 32)
 
 
 def attempt_mutation(path: Path, operation: str) -> dict:
@@ -118,13 +125,44 @@ def probe(root: Path, report: dict) -> None:
     report["paths"] = {"source": str(source), "alias": str(alias)}
     report["original_sha256"] = expected_hash
 
-    # Record the exact production comparison without treating its failure as a fix.
+    # Production copy and publication must pass before the independent lock experiment.
     try:
         with production.private_cargo_output(source) as private:
             report["production_private_copy"] = {"status": "passed", "sha256": file_hash(private)}
     except (OSError, ValueError) as error:
         report["production_private_copy"] = {"status": "failed", "error": str(error),
                                              "exception": type(error).__name__}
+    require(report["production_private_copy"]["status"] == "passed", "production private copy failed")
+    installed = root / "installed/cc_bindings_from_rs.exe"
+    report["production_atomic_install"] = production.publish_cargo_output(source, installed)
+    require(file_hash(installed) == expected_hash and installed.stat().st_nlink == 1
+            and not installed.samefile(source), "production atomic install identity mismatch")
+    try:
+        production.publish_cargo_output(source, installed)
+    except ValueError as error:
+        report["existing_destination_rejected"] = str(error)
+    else:
+        raise ValueError("production install overwrote an existing destination")
+    report["negative_cases"] = []
+    outside = root / "external.exe"
+    os.link(source, outside)
+    try:
+        with production.private_cargo_output(source):
+            raise AssertionError("third link unexpectedly admitted")
+    except ValueError as error:
+        report["negative_cases"].append({"case": "third_link", "rejected": True, "error": str(error)})
+    finally:
+        outside.unlink()
+    alias.unlink()
+    os.link(source, outside)
+    try:
+        with production.private_cargo_output(source):
+            raise AssertionError("external-only alias unexpectedly admitted")
+    except ValueError as error:
+        report["negative_cases"].append({"case": "external_alias", "rejected": True, "error": str(error)})
+    finally:
+        outside.unlink()
+        os.link(source, alias)
     private = root / "private-copy.exe"
     with production.locked_file(source) as held:
         path_stat = stat_info(source.stat())
@@ -153,8 +191,15 @@ def probe(root: Path, report: dict) -> None:
             for operation in ("write", "delete"):
                 result = attempt_mutation(path, operation)
                 report["mutations"].append(result)
-                require(result.get("blocked") is True and result.get("winerror") == 32,
-                        "expected ERROR_SHARING_VIOLATION for actual child mutation")
+                require(all(result[api].get("path") == str(path) and result[api].get("operation") == operation
+                            for api in ("python", "win32")), "child mutation reported another operation or path")
+                require(denial_verified(result), "Python denial not corroborated by raw Win32 sharing violation")
+                require(file_hash(source) == expected_hash and source.samefile(alias)
+                        and stable_identity(handle_info(held)) == identity
+                        and stable_identity(path_info(source)) == identity
+                        and stable_identity(path_info(alias)) == identity,
+                        "actual child mutation changed bytes, names or identity")
+                result["unchanged_after_attempt"] = True
         report["after"] = {"held_win32": handle_info(held), "path_win32": path_info(source),
                            "alias_win32": path_info(alias)}
         for info in report["after"].values():
@@ -162,9 +207,12 @@ def probe(root: Path, report: dict) -> None:
         require(file_hash(source) == expected_hash, "source bytes changed under lock")
     result = attempt_mutation(alias, "write")
     report["unlocked_write"] = result
-    require(result["blocked"] is False, "mutation test did not actually exercise a writable file")
+    require(result["python"]["blocked"] is False and result["win32"]["blocked"] is False
+            and result["win32"]["bytes_written"] == 8,
+            "mutation test did not actually exercise a writable file")
     require(file_hash(source) != expected_hash, "unlocked alias mutation did not reach source")
-    require(file_hash(private) == expected_hash, "private copy still aliases source")
+    require(file_hash(private) == expected_hash and file_hash(installed) == expected_hash,
+            "private or published copy still aliases source")
     report["unlocked_identity"] = path_info(source)
     require(stable_identity(report["unlocked_identity"]) != identity,
             "same-API comparison missed an actual post-unlock write")
@@ -179,6 +227,8 @@ def probe(root: Path, report: dict) -> None:
                                                     "winerror": getattr(error, "winerror", None)}
             require(error.errno == 32 or getattr(error, "winerror", None) == 32,
                     "existing-writer failure was not sharing violation")
+    report["negative_cases"].append({"case": "unlocked_source_tamper", "detected": True,
+                                      "installed_copy_unchanged": file_hash(installed) == expected_hash})
     report["same_api_comparison"] = "passed"
 
 
@@ -192,7 +242,10 @@ def main(argv=None) -> int:
     if args.child:
         if not args.path:
             parser.error("child requires --path")
-        print(json.dumps(mutation_child(args.path, args.child), sort_keys=True))
+        result = mutation_child(args.path, args.child)
+        if sys.platform == "win32":
+            result = {"python": result, "win32": win32_mutation(args.path, args.child)}
+        print(json.dumps(result, sort_keys=True))
         return 0
     if not args.report or not args.directory:
         parser.error("probe requires --report and --directory")

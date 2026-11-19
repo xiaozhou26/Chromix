@@ -22,7 +22,7 @@ import gen_windows_arm64_workflow as generator
 from test_windows157 import pe_dll, put, host_tree, FILES
 
 HISTORICAL_AUDIT = json.loads(gzip.decompress((ROOT / 'tools/tests/fixtures/windows157_crubit_checkpoint.json.gz').read_bytes()))
-AUDIT = json.loads(gzip.decompress((ROOT / 'tools/tests/fixtures/windows157_crubit_retry2.json.gz').read_bytes()))['metadata']
+AUDIT = json.loads(gzip.decompress((ROOT / 'tools/tests/fixtures/windows157_handle_native.json.gz').read_bytes()))['latest_checkpoint']
 SOURCE = json.loads(gzip.decompress((ROOT / 'tools/tests/fixtures/windows157_crubit_source.json.gz').read_bytes()))
 NOW = datetime(2026, 11, 19, 16, tzinfo=timezone.utc)
 
@@ -147,7 +147,7 @@ def test_prepare_real_cargo_layout_installs_verified_bytes_without_clean(tmp_pat
 
 def test_real_latest_two_volumes_and_producer_attempt():
     assert resume.metadata(Client(), NOW) == resume.manifest()
-    assert [a['id'] for a in resume.manifest()['artifacts']] == [14554780574, 14554246738]
+    assert [a['id'] for a in resume.manifest()['artifacts']] == [14559964146, 14561755654]
 
 
 @pytest.mark.parametrize('mutation', ['attempt', 'sha', 'job', 'upload', 'expired', 'size', 'digest', 'extra', 'missing', 'later'])
@@ -336,7 +336,7 @@ def test_frozen_recipe_comparison_rejects_windows_change_not_linux_change():
 
 
 def test_current_main_base_includes_reviewed_platform_inputs_without_wildcards():
-    assert resume.MAIN_BASE == "1d9b9c89aecc4f6c33a6b0386dd179e8e7b27078"
+    assert resume.MAIN_BASE == "f80cfcc644cb3de026971e7585951649effbd877"
     assert resume.REVIEWED_PLATFORM_INPUTS == {}
     base = resume.git_tree('git', ROOT, resume.MAIN_BASE)
     resume.reviewed_changes('git', ROOT, resume.MAIN_BASE, base, base)
