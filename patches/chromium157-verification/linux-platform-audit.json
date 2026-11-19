@@ -1,0 +1,129 @@
+{
+  "status": "passed",
+  "qualification": "Exact upstream target files with all intersecting core per-file diffs; not a whole-core audit",
+  "patches": [
+    {
+      "patch": "build/linux/157.0.8103.78/patches/use-oauth2-client-switches-as-default.patch",
+      "returncode": 0,
+      "output": "patching file google_apis/api_key_cache.cc\n"
+    },
+    {
+      "patch": "build/linux/157.0.8103.78/patches/fix-compiling-on-arm64.patch",
+      "returncode": 0,
+      "output": "patching file build/toolchain/linux/BUILD.gn\npatching file tools/clang/scripts/build.py\npatching file tools/rust/build_bindgen.py\npatching file tools/rust/build_rust.py\npatching file tools/rust/cargo-config.toml.template\npatching file tools/rust/config.toml.template\npatching file tools/rust/host_tools.py\n"
+    },
+    {
+      "patch": "build/linux/157.0.8103.78/patches/chromium-138-drop-nodejs-version-check.patch",
+      "returncode": 0,
+      "output": "patching file third_party/node/node.gni\n"
+    },
+    {
+      "patch": "build/linux/157.0.8103.78/patches/chromium-153-revert-hermetic-python.patch",
+      "returncode": 0,
+      "output": "patching file .gn\n"
+    },
+    {
+      "patch": "build/linux/157.0.8103.78/patches/chromium-154-use-system-tsc.patch",
+      "returncode": 0,
+      "output": "patching file third_party/devtools-frontend/src/scripts/build/typescript/typescript_vars.gni\npatching file third_party/devtools-frontend/src/third_party/typescript/typescript.py\n"
+    },
+    {
+      "patch": "build/linux/157.0.8103.78/patches/chromium-155-use-system-esbuild.patch",
+      "returncode": 0,
+      "output": "patching file third_party/devtools-frontend/src/front_end/core/host/DispatchHttpRequestClient.ts\npatching file third_party/devtools-frontend/src/scripts/build/ninja/bundle.gni\n"
+    },
+    {
+      "patch": "build/linux/157.0.8103.78/patches/chromium-156-remove-private-verification-tokens.patch",
+      "returncode": 0,
+      "output": "patching file chrome/browser/BUILD.gn\npatching file chrome/browser/browsing_data/BUILD.gn\npatching file chrome/browser/browsing_data/chrome_browsing_data_model_delegate.cc\npatching file chrome/browser/browsing_data/chrome_browsing_data_remover_delegate.cc\npatching file chrome/browser/chrome_content_browser_client.cc\npatching file chrome/browser/component_updater/BUILD.gn\npatching file chrome/browser/component_updater/private_verification_tokens_installer.cc\npatching file chrome/browser/devtools/BUILD.gn\npatching file chrome/browser/devtools/protocol/storage_handler.cc\npatching file chrome/browser/devtools/protocol/storage_handler.h\npatching file chrome/browser/private_verification_tokens/BUILD.gn\npatching file chrome/browser/profiles/BUILD.gn\npatching file chrome/browser/profiles/chrome_browser_main_extra_parts_profiles.cc\npatching file chrome/test/BUILD.gn\npatching file components/BUILD.gn\npatching file components/component_updater/installer_policies/BUILD.gn\n"
+    },
+    {
+      "patch": "build/linux/157.0.8103.78/patches/chromium-156-revert-crubit-changes.patch",
+      "returncode": 0,
+      "output": "patching file components/web_package/BUILD.gn\npatching file third_party/blink/renderer/platform/BUILD.gn\n"
+    },
+    {
+      "patch": "build/linux/157.0.8103.78/patches/chromium-156-revert-use-typescript-go.patch",
+      "returncode": 0,
+      "output": "patching file tools/typescript/ts_definitions.gni\npatching file tools/typescript/ts_definitions.py\npatching file tools/typescript/ts_library.gni\npatching file tools/typescript/ts_library.py\n"
+    }
+  ],
+  "final_outputs": {
+    ".gn": "e58bbfd0dbff85cbeb254d9cba347955cb6fc560109a6138b1d5210f8cdeb947",
+    "build/toolchain/linux/BUILD.gn": "3f66acd723de1f921ab7134a31b03bf5674225818208dfddc3a030d8e199c71e",
+    "chrome/browser/BUILD.gn": "612502ea90379323e3972cec28b20ca76d1e56743fdc1d8a0f32d54cd908d034",
+    "chrome/browser/browsing_data/BUILD.gn": "78ae0c5905eb80dc2d43229e1f8049f51eda25dc56e4ca1d815c01cae660c2db",
+    "chrome/browser/browsing_data/chrome_browsing_data_model_delegate.cc": "5a35a28c466b65dc017b895d690a397fe77a1729093e90b8bbb12fc83ae0ff61",
+    "chrome/browser/browsing_data/chrome_browsing_data_remover_delegate.cc": "f22ee7eb9a454ac0736a527df1b4a7f45099f0e5558aed2714a6fe91f1281b92",
+    "chrome/browser/chrome_content_browser_client.cc": "7a8a5951c8a915cfe08ed4ed693520048ebab62c926eb22d7f0bee341d7b6f9b",
+    "chrome/browser/component_updater/BUILD.gn": "26c08156d778c7a2dd77b11697b5b4dd756840ce55267de58d6b16b78137f246",
+    "chrome/browser/component_updater/private_verification_tokens_installer.cc": "1a95754e34097242f76fe0153cbbed1342fd787482af4398543842836e367b88",
+    "chrome/browser/devtools/BUILD.gn": "fefd077b37dd34383ed3ecada1c10c25b59408e29c12518841ca9ce49a8b14c1",
+    "chrome/browser/devtools/protocol/storage_handler.cc": "642371405cf3bc550d92e9ecc2b5832d04cce07a514add5c314b0412a8a564b2",
+    "chrome/browser/devtools/protocol/storage_handler.h": "f1dbb4eb30dd1685b965f84a621add3943b1d77c38d9c4bb2f98c41a542830ca",
+    "chrome/browser/private_verification_tokens/BUILD.gn": "717430aa2f92249619f6a100ab392ee341da87578756af433268989321d227f3",
+    "chrome/browser/profiles/BUILD.gn": "9af10afba972c074f199faf2a46eb518482f13276320adde7a2c6c5357f9d4f4",
+    "chrome/browser/profiles/chrome_browser_main_extra_parts_profiles.cc": "8cee6759a8c40f3811930e0c7919aace48857478ed323fa6be338623befb16ad",
+    "chrome/test/BUILD.gn": "8e4376648a7410beb3e43750fdfcea4a4c80d5eda003462f2f6bfac20519e887",
+    "components/BUILD.gn": "1093640ec8acdd06e3f51c94c73d3741d7f880847cb9a03f7c622d8d46ca9d0b",
+    "components/component_updater/installer_policies/BUILD.gn": "faee4a7e1c95129623d80ebdee1e87d25cdb20944963055b36cfe70d84486edc",
+    "components/web_package/BUILD.gn": "7bf8eae684b669031d1d2b819b998820dcb5b57303e344ec3b658766791a7ee0",
+    "google_apis/api_key_cache.cc": "44e3e450d0e5df8f307df32e4b7e9b7921e2dee52317289f07408d3879ba774e",
+    "third_party/blink/renderer/platform/BUILD.gn": "5704882d2b8b02113e1272231a31d53b0aeb92cd6e5abf6e6f931f515e06783a",
+    "third_party/devtools-frontend/src/front_end/core/host/DispatchHttpRequestClient.ts": "1c405cc6e791b16ec28ee43a802431d377baf4569d1ac90d85daa5a121b4a8d7",
+    "third_party/devtools-frontend/src/scripts/build/ninja/bundle.gni": "6619a80bf8f2b857efc25a454e965fef82077d6f67fafb9629b35006c6a4c82c",
+    "third_party/devtools-frontend/src/scripts/build/typescript/typescript_vars.gni": "6ace06588c4363ac6c7ca5ec3a25b318099266c4941031b75c7e7aa20feb346a",
+    "third_party/devtools-frontend/src/third_party/typescript/typescript.py": "ea28bb174a35b6da05ce4be35d2a354500abddac2733953a1a539d4c9a8e0033",
+    "third_party/node/node.gni": "d44e2a0e08598d62110565a1aca8ba4792028f8f2f5e8f7e62335cda64cb9a7f",
+    "tools/clang/scripts/build.py": "bc7e68b4885a9dbc783e76ebede60ba7eaf9eb05fc156ce2068e479f1b34bf90",
+    "tools/rust/build_bindgen.py": "0e5e7735eb12227d459294455935d08565b1a94940476343fde49d11834d693b",
+    "tools/rust/build_rust.py": "4d9ed5c141d5558b06c4d542467b730ae4c6ae1e365324c986af79da613bfc48",
+    "tools/rust/cargo-config.toml.template": "061b3b86854e4ac8ffe002359e20a850550bbf547bb7b7a49e4fd371fbffb436",
+    "tools/rust/config.toml.template": "ca9322c06c2710328320224b3a4bf4bac2e681310b04d2f009f41dffd9a38228",
+    "tools/rust/host_tools.py": "1ed90fd013529cab7c5e1539efc71d566f5a51e22943710cc8466b04c38d7581",
+    "tools/typescript/ts_definitions.gni": "b0bbe3563d1db30178681e49161d52147199b894e2d2f35b1c3a7d52e9d8182f",
+    "tools/typescript/ts_definitions.py": "81b90da53b500995fa7854ceee49ea5b3a1253935c969a6764b59f5fe3da6463",
+    "tools/typescript/ts_library.gni": "0b3a2f9a2ba95d7f83ebedbf406f8f85416e588287d49e159df11cf54eba2584",
+    "tools/typescript/ts_library.py": "73870e124346e37566aa10d942274975568576c717695e89f4051903b9768811"
+  },
+  "recipe": {
+    "kind": "linux157-downstream-fresh",
+    "chromium_version": "157.0.8103.78",
+    "core_commit": "8c886dffc6ade39d8f7df5d64ace5a8824b455e1",
+    "platform_commit": "6f0aa178c2394fc0a177edc0fd64e41f402a0418",
+    "platform_ref": "156.0.8078.79-1",
+    "platform_core_gitlink": "28a211ab4ab6b83d919966a4f58a6df23cf4fb29",
+    "core_override": "8c886dffc6ade39d8f7df5d64ace5a8824b455e1",
+    "official_platform_tag": null,
+    "inputs": {
+      "build/linux/157.0.8103.78/source.json": "5ad5898d9442cc31b6ed571702f9e88510e9eea144ed544f60187e66e5c948d8",
+      "tools/linux157_source.py": "342b7c98f191280bc23e9c988b1ffe1f39cdc514f460f0b186ab026bb2d4a9d9",
+      "tools/linux157_toolchain.py": "0d5d2bfeaccfea5cf75f874e0f52831773f77419e89ec45b0a36d1cfee324d04",
+      "tools/linux157_build.py": "048e644354c26812c5b0db71e272c53066eb6f1b7d19d68821bb4329cfdb6503",
+      "build/linux/157.0.8103.78/patches/use-oauth2-client-switches-as-default.patch": "9564c36390f1ca1d08ffe42a81a1088aaba7eec8249ba6ff66a85f0592a282ef",
+      "build/linux/157.0.8103.78/patches/fix-compiling-on-arm64.patch": "a2932c2ea04e4822e5d5c3e94f39b779134990c9d417a707a1652702239705a6",
+      "build/linux/157.0.8103.78/patches/chromium-138-drop-nodejs-version-check.patch": "48172278ee8bf7c00402c2db3ef37b5514a65fa3403b9b0a028d63ca317a409f",
+      "build/linux/157.0.8103.78/patches/chromium-153-revert-hermetic-python.patch": "f224514a21dcd53f444398055a24a46e43af71e71dc6292dd86c0d9c09001d88",
+      "build/linux/157.0.8103.78/patches/chromium-154-use-system-tsc.patch": "23fcfaeb3a719ec355a38a28e632b846cc7a24993851b82d4c142fd332b46e88",
+      "build/linux/157.0.8103.78/patches/chromium-155-use-system-esbuild.patch": "3cb7ea96ca9dfde0d038c5f97739eec27eb092ff6d4bf3d77c3c8d896980d834",
+      "build/linux/157.0.8103.78/patches/chromium-156-remove-private-verification-tokens.patch": "e95993ab3fd758b71aabbe329a9b6a50360082c70c6610749f76e66f3a37a1b3",
+      "build/linux/157.0.8103.78/patches/chromium-156-revert-crubit-changes.patch": "70c63c2d028c5b4069c16b13152e97ce42785752cf9837cc63bbc0243d3e20d0",
+      "build/linux/157.0.8103.78/patches/chromium-156-revert-use-typescript-go.patch": "e1f21b386321371bf76fc0dd5d14c5f142f54f495685e6e7b67313a1d3a0ce6f"
+    },
+    "sha256": "42d788d91c0ec2345c253044665af7f623501a73c8bdb627a94d1739790aeb11"
+  },
+  "manifest_sha256": "5ad5898d9442cc31b6ed571702f9e88510e9eea144ed544f60187e66e5c948d8",
+  "baseline_commit": "248e340a05acf30a15e3bf50b604a99ae93ac93b",
+  "fixture_sha256": "48b030b7ac3a4023270c6268602e8c6856fe13b44afd17b6d32e701225b1711f",
+  "semantic_policy": {
+    "typescript": "native-tsgo-7.0.2",
+    "node": "24.12.0",
+    "web_bundle": "retain-native-157-implementation",
+    "private_tokens": "preserve-platform-disable-policy",
+    "upstream_cache": false,
+    "crubit": "retain-native-webbundle-and-ift-no-function-removal"
+  },
+  "build_verified": false,
+  "upstream_cache_used": false,
+  "implementation_commit": "d1edf19bd5074f9473d89dc91a6c6d833d15ecc3"
+}

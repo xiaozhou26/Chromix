@@ -48,6 +48,37 @@ def snapshot(src, names):
             for name in sorted(names)}
 
 
+def linux_recipe(manifest):
+    evidence = manifest["linux_downstream"]
+    recipe = json.loads(checked(evidence["source_manifest"]))
+    fixture = json.loads(gzip.decompress(checked(evidence["platform_fixture"])))
+    audit = json.loads(checked(evidence["platform_audit"]))
+    assert audit["status"] == "passed" and not audit["build_verified"]
+    assert audit["implementation_commit"] == evidence["implementation_commit"]
+    assert audit["manifest_sha256"] == evidence["source_manifest"]["sha256"]
+    assert audit["fixture_sha256"] == digest(gzip.decompress(checked(evidence["platform_fixture"])))
+    assert audit["recipe"]["sha256"] == evidence["recipe_sha256"]
+    assert digest(json.dumps(audit["recipe"]["inputs"], sort_keys=True).encode()) == evidence["recipe_sha256"]
+    assert recipe["core_commit"] == manifest["core_commit"] == fixture["core_commit"]
+    assert recipe["platform_commit"] == manifest["platform_commits"]["linux"]
+    identity = manifest["platform_identities"]["linux"]
+    assert recipe["platform_core_gitlink"] == identity["core_gitlink"]
+    assert identity["core_override"] == manifest["core_commit"]
+    assert recipe["official_platform_tag"] is None and not identity["target_version_available"]
+    assert digest(fixture["upstream_series"].encode()) == recipe["upstream_series_sha256"]
+    names = [line.strip() for line in fixture["upstream_series"].splitlines()
+             if line.strip() and not line.startswith("#")]
+    assert len(recipe["patches"]) == len(names) == 9
+    assert names == [entry["upstream_path"] for entry in recipe["patches"]]
+    assert [entry["path"] for entry in recipe["patches"]] == [entry["patch"] for entry in audit["patches"]]
+    assert all(entry["returncode"] == 0 for entry in audit["patches"])
+    assert recipe["final_outputs"] == audit["final_outputs"]
+    for entry in recipe["patches"]:
+        checked(entry)
+        assert digest(fixture["upstream_patches"][entry["upstream_path"]].encode()) == entry["upstream_sha256"]
+    return recipe, fixture
+
+
 def invariants(src, platform):
     def text(name):
         return (src / name).read_text()
@@ -70,6 +101,15 @@ def invariants(src, platform):
     ua = text("components/embedder_support/user_agent_utils.cc")
     assert ua.count("std::string GetUserAgentInternal() {") == 1
     assert ua.count("std::string BuildUserAgentFromProduct(const std::string& product) {") == 1
+    if platform == "linux":
+        blink = text("third_party/blink/renderer/platform/BUILD.gn")
+        web_bundle = text("components/web_package/BUILD.gn")
+        for content in (blink, web_bundle):
+            assert "assert(!is_linux || enable_cpp_api_from_rust," in content
+        assert '"fonts:ift_patcher_bindings"' in blink
+        assert "signed_web_bundles_rust_bindings" in web_bundle
+        assert "web_bundle_parser_factory.cc" in web_bundle
+        assert '"//third_party/node:check_version"' in text("third_party/node/node.gni")
     if platform == "windows":
         timezone = text("third_party/blink/renderer/core/timezone/timezone_controller.cc")
         assert "bool TimeZoneController::SetDefaultTimeZone(" in timezone
@@ -128,31 +168,39 @@ def verify():
         if "original" in entry:
             assert digest((ROOT / entry["original"]).read_bytes()) == entry["original_sha256"]
         preservation.append(entry["path"])
+    recipe, platform_fixture = linux_recipe(manifest)
+    assert source["linux_downstream"] == manifest["linux_downstream"]
+    assert set(platform_fixture["sources"]) <= set(fixture["files"])
+    assert source["platform_source_files"] == fixture["platform_source_files"]
+    expected_sections = [(entry["path"], name) for entry in recipe["patches"]
+                         for name, _, _ in arp.transform_patch(checked(entry), set(), [])[1]]
+    assert [(entry["path"], entry["target"]) for entry in fixture["predecessors"]["linux"]] == expected_sections
+    for entry in fixture["predecessors"]["linux"]:
+        raw = (ROOT / entry["path"]).read_bytes()
+        assert digest(raw) == entry["patch_sha256"] and entry["text"].encode() in raw
     results = []
     with tempfile.TemporaryDirectory(prefix="chromix157-verify-") as temporary:
         work = Path(temporary)
         env = {k: v for k, v in os.environ.items() if not k.startswith("GIT_")}
         env.update(GIT_CONFIG_NOSYSTEM="1", GIT_CONFIG_GLOBAL=os.devnull,
                    GIT_CEILING_DIRECTORIES=str(work))
-        for platform, core_only in (("linux", False), ("windows", False),
-                                    ("macos", False), ("linux", True)):
+        for platform in ("linux", "windows", "macos"):
             for substituted in (False, True):
-                src = work / (platform + ("-core-only" if core_only else "") +
-                              ("-substituted" if substituted else "-raw"))
+                src = work / (platform + ("-substituted" if substituted else "-raw"))
                 src.mkdir()
-                for name, text in fixture["files"].items():
+                for name in fixture["platform_source_files"][platform]:
                     path = src / name
                     path.parent.mkdir(parents=True, exist_ok=True)
-                    path.write_text(text)
+                    path.write_text(fixture["files"][name])
                 result = {"platform": platform, "architectures": ["x64", "arm64"],
                           "domain_substituted": substituted, "status": "failed",
-                          "overlay_mode": "core-only-diagnostic" if core_only else "actual-platform",
-                          "production_eligible": platform != "linux",
+                          "overlay_mode": "downstream-nine-patch-recipe" if platform == "linux" else "actual-platform",
+                          "build_verified": False, "runtime_verified": False,
                           "expected_patch_count": {"linux": 226, "windows": 232, "macos": 228}[platform],
                           "patches": [], "predecessors": []}
                 results.append(result)
                 try:
-                    for layer in (("core",) if core_only else ("core", platform)):
+                    for layer in (("linux_core",) if platform == "linux" else ("core", platform)):
                         for entry in fixture["predecessors"][layer]:
                             result["stage"] = "overlay"
                             result["current_file"] = entry["target"]
@@ -162,6 +210,38 @@ def verify():
                             apply(src, raw, env, check=True)
                             apply(src, raw, env)
                             result["predecessors"].append({k: v for k, v in entry.items() if k != "text"})
+                    if platform == "linux":
+                        for name, text in platform_fixture["sources"].items():
+                            assert (src / name).read_bytes() == text.encode(), name
+                        platform_initial = snapshot(src, recipe["final_outputs"])
+                        platform_patches = []
+                        for entry in recipe["patches"]:
+                            result["stage"] = "downstream-platform-apply"
+                            result["current_patch"] = entry["path"]
+                            result["current_file"] = list(entry["inputs"])
+                            assert snapshot(src, entry["inputs"]) == entry["inputs"], entry["path"]
+                            raw = checked(entry)
+                            apply(src, raw, env, check=True)
+                            apply(src, raw, env)
+                            assert snapshot(src, entry["outputs"]) == entry["outputs"], entry["path"]
+                            platform_patches.append(raw)
+                            result["predecessors"].append({"path": entry["path"], "sha256": entry["sha256"],
+                                                           "inputs": entry["inputs"], "outputs": entry["outputs"],
+                                                           "status": "applied", "layer": "linux-downstream"})
+                        assert snapshot(src, recipe["final_outputs"]) == recipe["final_outputs"]
+                        for reverse in (True, False):
+                            sequence = reversed(platform_patches) if reverse else platform_patches
+                            for raw in sequence:
+                                apply(src, raw, env, check=True, reverse=reverse)
+                                apply(src, raw, env, reverse=reverse)
+                            assert snapshot(src, recipe["final_outputs"]) == (
+                                platform_initial if reverse else recipe["final_outputs"])
+                        result["full_platform_replay"] = {
+                            "status": "verified", "patch_count": len(platform_patches),
+                            "source_file_count": len(platform_initial), "roundtrip": "reverse-forward-exact-bytes",
+                            "initial": platform_initial, "final": recipe["final_outputs"],
+                            "source_manifest": manifest["linux_downstream"]["source_manifest"],
+                            "previous_full_platform_audit": manifest["linux_downstream"]["platform_audit"]}
                     listed = set(fixture["domain_lists"][platform].splitlines()) if substituted else set()
                     rules = arp._rules(fixture["domain_regex"].encode()) if substituted else []
                     for name in listed:
@@ -190,20 +270,35 @@ def verify():
                                                   "status": "applied", "preimages": before,
                                                   "postimages": snapshot(src, before)})
                     invariants(src, platform)
+                    roundtrip_patches = prepared
+                    roundtrip_initial = initial.copy()
+                    if platform == "linux":
+                        prefix = []
+                        for entry in recipe["patches"]:
+                            data, entries = arp.transform_patch(checked(entry), listed, rules)
+                            prefix.append((entry, data, entries))
+                        roundtrip_patches = prefix + prepared
+                        for name, text in platform_fixture["sources"].items():
+                            targets.add(name)
+                            if name in listed:
+                                text = arp._substitute(text, rules)
+                            roundtrip_initial[name] = digest(text.encode())
                     final = snapshot(src, targets)
                     for reverse in (True, False):
-                        sequence = reversed(prepared) if reverse else prepared
+                        sequence = reversed(roundtrip_patches) if reverse else roundtrip_patches
                         result["stage"] = "reverse" if reverse else "forward"
                         for entry, data, entries in sequence:
                             result["current_patch"] = entry["path"]
                             result["current_file"] = entries[0][0]
                             apply(src, data, env, check=True, reverse=reverse)
                             apply(src, data, env, reverse=reverse)
-                        assert snapshot(src, targets) == (initial if reverse else final)
+                        assert snapshot(src, targets) == (roundtrip_initial if reverse else final)
                     invariants(src, platform)
                     result.update(status="verified", patch_count=len(prepared),
                                   roundtrip={"status": "verified", "method": "reverse-forward-exact-bytes",
-                                             "initial": initial, "final": final})
+                                             "patch_count": len(roundtrip_patches),
+                                             "scope": "platform9-plus-chromix226" if platform == "linux" else "chromix-stack",
+                                             "initial": roundtrip_initial, "final": final})
                     for key in ("stage", "current_patch", "current_file"):
                         del result[key]
                 except (ValueError, AssertionError) as error:

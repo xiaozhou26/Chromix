@@ -5,13 +5,14 @@
   "core_tag_object": "33eece1eb0b5286bf71e732fbbad7a46faface5a",
   "core_peeled_commit": "8c886dffc6ade39d8f7df5d64ace5a8824b455e1",
   "chromium_commit": "4b3d0dabb8250b6f152d2d85d79e7706e309d087",
-  "scope": "New157 patches, additions, verification and exact source fixture only. Historical root224 and156, pins and selector unchanged.",
+  "scope": "157 evidence update plus exact Linux recipe/nine platform replacements imported from d1edf19. Historical224/156 and all Chromix157 patch bytes unchanged. No pins, selector or production helper changes.",
   "verification_limits": [
-    "Exact-source overlapping file sections only, not full upstream overlay/tree application.",
-    "No compilation, GN generation, browser runtime or architecture execution.",
+    "Full Linux downstream platform sequence is replayed, nine patches covering all36 target files. Core replay is the exact intersecting-file subset, not all827 core sections.",
+    "No compilation, GN generation, full GN/link, browser runtime or architecture execution.",
     "x64/arm64 share source patches; this is not six native builds.",
-    "Linux157 portablelinux tag/gitlink absent; actual156 overlay conflicts and is not production eligible.",
-    "Linux core-only diagnostic deliberately omits the incompatible platform overlay and cannot certify Linux production.",
+    "Linux uses authorized156 platform configuration baseline plus explicit157 core override and pinned downstream recipe, not an official portablelinux157 tag.",
+    "No core-only diagnostic cases count toward success.",
+    "Windows/macOS retain original157 source scope and actual overlay intersection audit.",
     "No push or workflow dispatch."
   ],
   "final_overrides": {
@@ -181,7 +182,54 @@
       "version": "156.0.8078.79-1",
       "commit": "6f0aa178c2394fc0a177edc0fd64e41f402a0418",
       "core_gitlink": "28a211ab4ab6b83d919966a4f58a6df23cf4fb29",
-      "target_version_available": false
+      "target_version_available": false,
+      "kind": "linux157-downstream-fresh",
+      "core_override": "8c886dffc6ade39d8f7df5d64ace5a8824b455e1",
+      "official_platform_tag": null,
+      "downstream_recipe_available": true
     }
+  },
+  "linux_downstream": {
+    "implementation_commit": "d1edf19bd5074f9473d89dc91a6c6d833d15ecc3",
+    "source_manifest": {
+      "path": "build/linux/157.0.8103.78/source.json",
+      "sha256": "5ad5898d9442cc31b6ed571702f9e88510e9eea144ed544f60187e66e5c948d8"
+    },
+    "platform_fixture": {
+      "path": "tools/tests/fixtures/linux157_platform_sources.json.gz",
+      "sha256": "ebf62286101d1c7306da303ca5200d0dd737f3ddbf237067185595d543b1f408"
+    },
+    "platform_audit": {
+      "path": "patches/chromium157-verification/linux-platform-audit.json",
+      "sha256": "d338adf0c712319a3b8efa666f57d378c6cef3bb31a027681a87e97694346417"
+    },
+    "recipe_sha256": "42d788d91c0ec2345c253044665af7f623501a73c8bdb627a94d1739790aeb11",
+    "qualification": "Authorized old platform baseline plus exact157 core override and all nine downstream replacements; not an official portablelinux157 tag."
+  },
+  "review_manifest_sha256": "8e25b19e957f3c96d2a308b0d519fd35efbdfefe15d3156bb7540d08dd25abac",
+  "linux_full_platform_coverage": {
+    "raw_source_files": 192,
+    "platform_files": 36,
+    "core_sections": 43,
+    "platform_patches": 9,
+    "platform_sections": 36,
+    "chromix_patches": 226,
+    "combined_roundtrip_patches": 235,
+    "domain_modes": [
+      "raw",
+      "substituted"
+    ],
+    "post_core_preimages": "Every36 platform source bytes must equal independently audited fixture before any replacement.",
+    "sequential_checks": "Each of9 exact pre/post SHA256 maps plus final_outputs checked; all9 platform reverse/forward and combined235 reverse/forward verified.",
+    "policy": "Retains157 native WebBundle/IFT and Rust/Crubit assertions, Node version check and native TypeScript recipe. Full GN/link compatibility remains unverified."
+  },
+  "regression_tests": {
+    "passed": 151,
+    "skipped": 7,
+    "skip_reason": "PowerShell is required",
+    "negative_checks": [
+      "modified downstream platform patch rejected",
+      "reordered downstream recipe rejected by audit binding"
+    ]
   }
 }

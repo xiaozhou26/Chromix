@@ -1259,7 +1259,7 @@
   },
   "fixture": {
     "path": "tools/tests/fixtures/chromium157_patch_sources.json.gz",
-    "sha256": "d0da705dc91c1e52abffec76d18c2c294af6471e90720d7cbe9c87a35cdbbad3"
+    "sha256": "6b9a15d6b35004d7690323ef4ff1b282da5f03c8b7d276488dbb44e0be0155bf"
   },
   "historical_files": [
     {
@@ -1399,7 +1399,7 @@
       "sha256": "b9f895112210e0753abe0ff4c8a065db0b26f006ba763819b2530969584eb961"
     }
   ],
-  "qualification": "Exact-source subset structural replay only; no compilation/runtime or production selector integration. Linux upstream156 overlay fails on157 and is not certified.",
+  "qualification": "Exact-source structural replay; all nine Linux downstream platform replacements and complete Chromix stacks. Core is intersecting-file subset only. No compilation/runtime, full GN/link or production selector/helper integration is claimed.",
   "platform_identities": {
     "windows": {
       "version": "157.0.8103.78-1.1",
@@ -1417,7 +1417,28 @@
       "version": "156.0.8078.79-1",
       "commit": "6f0aa178c2394fc0a177edc0fd64e41f402a0418",
       "core_gitlink": "28a211ab4ab6b83d919966a4f58a6df23cf4fb29",
-      "target_version_available": false
+      "target_version_available": false,
+      "kind": "linux157-downstream-fresh",
+      "core_override": "8c886dffc6ade39d8f7df5d64ace5a8824b455e1",
+      "official_platform_tag": null,
+      "downstream_recipe_available": true
     }
+  },
+  "linux_downstream": {
+    "implementation_commit": "d1edf19bd5074f9473d89dc91a6c6d833d15ecc3",
+    "source_manifest": {
+      "path": "build/linux/157.0.8103.78/source.json",
+      "sha256": "5ad5898d9442cc31b6ed571702f9e88510e9eea144ed544f60187e66e5c948d8"
+    },
+    "platform_fixture": {
+      "path": "tools/tests/fixtures/linux157_platform_sources.json.gz",
+      "sha256": "ebf62286101d1c7306da303ca5200d0dd737f3ddbf237067185595d543b1f408"
+    },
+    "platform_audit": {
+      "path": "patches/chromium157-verification/linux-platform-audit.json",
+      "sha256": "d338adf0c712319a3b8efa666f57d378c6cef3bb31a027681a87e97694346417"
+    },
+    "recipe_sha256": "42d788d91c0ec2345c253044665af7f623501a73c8bdb627a94d1739790aeb11",
+    "qualification": "Authorized old platform baseline plus exact157 core override and all nine downstream replacements; not an official portablelinux157 tag."
   }
 }
