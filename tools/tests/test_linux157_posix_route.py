@@ -14,7 +14,7 @@ import yaml
 
 from tools import linux157_source as source
 from tools import linux157_build as build
-from tools import linux157_postgn as checkpoint
+from tools import linux157_locale as checkpoint
 
 ROOT = Path(__file__).resolve().parents[2]
 

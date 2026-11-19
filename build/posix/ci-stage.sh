@@ -153,9 +153,12 @@ fi
 
 LINUX157_FRESH=0
 LINUX157_RECOVERY=0
-case "${CHROMIX_LINUX157_PRE_GN_RECOVERY:-0}:${CHROMIX_LINUX157_POST_GN_RECOVERY:-0}" in
-  0:0) ;;
-  1:0|0:1) LINUX157_RECOVERY=1 ;;
+case "${CHROMIX_LINUX157_PRE_GN_RECOVERY:-0}:${CHROMIX_LINUX157_POST_GN_RECOVERY:-0}:${CHROMIX_LINUX157_LOCALE_RECOVERY:-0}" in
+  0:0:0) ;;
+  1:0:0|0:1:0) LINUX157_RECOVERY=1 ;;
+  0:0:1)
+    [ "$PLATFORM:$ARCH" = linux:x64 ] || die "locale recovery requires exact Linux x64 donor"
+    LINUX157_RECOVERY=1 ;;
   *) die "select exactly one Linux157 recovery route" ;;
 esac
 if [ "$LINUX157_RECOVERY" = 1 ] && [ "$PLATFORM" != linux ]; then

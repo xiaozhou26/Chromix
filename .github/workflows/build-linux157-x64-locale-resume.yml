@@ -1,0 +1,34 @@
+name: build-linux157-x64-locale-resume
+run-name: Linux157 x64 compiled 44578881741 locale API repair
+
+on:
+  workflow_dispatch:
+    inputs:
+      compile_jobs:
+        description: 'Ninja jobs; latest compiled donor and single locale source migration are fixed'
+        type: string
+        default: auto
+
+permissions:
+  actions: read
+  contents: read
+
+concurrency:
+  group: linux157-x64-locale-resume-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  resume:
+    name: Linux157 x64 (latest compiled tree + reviewed locale API)
+    uses: ./.github/workflows/build-posix-github.yml
+    with:
+      platform: linux
+      arch: x64
+      runner: ubuntu-22.04
+      artifact: chromix-linux-x64
+      max-stages: 8
+      build_profile: fast
+      compile_jobs: ${{ inputs.compile_jobs || 'auto' }}
+      use_upstream_cache: false
+      linux157_locale_recovery: true
+    secrets: inherit

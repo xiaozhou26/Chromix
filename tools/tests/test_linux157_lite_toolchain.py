@@ -14,7 +14,7 @@ import pytest
 from tools import linux157_source as source
 from tools import linux157_toolchain as tools
 from tools import linux157_build as build
-from tools import linux157_postgn as checkpoint
+from tools import linux157_locale as checkpoint
 
 
 def lite_inputs(tmp_path):

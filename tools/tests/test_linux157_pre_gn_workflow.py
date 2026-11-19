@@ -35,7 +35,7 @@ def render(text, arch='x64', **overrides):
               'github.ref':'refs/heads/main', 'inputs.platform':'linux', 'inputs.build_profile':'fast',
               'inputs.use_upstream_cache':'false', 'inputs.resume_migration':'', 'inputs.resume_run_id':'',
               'inputs.resume_artifact_ids':'', 'inputs.resume_attempt':'1', 'inputs.arch':arch,
-              'inputs.linux157_pre_gn_recovery':'true', "inputs['max-stages']":'8'}
+              'inputs.linux157_pre_gn_recovery':'true', 'inputs.linux157_locale_recovery':'false', "inputs['max-stages']":'8'}
     values.update(overrides)
     for key, value in values.items(): text = text.replace('${{ '+key+' }}', value)
     assert '${{' not in text
@@ -194,7 +194,7 @@ def test_current_builder_checks_postgn_proof_without_repeating_args_repair(tmp_p
          mock.patch.object(build,'prepare_host_go',return_value={}), \
          mock.patch.object(build.shutil,'which',return_value=sys.executable), \
          mock.patch.object(build.subprocess,'run',side_effect=run), \
-         mock.patch.object(build.postgn,'verify',side_effect=lambda *a:order.append('read-postgn-proof')), \
+         mock.patch.object(build.locale_recovery,'verify',side_effect=lambda *a:order.append('read-postgn-proof')), \
          mock.patch.object(build.host_gn,'prepare',side_effect=ValueError('stop-before-GN')):
         with pytest.raises(ValueError,match='stop-before-GN'):build.build(work,'arm64')
     assert order==['verify-migrated-source','verified-tools','source-proof','read-postgn-proof']

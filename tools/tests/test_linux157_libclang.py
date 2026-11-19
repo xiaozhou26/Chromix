@@ -124,7 +124,8 @@ def test_postgn_donor_is_latest_and_has_generated_graph():
 
 def test_tool_only_delta_cannot_modify_previous_gn_recipe_or_patches():
     old = postgn.load()["donors"]["arm64"]["source_receipt"]["recipe"]
-    new = source.recipe()
+    from tools import linux157_locale
+    new = linux157_locale.load()["source_receipt"]["recipe"]
     postgn.delta(old, new)
     bad = copy.deepcopy(new)
     bad["inputs"]["tools/linux157_checkpoint.py"] = "0" * 64

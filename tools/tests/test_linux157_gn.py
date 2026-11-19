@@ -138,7 +138,7 @@ def test_no_warning_suppression_or_third_fresh_source_route():
     assert "-Wno" not in text and "-Werror=false" not in text
     build = (source.ROOT / "tools/linux157_build.py").read_text()
     assert 'target_gn.write_text' not in build
-    assert 'postgn.verify(work, arch, repo)' in build
+    assert 'locale_recovery.verify(work, arch, repo)' in build
     assert "fresh fallback forbidden" in build
 
 

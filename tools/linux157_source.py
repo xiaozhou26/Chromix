@@ -81,7 +81,8 @@ def recipe(repo: Path = ROOT) -> dict:
              "tools/linux157_build.py", "tools/linux157_gn.py", "tools/linux157_checkpoint.py",
              "build/linux/157.0.8103.78/pre-gn-checkpoints.json", "tools/linux157_libclang.py",
              "tools/linux157_postgn.py", "build/linux/157.0.8103.78/libclang.json",
-             "build/linux/157.0.8103.78/post-gn-checkpoints.json", LITE_PATH]
+             "build/linux/157.0.8103.78/post-gn-checkpoints.json", "tools/linux157_locale.py",
+             "build/linux/157.0.8103.78/locale-checkpoint.json", LITE_PATH]
     if digest(regular(repo, LITE_PATH).read_bytes()) != LITE_SHA256:
         raise ValueError("changed Linux157 lite payload")
     files += [entry["path"] for entry in manifest["patches"]]
@@ -252,9 +253,9 @@ def prepare(work: Path, arch: str, repo: Path = ROOT) -> None:
     src = work / "src"
     if src.exists():
         try:
-            from .linux157_postgn import verify as verify_migrated
+            from .linux157_locale import verify as verify_migrated
         except ImportError:
-            from linux157_postgn import verify as verify_migrated
+            from linux157_locale import verify as verify_migrated
         verify_migrated(work, arch, repo)
         receipt = verify_receipt(src, repo)
         expected_ready = "linux157-fresh|" + arch + "|" + recipe(repo)["sha256"]
@@ -264,7 +265,7 @@ def prepare(work: Path, arch: str, repo: Path = ROOT) -> None:
         get_platform(work / "tooling/ungoogled-chromium",
                      work / "tooling/ungoogled-chromium-portablelinux", repo)
         return
-    raise ValueError("Linux157 recovery requires the exact latest post-GN snapshot; fresh preparation is disabled")
+    raise ValueError("Linux157 recovery requires the exact latest compiled locale snapshot; fresh preparation is disabled")
 
 
 def validate_route(repo: Path = ROOT, arch: str = "x64") -> dict:
@@ -290,9 +291,9 @@ def checkpoint(work: Path, arch: str, repo: Path = ROOT) -> dict:
     work = work.resolve()
     src = work / "src"
     try:
-        from .linux157_postgn import verify as verify_migrated
+        from .linux157_locale import verify as verify_migrated
     except ImportError:
-        from linux157_postgn import verify as verify_migrated
+        from linux157_locale import verify as verify_migrated
     verify_migrated(work, arch, repo)
     receipt = verify_receipt(src, repo)
     selection, _ = patch_selection.select(repo, "linux", src=src)

@@ -17,13 +17,13 @@ try:
     from . import linux157_toolchain as toolchain
     from . import linux157_gn as host_gn
     from . import linux157_libclang as libclang
-    from . import linux157_postgn as postgn
+    from . import linux157_locale as locale_recovery
 except ImportError:
     import linux157_source as source
     import linux157_toolchain as toolchain
     import linux157_gn as host_gn
     import linux157_libclang as libclang
-    import linux157_postgn as postgn
+    import linux157_locale as locale_recovery
 
 
 GO_VERSION = "go1.27.1"
@@ -117,7 +117,7 @@ def build(work: Path, arch: str, repo: Path = source.ROOT) -> None:
     if os.environ.get("CHROMIX_USE_UPSTREAM_CACHE", "0") != "0" or os.environ.get("CHROMIX_UPSTREAM_CACHE_DIR"):
         raise ValueError("Linux157 fresh builds cannot use a donor cache")
     if not (work / "src").is_dir():
-        raise ValueError("Linux157 libclang recovery requires the exact latest post-GN checkpoint; fresh fallback forbidden")
+        raise ValueError("Linux157 libclang recovery requires the exact latest compiled locale checkpoint; fresh fallback forbidden")
     source.prepare(work, arch, repo)
     src = work / "src"
     toolchain.prepare(src, arch, repo)
@@ -170,17 +170,16 @@ def build(work: Path, arch: str, repo: Path = source.ROOT) -> None:
                     "--repo", str(repo), "--core", str(core), "--platform-tooling", str(tooling),
                     "--platform", "linux", "--output", str(report)], check=True, env=env)
     shutil.copy2(report, diagnostic / "source-final.json")
-    postgn.verify(work, arch, repo)
+    locale_recovery.verify(work, arch, repo)
     gn_identity = host_gn.prepare(src, out, env=env)
     (diagnostic / "linux157-host-gn.json").write_text(json.dumps(gn_identity, indent=2) + "\n")
-    subprocess.run([str(out / "gn"), "gen", str(out), "--fail-on-unused-args"], cwd=src, check=True, env=env)
+    # The locale-only migration preserves the admitted generated graph and object cache.
+    source.regular(out, "build.ninja")
     libclang.prepare(src, repo)
     # Metagen's gn-desc lookup falls back to PATH after core prunes buildtools/linux64.
     env["PATH"] = str(out) + os.pathsep + env["PATH"]
     env["PYTHONDONTWRITEBYTECODE"] = "1"
-    ninja = shutil.which("ninja")
-    if not ninja:
-        raise ValueError("ninja is required")
+    ninja = str(locale_recovery.verify_ninja(work, repo))
     jobs = os.environ.get("CHROMIX_JOBS", str(os.cpu_count() or 2))
     if not jobs.isdecimal() or int(jobs) <= 0:
         raise ValueError("invalid Linux157 job count")

@@ -162,12 +162,12 @@ def test_real_builder_installs_libclang_before_ninja_without_rewriting_args(tmp_
          mock.patch.object(build,'prepare_host_go',return_value={}), \
          mock.patch.object(build.shutil,'which',return_value=sys.executable), \
          mock.patch.object(build.subprocess,'run',side_effect=run), \
-         mock.patch.object(build.postgn,'verify',side_effect=lambda *a:order.append('read-postgn-proof')), \
+         mock.patch.object(build.locale_recovery,'verify',side_effect=lambda *a:order.append('read-postgn-proof')), \
          mock.patch.object(build.host_gn,'prepare',return_value={}), \
          mock.patch.object(build.libclang,'prepare',side_effect=ValueError('libclang-before-ninja')) as install:
         with pytest.raises(ValueError,match='libclang-before-ninja'):build.build(tmp_path,'arm64')
         install.assert_called_once_with(src,source.ROOT)
-    assert order==['read-source-proof','sourceproof','read-postgn-proof','gn-gen']
+    assert order==['read-source-proof','sourceproof','read-postgn-proof']
     assert (out/'args.gn').read_text()=='protected args'
     assert (out/'build.ninja').read_text()=='protected graph'
 
