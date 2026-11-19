@@ -153,6 +153,15 @@ fi
 
 LINUX157_FRESH=0
 LINUX157_RECOVERY=0
+case "${CHROMIX_LINUX157_UA_RECOVERY:-0}" in
+  0) ;;
+  1)
+    [ "$PLATFORM:$ARCH" = linux:x64 ] || die "UA recovery requires exact Linux x64 donor"
+    [ "${CHROMIX_LINUX157_PRE_GN_RECOVERY:-0}:${CHROMIX_LINUX157_POST_GN_RECOVERY:-0}:${CHROMIX_LINUX157_LOCALE_RECOVERY:-0}" = 0:0:0 ] ||
+      die "UA recovery cannot be combined with historical donor routes"
+    LINUX157_RECOVERY=1 ;;
+  *) die "invalid UA recovery opt-in" ;;
+esac
 case "${CHROMIX_LINUX157_PRE_GN_RECOVERY:-0}:${CHROMIX_LINUX157_POST_GN_RECOVERY:-0}:${CHROMIX_LINUX157_LOCALE_RECOVERY:-0}" in
   0:0:0) ;;
   1:0:0|0:1:0) LINUX157_RECOVERY=1 ;;
