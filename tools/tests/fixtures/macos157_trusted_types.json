@@ -1,0 +1,92 @@
+{
+  "chromium_version": "157.0.8103.78",
+  "official_archive_sha256": "f7d15a9ba38b018602496cde9b094c34c5876c75723d3a5497682fd2e71fcdf3",
+  "donors": {
+    "arm64": {
+      "artifact_id": 14214802687,
+      "files": {
+        "third_party/node/mac_arm64/node-darwin-arm64/bin/node": {
+          "sha256": "90ee1d271eec831fd38d16c78c19cc36809548ac5cd034a6e0c10c4389c881ef",
+          "mode": 493,
+          "size": 117655968
+        },
+        "third_party/node/node_modules/@types/trusted-types/index.d.ts": {
+          "sha256": "cd05fb7a0d2d8f84781594a4affac005ba5f0cf72688374512ac2f39766f41a4",
+          "mode": 420,
+          "size": 2362
+        },
+        "third_party/node/node_modules/@types/trusted-types/lib/index.d.ts": {
+          "sha256": "15fe687c59d62741b4494d5e623d497d55eb38966ecf5bea7f36e48fc3fbe15e",
+          "mode": 420,
+          "size": 3005
+        },
+        "tools/typescript/tsconfig_definitions_base.json": {
+          "sha256": "9c41bb891facd57b9ffd045276e0a92a6fa427c703788a0fbafc4a125913c102",
+          "mode": 420,
+          "size": 461
+        },
+        "tools/typescript/tsconfig_base.json": {
+          "sha256": "aed6f0a2d049af86b5819f2d9da72bf6fd25d0dacfdbe6d2d35578d8c34de3ff",
+          "mode": 420,
+          "size": 770
+        }
+      }
+    },
+    "x64": {
+      "artifact_id": 14228304612,
+      "files": {
+        "third_party/node/mac_arm64/node-darwin-arm64/bin/node": {
+          "sha256": "90ee1d271eec831fd38d16c78c19cc36809548ac5cd034a6e0c10c4389c881ef",
+          "mode": 493,
+          "size": 117655968
+        },
+        "third_party/node/node_modules/@types/trusted-types/index.d.ts": {
+          "sha256": "cd05fb7a0d2d8f84781594a4affac005ba5f0cf72688374512ac2f39766f41a4",
+          "mode": 420,
+          "size": 2362
+        },
+        "third_party/node/node_modules/@types/trusted-types/lib/index.d.ts": {
+          "sha256": "15fe687c59d62741b4494d5e623d497d55eb38966ecf5bea7f36e48fc3fbe15e",
+          "mode": 420,
+          "size": 3005
+        },
+        "tools/typescript/tsconfig_definitions_base.json": {
+          "sha256": "9c41bb891facd57b9ffd045276e0a92a6fa427c703788a0fbafc4a125913c102",
+          "mode": 420,
+          "size": 461
+        },
+        "tools/typescript/tsconfig_base.json": {
+          "sha256": "aed6f0a2d049af86b5819f2d9da72bf6fd25d0dacfdbe6d2d35578d8c34de3ff",
+          "mode": 420,
+          "size": 770
+        }
+      }
+    }
+  },
+  "files": {
+    "third_party/node/node_modules/@types/trusted-types/index.d.ts": {
+      "text": "import * as lib from \"./lib/index.js\";\n\n// Re-export the type definitions globally.\ndeclare global {\n    // eslint-disable-next-line @typescript-eslint/no-empty-interface -- interface to allow module augmentation\n    interface TrustedHTML extends lib.TrustedHTML {}\n    // eslint-disable-next-line @typescript-eslint/no-empty-interface -- interface to allow module augmentation\n    interface TrustedScript extends lib.TrustedScript {}\n    // eslint-disable-next-line @typescript-eslint/no-empty-interface -- interface to allow module augmentation\n    interface TrustedScriptURL extends lib.TrustedScriptURL {}\n\n    // eslint-disable-next-line @typescript-eslint/no-empty-interface -- interface to allow module augmentation\n    interface TrustedTypePolicy extends lib.TrustedTypePolicy {}\n\n    // eslint-disable-next-line @typescript-eslint/no-empty-interface -- interface to allow module augmentation\n    interface TrustedTypePolicyFactory extends lib.TrustedTypePolicyFactory {}\n\n    // eslint-disable-next-line @typescript-eslint/no-empty-interface -- interface to allow module augmentation\n    interface TrustedTypePolicyOptions extends lib.TrustedTypePolicyOptions {}\n\n    // Attach the relevant Trusted Types properties to the Window object.\n    // eslint-disable-next-line @typescript-eslint/no-empty-interface -- interface to allow module augmentation\n    interface Window extends lib.TrustedTypesWindow {}\n}\n\n// These are the available exports when using the polyfill as npm package (e.g. in nodejs)\ninterface InternalTrustedTypePolicyFactory extends lib.TrustedTypePolicyFactory {\n    TrustedHTML: typeof lib.TrustedHTML;\n    TrustedScript: typeof lib.TrustedScript;\n    TrustedScriptURL: typeof lib.TrustedScriptURL;\n}\n\ndeclare const trustedTypes: InternalTrustedTypePolicyFactory;\n\ndeclare class TrustedTypesEnforcer {\n    constructor(config: TrustedTypeConfig);\n    install: () => void;\n    uninstall: () => void;\n}\n\n// tslint:disable-next-line no-unnecessary-class\ndeclare class TrustedTypeConfig {\n    constructor(\n        isLoggingEnabled: boolean,\n        isEnforcementEnabled: boolean,\n        allowedPolicyNames: string[],\n        allowDuplicates: boolean,\n        cspString?: string | null,\n        windowObject?: Window,\n    );\n}\n\nexport { TrustedTypeConfig, TrustedTypePolicy, TrustedTypePolicyFactory, trustedTypes, TrustedTypesEnforcer };\n",
+      "sha256": "cd05fb7a0d2d8f84781594a4affac005ba5f0cf72688374512ac2f39766f41a4",
+      "mode": 420,
+      "size": 2362
+    },
+    "third_party/node/node_modules/@types/trusted-types/lib/index.d.ts": {
+      "text": "// The main type definitions. Packages that do not want to pollute the global\n// scope with Trusted Types (e.g. libraries whose users may not be using Trusted\n// Types) can import the types directly from 'trusted-types/lib'.\n\nexport type FnNames = keyof TrustedTypePolicyOptions;\nexport type Args<Options extends TrustedTypePolicyOptions, K extends FnNames> = Parameters<NonNullable<Options[K]>>;\n\nexport class TrustedHTML {\n    private constructor(); // To prevent instantiting with 'new'.\n    private brand: true; // To prevent structural typing.\n}\n\nexport class TrustedScript {\n    private constructor(); // To prevent instantiting with 'new'.\n    private brand: true; // To prevent structural typing.\n}\n\nexport class TrustedScriptURL {\n    private constructor(); // To prevent instantiting with 'new'.\n    private brand: true; // To prevent structural typing.\n}\n\nexport abstract class TrustedTypePolicyFactory {\n    createPolicy<Options extends TrustedTypePolicyOptions>(\n        policyName: string,\n        policyOptions?: Options,\n    ): Pick<TrustedTypePolicy<Options>, \"name\" | Extract<keyof Options, FnNames>>;\n    isHTML(value: unknown): value is TrustedHTML;\n    isScript(value: unknown): value is TrustedScript;\n    isScriptURL(value: unknown): value is TrustedScriptURL;\n    readonly emptyHTML: TrustedHTML;\n    readonly emptyScript: TrustedScript;\n    getAttributeType(tagName: string, attribute: string, elementNs?: string, attrNs?: string): string | null;\n    getPropertyType(tagName: string, property: string, elementNs?: string): string | null;\n    readonly defaultPolicy: TrustedTypePolicy | null;\n}\n\nexport abstract class TrustedTypePolicy<Options extends TrustedTypePolicyOptions = TrustedTypePolicyOptions> {\n    readonly name: string;\n    createHTML(...args: Args<Options, \"createHTML\">): TrustedHTML;\n    createScript(...args: Args<Options, \"createScript\">): TrustedScript;\n    createScriptURL(...args: Args<Options, \"createScriptURL\">): TrustedScriptURL;\n}\n\nexport interface TrustedTypePolicyOptions {\n    createHTML?: ((input: string, ...arguments: any[]) => string) | undefined;\n    createScript?: ((input: string, ...arguments: any[]) => string) | undefined;\n    createScriptURL?: ((input: string, ...arguments: any[]) => string) | undefined;\n}\n\n// The Window object is augmented with the following properties in browsers that\n// support Trusted Types. Users of the 'trusted-types/lib' entrypoint can cast\n// window as TrustedTypesWindow to access these properties.\nexport interface TrustedTypesWindow {\n    // `trustedTypes` is left intentionally optional to make sure that\n    // people handle the case when their code is running in a browser not\n    // supporting trustedTypes.\n    trustedTypes?: TrustedTypePolicyFactory | undefined;\n    TrustedHTML: typeof TrustedHTML;\n    TrustedScript: typeof TrustedScript;\n    TrustedScriptURL: typeof TrustedScriptURL;\n    TrustedTypePolicyFactory: typeof TrustedTypePolicyFactory;\n    TrustedTypePolicy: typeof TrustedTypePolicy;\n}\n",
+      "sha256": "15fe687c59d62741b4494d5e623d497d55eb38966ecf5bea7f36e48fc3fbe15e",
+      "mode": 420,
+      "size": 3005
+    },
+    "tools/typescript/tsconfig_definitions_base.json": {
+      "text": "{\n  \"compilerOptions\": {\n    \"module\": \"preserve\",\n    \"moduleResolution\": \"bundler\",\n    \"resolvePackageJsonExports\": false,\n    \"target\": \"ESNext\",\n    \"noEmitOnError\": true,\n\n    \"allowJs\": true,\n    \"declaration\": true,\n    \"emitDeclarationOnly\": true,\n    \"pretty\": true,\n    \"removeComments\": true,\n    \"listEmittedFiles\": true,\n    \"typeRoots\": [\n      \"../../third_party/node/node_modules/@types\"\n    ],\n    \"types\": [\n      \"trusted-types\"\n    ]\n  }\n}\n",
+      "sha256": "9c41bb891facd57b9ffd045276e0a92a6fa427c703788a0fbafc4a125913c102",
+      "mode": 420,
+      "size": 461
+    },
+    "tools/typescript/tsconfig_base.json": {
+      "text": "{\n  \"compilerOptions\": {\n    \"module\": \"nodenext\",\n    \"moduleResolution\": \"nodenext\",\n    \"resolvePackageJsonExports\": false,\n    \"target\": \"ESNext\",\n    \"libReplacement\": false,\n\n    \"noEmitOnError\": true,\n    \"pretty\": true,\n\n    \"allowUnreachableCode\": false,\n    \"forceConsistentCasingInFileNames\": true,\n    \"noFallthroughCasesInSwitch\": true,\n    \"noImplicitOverride\": true,\n    \"noImplicitReturns\": true,\n    \"noPropertyAccessFromIndexSignature\": true,\n    \"noUncheckedIndexedAccess\": true,\n    \"noUncheckedSideEffectImports\": true,\n    \"noUnusedLocals\": true,\n    \"noUnusedParameters\": true,\n    \"preserveSymlinks\": true,\n    \"strict\": true,\n\n    \"typeRoots\": [\n        \"./../../third_party/node/node_modules/@types\"\n    ],\n    \"types\": [\"trusted-types\"]\n  }\n}\n",
+      "sha256": "aed6f0a2d049af86b5819f2d9da72bf6fd25d0dacfdbe6d2d35578d8c34de3ff",
+      "mode": 420,
+      "size": 770
+    }
+  }
+}

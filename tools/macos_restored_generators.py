@@ -268,6 +268,15 @@ NODE_TYPESCRIPT157_OFFICIAL = {'version': '6.0.2',
                    'typescript.patch': '894efe30aaadf1d482a9560e41026c9c63a3707d14f667b83a594ab8fb1d5916'}}
 
 
+# Both files survive Chromium's Node package filters and are used by WebUI tsconfig.
+TRUSTED_TYPES157 = {
+    "third_party/node/node_modules/@types/trusted-types/index.d.ts":
+        "cd05fb7a0d2d8f84781594a4affac005ba5f0cf72688374512ac2f39766f41a4",
+    "third_party/node/node_modules/@types/trusted-types/lib/index.d.ts":
+        "15fe687c59d62741b4494d5e623d497d55eb38966ecf5bea7f36e48fc3fbe15e",
+}
+
+
 def sha256(data: bytes) -> str:
     return hashlib.sha256(data).hexdigest()
 
@@ -278,7 +287,8 @@ def manifest_digest(pins=PINS) -> str:
              "sources": {name: entry[:2] for name, entry in repairs.items()}}
     if pins == PINS157:
         value.update(node_typescript=NODE_TYPESCRIPT157, node_sources=NODE_TYPESCRIPT157_SOURCES,
-                     node_typescript_official=NODE_TYPESCRIPT157_OFFICIAL)
+                     node_typescript_official=NODE_TYPESCRIPT157_OFFICIAL,
+                     trusted_types=TRUSTED_TYPES157)
     return sha256(json.dumps(value, sort_keys=True, separators=(",", ":")).encode())
 
 
@@ -544,6 +554,11 @@ def smoke(src: Path, host_arch: str, *, pins=PINS) -> dict:
         raise ValueError("macOS generator probes require the matching native host")
     paths = native_paths(host_arch)
     identities = {}
+    if pins == PINS157:
+        for relative, expected in TRUSTED_TYPES157.items():
+            if sha256(safe.read_verified(src, relative)) != expected:
+                raise ValueError(f"unknown macOS157 Trusted Types declaration: {relative}")
+            identities[relative] = {"path": relative, "sha256": expected}
     for name, relative in paths.items():
         path = safe.regular(src, relative)
         if host_arch not in binary_architectures(path, "macos") or not os.access(path, os.X_OK):
@@ -585,8 +600,30 @@ def smoke(src: Path, host_arch: str, *, pins=PINS) -> dict:
         if run([node, str(root / "native-compiled/sample.js")], root) != "42":
             raise ValueError("TypeScript direct native compilation probe mismatch")
         if node_tsc:
-            run([node, node_tsc, "sample.ts", "--outDir", "webui-compiled", "--target", "es2023"], root)
-            if run([node, str(root / "webui-compiled/sample.js")], root) != "42":
+            # The production WebUI tsconfig loads these globals for Chromium's patched DOM.
+            official = package_identity(src, "node-typescript157").get("variant")
+            sample = (
+                "export function trusted(html: TrustedHTML, url: TrustedScriptURL): void {\n"
+                "  const htmlValue: TrustedHTML = html;\n"
+                "  const urlValue: TrustedScriptURL = url;\n"
+                "  void htmlValue; void urlValue;\n"
+                "}\nconsole.log(42);\n")
+            if official:
+                sample = (
+                    "export function trusted(html: TrustedHTML, url: TrustedScriptURL): void {\n"
+                    "  document.body.innerHTML = html;\n"
+                    "  document.createElement('script').src = url;\n"
+                    "}\nconsole.log(42);\n")
+            (root / "webui.ts").write_text(sample)
+            config = {"compilerOptions": {
+                "target": "es2023", "module": "commonjs", "strict": True,
+                "noEmitOnError": True, "skipLibCheck": False, "libReplacement": False,
+                "outDir": "webui-compiled", "types": ["trusted-types"],
+                "typeRoots": [str(src / "third_party/node/node_modules/@types")],
+            }, "files": ["webui.ts"]}
+            (root / "webui.json").write_text(json.dumps(config))
+            run([node, node_tsc, "--project", "webui.json"], root)
+            if run([node, str(root / "webui-compiled/webui.js")], root) != "42":
                 raise ValueError("Node TypeScript compilation probe mismatch")
         module = str(src / package_path("esbuild") / "lib/main.js")
         script = "require(process.argv[1]).buildSync({entryPoints:['sample.ts'],bundle:true,outfile:'bundle.js'});"

@@ -328,6 +328,9 @@ def test_157_smoke_probes_both_typescript_compilers_without_path_search(generato
     node = helper.write(paths["node"], helper.files["esbuild-arm64"]["bin/esbuild"][0])
     node.chmod(0o755)
     node_tsc = str(helper.src / gen.package_path("node-typescript157") / "bin/tsc")
+    declarations = json.loads((Path(__file__).parent / "fixtures/macos157_trusted_types.json").read_text())
+    for name in gen.TRUSTED_TYPES157:
+        helper.write(name, declarations["files"][name]["text"].encode())
     commands = []
 
     def run(command, **kwargs):
@@ -346,7 +349,7 @@ def test_157_smoke_probes_both_typescript_compilers_without_path_search(generato
         probe = gen.smoke(helper.src, "arm64", pins=gen.PINS157)
     assert probe["node_typescript"] == "Version 6.0.2"
     assert probe["typescript_native"] == "Version 7.0.2"
-    assert [str(node), node_tsc, "sample.ts", "--outDir", "webui-compiled", "--target", "es2023"] in commands
+    assert [str(node), node_tsc, "--project", "webui.json"] in commands
 
 
 def test_node_package_domain_records_match_exact_core_rules():
