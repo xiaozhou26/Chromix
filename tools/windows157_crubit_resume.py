@@ -50,6 +50,16 @@ RECOVERY_FILES = frozenset({HELPER, PROOF, "build/windows/ci-stage.ps1", "tools/
     "tools/tests/test_windows157_crubit_resume.py", "tools/tests/fixtures/windows157_crubit_checkpoint.json.gz",
     "tools/tests/fixtures/windows157_crubit_source.json.gz", "tools/gen_windows_arm64_workflow.py",
     f".github/workflows/{WORKFLOW}.yml"})
+# fe50df0c124556f3a1a90196403a850fda68592e: reviewed macOS-only transitions.
+REVIEWED_PLATFORM_INPUTS = {
+    "tools/macos_restored_generators.py": (
+        "36ffd82eece62ef5177e6b7cd703bc341cd8dd0c1b971d59358a34868c0bb154",
+        "4027ab24e29c98f871b20ff84530fc884f4850f27044f75da942086222712bf0"),
+    "tools/tests/fixtures/macos157_official_typescript.json.gz": (
+        None, "adba2c096b5562c52cf5d81ec955c4bb474f49ef90dd6601be9d4c63a813809e"),
+    "tools/tests/test_macos157_official_typescript.py": (
+        None, "3933f56cd9dcc0fd11afb2cb3d3d46621a32fe451d1544457498f1fe35db4035"),
+}
 VIEW = "windows157-crubit-recipe"
 RECOVERY_CODE = {
     "build/windows/ci-stage.ps1": "73ade18522a3336f3ff2a7df28283ed6c54d37ab51920c983e04f329f4b8ffb9",
@@ -145,14 +155,30 @@ def blob(git, repo, sha, path):
     return files._git(git, repo, "cat-file", "blob", f"{sha}:{path}")
 
 
+def reviewed_changes(git: str, repo: Path, head: str, base: dict, tree: dict) -> None:
+    changed = {n for n in set(base) | set(tree) if base.get(n) != tree.get(n)}
+    outside = changed - RECOVERY_FILES
+    unreviewed = outside - REVIEWED_PLATFORM_INPUTS.keys()
+    if unreviewed:
+        raise ValueError("consumer differs outside reviewed Crubit recovery: " + str(sorted(unreviewed)))
+    for name in sorted(outside):
+        before, after = REVIEWED_PLATFORM_INPUTS[name]
+        old, new = base.get(name), tree.get(name)
+        if (new is None or new[:2] != ("100644", "blob")
+                or (before is None and old is not None)
+                or (before is not None and (old is None or old[:2] != ("100644", "blob")))):
+            raise ValueError("unreviewed platform input presence/mode: " + name)
+        if ((before is not None and digest(blob(git, repo, MAIN_BASE, name)) != before)
+                or digest(blob(git, repo, head, name)) != after):
+            raise ValueError("unreviewed platform input transition: " + name)
+
+
 def checkout_identity(repo: Path, expected_sha: str) -> tuple[str, dict]:
     git = files._host_git((repo,))
     head, tree = files._tree(git, repo, expected_sha)
     files._git(git, repo, "merge-base", "--is-ancestor", MAIN_BASE, head)
     base = git_tree(git, repo, MAIN_BASE)
-    changed = {n for n in set(base) | set(tree) if base.get(n) != tree.get(n)}
-    if changed - RECOVERY_FILES:
-        raise ValueError("consumer differs outside reviewed Crubit recovery: " + str(sorted(changed - RECOVERY_FILES)))
+    reviewed_changes(git, repo, head, base, tree)
     if _inventory(repo) != set(tree):
         raise ValueError("consumer checkout has untracked/missing inputs")
     files._tracked(repo, tree)

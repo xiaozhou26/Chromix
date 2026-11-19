@@ -331,3 +331,77 @@ def test_frozen_recipe_comparison_rejects_windows_change_not_linux_change():
     assert resume.windows_recipe(changed) == resume.windows_recipe(donor)
     changed['platforms']['windows']['commit'] = 'f' * 40
     assert resume.windows_recipe(changed) != resume.windows_recipe(donor)
+
+
+REVIEWED_MAC_COMMIT = "fe50df0c124556f3a1a90196403a850fda68592e"
+
+
+def platform_trees():
+    head = subprocess.check_output(['git', '-C', str(ROOT), 'rev-parse', 'HEAD'], text=True).strip()
+    return head, resume.git_tree('git', ROOT, resume.MAIN_BASE), resume.git_tree('git', ROOT, head)
+
+
+def test_main_reviewed_mac_inputs_are_exact_content_transitions():
+    head, base, tree = platform_trees()
+    assert set(resume.REVIEWED_PLATFORM_INPUTS) == {
+        'tools/macos_restored_generators.py',
+        'tools/tests/fixtures/macos157_official_typescript.json.gz',
+        'tools/tests/test_macos157_official_typescript.py',
+    }
+    for name, (before, after) in resume.REVIEWED_PLATFORM_INPUTS.items():
+        assert resume.digest(resume.blob('git', ROOT, REVIEWED_MAC_COMMIT, name)) == after
+        assert resume.digest(resume.blob('git', ROOT, head, name)) == after
+        assert resume.digest((ROOT / name).read_bytes()) == after
+        if before is None:
+            assert name not in base
+        else:
+            assert resume.digest(resume.blob('git', ROOT, resume.MAIN_BASE, name)) == before
+    resume.reviewed_changes('git', ROOT, head, base, tree)
+    # The exception is optional: the original Windows-only consumer remains valid.
+    resume.reviewed_changes('git', ROOT, resume.MAIN_BASE, base, base)
+
+
+@pytest.mark.parametrize('name', [
+    'tools/macos_restored_generators.py',
+    'tools/tests/fixtures/macos157_official_typescript.json.gz',
+    'tools/tests/test_macos157_official_typescript.py',
+])
+@pytest.mark.parametrize('mutation', ['content', 'deleted', 'mode', 'preimage'])
+def test_reviewed_platform_tuple_rejects_tampering(name, mutation):
+    head, base, tree = platform_trees()
+    original = resume.blob
+    if mutation == 'deleted':
+        del tree[name]
+        if name not in base:
+            base[name] = ('100644', 'blob', '0' * 40)
+    elif mutation == 'mode':
+        tree[name] = ('120000', 'blob', tree[name][2])
+    elif mutation == 'preimage' and name not in base:
+        base[name] = ('100644', 'blob', '0' * 40)
+    def changed_blob(git, repo, revision, path):
+        data = original(git, repo, revision, path)
+        if path == name and ((mutation == 'content' and revision == head)
+                             or (mutation == 'preimage' and revision == resume.MAIN_BASE)):
+            return data + b'changed'
+        return data
+    with mock.patch.object(resume, 'blob', side_effect=changed_blob), pytest.raises(ValueError, match='platform input'):
+        resume.reviewed_changes('git', ROOT, head, base, tree)
+
+
+@pytest.mark.parametrize('name', ['tools/macos_unreviewed.py', 'tools/tests/test_unreviewed.py',
+                                  'tools/linux157_toolchain.py', 'build/windows/prepare-ungoogled.ps1'])
+def test_other_platform_or_windows_changes_still_require_individual_review(name):
+    head, base, tree = platform_trees()
+    tree[name] = ('100644', 'blob', 'f' * 40)
+    with pytest.raises(ValueError, match='outside reviewed'):
+        resume.reviewed_changes('git', ROOT, head, base, tree)
+
+
+def test_reviewed_platform_exception_keeps_tracked_checkout_validation():
+    head, _, _ = platform_trees()
+    # Dirty source still fails after committed Git blobs pass the exception gate.
+    with mock.patch.object(resume, '_inventory', return_value=set(resume.git_tree('git', ROOT, head))), \
+            mock.patch.object(resume.files, '_tracked', side_effect=ValueError('tracked bytes changed')) as tracked:
+        with pytest.raises(ValueError, match='tracked bytes changed'):
+            resume.checkout_identity(ROOT, head)
+        tracked.assert_called_once()
