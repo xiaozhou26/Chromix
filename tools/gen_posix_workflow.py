@@ -638,6 +638,30 @@ FINAL_UPLOADS = """      - name: Upload final bundle
 """
 
 
+COMPILE_RELEASE = "inputs.platform == 'macos' && steps.stage.outputs.finished == 'true' && steps.stage.outputs.release_policy == 'macos-compile-release'"
+LEGACY_FINISHED = "steps.stage.outputs.finished == 'true' && steps.stage.outputs.release_policy != 'macos-compile-release'"
+
+
+def compile_release_uploads(stage: int) -> str:
+    blocks = FINAL_UPLOADS.split("      - name: ")[1:]
+    # Publish bundle and source receipt before diagnostic/checkpoint infrastructure.
+    ordered = [blocks[0], blocks[2], blocks[1]]
+    result = []
+    for block in ordered:
+        name, rest = block.split("\n", 1)
+        rest = rest.replace("if: steps.stage.outputs.finished == 'true'",
+                            "if: ${{ !cancelled() && steps.stage.outcome == 'success' && " + COMPILE_RELEASE + " }}")
+        rest = rest.replace("if: always()", "if: ${{ !cancelled() && " + COMPILE_RELEASE + " }}\n        continue-on-error: true")
+        result.append("      - name: " + name + " (compile-release)\n" + rest)
+    return "".join(result) % {"stage": stage}
+
+
+def auxiliary_steps(text: str) -> str:
+    return text.replace("        run: |", "        continue-on-error: ${{ " + COMPILE_RELEASE + " }}\n        run: |"
+                        ).replace("        uses: actions/upload-artifact@v4",
+                                  "        continue-on-error: ${{ " + COMPILE_RELEASE + " }}\n        uses: actions/upload-artifact@v4")
+
+
 def job(stage: int) -> str:
     needs = f"posix-{stage - 1}" if stage > 1 else None
     # Job titles also carry GHA expressions; build them without f-strings.
@@ -808,12 +832,15 @@ def job(stage: int) -> str:
     parts.append("      - name: Select compile parallelism\n"
                  "        run: python3 tools/build_resources.py --github-env\n\n")
     parts.append(run_step(stage))
-    parts.append(RUNTIME_FAILURE % {"stage": stage})
+    parts.append(compile_release_uploads(stage))
+    parts.append(RUNTIME_FAILURE.replace("        id: runtime_checkpoint\n",
+                                        "        id: runtime_checkpoint\n        continue-on-error: ${{ " + COMPILE_RELEASE + " }}\n") % {"stage": stage})
     parts.append(LINUX_FAILURE % {"stage": stage})
-    parts.append(SNAPSHOT_ENSURE % {"stage": stage})
+    parts.append(auxiliary_steps(SNAPSHOT_ENSURE) % {"stage": stage})
     parts.append("\n")
-    parts.append(UPLOAD_PARTS % {"stage": stage})
-    parts.append(FINAL_UPLOADS % {"stage": stage})
+    parts.append(auxiliary_steps(UPLOAD_PARTS) % {"stage": stage})
+    parts.append(FINAL_UPLOADS.replace("if: steps.stage.outputs.finished == 'true'", "if: " + LEGACY_FINISHED
+                                      ).replace("if: always()", "if: always() && !(" + COMPILE_RELEASE + ")") % {"stage": stage})
     return "".join(parts)
 
 

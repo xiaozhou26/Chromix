@@ -70,11 +70,11 @@ class FastWorkflowTest(unittest.TestCase):
                     self.assertIn(f"needs.posix-{index - 1}.outputs.finished != 'true'", job["if"])
                     self.assertIn('--from-snapshot "${RUNNER_TEMP}/chromix-restore"', stage["run"])
                 final = next(step for step in job["steps"] if step.get("name") == "Upload final bundle")
-                self.assertEqual(final["if"], "steps.stage.outputs.finished == 'true'")
+                self.assertEqual(final["if"], "steps.stage.outputs.finished == 'true' && steps.stage.outputs.release_policy != 'macos-compile-release'")
                 self.assertEqual(final["with"]["if-no-files-found"], "error")
                 diagnostics = next(step for step in job["steps"]
                                    if step.get("name") == "Upload build diagnostics")
-                self.assertEqual(diagnostics["if"], "always()")
+                self.assertEqual(diagnostics["if"], "always() && !(inputs.platform == 'macos' && steps.stage.outputs.finished == 'true' && steps.stage.outputs.release_policy == 'macos-compile-release')")
 
     def test_each_deadline_is_the_earlier_stage_or_job_limit(self):
         start = 1700000000

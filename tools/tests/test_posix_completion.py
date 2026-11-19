@@ -784,6 +784,23 @@ class MacOSCompileReleaseTest(unittest.TestCase):
                 errors = ["source changed since its freshness check: file.cc"] if failure == "source_error" else ["device: real fixture failure"] if failure == "fingerprint" else []
                 report = {"status": status, "ci_gate_passed": status == "passed", "errors": errors,
                           "gaps": ["native probe incomplete"] if status == "incomplete" else []}
+                if failure in ("startup_missing_version", "observed_wrong_version", "observed_wrong_sha", "preflight_wrong_version"):
+                    import hashlib
+                    sys.path.insert(0, str(root / "repo/tools"))
+                    from fingerprint_acceptance import assess_suite
+                    observed = {"status": "failed", "errors": ["native startup failed"],
+                                "browser_sha256": hashlib.sha256(value("--browser").read_bytes()).hexdigest()}
+                    if failure == "observed_wrong_version":
+                        observed["browser_version"] = "0.0.0.0"
+                    if failure == "observed_wrong_sha":
+                        observed["browser_sha256"] = "0" * 64
+                    errors, gaps = assess_suite("device", observed, args[args.index("--expected-sha256") + 1],
+                                                args[args.index("--expected-version") + 1])
+                    report.update(status="failed", ci_gate_passed=False, errors=errors, gaps=gaps,
+                                  suites=[{"name": "device", "report": "device.json"}])
+                    (output / "device.json").write_text(json.dumps(observed))
+                    if failure == "preflight_wrong_version":
+                        (output / "browser.json").write_text(json.dumps({"version": "0.0.0.0"}))
                 if failure not in ("missing_report", "timeout"):
                     raw = json.dumps(report, indent=3) + "\\n"
                     (output / "acceptance.json").write_text(raw)
@@ -796,7 +813,7 @@ class MacOSCompileReleaseTest(unittest.TestCase):
                         stream.write(b"changed after integrity check")
                 if failure == "timeout":
                     time.sleep(60)
-                sys.exit(17 if failure in ("fingerprint", "source_error", "incomplete", "missing_report") else 0)
+                sys.exit(17 if report["status"] == "failed" or failure in ("incomplete", "missing_report") else 0)
             if name == "verify_macos_bundle.py" and "--zip" in args and os.environ["FIXTURE_DAMAGE"] in ("crc", "unsafe", "sha"):
                 archive = value("--zip")
                 # Damage after the packager has verified it, before stage verification.
@@ -861,13 +878,13 @@ class MacOSCompileReleaseTest(unittest.TestCase):
         self.assertEqual(outputs["release_policy"], "macos-compile-release")
         jobs = yaml.safe_load((REPO / ".github/workflows/build-posix-github.yml").read_text())["jobs"]
         for stage in range(1, 9):
-            upload = next(s for s in jobs[f"posix-{stage}"]["steps"] if s.get("name") == "Upload final bundle")
-            self.assertEqual(upload["if"], "steps.stage.outputs.finished == 'true'")
+            upload = next(s for s in jobs[f"posix-{stage}"]["steps"] if s.get("name") == "Upload final bundle (compile-release)")
+            self.assertIn("steps.stage.outputs.release_policy == 'macos-compile-release'", upload["if"])
             steps = jobs[f"posix-{stage}"]["steps"]
-            source_upload = next(s for s in steps if s.get("name") == "Upload fingerprint source receipt")
+            source_upload = next(s for s in steps if s.get("name") == "Upload fingerprint source receipt (compile-release)")
             self.assertEqual(source_upload["if"], upload["if"])
-            diagnostics = next(s for s in steps if s.get("name") == "Upload build diagnostics")
-            self.assertEqual(diagnostics["if"], "always()")
+            diagnostics = next(s for s in steps if s.get("name") == "Upload build diagnostics (compile-release)")
+            self.assertIn("!cancelled()", diagnostics["if"])
             self.assertIn("/fingerprint-diagnostics/", diagnostics["with"]["path"])
             # Execute a local upload double only when the real workflow condition is true.
             destination = root / f"uploaded-s{stage}"
@@ -924,6 +941,22 @@ class MacOSCompileReleaseTest(unittest.TestCase):
                 self.assertEqual(outputs["finished"], "false")
                 self.assertIn("fingerprint regression gate failed", result.stderr)
 
+    def test_startup_missing_identity_is_diagnostic_but_observed_mismatches_block(self):
+        for arch in ("x64", "arm64"):
+            for failure in ("startup_missing_version", "observed_wrong_version", "observed_wrong_sha", "preflight_wrong_version"):
+                with self.subTest(arch=arch, failure=failure):
+                    root, result, outputs, summary = self.fixture(arch=arch, failure=failure)
+                    self.assertEqual(summary["status"], "failed")
+                    if failure == "startup_missing_version":
+                        self.assert_final_upload(root, result, outputs)
+                        self.assertEqual(outputs["runtime_verified"], "false")
+                        report = json.loads((root / "original-acceptance.json").read_text())
+                        self.assertIn("suite used a different browser version", report["errors"])
+                    else:
+                        self.assertNotEqual(result.returncode, 0)
+                        self.assertEqual(outputs["finished"], "false")
+                        self.assertIn("observed browser identity mismatch", result.stderr)
+
     def test_generated_workflow_scopes_opt_in_without_continue_on_error(self):
         import yaml
         path = REPO / ".github/workflows/build-posix-github.yml"
@@ -939,6 +972,170 @@ class MacOSCompileReleaseTest(unittest.TestCase):
             self.assertNotIn("continue-on-error", stage)
             self.assertEqual(stage["env"]["CHROMIX_MACOS_COMPILE_RELEASE"],
                              "${{ inputs.platform == 'macos' && inputs.macos_compile_release && '1' || '0' }}")
+
+
+class CompileReleaseWorkflowExecutionTest(unittest.TestCase):
+    """Execute generated post-stage run blocks with offline upload/snapshot doubles."""
+
+    def execute(self, stage, platform, policy, finished, fault, cancelled=False):
+        import re
+        import yaml
+        workflow = yaml.safe_load((REPO / ".github/workflows/build-posix-github.yml").read_text())
+        steps = workflow["jobs"][f"posix-{stage}"]["steps"]
+        steps = steps[next(i for i, step in enumerate(steps) if step.get("id") == "stage") + 1:]
+        with tempfile.TemporaryDirectory(prefix="workflow uploads ") as temp:
+            root = Path(temp).resolve()
+            runner = root / "runner"
+            work = runner / "chromix-build"
+            dist = work / "dist"
+            dist.mkdir(parents=True)
+            (work / "src").mkdir()
+            (runner / "chromix-logs").mkdir()
+            evidence = work / "fingerprint-diagnostics"
+            evidence.mkdir()
+            (evidence / "source-final.json").write_text('{"status":"verified"}\n')
+            (evidence / "acceptance.json").write_text('{"status":"failed","errors":["native startup failed"]}\n')
+            original = (evidence / "acceptance.json").read_bytes()
+            asset = "chromix-mac-x64" if platform == "macos" else "chromix-linux-x64"
+            (dist / (asset + ".zip")).write_bytes(b"integrity-verified fixture")
+            (dist / "SHA256SUMS").write_text("fixture checksum\n")
+            tools = root / "tools"
+            tools.mkdir()
+            parts = root / "build/posix/ci-parts.sh"
+            parts.parent.mkdir(parents=True)
+            parts.write_text('#!/bin/bash\nset -eu\n[ "$FAULT" != snapshot ] || exit 23\n'
+                             'mkdir -p "$2/p1"\nprintf "snapshot" > "$2/p1/volume"\n')
+            (tools / "snapshot_volumes.py").write_text(
+                'import sys\nfrom pathlib import Path\nsys.stdout.buffer.write(str(Path(sys.argv[1])/"p1/volume").encode()+b"\\0")\n')
+            (tools / "verify_snapshot_tar.py").write_text(
+                'import os,sys\nsys.stdin.buffer.read()\nsys.exit(29 if os.environ["FAULT"] == "verify" else 0)\n')
+            (tools / "verify_linux_checkpoint.py").write_text('print("{}")\n')
+            bin_dir = root / "bin"
+            bin_dir.mkdir()
+            (bin_dir / "zstd").write_text('#!/bin/sh\ncat\n')
+            (bin_dir / "zstd").chmod(0o755)
+            (bin_dir / "python3").symlink_to(sys.executable)
+            # An unfinished stage supplies its own checkpoint instead of runtime_checkpoint.
+            if not finished:
+                snap = work / f".snapshot-stage-{stage}/p1"
+                snap.mkdir(parents=True)
+                (snap / "volume").write_text("handoff")
+            state = {"inputs.platform": platform, "inputs.arch": "x64", "inputs.artifact": asset,
+                     "inputs.resume_migration": "", "runner.temp": str(runner), "github.run_attempt": "1",
+                     "steps.stage.outcome": "success", "steps.stage.outputs.finished": str(finished).lower(),
+                     "steps.stage.outputs.release_policy": policy,
+                     "steps.stage.outputs.compiled_ready": "true" if finished else "",
+                     "steps.stage.outputs.upload_snapshot": "" if finished else "true"}
+            failed = False
+            trace, failures, uploaded = [], [], []
+
+            def evaluate(expression, implicit=False):
+                expression = expression.removeprefix("${{ ").removesuffix(" }}")
+                if implicit and not any(token in expression for token in ("success()", "failure()", "always()", "cancelled()")):
+                    if failed or cancelled:
+                        return False
+                expression = expression.replace("!cancelled()", str(not cancelled)).replace("cancelled()", str(cancelled))
+                expression = expression.replace("always()", "True").replace("success()", str(not failed and not cancelled))
+                expression = expression.replace("failure()", str(failed))
+                expression = re.sub(r"\b(?:inputs|steps|runner|github)\.[\w.-]+", lambda m: repr(state.get(m[0], "")), expression)
+                return eval(re.sub(r"!(?!=)", " not ", expression).replace("&&", " and ").replace("||", " or "),
+                            {"__builtins__": {}})
+
+            def render(text):
+                return re.sub(r"\$\{\{ (.*?) \}\}", lambda m: str(evaluate(m[1])), text)
+
+            for step in steps:
+                if not evaluate(step.get("if", "success()"), implicit=True):
+                    continue
+                name = step["name"]
+                trace.append(name)
+                output = root / "step-output"
+                output.write_text("")
+                env = {**os.environ, "RUNNER_TEMP": str(runner), "GITHUB_OUTPUT": str(output), "FAULT": fault,
+                       "PATH": str(bin_dir) + os.pathsep + os.environ["PATH"]}
+                if "run" in step:
+                    result = subprocess.run(["/bin/bash", "-e", "-o", "pipefail", "-c", render(step["run"])],
+                                            cwd=root, env=env, capture_output=True, timeout=10)
+                else:
+                    artifact = render(step["with"]["name"])
+                    destination = root / "uploaded" / artifact
+                    is_bundle = name.startswith("Upload final bundle")
+                    is_receipt = name.startswith("Upload fingerprint source receipt")
+                    is_logs = name.startswith("Upload build diagnostics")
+                    should_fail = (fault == "diagnostics" and is_logs or fault == "tree" and name.startswith("Upload tree")
+                                   or fault == "bundle" and is_bundle or fault == "receipt" and is_receipt)
+                    paths = [Path(render(line.strip())) for line in step["with"]["path"].splitlines() if line.strip()]
+                    if is_bundle or is_receipt or is_logs:
+                        # The action double copies the paths from the generated workflow.
+                        paths = [p for p in paths if p.exists()]
+                        command = 'exit 31' if should_fail else 'mkdir -p "$1"; shift; cp -R "$@" "$DEST/"'
+                        result = subprocess.run(["/bin/bash", "-euc", command, "upload", str(destination), *map(str, paths)],
+                                                env={**env, "DEST": str(destination)}, capture_output=True, timeout=10)
+                        if result.returncode == 0:
+                            uploaded.append(artifact)
+                    else:
+                        result = subprocess.run(["/bin/bash", "-c", "exit 31" if should_fail else "exit 0"], timeout=10)
+                outcome = "failure" if result.returncode else "success"
+                if step.get("id"):
+                    state[f"steps.{step['id']}.outcome"] = outcome
+                    for line in output.read_text().splitlines():
+                        key, value = line.split("=", 1)
+                        state[f"steps.{step['id']}.outputs.{key}"] = value
+                if result.returncode:
+                    failures.append(name)
+                    continued = step.get("continue-on-error", False)
+                    if isinstance(continued, str):
+                        continued = evaluate(continued)
+                    if not continued:
+                        failed = True
+            self.assertEqual((evidence / "acceptance.json").read_bytes(), original)
+            if asset in uploaded:
+                self.assertEqual((root / "uploaded" / asset / (asset + ".zip")).read_bytes(), b"integrity-verified fixture")
+            logs = f"{asset}-logs-s{stage}-attempt-1"
+            if logs in uploaded:
+                self.assertEqual((root / "uploaded" / logs / "fingerprint-diagnostics/acceptance.json").read_bytes(), original)
+            return failed, trace, failures, uploaded
+
+    def test_auxiliary_failures_do_not_prevent_compiled_uploads_or_fail_the_job(self):
+        for stage in (1, 8):
+            for fault in ("snapshot", "verify", "tree", "diagnostics"):
+                with self.subTest(stage=stage, fault=fault):
+                    failed, trace, failures, uploaded = self.execute(stage, "macos", "macos-compile-release", True, fault)
+                    self.assertFalse(failed)
+                    failed_step = {"snapshot": "Preserve latest macOS compiled checkpoint",
+                                   "verify": "Verify handoff snapshot", "tree": "Upload tree part 1",
+                                   "diagnostics": "Upload build diagnostics (compile-release)"}[fault]
+                    self.assertIn(failed_step, failures)
+                    self.assertIn("chromix-mac-x64", uploaded)
+                    self.assertIn("chromix-mac-x64-fingerprint-source", uploaded)
+                    self.assertLess(trace.index("Upload fingerprint source receipt (compile-release)"),
+                                    trace.index("Preserve latest macOS compiled checkpoint"))
+                    if fault != "diagnostics":
+                        self.assertIn(f"chromix-mac-x64-logs-s{stage}-attempt-1", uploaded)
+
+    def test_release_upload_failure_is_fatal_and_other_upload_still_attempted(self):
+        for fault in ("bundle", "receipt"):
+            with self.subTest(fault=fault):
+                failed, trace, _, _ = self.execute(1, "macos", "macos-compile-release", True, fault)
+                self.assertTrue(failed)
+                self.assertIn("Upload final bundle (compile-release)", trace)
+                self.assertIn("Upload fingerprint source receipt (compile-release)", trace)
+
+    def test_unfinished_and_legacy_failures_stay_blocking(self):
+        for platform in ("macos", "linux"):
+            with self.subTest(platform=platform):
+                failed, trace, _, uploaded = self.execute(1, platform, "", False, "verify")
+                self.assertTrue(failed)
+                self.assertFalse(any("final bundle" in name for name in trace))
+                self.assertFalse(any(name.startswith("Upload tree part") for name in trace))
+        failed, trace, _, uploaded = self.execute(1, "macos", "", True, "snapshot")
+        self.assertTrue(failed)
+        self.assertNotIn("Upload final bundle", trace)
+        failed, trace, _, uploaded = self.execute(1, "linux", "", True, "diagnostics")
+        self.assertTrue(failed)
+        self.assertIn("Upload final bundle", trace)
+        self.assertNotIn("Upload fingerprint source receipt", trace)
+        self.assertFalse(any("compile-release" in name for name in trace))
 
 
 class PosixChecksumContractTest(unittest.TestCase):

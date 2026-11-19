@@ -406,6 +406,23 @@ if smoke.get("passed") is not True:
     gaps.append("native smoke did not pass")
 if acceptance.get("status") != "passed" or acceptance.get("ci_gate_passed") is not True:
     gaps.append("fingerprint acceptance did not pass completely")
+# Startup failures may have no version/hash; only observed identities can mismatch.
+identity_mismatches = []
+expected = json.loads((root / "integrity-before.json").read_text())
+for path in sorted((root / "fingerprint").glob("*.json")):
+    observation = read_report(path)
+    browser = observation.get("browser")
+    browser = browser if isinstance(browser, dict) else {}
+    identities = [(observation.get("browser_sha256"), expected["browser_sha256"]),
+                  (observation.get("browser_version"), expected["version"]),
+                  (browser.get("sha256"), expected["browser_sha256"]),
+                  (browser.get("version"), expected["version"])]
+    if path.name == "browser.json":
+        identities += [(observation.get("sha256"), expected["browser_sha256"]),
+                       (observation.get("version"), expected["version"])]
+    if any(observed not in (None, "") and observed != pinned for observed, pinned in identities):
+        identity_mismatches.append("observed browser identity mismatch in " + str(path))
+errors.extend(identity_mismatches)
 status = "failed" if errors or acceptance.get("status") == "failed" else "incomplete" if gaps else "passed"
 report = {"schema_version": 1, "policy": "macos-compile-release", "status": status,
           "runtime_verified": status == "passed", "errors": errors, "gaps": gaps,
@@ -419,8 +436,9 @@ integrity_errors = (
     "malformed source", "source receipt", "invalid source output hash", "source-final.json",
     "source changed since its freshness check", "executable SHA-256",
     "browser executable changed during acceptance", "runner or patch inputs changed during acceptance",
-    "running browser version/hash does not match", "suite used a different browser",
 )
+if identity_mismatches:
+    raise SystemExit("; ".join(identity_mismatches))
 if any(message in str(raw_errors) for message in integrity_errors):
     raise SystemExit("fingerprint reported source/binary integrity failure")
 if isinstance(smoke.get("version"), dict) and smoke["version"].get("status") == "version_mismatch":

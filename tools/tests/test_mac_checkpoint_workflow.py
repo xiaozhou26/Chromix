@@ -82,7 +82,7 @@ class PosixCheckpointWorkflowTest(unittest.TestCase):
                 self.assertIn("steps.checkpoint.outcome == 'success'", upload['if'])
                 self.assertNotIn('success()', upload['if'])
             final = next(step for step in steps if step.get('name') == 'Upload final bundle')
-            self.assertEqual(final['if'], "steps.stage.outputs.finished == 'true'")
+            self.assertEqual(final['if'], "steps.stage.outputs.finished == 'true' && steps.stage.outputs.release_policy != 'macos-compile-release'")
 
     def test_failed_mac_runtime_bundle_is_diagnostic_only(self):
         for number in range(1, 9):
@@ -108,10 +108,10 @@ class PosixCheckpointWorkflowTest(unittest.TestCase):
             for step in [verify, *[item for item in steps if item.get('name', '').startswith('Upload tree part')]]:
                 self.assertIn("steps.runtime_checkpoint.outputs.upload_snapshot == 'true'", step['if'])
             logs = next(step for step in steps if step.get('name') == 'Upload build diagnostics')
-            self.assertEqual(logs['if'], 'always()')
+            self.assertEqual(logs['if'], "always() && !(inputs.platform == 'macos' && steps.stage.outputs.finished == 'true' && steps.stage.outputs.release_policy == 'macos-compile-release')")
             self.assertIn(f'/runtime-smoke-stage-{number}/', logs['with']['path'])
             final = next(step for step in steps if step.get('name') == 'Upload final bundle')
-            self.assertEqual(final['if'], "steps.stage.outputs.finished == 'true'")
+            self.assertEqual(final['if'], "steps.stage.outputs.finished == 'true' && steps.stage.outputs.release_policy != 'macos-compile-release'")
 
     def test_fingerprint_receipts_and_native_gate_survive_runtime_recovery(self):
         jobs = workflow('build-posix-github.yml')['jobs']
@@ -119,7 +119,7 @@ class PosixCheckpointWorkflowTest(unittest.TestCase):
             stage = jobs[f'posix-{number}']
             steps = stage['steps']
             receipt = next(step for step in steps if step.get('name') == 'Upload fingerprint source receipt')
-            self.assertEqual(receipt['if'], "steps.stage.outputs.finished == 'true'")
+            self.assertEqual(receipt['if'], "steps.stage.outputs.finished == 'true' && steps.stage.outputs.release_policy != 'macos-compile-release'")
             self.assertEqual(receipt['with']['name'], '${{ inputs.artifact }}-fingerprint-source')
             self.assertTrue(receipt['with']['path'].endswith('/fingerprint-diagnostics/source-final.json'))
             self.assertEqual(receipt['with']['if-no-files-found'], 'error')

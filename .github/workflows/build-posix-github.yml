@@ -522,6 +522,54 @@ jobs:
             if [ "${codes[0]}" -ne 0 ]; then exit "${codes[0]}"; fi
             exit "${codes[1]}"
           fi
+      - name: Upload final bundle (compile-release)
+        if: ${{ !cancelled() && steps.stage.outcome == 'success' && inputs.platform == 'macos' && steps.stage.outputs.finished == 'true' && steps.stage.outputs.release_policy == 'macos-compile-release' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ inputs.artifact }}
+          path: |
+            ${{ runner.temp }}/chromix-build/dist/${{ inputs.artifact }}.zip
+            ${{ runner.temp }}/chromix-build/dist/${{ (inputs.resume_migration == 'mac156-arm64-stage8' || inputs.resume_migration == 'mac156-arm64-stage1' || inputs.resume_migration == 'mac156-arm64-hevc') && 'chromix-mac-arm64' || inputs.artifact }}.zip
+            ${{ runner.temp }}/chromix-build/dist/${{ (inputs.resume_migration == 'mac156-x64-stage8' || inputs.resume_migration == 'mac156-x64-stage2' || inputs.resume_migration == 'mac156-x64-stage3') && 'chromix-mac-x64' || inputs.artifact }}.zip
+            ${{ runner.temp }}/chromix-build/dist/SHA256SUMS
+          if-no-files-found: error
+          retention-days: 14
+          compression-level: 0
+
+      - name: Upload fingerprint source receipt (compile-release)
+        if: ${{ !cancelled() && steps.stage.outcome == 'success' && inputs.platform == 'macos' && steps.stage.outputs.finished == 'true' && steps.stage.outputs.release_policy == 'macos-compile-release' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ inputs.artifact }}-fingerprint-source
+          path: ${{ runner.temp }}/chromix-build/fingerprint-diagnostics/source-final.json
+          if-no-files-found: error
+          retention-days: 14
+      - name: Upload build diagnostics (compile-release)
+        if: ${{ !cancelled() && inputs.platform == 'macos' && steps.stage.outputs.finished == 'true' && steps.stage.outputs.release_policy == 'macos-compile-release' }}
+        continue-on-error: true
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ inputs.artifact }}-logs-s1-attempt-${{ github.run_attempt }}
+          include-hidden-files: true
+          path: |
+            ${{ runner.temp }}/chromix-logs/
+            ${{ runner.temp }}/chromix-build/runtime-smoke-stage-1/
+            ${{ runner.temp }}/chromix-build/src/out/Chromix/args.gn
+            ${{ runner.temp }}/chromix-build/src/out/Default/args.gn
+            ${{ runner.temp }}/chromix-build/src/.chromix-upstream-restored.json
+            ${{ runner.temp }}/chromix-build/src/.chromix-restored-patches.json
+            ${{ runner.temp }}/chromix-build/upstream-cache-restore.json
+            ${{ runner.temp }}/chromix-build/upstream-cache-preparation.json
+            ${{ runner.temp }}/chromix-build/upstream-cache-ninja.json
+            ${{ runner.temp }}/chromix-build/upstream-cache-import.json
+            ${{ runner.temp }}/chromix-build/upstream-cache-plan.log
+            ${{ runner.temp }}/chromix-build/upstream-reuse/
+            ${{ runner.temp }}/chromix-build/upstream-object-cache.json
+            ${{ runner.temp }}/chromix-build/fingerprint-diagnostics/
+            ${{ runner.temp }}/chromix-upstream/result.json
+          if-no-files-found: warn
+          retention-days: 14
+
       - name: Upload failed macOS runtime bundle
         if: ${{ !cancelled() && inputs.platform == 'macos' && steps.stage.outcome == 'failure' && steps.stage.outputs.package_ready == 'true' && steps.stage.outputs.runtime_failed == 'true' }}
         uses: actions/upload-artifact@v4
@@ -541,6 +589,7 @@ jobs:
 
       - name: Preserve latest macOS compiled checkpoint
         id: runtime_checkpoint
+        continue-on-error: ${{ inputs.platform == 'macos' && steps.stage.outputs.finished == 'true' && steps.stage.outputs.release_policy == 'macos-compile-release' }}
         if: ${{ !cancelled() && inputs.platform == 'macos' && (steps.stage.outputs.compiled_ready == 'true' || (inputs.resume_migration == 'mac156-x64-stage8' && failure()) || (inputs.resume_migration == 'mac156-x64-stage2' && failure()) || (inputs.resume_migration == 'mac156-x64-stage3' && failure())) }}
         run: |
           set -euo pipefail
@@ -608,6 +657,7 @@ jobs:
       - name: Verify handoff snapshot
         id: checkpoint
         if: ${{ !cancelled() && (steps.stage.outputs.upload_snapshot == 'true' || steps.runtime_checkpoint.outputs.upload_snapshot == 'true' || (inputs.platform == 'linux' && steps.linux_runtime_checkpoint.outputs.upload_snapshot == 'true')) }}
+        continue-on-error: ${{ inputs.platform == 'macos' && steps.stage.outputs.finished == 'true' && steps.stage.outputs.release_policy == 'macos-compile-release' }}
         run: |
           set -euo pipefail
           SNAP="${RUNNER_TEMP}/chromix-build/.snapshot-stage-1"
@@ -621,6 +671,7 @@ jobs:
 
       - name: Upload tree part 1
         if: ${{ !cancelled() && (steps.stage.outputs.upload_snapshot == 'true' || steps.runtime_checkpoint.outputs.upload_snapshot == 'true' || (inputs.platform == 'linux' && steps.linux_runtime_checkpoint.outputs.upload_snapshot == 'true')) && steps.checkpoint.outcome == 'success' }}
+        continue-on-error: ${{ inputs.platform == 'macos' && steps.stage.outputs.finished == 'true' && steps.stage.outputs.release_policy == 'macos-compile-release' }}
         uses: actions/upload-artifact@v4
         with:
           name: ${{ inputs.artifact }}-tree-s1-attempt-${{ github.run_attempt }}-part1
@@ -630,6 +681,7 @@ jobs:
           compression-level: 0
       - name: Upload tree part 2
         if: ${{ !cancelled() && (steps.stage.outputs.upload_snapshot == 'true' || steps.runtime_checkpoint.outputs.upload_snapshot == 'true' || (inputs.platform == 'linux' && steps.linux_runtime_checkpoint.outputs.upload_snapshot == 'true')) && steps.checkpoint.outcome == 'success' }}
+        continue-on-error: ${{ inputs.platform == 'macos' && steps.stage.outputs.finished == 'true' && steps.stage.outputs.release_policy == 'macos-compile-release' }}
         uses: actions/upload-artifact@v4
         with:
           name: ${{ inputs.artifact }}-tree-s1-attempt-${{ github.run_attempt }}-part2
@@ -639,6 +691,7 @@ jobs:
           compression-level: 0
       - name: Upload tree part 3
         if: ${{ !cancelled() && (steps.stage.outputs.upload_snapshot == 'true' || steps.runtime_checkpoint.outputs.upload_snapshot == 'true' || (inputs.platform == 'linux' && steps.linux_runtime_checkpoint.outputs.upload_snapshot == 'true')) && steps.checkpoint.outcome == 'success' }}
+        continue-on-error: ${{ inputs.platform == 'macos' && steps.stage.outputs.finished == 'true' && steps.stage.outputs.release_policy == 'macos-compile-release' }}
         uses: actions/upload-artifact@v4
         with:
           name: ${{ inputs.artifact }}-tree-s1-attempt-${{ github.run_attempt }}-part3
@@ -648,6 +701,7 @@ jobs:
           compression-level: 0
       - name: Upload tree part 4
         if: ${{ !cancelled() && (steps.stage.outputs.upload_snapshot == 'true' || steps.runtime_checkpoint.outputs.upload_snapshot == 'true' || (inputs.platform == 'linux' && steps.linux_runtime_checkpoint.outputs.upload_snapshot == 'true')) && steps.checkpoint.outcome == 'success' }}
+        continue-on-error: ${{ inputs.platform == 'macos' && steps.stage.outputs.finished == 'true' && steps.stage.outputs.release_policy == 'macos-compile-release' }}
         uses: actions/upload-artifact@v4
         with:
           name: ${{ inputs.artifact }}-tree-s1-attempt-${{ github.run_attempt }}-part4
@@ -656,7 +710,7 @@ jobs:
           retention-days: ${{ inputs.platform == 'macos' && 14 || 3 }}
           compression-level: 0
       - name: Upload final bundle
-        if: steps.stage.outputs.finished == 'true'
+        if: steps.stage.outputs.finished == 'true' && steps.stage.outputs.release_policy != 'macos-compile-release'
         uses: actions/upload-artifact@v4
         with:
           name: ${{ inputs.artifact }}
@@ -670,7 +724,7 @@ jobs:
           compression-level: 0
 
       - name: Upload build diagnostics
-        if: always()
+        if: always() && !(inputs.platform == 'macos' && steps.stage.outputs.finished == 'true' && steps.stage.outputs.release_policy == 'macos-compile-release')
         uses: actions/upload-artifact@v4
         with:
           name: ${{ inputs.artifact }}-logs-s1-attempt-${{ github.run_attempt }}
@@ -699,7 +753,7 @@ jobs:
           retention-days: 14
 
       - name: Upload fingerprint source receipt
-        if: steps.stage.outputs.finished == 'true'
+        if: steps.stage.outputs.finished == 'true' && steps.stage.outputs.release_policy != 'macos-compile-release'
         uses: actions/upload-artifact@v4
         with:
           name: ${{ inputs.artifact }}-fingerprint-source
@@ -950,6 +1004,54 @@ jobs:
             if [ "${codes[0]}" -ne 0 ]; then exit "${codes[0]}"; fi
             exit "${codes[1]}"
           fi
+      - name: Upload final bundle (compile-release)
+        if: ${{ !cancelled() && steps.stage.outcome == 'success' && inputs.platform == 'macos' && steps.stage.outputs.finished == 'true' && steps.stage.outputs.release_policy == 'macos-compile-release' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ inputs.artifact }}
+          path: |
+            ${{ runner.temp }}/chromix-build/dist/${{ inputs.artifact }}.zip
+            ${{ runner.temp }}/chromix-build/dist/${{ (inputs.resume_migration == 'mac156-arm64-stage8' || inputs.resume_migration == 'mac156-arm64-stage1' || inputs.resume_migration == 'mac156-arm64-hevc') && 'chromix-mac-arm64' || inputs.artifact }}.zip
+            ${{ runner.temp }}/chromix-build/dist/${{ (inputs.resume_migration == 'mac156-x64-stage8' || inputs.resume_migration == 'mac156-x64-stage2' || inputs.resume_migration == 'mac156-x64-stage3') && 'chromix-mac-x64' || inputs.artifact }}.zip
+            ${{ runner.temp }}/chromix-build/dist/SHA256SUMS
+          if-no-files-found: error
+          retention-days: 14
+          compression-level: 0
+
+      - name: Upload fingerprint source receipt (compile-release)
+        if: ${{ !cancelled() && steps.stage.outcome == 'success' && inputs.platform == 'macos' && steps.stage.outputs.finished == 'true' && steps.stage.outputs.release_policy == 'macos-compile-release' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ inputs.artifact }}-fingerprint-source
+          path: ${{ runner.temp }}/chromix-build/fingerprint-diagnostics/source-final.json
+          if-no-files-found: error
+          retention-days: 14
+      - name: Upload build diagnostics (compile-release)
+        if: ${{ !cancelled() && inputs.platform == 'macos' && steps.stage.outputs.finished == 'true' && steps.stage.outputs.release_policy == 'macos-compile-release' }}
+        continue-on-error: true
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ inputs.artifact }}-logs-s2-attempt-${{ github.run_attempt }}
+          include-hidden-files: true
+          path: |
+            ${{ runner.temp }}/chromix-logs/
+            ${{ runner.temp }}/chromix-build/runtime-smoke-stage-2/
+            ${{ runner.temp }}/chromix-build/src/out/Chromix/args.gn
+            ${{ runner.temp }}/chromix-build/src/out/Default/args.gn
+            ${{ runner.temp }}/chromix-build/src/.chromix-upstream-restored.json
+            ${{ runner.temp }}/chromix-build/src/.chromix-restored-patches.json
+            ${{ runner.temp }}/chromix-build/upstream-cache-restore.json
+            ${{ runner.temp }}/chromix-build/upstream-cache-preparation.json
+            ${{ runner.temp }}/chromix-build/upstream-cache-ninja.json
+            ${{ runner.temp }}/chromix-build/upstream-cache-import.json
+            ${{ runner.temp }}/chromix-build/upstream-cache-plan.log
+            ${{ runner.temp }}/chromix-build/upstream-reuse/
+            ${{ runner.temp }}/chromix-build/upstream-object-cache.json
+            ${{ runner.temp }}/chromix-build/fingerprint-diagnostics/
+            ${{ runner.temp }}/chromix-upstream/result.json
+          if-no-files-found: warn
+          retention-days: 14
+
       - name: Upload failed macOS runtime bundle
         if: ${{ !cancelled() && inputs.platform == 'macos' && steps.stage.outcome == 'failure' && steps.stage.outputs.package_ready == 'true' && steps.stage.outputs.runtime_failed == 'true' }}
         uses: actions/upload-artifact@v4
@@ -969,6 +1071,7 @@ jobs:
 
       - name: Preserve latest macOS compiled checkpoint
         id: runtime_checkpoint
+        continue-on-error: ${{ inputs.platform == 'macos' && steps.stage.outputs.finished == 'true' && steps.stage.outputs.release_policy == 'macos-compile-release' }}
         if: ${{ !cancelled() && inputs.platform == 'macos' && (steps.stage.outputs.compiled_ready == 'true' || (inputs.resume_migration == 'mac156-x64-stage8' && failure()) || (inputs.resume_migration == 'mac156-x64-stage2' && failure()) || (inputs.resume_migration == 'mac156-x64-stage3' && failure())) }}
         run: |
           set -euo pipefail
@@ -1036,6 +1139,7 @@ jobs:
       - name: Verify handoff snapshot
         id: checkpoint
         if: ${{ !cancelled() && (steps.stage.outputs.upload_snapshot == 'true' || steps.runtime_checkpoint.outputs.upload_snapshot == 'true' || (inputs.platform == 'linux' && steps.linux_runtime_checkpoint.outputs.upload_snapshot == 'true')) }}
+        continue-on-error: ${{ inputs.platform == 'macos' && steps.stage.outputs.finished == 'true' && steps.stage.outputs.release_policy == 'macos-compile-release' }}
         run: |
           set -euo pipefail
           SNAP="${RUNNER_TEMP}/chromix-build/.snapshot-stage-2"
@@ -1049,6 +1153,7 @@ jobs:
 
       - name: Upload tree part 1
         if: ${{ !cancelled() && (steps.stage.outputs.upload_snapshot == 'true' || steps.runtime_checkpoint.outputs.upload_snapshot == 'true' || (inputs.platform == 'linux' && steps.linux_runtime_checkpoint.outputs.upload_snapshot == 'true')) && steps.checkpoint.outcome == 'success' }}
+        continue-on-error: ${{ inputs.platform == 'macos' && steps.stage.outputs.finished == 'true' && steps.stage.outputs.release_policy == 'macos-compile-release' }}
         uses: actions/upload-artifact@v4
         with:
           name: ${{ inputs.artifact }}-tree-s2-attempt-${{ github.run_attempt }}-part1
@@ -1058,6 +1163,7 @@ jobs:
           compression-level: 0
       - name: Upload tree part 2
         if: ${{ !cancelled() && (steps.stage.outputs.upload_snapshot == 'true' || steps.runtime_checkpoint.outputs.upload_snapshot == 'true' || (inputs.platform == 'linux' && steps.linux_runtime_checkpoint.outputs.upload_snapshot == 'true')) && steps.checkpoint.outcome == 'success' }}
+        continue-on-error: ${{ inputs.platform == 'macos' && steps.stage.outputs.finished == 'true' && steps.stage.outputs.release_policy == 'macos-compile-release' }}
         uses: actions/upload-artifact@v4
         with:
           name: ${{ inputs.artifact }}-tree-s2-attempt-${{ github.run_attempt }}-part2
@@ -1067,6 +1173,7 @@ jobs:
           compression-level: 0
       - name: Upload tree part 3
         if: ${{ !cancelled() && (steps.stage.outputs.upload_snapshot == 'true' || steps.runtime_checkpoint.outputs.upload_snapshot == 'true' || (inputs.platform == 'linux' && steps.linux_runtime_checkpoint.outputs.upload_snapshot == 'true')) && steps.checkpoint.outcome == 'success' }}
+        continue-on-error: ${{ inputs.platform == 'macos' && steps.stage.outputs.finished == 'true' && steps.stage.outputs.release_policy == 'macos-compile-release' }}
         uses: actions/upload-artifact@v4
         with:
           name: ${{ inputs.artifact }}-tree-s2-attempt-${{ github.run_attempt }}-part3
@@ -1076,6 +1183,7 @@ jobs:
           compression-level: 0
       - name: Upload tree part 4
         if: ${{ !cancelled() && (steps.stage.outputs.upload_snapshot == 'true' || steps.runtime_checkpoint.outputs.upload_snapshot == 'true' || (inputs.platform == 'linux' && steps.linux_runtime_checkpoint.outputs.upload_snapshot == 'true')) && steps.checkpoint.outcome == 'success' }}
+        continue-on-error: ${{ inputs.platform == 'macos' && steps.stage.outputs.finished == 'true' && steps.stage.outputs.release_policy == 'macos-compile-release' }}
         uses: actions/upload-artifact@v4
         with:
           name: ${{ inputs.artifact }}-tree-s2-attempt-${{ github.run_attempt }}-part4
@@ -1084,7 +1192,7 @@ jobs:
           retention-days: ${{ inputs.platform == 'macos' && 14 || 3 }}
           compression-level: 0
       - name: Upload final bundle
-        if: steps.stage.outputs.finished == 'true'
+        if: steps.stage.outputs.finished == 'true' && steps.stage.outputs.release_policy != 'macos-compile-release'
         uses: actions/upload-artifact@v4
         with:
           name: ${{ inputs.artifact }}
@@ -1098,7 +1206,7 @@ jobs:
           compression-level: 0
 
       - name: Upload build diagnostics
-        if: always()
+        if: always() && !(inputs.platform == 'macos' && steps.stage.outputs.finished == 'true' && steps.stage.outputs.release_policy == 'macos-compile-release')
         uses: actions/upload-artifact@v4
         with:
           name: ${{ inputs.artifact }}-logs-s2-attempt-${{ github.run_attempt }}
@@ -1127,7 +1235,7 @@ jobs:
           retention-days: 14
 
       - name: Upload fingerprint source receipt
-        if: steps.stage.outputs.finished == 'true'
+        if: steps.stage.outputs.finished == 'true' && steps.stage.outputs.release_policy != 'macos-compile-release'
         uses: actions/upload-artifact@v4
         with:
           name: ${{ inputs.artifact }}-fingerprint-source
@@ -1378,6 +1486,54 @@ jobs:
             if [ "${codes[0]}" -ne 0 ]; then exit "${codes[0]}"; fi
             exit "${codes[1]}"
           fi
+      - name: Upload final bundle (compile-release)
+        if: ${{ !cancelled() && steps.stage.outcome == 'success' && inputs.platform == 'macos' && steps.stage.outputs.finished == 'true' && steps.stage.outputs.release_policy == 'macos-compile-release' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ inputs.artifact }}
+          path: |
+            ${{ runner.temp }}/chromix-build/dist/${{ inputs.artifact }}.zip
+            ${{ runner.temp }}/chromix-build/dist/${{ (inputs.resume_migration == 'mac156-arm64-stage8' || inputs.resume_migration == 'mac156-arm64-stage1' || inputs.resume_migration == 'mac156-arm64-hevc') && 'chromix-mac-arm64' || inputs.artifact }}.zip
+            ${{ runner.temp }}/chromix-build/dist/${{ (inputs.resume_migration == 'mac156-x64-stage8' || inputs.resume_migration == 'mac156-x64-stage2' || inputs.resume_migration == 'mac156-x64-stage3') && 'chromix-mac-x64' || inputs.artifact }}.zip
+            ${{ runner.temp }}/chromix-build/dist/SHA256SUMS
+          if-no-files-found: error
+          retention-days: 14
+          compression-level: 0
+
+      - name: Upload fingerprint source receipt (compile-release)
+        if: ${{ !cancelled() && steps.stage.outcome == 'success' && inputs.platform == 'macos' && steps.stage.outputs.finished == 'true' && steps.stage.outputs.release_policy == 'macos-compile-release' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ inputs.artifact }}-fingerprint-source
+          path: ${{ runner.temp }}/chromix-build/fingerprint-diagnostics/source-final.json
+          if-no-files-found: error
+          retention-days: 14
+      - name: Upload build diagnostics (compile-release)
+        if: ${{ !cancelled() && inputs.platform == 'macos' && steps.stage.outputs.finished == 'true' && steps.stage.outputs.release_policy == 'macos-compile-release' }}
+        continue-on-error: true
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ inputs.artifact }}-logs-s3-attempt-${{ github.run_attempt }}
+          include-hidden-files: true
+          path: |
+            ${{ runner.temp }}/chromix-logs/
+            ${{ runner.temp }}/chromix-build/runtime-smoke-stage-3/
+            ${{ runner.temp }}/chromix-build/src/out/Chromix/args.gn
+            ${{ runner.temp }}/chromix-build/src/out/Default/args.gn
+            ${{ runner.temp }}/chromix-build/src/.chromix-upstream-restored.json
+            ${{ runner.temp }}/chromix-build/src/.chromix-restored-patches.json
+            ${{ runner.temp }}/chromix-build/upstream-cache-restore.json
+            ${{ runner.temp }}/chromix-build/upstream-cache-preparation.json
+            ${{ runner.temp }}/chromix-build/upstream-cache-ninja.json
+            ${{ runner.temp }}/chromix-build/upstream-cache-import.json
+            ${{ runner.temp }}/chromix-build/upstream-cache-plan.log
+            ${{ runner.temp }}/chromix-build/upstream-reuse/
+            ${{ runner.temp }}/chromix-build/upstream-object-cache.json
+            ${{ runner.temp }}/chromix-build/fingerprint-diagnostics/
+            ${{ runner.temp }}/chromix-upstream/result.json
+          if-no-files-found: warn
+          retention-days: 14
+
       - name: Upload failed macOS runtime bundle
         if: ${{ !cancelled() && inputs.platform == 'macos' && steps.stage.outcome == 'failure' && steps.stage.outputs.package_ready == 'true' && steps.stage.outputs.runtime_failed == 'true' }}
         uses: actions/upload-artifact@v4
@@ -1397,6 +1553,7 @@ jobs:
 
       - name: Preserve latest macOS compiled checkpoint
         id: runtime_checkpoint
+        continue-on-error: ${{ inputs.platform == 'macos' && steps.stage.outputs.finished == 'true' && steps.stage.outputs.release_policy == 'macos-compile-release' }}
         if: ${{ !cancelled() && inputs.platform == 'macos' && (steps.stage.outputs.compiled_ready == 'true' || (inputs.resume_migration == 'mac156-x64-stage8' && failure()) || (inputs.resume_migration == 'mac156-x64-stage2' && failure()) || (inputs.resume_migration == 'mac156-x64-stage3' && failure())) }}
         run: |
           set -euo pipefail
@@ -1464,6 +1621,7 @@ jobs:
       - name: Verify handoff snapshot
         id: checkpoint
         if: ${{ !cancelled() && (steps.stage.outputs.upload_snapshot == 'true' || steps.runtime_checkpoint.outputs.upload_snapshot == 'true' || (inputs.platform == 'linux' && steps.linux_runtime_checkpoint.outputs.upload_snapshot == 'true')) }}
+        continue-on-error: ${{ inputs.platform == 'macos' && steps.stage.outputs.finished == 'true' && steps.stage.outputs.release_policy == 'macos-compile-release' }}
         run: |
           set -euo pipefail
           SNAP="${RUNNER_TEMP}/chromix-build/.snapshot-stage-3"
@@ -1477,6 +1635,7 @@ jobs:
 
       - name: Upload tree part 1
         if: ${{ !cancelled() && (steps.stage.outputs.upload_snapshot == 'true' || steps.runtime_checkpoint.outputs.upload_snapshot == 'true' || (inputs.platform == 'linux' && steps.linux_runtime_checkpoint.outputs.upload_snapshot == 'true')) && steps.checkpoint.outcome == 'success' }}
+        continue-on-error: ${{ inputs.platform == 'macos' && steps.stage.outputs.finished == 'true' && steps.stage.outputs.release_policy == 'macos-compile-release' }}
         uses: actions/upload-artifact@v4
         with:
           name: ${{ inputs.artifact }}-tree-s3-attempt-${{ github.run_attempt }}-part1
@@ -1486,6 +1645,7 @@ jobs:
           compression-level: 0
       - name: Upload tree part 2
         if: ${{ !cancelled() && (steps.stage.outputs.upload_snapshot == 'true' || steps.runtime_checkpoint.outputs.upload_snapshot == 'true' || (inputs.platform == 'linux' && steps.linux_runtime_checkpoint.outputs.upload_snapshot == 'true')) && steps.checkpoint.outcome == 'success' }}
+        continue-on-error: ${{ inputs.platform == 'macos' && steps.stage.outputs.finished == 'true' && steps.stage.outputs.release_policy == 'macos-compile-release' }}
         uses: actions/upload-artifact@v4
         with:
           name: ${{ inputs.artifact }}-tree-s3-attempt-${{ github.run_attempt }}-part2
@@ -1495,6 +1655,7 @@ jobs:
           compression-level: 0
       - name: Upload tree part 3
         if: ${{ !cancelled() && (steps.stage.outputs.upload_snapshot == 'true' || steps.runtime_checkpoint.outputs.upload_snapshot == 'true' || (inputs.platform == 'linux' && steps.linux_runtime_checkpoint.outputs.upload_snapshot == 'true')) && steps.checkpoint.outcome == 'success' }}
+        continue-on-error: ${{ inputs.platform == 'macos' && steps.stage.outputs.finished == 'true' && steps.stage.outputs.release_policy == 'macos-compile-release' }}
         uses: actions/upload-artifact@v4
         with:
           name: ${{ inputs.artifact }}-tree-s3-attempt-${{ github.run_attempt }}-part3
@@ -1504,6 +1665,7 @@ jobs:
           compression-level: 0
       - name: Upload tree part 4
         if: ${{ !cancelled() && (steps.stage.outputs.upload_snapshot == 'true' || steps.runtime_checkpoint.outputs.upload_snapshot == 'true' || (inputs.platform == 'linux' && steps.linux_runtime_checkpoint.outputs.upload_snapshot == 'true')) && steps.checkpoint.outcome == 'success' }}
+        continue-on-error: ${{ inputs.platform == 'macos' && steps.stage.outputs.finished == 'true' && steps.stage.outputs.release_policy == 'macos-compile-release' }}
         uses: actions/upload-artifact@v4
         with:
           name: ${{ inputs.artifact }}-tree-s3-attempt-${{ github.run_attempt }}-part4
@@ -1512,7 +1674,7 @@ jobs:
           retention-days: ${{ inputs.platform == 'macos' && 14 || 3 }}
           compression-level: 0
       - name: Upload final bundle
-        if: steps.stage.outputs.finished == 'true'
+        if: steps.stage.outputs.finished == 'true' && steps.stage.outputs.release_policy != 'macos-compile-release'
         uses: actions/upload-artifact@v4
         with:
           name: ${{ inputs.artifact }}
@@ -1526,7 +1688,7 @@ jobs:
           compression-level: 0
 
       - name: Upload build diagnostics
-        if: always()
+        if: always() && !(inputs.platform == 'macos' && steps.stage.outputs.finished == 'true' && steps.stage.outputs.release_policy == 'macos-compile-release')
         uses: actions/upload-artifact@v4
         with:
           name: ${{ inputs.artifact }}-logs-s3-attempt-${{ github.run_attempt }}
@@ -1555,7 +1717,7 @@ jobs:
           retention-days: 14
 
       - name: Upload fingerprint source receipt
-        if: steps.stage.outputs.finished == 'true'
+        if: steps.stage.outputs.finished == 'true' && steps.stage.outputs.release_policy != 'macos-compile-release'
         uses: actions/upload-artifact@v4
         with:
           name: ${{ inputs.artifact }}-fingerprint-source
@@ -1806,6 +1968,54 @@ jobs:
             if [ "${codes[0]}" -ne 0 ]; then exit "${codes[0]}"; fi
             exit "${codes[1]}"
           fi
+      - name: Upload final bundle (compile-release)
+        if: ${{ !cancelled() && steps.stage.outcome == 'success' && inputs.platform == 'macos' && steps.stage.outputs.finished == 'true' && steps.stage.outputs.release_policy == 'macos-compile-release' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ inputs.artifact }}
+          path: |
+            ${{ runner.temp }}/chromix-build/dist/${{ inputs.artifact }}.zip
+            ${{ runner.temp }}/chromix-build/dist/${{ (inputs.resume_migration == 'mac156-arm64-stage8' || inputs.resume_migration == 'mac156-arm64-stage1' || inputs.resume_migration == 'mac156-arm64-hevc') && 'chromix-mac-arm64' || inputs.artifact }}.zip
+            ${{ runner.temp }}/chromix-build/dist/${{ (inputs.resume_migration == 'mac156-x64-stage8' || inputs.resume_migration == 'mac156-x64-stage2' || inputs.resume_migration == 'mac156-x64-stage3') && 'chromix-mac-x64' || inputs.artifact }}.zip
+            ${{ runner.temp }}/chromix-build/dist/SHA256SUMS
+          if-no-files-found: error
+          retention-days: 14
+          compression-level: 0
+
+      - name: Upload fingerprint source receipt (compile-release)
+        if: ${{ !cancelled() && steps.stage.outcome == 'success' && inputs.platform == 'macos' && steps.stage.outputs.finished == 'true' && steps.stage.outputs.release_policy == 'macos-compile-release' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ inputs.artifact }}-fingerprint-source
+          path: ${{ runner.temp }}/chromix-build/fingerprint-diagnostics/source-final.json
+          if-no-files-found: error
+          retention-days: 14
+      - name: Upload build diagnostics (compile-release)
+        if: ${{ !cancelled() && inputs.platform == 'macos' && steps.stage.outputs.finished == 'true' && steps.stage.outputs.release_policy == 'macos-compile-release' }}
+        continue-on-error: true
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ inputs.artifact }}-logs-s4-attempt-${{ github.run_attempt }}
+          include-hidden-files: true
+          path: |
+            ${{ runner.temp }}/chromix-logs/
+            ${{ runner.temp }}/chromix-build/runtime-smoke-stage-4/
+            ${{ runner.temp }}/chromix-build/src/out/Chromix/args.gn
+            ${{ runner.temp }}/chromix-build/src/out/Default/args.gn
+            ${{ runner.temp }}/chromix-build/src/.chromix-upstream-restored.json
+            ${{ runner.temp }}/chromix-build/src/.chromix-restored-patches.json
+            ${{ runner.temp }}/chromix-build/upstream-cache-restore.json
+            ${{ runner.temp }}/chromix-build/upstream-cache-preparation.json
+            ${{ runner.temp }}/chromix-build/upstream-cache-ninja.json
+            ${{ runner.temp }}/chromix-build/upstream-cache-import.json
+            ${{ runner.temp }}/chromix-build/upstream-cache-plan.log
+            ${{ runner.temp }}/chromix-build/upstream-reuse/
+            ${{ runner.temp }}/chromix-build/upstream-object-cache.json
+            ${{ runner.temp }}/chromix-build/fingerprint-diagnostics/
+            ${{ runner.temp }}/chromix-upstream/result.json
+          if-no-files-found: warn
+          retention-days: 14
+
       - name: Upload failed macOS runtime bundle
         if: ${{ !cancelled() && inputs.platform == 'macos' && steps.stage.outcome == 'failure' && steps.stage.outputs.package_ready == 'true' && steps.stage.outputs.runtime_failed == 'true' }}
         uses: actions/upload-artifact@v4
@@ -1825,6 +2035,7 @@ jobs:
 
       - name: Preserve latest macOS compiled checkpoint
         id: runtime_checkpoint
+        continue-on-error: ${{ inputs.platform == 'macos' && steps.stage.outputs.finished == 'true' && steps.stage.outputs.release_policy == 'macos-compile-release' }}
         if: ${{ !cancelled() && inputs.platform == 'macos' && (steps.stage.outputs.compiled_ready == 'true' || (inputs.resume_migration == 'mac156-x64-stage8' && failure()) || (inputs.resume_migration == 'mac156-x64-stage2' && failure()) || (inputs.resume_migration == 'mac156-x64-stage3' && failure())) }}
         run: |
           set -euo pipefail
@@ -1892,6 +2103,7 @@ jobs:
       - name: Verify handoff snapshot
         id: checkpoint
         if: ${{ !cancelled() && (steps.stage.outputs.upload_snapshot == 'true' || steps.runtime_checkpoint.outputs.upload_snapshot == 'true' || (inputs.platform == 'linux' && steps.linux_runtime_checkpoint.outputs.upload_snapshot == 'true')) }}
+        continue-on-error: ${{ inputs.platform == 'macos' && steps.stage.outputs.finished == 'true' && steps.stage.outputs.release_policy == 'macos-compile-release' }}
         run: |
           set -euo pipefail
           SNAP="${RUNNER_TEMP}/chromix-build/.snapshot-stage-4"
@@ -1905,6 +2117,7 @@ jobs:
 
       - name: Upload tree part 1
         if: ${{ !cancelled() && (steps.stage.outputs.upload_snapshot == 'true' || steps.runtime_checkpoint.outputs.upload_snapshot == 'true' || (inputs.platform == 'linux' && steps.linux_runtime_checkpoint.outputs.upload_snapshot == 'true')) && steps.checkpoint.outcome == 'success' }}
+        continue-on-error: ${{ inputs.platform == 'macos' && steps.stage.outputs.finished == 'true' && steps.stage.outputs.release_policy == 'macos-compile-release' }}
         uses: actions/upload-artifact@v4
         with:
           name: ${{ inputs.artifact }}-tree-s4-attempt-${{ github.run_attempt }}-part1
@@ -1914,6 +2127,7 @@ jobs:
           compression-level: 0
       - name: Upload tree part 2
         if: ${{ !cancelled() && (steps.stage.outputs.upload_snapshot == 'true' || steps.runtime_checkpoint.outputs.upload_snapshot == 'true' || (inputs.platform == 'linux' && steps.linux_runtime_checkpoint.outputs.upload_snapshot == 'true')) && steps.checkpoint.outcome == 'success' }}
+        continue-on-error: ${{ inputs.platform == 'macos' && steps.stage.outputs.finished == 'true' && steps.stage.outputs.release_policy == 'macos-compile-release' }}
         uses: actions/upload-artifact@v4
         with:
           name: ${{ inputs.artifact }}-tree-s4-attempt-${{ github.run_attempt }}-part2
@@ -1923,6 +2137,7 @@ jobs:
           compression-level: 0
       - name: Upload tree part 3
         if: ${{ !cancelled() && (steps.stage.outputs.upload_snapshot == 'true' || steps.runtime_checkpoint.outputs.upload_snapshot == 'true' || (inputs.platform == 'linux' && steps.linux_runtime_checkpoint.outputs.upload_snapshot == 'true')) && steps.checkpoint.outcome == 'success' }}
+        continue-on-error: ${{ inputs.platform == 'macos' && steps.stage.outputs.finished == 'true' && steps.stage.outputs.release_policy == 'macos-compile-release' }}
         uses: actions/upload-artifact@v4
         with:
           name: ${{ inputs.artifact }}-tree-s4-attempt-${{ github.run_attempt }}-part3
@@ -1932,6 +2147,7 @@ jobs:
           compression-level: 0
       - name: Upload tree part 4
         if: ${{ !cancelled() && (steps.stage.outputs.upload_snapshot == 'true' || steps.runtime_checkpoint.outputs.upload_snapshot == 'true' || (inputs.platform == 'linux' && steps.linux_runtime_checkpoint.outputs.upload_snapshot == 'true')) && steps.checkpoint.outcome == 'success' }}
+        continue-on-error: ${{ inputs.platform == 'macos' && steps.stage.outputs.finished == 'true' && steps.stage.outputs.release_policy == 'macos-compile-release' }}
         uses: actions/upload-artifact@v4
         with:
           name: ${{ inputs.artifact }}-tree-s4-attempt-${{ github.run_attempt }}-part4
@@ -1940,7 +2156,7 @@ jobs:
           retention-days: ${{ inputs.platform == 'macos' && 14 || 3 }}
           compression-level: 0
       - name: Upload final bundle
-        if: steps.stage.outputs.finished == 'true'
+        if: steps.stage.outputs.finished == 'true' && steps.stage.outputs.release_policy != 'macos-compile-release'
         uses: actions/upload-artifact@v4
         with:
           name: ${{ inputs.artifact }}
@@ -1954,7 +2170,7 @@ jobs:
           compression-level: 0
 
       - name: Upload build diagnostics
-        if: always()
+        if: always() && !(inputs.platform == 'macos' && steps.stage.outputs.finished == 'true' && steps.stage.outputs.release_policy == 'macos-compile-release')
         uses: actions/upload-artifact@v4
         with:
           name: ${{ inputs.artifact }}-logs-s4-attempt-${{ github.run_attempt }}
@@ -1983,7 +2199,7 @@ jobs:
           retention-days: 14
 
       - name: Upload fingerprint source receipt
-        if: steps.stage.outputs.finished == 'true'
+        if: steps.stage.outputs.finished == 'true' && steps.stage.outputs.release_policy != 'macos-compile-release'
         uses: actions/upload-artifact@v4
         with:
           name: ${{ inputs.artifact }}-fingerprint-source
@@ -2234,6 +2450,54 @@ jobs:
             if [ "${codes[0]}" -ne 0 ]; then exit "${codes[0]}"; fi
             exit "${codes[1]}"
           fi
+      - name: Upload final bundle (compile-release)
+        if: ${{ !cancelled() && steps.stage.outcome == 'success' && inputs.platform == 'macos' && steps.stage.outputs.finished == 'true' && steps.stage.outputs.release_policy == 'macos-compile-release' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ inputs.artifact }}
+          path: |
+            ${{ runner.temp }}/chromix-build/dist/${{ inputs.artifact }}.zip
+            ${{ runner.temp }}/chromix-build/dist/${{ (inputs.resume_migration == 'mac156-arm64-stage8' || inputs.resume_migration == 'mac156-arm64-stage1' || inputs.resume_migration == 'mac156-arm64-hevc') && 'chromix-mac-arm64' || inputs.artifact }}.zip
+            ${{ runner.temp }}/chromix-build/dist/${{ (inputs.resume_migration == 'mac156-x64-stage8' || inputs.resume_migration == 'mac156-x64-stage2' || inputs.resume_migration == 'mac156-x64-stage3') && 'chromix-mac-x64' || inputs.artifact }}.zip
+            ${{ runner.temp }}/chromix-build/dist/SHA256SUMS
+          if-no-files-found: error
+          retention-days: 14
+          compression-level: 0
+
+      - name: Upload fingerprint source receipt (compile-release)
+        if: ${{ !cancelled() && steps.stage.outcome == 'success' && inputs.platform == 'macos' && steps.stage.outputs.finished == 'true' && steps.stage.outputs.release_policy == 'macos-compile-release' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ inputs.artifact }}-fingerprint-source
+          path: ${{ runner.temp }}/chromix-build/fingerprint-diagnostics/source-final.json
+          if-no-files-found: error
+          retention-days: 14
+      - name: Upload build diagnostics (compile-release)
+        if: ${{ !cancelled() && inputs.platform == 'macos' && steps.stage.outputs.finished == 'true' && steps.stage.outputs.release_policy == 'macos-compile-release' }}
+        continue-on-error: true
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ inputs.artifact }}-logs-s5-attempt-${{ github.run_attempt }}
+          include-hidden-files: true
+          path: |
+            ${{ runner.temp }}/chromix-logs/
+            ${{ runner.temp }}/chromix-build/runtime-smoke-stage-5/
+            ${{ runner.temp }}/chromix-build/src/out/Chromix/args.gn
+            ${{ runner.temp }}/chromix-build/src/out/Default/args.gn
+            ${{ runner.temp }}/chromix-build/src/.chromix-upstream-restored.json
+            ${{ runner.temp }}/chromix-build/src/.chromix-restored-patches.json
+            ${{ runner.temp }}/chromix-build/upstream-cache-restore.json
+            ${{ runner.temp }}/chromix-build/upstream-cache-preparation.json
+            ${{ runner.temp }}/chromix-build/upstream-cache-ninja.json
+            ${{ runner.temp }}/chromix-build/upstream-cache-import.json
+            ${{ runner.temp }}/chromix-build/upstream-cache-plan.log
+            ${{ runner.temp }}/chromix-build/upstream-reuse/
+            ${{ runner.temp }}/chromix-build/upstream-object-cache.json
+            ${{ runner.temp }}/chromix-build/fingerprint-diagnostics/
+            ${{ runner.temp }}/chromix-upstream/result.json
+          if-no-files-found: warn
+          retention-days: 14
+
       - name: Upload failed macOS runtime bundle
         if: ${{ !cancelled() && inputs.platform == 'macos' && steps.stage.outcome == 'failure' && steps.stage.outputs.package_ready == 'true' && steps.stage.outputs.runtime_failed == 'true' }}
         uses: actions/upload-artifact@v4
@@ -2253,6 +2517,7 @@ jobs:
 
       - name: Preserve latest macOS compiled checkpoint
         id: runtime_checkpoint
+        continue-on-error: ${{ inputs.platform == 'macos' && steps.stage.outputs.finished == 'true' && steps.stage.outputs.release_policy == 'macos-compile-release' }}
         if: ${{ !cancelled() && inputs.platform == 'macos' && (steps.stage.outputs.compiled_ready == 'true' || (inputs.resume_migration == 'mac156-x64-stage8' && failure()) || (inputs.resume_migration == 'mac156-x64-stage2' && failure()) || (inputs.resume_migration == 'mac156-x64-stage3' && failure())) }}
         run: |
           set -euo pipefail
@@ -2320,6 +2585,7 @@ jobs:
       - name: Verify handoff snapshot
         id: checkpoint
         if: ${{ !cancelled() && (steps.stage.outputs.upload_snapshot == 'true' || steps.runtime_checkpoint.outputs.upload_snapshot == 'true' || (inputs.platform == 'linux' && steps.linux_runtime_checkpoint.outputs.upload_snapshot == 'true')) }}
+        continue-on-error: ${{ inputs.platform == 'macos' && steps.stage.outputs.finished == 'true' && steps.stage.outputs.release_policy == 'macos-compile-release' }}
         run: |
           set -euo pipefail
           SNAP="${RUNNER_TEMP}/chromix-build/.snapshot-stage-5"
@@ -2333,6 +2599,7 @@ jobs:
 
       - name: Upload tree part 1
         if: ${{ !cancelled() && (steps.stage.outputs.upload_snapshot == 'true' || steps.runtime_checkpoint.outputs.upload_snapshot == 'true' || (inputs.platform == 'linux' && steps.linux_runtime_checkpoint.outputs.upload_snapshot == 'true')) && steps.checkpoint.outcome == 'success' }}
+        continue-on-error: ${{ inputs.platform == 'macos' && steps.stage.outputs.finished == 'true' && steps.stage.outputs.release_policy == 'macos-compile-release' }}
         uses: actions/upload-artifact@v4
         with:
           name: ${{ inputs.artifact }}-tree-s5-attempt-${{ github.run_attempt }}-part1
@@ -2342,6 +2609,7 @@ jobs:
           compression-level: 0
       - name: Upload tree part 2
         if: ${{ !cancelled() && (steps.stage.outputs.upload_snapshot == 'true' || steps.runtime_checkpoint.outputs.upload_snapshot == 'true' || (inputs.platform == 'linux' && steps.linux_runtime_checkpoint.outputs.upload_snapshot == 'true')) && steps.checkpoint.outcome == 'success' }}
+        continue-on-error: ${{ inputs.platform == 'macos' && steps.stage.outputs.finished == 'true' && steps.stage.outputs.release_policy == 'macos-compile-release' }}
         uses: actions/upload-artifact@v4
         with:
           name: ${{ inputs.artifact }}-tree-s5-attempt-${{ github.run_attempt }}-part2
@@ -2351,6 +2619,7 @@ jobs:
           compression-level: 0
       - name: Upload tree part 3
         if: ${{ !cancelled() && (steps.stage.outputs.upload_snapshot == 'true' || steps.runtime_checkpoint.outputs.upload_snapshot == 'true' || (inputs.platform == 'linux' && steps.linux_runtime_checkpoint.outputs.upload_snapshot == 'true')) && steps.checkpoint.outcome == 'success' }}
+        continue-on-error: ${{ inputs.platform == 'macos' && steps.stage.outputs.finished == 'true' && steps.stage.outputs.release_policy == 'macos-compile-release' }}
         uses: actions/upload-artifact@v4
         with:
           name: ${{ inputs.artifact }}-tree-s5-attempt-${{ github.run_attempt }}-part3
@@ -2360,6 +2629,7 @@ jobs:
           compression-level: 0
       - name: Upload tree part 4
         if: ${{ !cancelled() && (steps.stage.outputs.upload_snapshot == 'true' || steps.runtime_checkpoint.outputs.upload_snapshot == 'true' || (inputs.platform == 'linux' && steps.linux_runtime_checkpoint.outputs.upload_snapshot == 'true')) && steps.checkpoint.outcome == 'success' }}
+        continue-on-error: ${{ inputs.platform == 'macos' && steps.stage.outputs.finished == 'true' && steps.stage.outputs.release_policy == 'macos-compile-release' }}
         uses: actions/upload-artifact@v4
         with:
           name: ${{ inputs.artifact }}-tree-s5-attempt-${{ github.run_attempt }}-part4
@@ -2368,7 +2638,7 @@ jobs:
           retention-days: ${{ inputs.platform == 'macos' && 14 || 3 }}
           compression-level: 0
       - name: Upload final bundle
-        if: steps.stage.outputs.finished == 'true'
+        if: steps.stage.outputs.finished == 'true' && steps.stage.outputs.release_policy != 'macos-compile-release'
         uses: actions/upload-artifact@v4
         with:
           name: ${{ inputs.artifact }}
@@ -2382,7 +2652,7 @@ jobs:
           compression-level: 0
 
       - name: Upload build diagnostics
-        if: always()
+        if: always() && !(inputs.platform == 'macos' && steps.stage.outputs.finished == 'true' && steps.stage.outputs.release_policy == 'macos-compile-release')
         uses: actions/upload-artifact@v4
         with:
           name: ${{ inputs.artifact }}-logs-s5-attempt-${{ github.run_attempt }}
@@ -2411,7 +2681,7 @@ jobs:
           retention-days: 14
 
       - name: Upload fingerprint source receipt
-        if: steps.stage.outputs.finished == 'true'
+        if: steps.stage.outputs.finished == 'true' && steps.stage.outputs.release_policy != 'macos-compile-release'
         uses: actions/upload-artifact@v4
         with:
           name: ${{ inputs.artifact }}-fingerprint-source
@@ -2662,6 +2932,54 @@ jobs:
             if [ "${codes[0]}" -ne 0 ]; then exit "${codes[0]}"; fi
             exit "${codes[1]}"
           fi
+      - name: Upload final bundle (compile-release)
+        if: ${{ !cancelled() && steps.stage.outcome == 'success' && inputs.platform == 'macos' && steps.stage.outputs.finished == 'true' && steps.stage.outputs.release_policy == 'macos-compile-release' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ inputs.artifact }}
+          path: |
+            ${{ runner.temp }}/chromix-build/dist/${{ inputs.artifact }}.zip
+            ${{ runner.temp }}/chromix-build/dist/${{ (inputs.resume_migration == 'mac156-arm64-stage8' || inputs.resume_migration == 'mac156-arm64-stage1' || inputs.resume_migration == 'mac156-arm64-hevc') && 'chromix-mac-arm64' || inputs.artifact }}.zip
+            ${{ runner.temp }}/chromix-build/dist/${{ (inputs.resume_migration == 'mac156-x64-stage8' || inputs.resume_migration == 'mac156-x64-stage2' || inputs.resume_migration == 'mac156-x64-stage3') && 'chromix-mac-x64' || inputs.artifact }}.zip
+            ${{ runner.temp }}/chromix-build/dist/SHA256SUMS
+          if-no-files-found: error
+          retention-days: 14
+          compression-level: 0
+
+      - name: Upload fingerprint source receipt (compile-release)
+        if: ${{ !cancelled() && steps.stage.outcome == 'success' && inputs.platform == 'macos' && steps.stage.outputs.finished == 'true' && steps.stage.outputs.release_policy == 'macos-compile-release' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ inputs.artifact }}-fingerprint-source
+          path: ${{ runner.temp }}/chromix-build/fingerprint-diagnostics/source-final.json
+          if-no-files-found: error
+          retention-days: 14
+      - name: Upload build diagnostics (compile-release)
+        if: ${{ !cancelled() && inputs.platform == 'macos' && steps.stage.outputs.finished == 'true' && steps.stage.outputs.release_policy == 'macos-compile-release' }}
+        continue-on-error: true
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ inputs.artifact }}-logs-s6-attempt-${{ github.run_attempt }}
+          include-hidden-files: true
+          path: |
+            ${{ runner.temp }}/chromix-logs/
+            ${{ runner.temp }}/chromix-build/runtime-smoke-stage-6/
+            ${{ runner.temp }}/chromix-build/src/out/Chromix/args.gn
+            ${{ runner.temp }}/chromix-build/src/out/Default/args.gn
+            ${{ runner.temp }}/chromix-build/src/.chromix-upstream-restored.json
+            ${{ runner.temp }}/chromix-build/src/.chromix-restored-patches.json
+            ${{ runner.temp }}/chromix-build/upstream-cache-restore.json
+            ${{ runner.temp }}/chromix-build/upstream-cache-preparation.json
+            ${{ runner.temp }}/chromix-build/upstream-cache-ninja.json
+            ${{ runner.temp }}/chromix-build/upstream-cache-import.json
+            ${{ runner.temp }}/chromix-build/upstream-cache-plan.log
+            ${{ runner.temp }}/chromix-build/upstream-reuse/
+            ${{ runner.temp }}/chromix-build/upstream-object-cache.json
+            ${{ runner.temp }}/chromix-build/fingerprint-diagnostics/
+            ${{ runner.temp }}/chromix-upstream/result.json
+          if-no-files-found: warn
+          retention-days: 14
+
       - name: Upload failed macOS runtime bundle
         if: ${{ !cancelled() && inputs.platform == 'macos' && steps.stage.outcome == 'failure' && steps.stage.outputs.package_ready == 'true' && steps.stage.outputs.runtime_failed == 'true' }}
         uses: actions/upload-artifact@v4
@@ -2681,6 +2999,7 @@ jobs:
 
       - name: Preserve latest macOS compiled checkpoint
         id: runtime_checkpoint
+        continue-on-error: ${{ inputs.platform == 'macos' && steps.stage.outputs.finished == 'true' && steps.stage.outputs.release_policy == 'macos-compile-release' }}
         if: ${{ !cancelled() && inputs.platform == 'macos' && (steps.stage.outputs.compiled_ready == 'true' || (inputs.resume_migration == 'mac156-x64-stage8' && failure()) || (inputs.resume_migration == 'mac156-x64-stage2' && failure()) || (inputs.resume_migration == 'mac156-x64-stage3' && failure())) }}
         run: |
           set -euo pipefail
@@ -2748,6 +3067,7 @@ jobs:
       - name: Verify handoff snapshot
         id: checkpoint
         if: ${{ !cancelled() && (steps.stage.outputs.upload_snapshot == 'true' || steps.runtime_checkpoint.outputs.upload_snapshot == 'true' || (inputs.platform == 'linux' && steps.linux_runtime_checkpoint.outputs.upload_snapshot == 'true')) }}
+        continue-on-error: ${{ inputs.platform == 'macos' && steps.stage.outputs.finished == 'true' && steps.stage.outputs.release_policy == 'macos-compile-release' }}
         run: |
           set -euo pipefail
           SNAP="${RUNNER_TEMP}/chromix-build/.snapshot-stage-6"
@@ -2761,6 +3081,7 @@ jobs:
 
       - name: Upload tree part 1
         if: ${{ !cancelled() && (steps.stage.outputs.upload_snapshot == 'true' || steps.runtime_checkpoint.outputs.upload_snapshot == 'true' || (inputs.platform == 'linux' && steps.linux_runtime_checkpoint.outputs.upload_snapshot == 'true')) && steps.checkpoint.outcome == 'success' }}
+        continue-on-error: ${{ inputs.platform == 'macos' && steps.stage.outputs.finished == 'true' && steps.stage.outputs.release_policy == 'macos-compile-release' }}
         uses: actions/upload-artifact@v4
         with:
           name: ${{ inputs.artifact }}-tree-s6-attempt-${{ github.run_attempt }}-part1
@@ -2770,6 +3091,7 @@ jobs:
           compression-level: 0
       - name: Upload tree part 2
         if: ${{ !cancelled() && (steps.stage.outputs.upload_snapshot == 'true' || steps.runtime_checkpoint.outputs.upload_snapshot == 'true' || (inputs.platform == 'linux' && steps.linux_runtime_checkpoint.outputs.upload_snapshot == 'true')) && steps.checkpoint.outcome == 'success' }}
+        continue-on-error: ${{ inputs.platform == 'macos' && steps.stage.outputs.finished == 'true' && steps.stage.outputs.release_policy == 'macos-compile-release' }}
         uses: actions/upload-artifact@v4
         with:
           name: ${{ inputs.artifact }}-tree-s6-attempt-${{ github.run_attempt }}-part2
@@ -2779,6 +3101,7 @@ jobs:
           compression-level: 0
       - name: Upload tree part 3
         if: ${{ !cancelled() && (steps.stage.outputs.upload_snapshot == 'true' || steps.runtime_checkpoint.outputs.upload_snapshot == 'true' || (inputs.platform == 'linux' && steps.linux_runtime_checkpoint.outputs.upload_snapshot == 'true')) && steps.checkpoint.outcome == 'success' }}
+        continue-on-error: ${{ inputs.platform == 'macos' && steps.stage.outputs.finished == 'true' && steps.stage.outputs.release_policy == 'macos-compile-release' }}
         uses: actions/upload-artifact@v4
         with:
           name: ${{ inputs.artifact }}-tree-s6-attempt-${{ github.run_attempt }}-part3
@@ -2788,6 +3111,7 @@ jobs:
           compression-level: 0
       - name: Upload tree part 4
         if: ${{ !cancelled() && (steps.stage.outputs.upload_snapshot == 'true' || steps.runtime_checkpoint.outputs.upload_snapshot == 'true' || (inputs.platform == 'linux' && steps.linux_runtime_checkpoint.outputs.upload_snapshot == 'true')) && steps.checkpoint.outcome == 'success' }}
+        continue-on-error: ${{ inputs.platform == 'macos' && steps.stage.outputs.finished == 'true' && steps.stage.outputs.release_policy == 'macos-compile-release' }}
         uses: actions/upload-artifact@v4
         with:
           name: ${{ inputs.artifact }}-tree-s6-attempt-${{ github.run_attempt }}-part4
@@ -2796,7 +3120,7 @@ jobs:
           retention-days: ${{ inputs.platform == 'macos' && 14 || 3 }}
           compression-level: 0
       - name: Upload final bundle
-        if: steps.stage.outputs.finished == 'true'
+        if: steps.stage.outputs.finished == 'true' && steps.stage.outputs.release_policy != 'macos-compile-release'
         uses: actions/upload-artifact@v4
         with:
           name: ${{ inputs.artifact }}
@@ -2810,7 +3134,7 @@ jobs:
           compression-level: 0
 
       - name: Upload build diagnostics
-        if: always()
+        if: always() && !(inputs.platform == 'macos' && steps.stage.outputs.finished == 'true' && steps.stage.outputs.release_policy == 'macos-compile-release')
         uses: actions/upload-artifact@v4
         with:
           name: ${{ inputs.artifact }}-logs-s6-attempt-${{ github.run_attempt }}
@@ -2839,7 +3163,7 @@ jobs:
           retention-days: 14
 
       - name: Upload fingerprint source receipt
-        if: steps.stage.outputs.finished == 'true'
+        if: steps.stage.outputs.finished == 'true' && steps.stage.outputs.release_policy != 'macos-compile-release'
         uses: actions/upload-artifact@v4
         with:
           name: ${{ inputs.artifact }}-fingerprint-source
@@ -3090,6 +3414,54 @@ jobs:
             if [ "${codes[0]}" -ne 0 ]; then exit "${codes[0]}"; fi
             exit "${codes[1]}"
           fi
+      - name: Upload final bundle (compile-release)
+        if: ${{ !cancelled() && steps.stage.outcome == 'success' && inputs.platform == 'macos' && steps.stage.outputs.finished == 'true' && steps.stage.outputs.release_policy == 'macos-compile-release' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ inputs.artifact }}
+          path: |
+            ${{ runner.temp }}/chromix-build/dist/${{ inputs.artifact }}.zip
+            ${{ runner.temp }}/chromix-build/dist/${{ (inputs.resume_migration == 'mac156-arm64-stage8' || inputs.resume_migration == 'mac156-arm64-stage1' || inputs.resume_migration == 'mac156-arm64-hevc') && 'chromix-mac-arm64' || inputs.artifact }}.zip
+            ${{ runner.temp }}/chromix-build/dist/${{ (inputs.resume_migration == 'mac156-x64-stage8' || inputs.resume_migration == 'mac156-x64-stage2' || inputs.resume_migration == 'mac156-x64-stage3') && 'chromix-mac-x64' || inputs.artifact }}.zip
+            ${{ runner.temp }}/chromix-build/dist/SHA256SUMS
+          if-no-files-found: error
+          retention-days: 14
+          compression-level: 0
+
+      - name: Upload fingerprint source receipt (compile-release)
+        if: ${{ !cancelled() && steps.stage.outcome == 'success' && inputs.platform == 'macos' && steps.stage.outputs.finished == 'true' && steps.stage.outputs.release_policy == 'macos-compile-release' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ inputs.artifact }}-fingerprint-source
+          path: ${{ runner.temp }}/chromix-build/fingerprint-diagnostics/source-final.json
+          if-no-files-found: error
+          retention-days: 14
+      - name: Upload build diagnostics (compile-release)
+        if: ${{ !cancelled() && inputs.platform == 'macos' && steps.stage.outputs.finished == 'true' && steps.stage.outputs.release_policy == 'macos-compile-release' }}
+        continue-on-error: true
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ inputs.artifact }}-logs-s7-attempt-${{ github.run_attempt }}
+          include-hidden-files: true
+          path: |
+            ${{ runner.temp }}/chromix-logs/
+            ${{ runner.temp }}/chromix-build/runtime-smoke-stage-7/
+            ${{ runner.temp }}/chromix-build/src/out/Chromix/args.gn
+            ${{ runner.temp }}/chromix-build/src/out/Default/args.gn
+            ${{ runner.temp }}/chromix-build/src/.chromix-upstream-restored.json
+            ${{ runner.temp }}/chromix-build/src/.chromix-restored-patches.json
+            ${{ runner.temp }}/chromix-build/upstream-cache-restore.json
+            ${{ runner.temp }}/chromix-build/upstream-cache-preparation.json
+            ${{ runner.temp }}/chromix-build/upstream-cache-ninja.json
+            ${{ runner.temp }}/chromix-build/upstream-cache-import.json
+            ${{ runner.temp }}/chromix-build/upstream-cache-plan.log
+            ${{ runner.temp }}/chromix-build/upstream-reuse/
+            ${{ runner.temp }}/chromix-build/upstream-object-cache.json
+            ${{ runner.temp }}/chromix-build/fingerprint-diagnostics/
+            ${{ runner.temp }}/chromix-upstream/result.json
+          if-no-files-found: warn
+          retention-days: 14
+
       - name: Upload failed macOS runtime bundle
         if: ${{ !cancelled() && inputs.platform == 'macos' && steps.stage.outcome == 'failure' && steps.stage.outputs.package_ready == 'true' && steps.stage.outputs.runtime_failed == 'true' }}
         uses: actions/upload-artifact@v4
@@ -3109,6 +3481,7 @@ jobs:
 
       - name: Preserve latest macOS compiled checkpoint
         id: runtime_checkpoint
+        continue-on-error: ${{ inputs.platform == 'macos' && steps.stage.outputs.finished == 'true' && steps.stage.outputs.release_policy == 'macos-compile-release' }}
         if: ${{ !cancelled() && inputs.platform == 'macos' && (steps.stage.outputs.compiled_ready == 'true' || (inputs.resume_migration == 'mac156-x64-stage8' && failure()) || (inputs.resume_migration == 'mac156-x64-stage2' && failure()) || (inputs.resume_migration == 'mac156-x64-stage3' && failure())) }}
         run: |
           set -euo pipefail
@@ -3176,6 +3549,7 @@ jobs:
       - name: Verify handoff snapshot
         id: checkpoint
         if: ${{ !cancelled() && (steps.stage.outputs.upload_snapshot == 'true' || steps.runtime_checkpoint.outputs.upload_snapshot == 'true' || (inputs.platform == 'linux' && steps.linux_runtime_checkpoint.outputs.upload_snapshot == 'true')) }}
+        continue-on-error: ${{ inputs.platform == 'macos' && steps.stage.outputs.finished == 'true' && steps.stage.outputs.release_policy == 'macos-compile-release' }}
         run: |
           set -euo pipefail
           SNAP="${RUNNER_TEMP}/chromix-build/.snapshot-stage-7"
@@ -3189,6 +3563,7 @@ jobs:
 
       - name: Upload tree part 1
         if: ${{ !cancelled() && (steps.stage.outputs.upload_snapshot == 'true' || steps.runtime_checkpoint.outputs.upload_snapshot == 'true' || (inputs.platform == 'linux' && steps.linux_runtime_checkpoint.outputs.upload_snapshot == 'true')) && steps.checkpoint.outcome == 'success' }}
+        continue-on-error: ${{ inputs.platform == 'macos' && steps.stage.outputs.finished == 'true' && steps.stage.outputs.release_policy == 'macos-compile-release' }}
         uses: actions/upload-artifact@v4
         with:
           name: ${{ inputs.artifact }}-tree-s7-attempt-${{ github.run_attempt }}-part1
@@ -3198,6 +3573,7 @@ jobs:
           compression-level: 0
       - name: Upload tree part 2
         if: ${{ !cancelled() && (steps.stage.outputs.upload_snapshot == 'true' || steps.runtime_checkpoint.outputs.upload_snapshot == 'true' || (inputs.platform == 'linux' && steps.linux_runtime_checkpoint.outputs.upload_snapshot == 'true')) && steps.checkpoint.outcome == 'success' }}
+        continue-on-error: ${{ inputs.platform == 'macos' && steps.stage.outputs.finished == 'true' && steps.stage.outputs.release_policy == 'macos-compile-release' }}
         uses: actions/upload-artifact@v4
         with:
           name: ${{ inputs.artifact }}-tree-s7-attempt-${{ github.run_attempt }}-part2
@@ -3207,6 +3583,7 @@ jobs:
           compression-level: 0
       - name: Upload tree part 3
         if: ${{ !cancelled() && (steps.stage.outputs.upload_snapshot == 'true' || steps.runtime_checkpoint.outputs.upload_snapshot == 'true' || (inputs.platform == 'linux' && steps.linux_runtime_checkpoint.outputs.upload_snapshot == 'true')) && steps.checkpoint.outcome == 'success' }}
+        continue-on-error: ${{ inputs.platform == 'macos' && steps.stage.outputs.finished == 'true' && steps.stage.outputs.release_policy == 'macos-compile-release' }}
         uses: actions/upload-artifact@v4
         with:
           name: ${{ inputs.artifact }}-tree-s7-attempt-${{ github.run_attempt }}-part3
@@ -3216,6 +3593,7 @@ jobs:
           compression-level: 0
       - name: Upload tree part 4
         if: ${{ !cancelled() && (steps.stage.outputs.upload_snapshot == 'true' || steps.runtime_checkpoint.outputs.upload_snapshot == 'true' || (inputs.platform == 'linux' && steps.linux_runtime_checkpoint.outputs.upload_snapshot == 'true')) && steps.checkpoint.outcome == 'success' }}
+        continue-on-error: ${{ inputs.platform == 'macos' && steps.stage.outputs.finished == 'true' && steps.stage.outputs.release_policy == 'macos-compile-release' }}
         uses: actions/upload-artifact@v4
         with:
           name: ${{ inputs.artifact }}-tree-s7-attempt-${{ github.run_attempt }}-part4
@@ -3224,7 +3602,7 @@ jobs:
           retention-days: ${{ inputs.platform == 'macos' && 14 || 3 }}
           compression-level: 0
       - name: Upload final bundle
-        if: steps.stage.outputs.finished == 'true'
+        if: steps.stage.outputs.finished == 'true' && steps.stage.outputs.release_policy != 'macos-compile-release'
         uses: actions/upload-artifact@v4
         with:
           name: ${{ inputs.artifact }}
@@ -3238,7 +3616,7 @@ jobs:
           compression-level: 0
 
       - name: Upload build diagnostics
-        if: always()
+        if: always() && !(inputs.platform == 'macos' && steps.stage.outputs.finished == 'true' && steps.stage.outputs.release_policy == 'macos-compile-release')
         uses: actions/upload-artifact@v4
         with:
           name: ${{ inputs.artifact }}-logs-s7-attempt-${{ github.run_attempt }}
@@ -3267,7 +3645,7 @@ jobs:
           retention-days: 14
 
       - name: Upload fingerprint source receipt
-        if: steps.stage.outputs.finished == 'true'
+        if: steps.stage.outputs.finished == 'true' && steps.stage.outputs.release_policy != 'macos-compile-release'
         uses: actions/upload-artifact@v4
         with:
           name: ${{ inputs.artifact }}-fingerprint-source
@@ -3518,6 +3896,54 @@ jobs:
             if [ "${codes[0]}" -ne 0 ]; then exit "${codes[0]}"; fi
             exit "${codes[1]}"
           fi
+      - name: Upload final bundle (compile-release)
+        if: ${{ !cancelled() && steps.stage.outcome == 'success' && inputs.platform == 'macos' && steps.stage.outputs.finished == 'true' && steps.stage.outputs.release_policy == 'macos-compile-release' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ inputs.artifact }}
+          path: |
+            ${{ runner.temp }}/chromix-build/dist/${{ inputs.artifact }}.zip
+            ${{ runner.temp }}/chromix-build/dist/${{ (inputs.resume_migration == 'mac156-arm64-stage8' || inputs.resume_migration == 'mac156-arm64-stage1' || inputs.resume_migration == 'mac156-arm64-hevc') && 'chromix-mac-arm64' || inputs.artifact }}.zip
+            ${{ runner.temp }}/chromix-build/dist/${{ (inputs.resume_migration == 'mac156-x64-stage8' || inputs.resume_migration == 'mac156-x64-stage2' || inputs.resume_migration == 'mac156-x64-stage3') && 'chromix-mac-x64' || inputs.artifact }}.zip
+            ${{ runner.temp }}/chromix-build/dist/SHA256SUMS
+          if-no-files-found: error
+          retention-days: 14
+          compression-level: 0
+
+      - name: Upload fingerprint source receipt (compile-release)
+        if: ${{ !cancelled() && steps.stage.outcome == 'success' && inputs.platform == 'macos' && steps.stage.outputs.finished == 'true' && steps.stage.outputs.release_policy == 'macos-compile-release' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ inputs.artifact }}-fingerprint-source
+          path: ${{ runner.temp }}/chromix-build/fingerprint-diagnostics/source-final.json
+          if-no-files-found: error
+          retention-days: 14
+      - name: Upload build diagnostics (compile-release)
+        if: ${{ !cancelled() && inputs.platform == 'macos' && steps.stage.outputs.finished == 'true' && steps.stage.outputs.release_policy == 'macos-compile-release' }}
+        continue-on-error: true
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ inputs.artifact }}-logs-s8-attempt-${{ github.run_attempt }}
+          include-hidden-files: true
+          path: |
+            ${{ runner.temp }}/chromix-logs/
+            ${{ runner.temp }}/chromix-build/runtime-smoke-stage-8/
+            ${{ runner.temp }}/chromix-build/src/out/Chromix/args.gn
+            ${{ runner.temp }}/chromix-build/src/out/Default/args.gn
+            ${{ runner.temp }}/chromix-build/src/.chromix-upstream-restored.json
+            ${{ runner.temp }}/chromix-build/src/.chromix-restored-patches.json
+            ${{ runner.temp }}/chromix-build/upstream-cache-restore.json
+            ${{ runner.temp }}/chromix-build/upstream-cache-preparation.json
+            ${{ runner.temp }}/chromix-build/upstream-cache-ninja.json
+            ${{ runner.temp }}/chromix-build/upstream-cache-import.json
+            ${{ runner.temp }}/chromix-build/upstream-cache-plan.log
+            ${{ runner.temp }}/chromix-build/upstream-reuse/
+            ${{ runner.temp }}/chromix-build/upstream-object-cache.json
+            ${{ runner.temp }}/chromix-build/fingerprint-diagnostics/
+            ${{ runner.temp }}/chromix-upstream/result.json
+          if-no-files-found: warn
+          retention-days: 14
+
       - name: Upload failed macOS runtime bundle
         if: ${{ !cancelled() && inputs.platform == 'macos' && steps.stage.outcome == 'failure' && steps.stage.outputs.package_ready == 'true' && steps.stage.outputs.runtime_failed == 'true' }}
         uses: actions/upload-artifact@v4
@@ -3537,6 +3963,7 @@ jobs:
 
       - name: Preserve latest macOS compiled checkpoint
         id: runtime_checkpoint
+        continue-on-error: ${{ inputs.platform == 'macos' && steps.stage.outputs.finished == 'true' && steps.stage.outputs.release_policy == 'macos-compile-release' }}
         if: ${{ !cancelled() && inputs.platform == 'macos' && (steps.stage.outputs.compiled_ready == 'true' || (inputs.resume_migration == 'mac156-x64-stage8' && failure()) || (inputs.resume_migration == 'mac156-x64-stage2' && failure()) || (inputs.resume_migration == 'mac156-x64-stage3' && failure())) }}
         run: |
           set -euo pipefail
@@ -3604,6 +4031,7 @@ jobs:
       - name: Verify handoff snapshot
         id: checkpoint
         if: ${{ !cancelled() && (steps.stage.outputs.upload_snapshot == 'true' || steps.runtime_checkpoint.outputs.upload_snapshot == 'true' || (inputs.platform == 'linux' && steps.linux_runtime_checkpoint.outputs.upload_snapshot == 'true')) }}
+        continue-on-error: ${{ inputs.platform == 'macos' && steps.stage.outputs.finished == 'true' && steps.stage.outputs.release_policy == 'macos-compile-release' }}
         run: |
           set -euo pipefail
           SNAP="${RUNNER_TEMP}/chromix-build/.snapshot-stage-8"
@@ -3617,6 +4045,7 @@ jobs:
 
       - name: Upload tree part 1
         if: ${{ !cancelled() && (steps.stage.outputs.upload_snapshot == 'true' || steps.runtime_checkpoint.outputs.upload_snapshot == 'true' || (inputs.platform == 'linux' && steps.linux_runtime_checkpoint.outputs.upload_snapshot == 'true')) && steps.checkpoint.outcome == 'success' }}
+        continue-on-error: ${{ inputs.platform == 'macos' && steps.stage.outputs.finished == 'true' && steps.stage.outputs.release_policy == 'macos-compile-release' }}
         uses: actions/upload-artifact@v4
         with:
           name: ${{ inputs.artifact }}-tree-s8-attempt-${{ github.run_attempt }}-part1
@@ -3626,6 +4055,7 @@ jobs:
           compression-level: 0
       - name: Upload tree part 2
         if: ${{ !cancelled() && (steps.stage.outputs.upload_snapshot == 'true' || steps.runtime_checkpoint.outputs.upload_snapshot == 'true' || (inputs.platform == 'linux' && steps.linux_runtime_checkpoint.outputs.upload_snapshot == 'true')) && steps.checkpoint.outcome == 'success' }}
+        continue-on-error: ${{ inputs.platform == 'macos' && steps.stage.outputs.finished == 'true' && steps.stage.outputs.release_policy == 'macos-compile-release' }}
         uses: actions/upload-artifact@v4
         with:
           name: ${{ inputs.artifact }}-tree-s8-attempt-${{ github.run_attempt }}-part2
@@ -3635,6 +4065,7 @@ jobs:
           compression-level: 0
       - name: Upload tree part 3
         if: ${{ !cancelled() && (steps.stage.outputs.upload_snapshot == 'true' || steps.runtime_checkpoint.outputs.upload_snapshot == 'true' || (inputs.platform == 'linux' && steps.linux_runtime_checkpoint.outputs.upload_snapshot == 'true')) && steps.checkpoint.outcome == 'success' }}
+        continue-on-error: ${{ inputs.platform == 'macos' && steps.stage.outputs.finished == 'true' && steps.stage.outputs.release_policy == 'macos-compile-release' }}
         uses: actions/upload-artifact@v4
         with:
           name: ${{ inputs.artifact }}-tree-s8-attempt-${{ github.run_attempt }}-part3
@@ -3644,6 +4075,7 @@ jobs:
           compression-level: 0
       - name: Upload tree part 4
         if: ${{ !cancelled() && (steps.stage.outputs.upload_snapshot == 'true' || steps.runtime_checkpoint.outputs.upload_snapshot == 'true' || (inputs.platform == 'linux' && steps.linux_runtime_checkpoint.outputs.upload_snapshot == 'true')) && steps.checkpoint.outcome == 'success' }}
+        continue-on-error: ${{ inputs.platform == 'macos' && steps.stage.outputs.finished == 'true' && steps.stage.outputs.release_policy == 'macos-compile-release' }}
         uses: actions/upload-artifact@v4
         with:
           name: ${{ inputs.artifact }}-tree-s8-attempt-${{ github.run_attempt }}-part4
@@ -3652,7 +4084,7 @@ jobs:
           retention-days: ${{ inputs.platform == 'macos' && 14 || 3 }}
           compression-level: 0
       - name: Upload final bundle
-        if: steps.stage.outputs.finished == 'true'
+        if: steps.stage.outputs.finished == 'true' && steps.stage.outputs.release_policy != 'macos-compile-release'
         uses: actions/upload-artifact@v4
         with:
           name: ${{ inputs.artifact }}
@@ -3666,7 +4098,7 @@ jobs:
           compression-level: 0
 
       - name: Upload build diagnostics
-        if: always()
+        if: always() && !(inputs.platform == 'macos' && steps.stage.outputs.finished == 'true' && steps.stage.outputs.release_policy == 'macos-compile-release')
         uses: actions/upload-artifact@v4
         with:
           name: ${{ inputs.artifact }}-logs-s8-attempt-${{ github.run_attempt }}
@@ -3695,7 +4127,7 @@ jobs:
           retention-days: 14
 
       - name: Upload fingerprint source receipt
-        if: steps.stage.outputs.finished == 'true'
+        if: steps.stage.outputs.finished == 'true' && steps.stage.outputs.release_policy != 'macos-compile-release'
         uses: actions/upload-artifact@v4
         with:
           name: ${{ inputs.artifact }}-fingerprint-source

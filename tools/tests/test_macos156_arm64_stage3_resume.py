@@ -303,7 +303,7 @@ class LatestMetadataTest(unittest.TestCase):
             run = next(s for s in steps if s.get('id') == 'stage')
             self.assertNotIn('continue-on-error', run)
             final = next(s for s in steps if s.get('name') == 'Upload final bundle')
-            self.assertEqual(final['if'], "steps.stage.outputs.finished == 'true'")
+            self.assertEqual(final['if'], "steps.stage.outputs.finished == 'true' && steps.stage.outputs.release_policy != 'macos-compile-release'")
 
     def test_main_entry_and_all_handoff_attempts_are_fixed(self):
         workflow = yaml.safe_load((ROOT / '.github/workflows/build-mac156-arm64-stage3-resume.yml').read_text())

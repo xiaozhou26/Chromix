@@ -165,8 +165,10 @@ class LinuxFailedCheckpointTest(unittest.TestCase):
                 for disabled in ({'platform': 'macos'}, {'outcome': 'success'}, {'cancelled': True}):
                     self.assertFalse(self.allowed(failed, **state, **disabled))
                     self.assertFalse(self.allowed(preserve, **state, **disabled))
-            for step in (failed, preserve, verify, *uploads):
+            for step in (failed, preserve):
                 self.assertNotIn('continue-on-error', step)
+            for step in (verify, *uploads):
+                self.assertFalse(self.allowed({'if': step['continue-on-error']}))
             self.assertIn('snapshot_volumes.py', verify['run'])
             self.assertIn('verify_linux_checkpoint.py', preserve['run'])
             self.assertIn('verify_linux_checkpoint.py', verify['run'])

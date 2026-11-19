@@ -253,3 +253,18 @@ def test_raw_report_identity_or_failure_cannot_be_overridden(change):
     value = {'browser_sha256': HASH, 'browser_version': VERSION, 'status': 'passed',
              'runs': [render_report(), render_report()], **change}
     assert audit.assess_suite('render', value, HASH, VERSION)[0]
+
+
+def test_missing_runtime_identity_still_fails_the_native_gate():
+    observation = {'status': 'failed', 'errors': ['browser startup failed'],
+                   'browser_sha256': HASH}
+    errors, _ = audit.assess_suite('device', observation, HASH, VERSION)
+    assert 'suite used a different browser version' in errors
+    assert 'suite reported failure' in errors
+    observation['browser_version'] = '0.0.0.0'
+    errors, _ = audit.assess_suite('device', observation, HASH, VERSION)
+    assert 'suite used a different browser version' in errors
+    observation['browser_version'] = VERSION
+    observation['browser_sha256'] = 'b' * 64
+    errors, _ = audit.assess_suite('device', observation, HASH, VERSION)
+    assert 'suite used a different browser executable' in errors
