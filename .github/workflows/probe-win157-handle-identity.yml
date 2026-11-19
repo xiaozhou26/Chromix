@@ -1,0 +1,46 @@
+name: probe-win157-handle-identity
+run-name: Native Windows157 handle identity probe (no Chromium restore)
+
+'on':
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+
+concurrency:
+  group: probe-win157-handle-identity-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  probe:
+    name: Windows AMD64 handle probe Python ${{ matrix.python }}
+    if: github.ref == 'refs/heads/main'
+    runs-on: windows-2022
+    timeout-minutes: 10
+    strategy:
+      fail-fast: false
+      matrix:
+        python: ['3.12', '3.13', '3.14']
+    env:
+      PYTHONUTF8: '1'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python }}
+          architecture: x64
+      - name: Run real NTFS hardlink and Win32 handle experiment
+        shell: powershell
+        run: |
+          python -X utf8 tools/windows157_handle_probe.py --directory "$env:RUNNER_TEMP\win157-handle-probe" --report "$env:RUNNER_TEMP\win157-handle-report.json"
+          if ($LASTEXITCODE -ne 0) { throw 'Native handle probe failed; do not dispatch large checkpoint recovery' }
+      - name: Upload native probe evidence
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: win157-handle-python-${{ matrix.python }}-${{ github.run_id }}-attempt-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/win157-handle-report.json
+          if-no-files-found: error
+          retention-days: 14
