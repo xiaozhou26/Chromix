@@ -250,14 +250,15 @@ def test_missing_reviewed0236_blocks_before_download(tmp_path):
 def addition_fixture():
     m = copy.deepcopy(locale.load())
     selected = copy.deepcopy(m['source_receipt']['chromix_selection'])
-    raw = [('old', b'')]*226
+    raw = [(entry['path'], source.regular(ROOT, entry['path']).read_bytes())
+           for entry in selected['patches']]
     for pin in m['migration']['additions']:
-        data = patch(pin['target'], 'old\n', 'new\n')[1]
-        pin['sha256'] = source.digest(data)
+        data = source.regular(ROOT, pin['patch']).read_bytes()
         entry = {'path': pin['patch'], 'sha256': pin['sha256']}
         raw.append((pin['patch'], data))
         selected['patches'].append(entry)
         selected['selection']['additions']['patches'].append(entry)
+    selected['series_sha256'] = locale.canonical_series(ROOT, selected, source.regular(ROOT, 'patches/series').read_bytes())
     return m, selected, raw
 
 
@@ -366,3 +367,70 @@ def test_real_agent_additions_are_read_only_and_full228_replay(tmp_path):
         assert source.digest(revised[pin['target']])==pin['after']
         assert source.regular(src,pin['target']).read_bytes()==before[pin['target']][0]
     for p,state in patch_states.items():assert (p.read_bytes(),p.stat().st_mtime_ns)==state
+
+
+def test_real_integrated_selector_has_new_effective_series_but_same_root():
+    # Use the real selector and reviewed repository, never an injected selection.
+    repo = Path(os.environ.get('CHROMIX_LOCALE_CANONICAL_REPO', ROOT))
+    selected, raw = locale.patch_selection.select(repo, 'linux')
+    manifest = locale.load(repo)
+    old = manifest['source_receipt']['chromix_selection']
+    assert selected['series_sha256'] != old['series_sha256']
+    assert selected['selection']['base_series_sha256'] == old['selection']['base_series_sha256']
+    locale.validate_additions(selected, raw, manifest, repo)
+    assert selected['patches'][:-2] == old['patches']
+    assert [name for name, _ in raw[-2:]] == [p['patch'] for p in manifest['migration']['additions']]
+
+
+def test_real_selector_onephase_private_donor_migration():
+    work = os.environ.get('CHROMIX_LOCALE_PRIVATE_DONOR')
+    if not work:
+        pytest.skip('requires a dedicated untouched copy of the exact compiled donor')
+    work = Path(work)
+    repo = Path(os.environ.get('CHROMIX_LOCALE_CANONICAL_REPO', ROOT))
+    # Real select/admit/verify calls; no mock recipe, selection or patch stack.
+    out = work / 'src/out'
+    before = locale.snapshot_outputs(out)
+    manifest = locale.load(repo)
+    protected = {name: locale.tools.file_hash(work / name) for name in manifest['files']
+                 if name.startswith('src/out/') and manifest['files'][name] is not None}
+    proof = locale.admit(work, 'x64', locale.expected('x64', repo), repo)
+    assert proof['new_patch_count'] == 228
+    locale.verify(work, 'x64', repo)
+    source.verify_receipt(work / 'src', repo)
+    report = json.loads((work / 'fingerprint-diagnostics/source-final.json').read_text())
+    assert report['patch_count'] == 228
+    assert locale.snapshot_outputs(out) == before
+    assert all(locale.tools.file_hash(work / name) == digest for name, digest in protected.items())
+
+
+@pytest.mark.parametrize('attack', ['old-effective', 'new-effective', 'root-metadata', 'raw-byte', 'raw-path', 'root-comment'])
+def test_effective_digest_and_raw_prefix_tampering_rejected(tmp_path, attack):
+    m, selected, raw = addition_fixture()
+    if attack == 'old-effective':
+        m['source_receipt']['chromix_selection']['series_sha256'] = '0'*64
+    elif attack == 'new-effective':
+        selected['series_sha256'] = m['source_receipt']['chromix_selection']['series_sha256']
+    elif attack == 'root-metadata':
+        selected['selection']['base_series_sha256'] = '0'*64
+    elif attack == 'raw-byte':
+        raw[0] = (raw[0][0], raw[0][1] + b'unknown')
+    elif attack == 'raw-path':
+        raw[0] = ('patches/wrong.patch', raw[0][1])
+    else:
+        (tmp_path/'patches').mkdir()
+        (tmp_path/'patches/series').write_bytes((ROOT/'patches/series').read_bytes()+b'# changed root\n')
+    with pytest.raises(ValueError):
+        locale.validate_additions(selected, raw, m, tmp_path if attack=='root-comment' else ROOT)
+
+
+def test_canonical_serializer_preserves_comments_blanks_and_no_final_newline():
+    m, selected, _ = addition_fixture()
+    lines=(ROOT/'patches/series').read_text().splitlines()
+    custom='# unchanged comment\n\n'+'\n'.join(lines)
+    names=[line.split('#',1)[0].strip() for line in custom.splitlines() if line.split('#',1)[0].strip()]
+    mapping=dict(zip(names,[e['path'] for e in selected['patches'][:224]],strict=True))
+    expected=''.join(line.replace(name,mapping[name],1) if (name:=line.split('#',1)[0].strip()) else line
+                     for line in custom.splitlines(keepends=True)).encode()
+    expected+=b'\n'+''.join(e['path']+'\n' for e in selected['selection']['additions']['patches']).encode()
+    assert locale.canonical_series(ROOT,selected,custom.encode()) == source.digest(expected)

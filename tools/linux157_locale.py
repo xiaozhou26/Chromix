@@ -109,12 +109,38 @@ def recipe_delta(old, new):
         raise ValueError("locale recovery recipe delta is not reviewed")
 
 
-def validate_additions(selected, raw, manifest):
+def canonical_series(repo, identity, root_series):
+    """Reproduce selector serialization, retaining root comments and line endings."""
+    lines = root_series.decode("utf-8").splitlines(keepends=True)
+    names = [line.split("#", 1)[0].strip() for line in lines]
+    names = [name for name in names if name]
+    if len(names) != 224 or len(set(names)) != len(names):
+        raise ValueError("locale recovery requires the unchanged224 root series")
+    entries = identity["patches"]
+    additions = identity["selection"]["additions"]["patches"]
+    if len(entries) != len(names) + len(additions) or entries[len(names):] != additions:
+        raise ValueError("effective series additions do not match ordered patch identities")
+    replacements = {"patches/" + Path(item["path"]).name: item["path"]
+                    for item in identity["selection"]["overrides"]}
+    mapped = [replacements.get(name, name) for name in names]
+    if [entry["path"] for entry in entries[:len(names)]] != mapped:
+        raise ValueError("effective root paths differ from reviewed224 overrides")
+    mapping = dict(zip(names, mapped, strict=True))
+    effective = "".join(line.replace(name, mapping[name], 1)
+                        if (name := line.split("#", 1)[0].strip()) else line
+                        for line in lines).encode("utf-8")
+    if additions:
+        if not effective.endswith(b"\n"):
+            effective += b"\n"
+        effective += "".join(entry["path"] + "\n" for entry in additions).encode("utf-8")
+    return source.digest(effective)
+
+
+def validate_additions(selected, raw, manifest, repo=source.ROOT):
     old = manifest["source_receipt"]["chromix_selection"]
     additions = manifest["migration"]["additions"]
     if (len(raw) != NEW_COUNT or len(selected["patches"]) != NEW_COUNT
-            or selected["patches"][:-ADDITION_COUNT] != old["patches"]
-            or selected["series_sha256"] != old["series_sha256"]):
+            or selected["patches"][:-ADDITION_COUNT] != old["patches"]):
         raise ValueError("reviewed0236/0237 migration unavailable: require unchanged old226 plus exact two additions")
     if (manifest["migration"]["old_patch_count"] != OLD_COUNT
             or manifest["migration"]["new_patch_count"] != NEW_COUNT
@@ -129,6 +155,17 @@ def validate_additions(selected, raw, manifest):
         if len(entries) != 1 or entries[0][0] != pin["target"] or entries[0][1] != "modify":
             raise ValueError("each locale addition must modify exactly its approved source")
     old_meta, new_meta = old["selection"], selected["selection"]
+    root_series = source.regular(repo, "patches/series").read_bytes()
+    if (source.digest(root_series) != old_meta["base_series_sha256"]
+            or new_meta["base_series_sha256"] != old_meta["base_series_sha256"]):
+        raise ValueError("locale root224 series identity changed")
+    if (canonical_series(repo, old, root_series) != old["series_sha256"]
+            or canonical_series(repo, selected, root_series) != selected["series_sha256"]):
+        raise ValueError("locale effective series digest does not match canonical ordered patches")
+    for (name, data), entry in zip(raw, selected["patches"], strict=True):
+        if (name != entry["path"] or source.digest(data) != entry["sha256"]
+                or source.regular(repo, name).read_bytes() != data):
+            raise ValueError("locale raw patch path/bytes mismatch: " + name)
     for key in ("version", "platform", "core_commit", "core_gitlink", "platform_commit", "platform_version", "overrides"):
         if old_meta.get(key) != new_meta.get(key):
             raise ValueError("unreviewed source/platform patch identity change")
@@ -140,7 +177,7 @@ def validate_additions(selected, raw, manifest):
 
 def selected_stacks(repo, core, tooling, src, manifest):
     selected, raw = patch_selection.select(repo, "linux", src=src, core=core)
-    additions = validate_additions(selected, raw, manifest)
+    additions = validate_additions(selected, raw, manifest, repo)
     identity, stack, _ = arp._load(repo, core, tooling, "linux", src=src)
     if len(stack) != NEW_COUNT:
         raise ValueError("incomplete current locale stack")
@@ -389,7 +426,7 @@ def verify(work, arch, repo=source.ROOT):
     m = load(repo)
     proof = json.loads(source.regular(src, MARKER).read_bytes())
     selected, raw = patch_selection.select(repo, "linux", src=src)
-    additions = validate_additions(selected, raw, m)
+    additions = validate_additions(selected, raw, m, repo)
     if (arch != "x64" or proof.get("metadata") != expected(arch, repo)
             or proof.get("origin_recipe") != m["source_receipt"]["recipe"]
             or proof.get("current_recipe") != source.recipe(repo) or proof.get("phase") != "exact-compiled-locale"
@@ -428,7 +465,7 @@ def restore(work, arch, repo=source.ROOT):
         raise ValueError("compiled restore requires absent workdir")
     m = load(repo)
     selected, patches = patch_selection.select(repo, "linux")
-    validate_additions(selected, patches, m)
+    validate_additions(selected, patches, m, repo)
     metadata = validate_metadata(snapshot.Client(m["repository"], os.environ.get("GH_TOKEN", "")), arch, repo)
     work.parent.mkdir(parents=True, exist_ok=True)
     with tempfile.TemporaryDirectory(prefix="linux157-locale-", dir=work.parent) as temp:
