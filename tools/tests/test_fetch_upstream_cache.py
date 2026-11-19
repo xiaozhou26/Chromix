@@ -587,8 +587,11 @@ class FetchUpstreamCacheTest(unittest.TestCase):
                 self.assertEqual(result["download_bytes"], 0)
                 self.assertEqual(client.mock_calls, [])
 
-    def test_checked_in_windows156_disabled_fails_before_network(self):
-        manifest = json.loads(cache.MANIFEST.read_text())
+    def test_historical_windows156_disabled_fails_before_network(self):
+        from tools.tests.macos156_historical import recipe_repo
+
+        historical = recipe_repo("248e340a05acf30a15e3bf50b604a99ae93ac93b")
+        manifest = json.loads((historical / "build/upstream-cache.json").read_text())
         source = manifest["sources"]["windows"]
         self.assertIs(source["available"], False)
         self.assertEqual(set(source), cache.UNAVAILABLE_SOURCE_FIELDS)
@@ -600,9 +603,9 @@ class FetchUpstreamCacheTest(unittest.TestCase):
             for run_id in (None, 37831345909, 37831345827):
                 with self.subTest(arch=arch, run_id=run_id):
                     with self.assertRaisesRegex(cache.CacheMiss, "^source_unavailable$"):
-                        cache.load_manifest("windows", arch, run_id, root=cache.ROOT)
+                        cache.load_manifest("windows", arch, run_id, root=historical)
                     with mock.patch.object(cache, "GitHub", side_effect=AssertionError("network forbidden")) as client:
-                        result = cache.fetch("windows", arch, self.destination, run_id, root=cache.ROOT)
+                        result = cache.fetch("windows", arch, self.destination, run_id, root=historical)
                     client.assert_not_called()
                     self.assertEqual(result["status"], "miss")
                     self.assertEqual(result["reason"], "source_unavailable")

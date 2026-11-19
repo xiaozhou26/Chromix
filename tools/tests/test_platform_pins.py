@@ -63,8 +63,8 @@ def save(root, values):
      "6f0aa178c2394fc0a177edc0fd64e41f402a0418"),
     ("macos", "157.0.8103.78", "8c886dffc6ade39d8f7df5d64ace5a8824b455e1",
      "84768e74ece113d9e68e5d774808afe6c3a8fbe6"),
-    ("windows", "156.0.8078.79", "28a211ab4ab6b83d919966a4f58a6df23cf4fb29",
-     "8492884eb30fdd9417ea7816aa92def805c97c74"),
+    ("windows", "157.0.8103.78", "8c886dffc6ade39d8f7df5d64ace5a8824b455e1",
+     "20e9a348fc616bd73a366fbd5d8881613d6c5cb0"),
 ])
 def test_checked_in_target_pins(platform, version, core, overlay):
     result = pins.load_pins(pins.ROOT, platform)
@@ -75,13 +75,21 @@ def test_checked_in_target_pins(platform, version, core, overlay):
     suffix = "-1" if platform == "linux" else "-1.1"
     expected_platform = "156.0.8078.79-1" if platform == "linux" else version + suffix
     assert result["Ungoogled" + pins.PLATFORMS[platform] + "Version"] == expected_platform
-    assert (pins.ROOT / "CHROMIUM_VERSION").read_text().strip() == "156.0.8078.79"
-    assert (pins.ROOT / "UNGOOGLED_VERSION").read_text().strip() == "156.0.8078.79-1"
-    assert (pins.ROOT / "UNGOOGLED_WINDOWS_VERSION").read_text().strip() == "156.0.8078.79-1.1"
+    assert (pins.ROOT / "CHROMIUM_VERSION").read_text().strip() == "157.0.8103.78"
+    assert (pins.ROOT / "UNGOOGLED_VERSION").read_text().strip() == "157.0.8103.78-1"
+    assert (pins.ROOT / "UNGOOGLED_WINDOWS_VERSION").read_text().strip() == "157.0.8103.78-1.1"
     shared = pins.load_shared_pins(pins.ROOT)
-    assert shared["ChromiumVersion"] == "156.0.8078.79"
-    assert shared["UngoogledVersion"] == "156.0.8078.79-1"
-    assert shared["UngoogledCommit"] == "28a211ab4ab6b83d919966a4f58a6df23cf4fb29"
+    assert shared["ChromiumVersion"] == "157.0.8103.78"
+    assert shared["UngoogledVersion"] == "157.0.8103.78-1"
+    assert shared["UngoogledCommit"] == "8c886dffc6ade39d8f7df5d64ace5a8824b455e1"
+    if platform == "linux":
+        source = json.loads((pins.ROOT / "build/linux/157.0.8103.78/source.json").read_text())
+        assert source["chromium_version"] == version
+        assert source["core_commit"] == core
+        assert source["platform_commit"] == overlay
+        assert source["platform_ref"] == expected_platform
+        assert source["platform_core_gitlink"] == "28a211ab4ab6b83d919966a4f58a6df23cf4fb29"
+        assert source["official_platform_tag"] is None
 
 
 @pytest.mark.parametrize("platform", pins.PLATFORMS)

@@ -6,6 +6,7 @@ import hashlib
 import json
 from pathlib import Path
 import re
+import shutil
 import struct
 import subprocess
 import sys
@@ -61,6 +62,9 @@ def repo(tmp_path):
     for name in ("build/upstream-cache.json", "build/ungoogled-revisions.psd1", "CHROMIUM_VERSION",
                  "CHROMIUM_WINDOWS_VERSION", "CHROMIUM_LINUX_VERSION", "CHROMIUM_MACOS_VERSION"):
         put(path / name, (ROOT / name).read_bytes())
+    # Global cache validation also authenticates the Linux downstream inputs.
+    relative = "build/linux/157.0.8103.78"
+    shutil.copytree(ROOT / relative, path / relative)
     return path
 
 
@@ -99,6 +103,51 @@ def test_arm_only_manifest_and_exact_live_metadata(repo):
     actual, _ = importer.repository_identity(repo, "windows", "arm64")
     assert actual == dict(midl.WINDOWS157_RECORDS[0]["identity"])
     assert identity["artifact_digest"] == actual["artifact_digest"]
+
+
+def test_real_checked_in_windows_manifest_keeps_linux_downstream_origin():
+    pin, _ = cache.load_manifest("windows", "arm64", root=ROOT)
+    assert pin["chromium_version"] == "157.0.8103.78"
+    assert pin["artifact"]["id"] == 14178413147
+    manifest = json.loads((ROOT / "build/upstream-cache.json").read_text())
+    linux = manifest["sources"]["linux"]
+    assert linux["chromium_version"] == "157.0.8103.78"
+    assert linux["ungoogled_commit"] == "8c886dffc6ade39d8f7df5d64ace5a8824b455e1"
+    assert linux["head_sha"] == "6f0aa178c2394fc0a177edc0fd64e41f402a0418"
+    assert linux["head_branch"] == "156.0.8078.79-1"
+    assert linux["available"] is False
+
+
+@pytest.mark.parametrize("mutation", ["missing-source", "changed-override"])
+def test_windows_manifest_still_authenticates_linux_downstream_inputs(repo, mutation):
+    source = repo / "build/linux/157.0.8103.78/source.json"
+    if mutation == "missing-source":
+        source.unlink()
+    else:
+        entry = json.loads(source.read_text())["patches"][0]
+        path = repo / entry["path"]
+        path.write_bytes(path.read_bytes() + b"\nchanged")
+    with pytest.raises(cache.CacheMiss, match="^invalid_manifest_or_pins$"):
+        cache.load_manifest("windows", "arm64", root=repo)
+
+
+@pytest.mark.parametrize("second,reason", [(28, "metadata_verified"), (29, "artifact_expired"),
+                                           (30, "artifact_expired")])
+def test_arm_fetch_expiry_uses_fixed_clock_before_any_download(repo, tmp_path, second, reason):
+    meta = AUDIT["metadata"]
+    client = mock.Mock()
+    client.json.side_effect = (meta["arm_run"], meta["arm_artifact"], meta["arm_job"])
+    client.download.side_effect = cache.CacheMiss("metadata_verified")
+    with mock.patch.object(cache, "datetime", wraps=datetime) as clock, \
+            mock.patch.object(cache.shutil, "disk_usage", return_value=mock.Mock(free=1024**4)):
+        clock.now.return_value = datetime(2026, 11, 19, 20, 14, second, tzinfo=timezone.utc)
+        result = cache.fetch("windows", "arm64", tmp_path.resolve() / "cache", root=repo, client=client)
+    assert result["status"] == "miss" and result["reason"] == reason
+    assert result["download_bytes"] == 0
+    if reason == "artifact_expired":
+        client.download.assert_not_called()
+    else:
+        client.download.assert_called_once()
 
 
 @pytest.mark.parametrize("field,value", [("run_attempt", 2), ("id", 1), ("conclusion", "failure"),

@@ -138,20 +138,20 @@ PLATFORM157_GITLINKS = {
     for platform in PLATFORM157_COMMITS
 }
 PLATFORM157_STATUS = {
-    platform: "blocked-platform-overlay" if platform == "linux" else "reviewed-patches"
+    platform: "reviewed-downstream-patches" if platform == "linux" else "reviewed-patches"
     for platform in PLATFORM157_COMMITS
 }
 PATCH_COUNTS157 = {"windows": 232, "macos": 228, "linux": 226}
 OVERRIDE157_ROOT = "patches/chromium157"
 ADDITIONS157_ROOT = "patches/chromium157-additions"
 MANIFEST157 = "build/patch-selection-157.json"
-MANIFEST157_SHA256 = "a47dd9da8c0e6f822c477615794fe4ccc11510bc6944352f3f164388b9d6d551"
+MANIFEST157_SHA256 = "e8481e10603d44408e82465147e7015897c06472afb9465c4333edcd25d49c11"
 REVIEW157 = "patches/chromium157/manifest.json"
-REVIEW157_SHA256 = "41cb3473ae99ea99156996c4cc8fb1f23e3952c9c631d183bf4e8e98a5964695"
+REVIEW157_SHA256 = "8e25b19e957f3c96d2a308b0d519fd35efbdfefe15d3156bb7540d08dd25abac"
 
-LINUX157_DOWNSTREAM_SHA256 = "6919b745bcb4cc9a7943032ab54696a1193f7e74f204ef98222cec82d4215778"
+LINUX157_DOWNSTREAM_SHA256 = "6f50479c8075e8a5fe88494e3d6e7d762a049f3e4071fc68f9c118ac67a2210c"
 # Activation requires the final patch review, not just successful platform preparation.
-LINUX157_VALIDATED_REVIEW_SHA256: str | None = None
+LINUX157_VALIDATED_REVIEW_SHA256: str | None = REVIEW157_SHA256
 
 
 MACOS152_VERSION = "152.0.7977.82"
@@ -446,7 +446,7 @@ def validate_linux157_downstream(value: object) -> dict:
     """Bind the complete fresh recipe and ordered nine-patch platform replacement group."""
     if (not isinstance(value, dict) or set(value) != {
             "recipe", "source_manifest", "upstream_series_sha256", "platform_overrides",
-            "platform_override_group_sha256"}
+            "platform_override_group_sha256", "validation"}
             or canonical_digest(value) != LINUX157_DOWNSTREAM_SHA256):
         raise SelectionError("unreviewed Linux157 downstream recipe or platform override group")
     recipe = value["recipe"]
@@ -456,6 +456,7 @@ def validate_linux157_downstream(value: object) -> dict:
             or recipe["platform_commit"] != PLATFORM157_COMMITS["linux"]
             or recipe["platform_ref"] != PLATFORM157_VERSIONS["linux"]
             or recipe["platform_core_gitlink"] != CORE156
+            or recipe["review"] != value["source_manifest"]
             or recipe["official_platform_tag"] is not None
             or digest(json.dumps(recipe["inputs"], sort_keys=True).encode()) != recipe["sha256"]
             or len(value["platform_overrides"]) != 9
@@ -470,16 +471,44 @@ def authenticate_linux157_downstream(repo: Path, downstream: dict, review: dict)
     if (LINUX157_VALIDATED_REVIEW_SHA256 is None
             or LINUX157_VALIDATED_REVIEW_SHA256 != REVIEW157_SHA256):
         raise SelectionError("Chromium 157 Linux blocked: final downstream patch review is pending")
-    expected_review = {
-        "status": "validated", "scope": "source-replay",
-        "recipe_sha256": downstream["recipe"]["sha256"],
-        "source_manifest": downstream["source_manifest"],
-        "platform_override_group_sha256": downstream["platform_override_group_sha256"],
-        "patch_count": 226, "architectures": ["x64", "arm64"],
-    }
-    if (review.get("linux_downstream_validation") != expected_review
+    evidence = downstream["validation"]
+    origin = review.get("linux_downstream", {})
+    if (evidence["status"] != "validated" or evidence["scope"] != "source-replay"
+            or evidence["review_manifest"] != {"path": REVIEW157, "sha256": REVIEW157_SHA256}
+            or origin.get("source_manifest") != downstream["source_manifest"]
+            or origin.get("recipe_sha256") != evidence["replayed_recipe_sha256"]
+            or evidence["recipe_integration"]["recipe_sha256"] != downstream["recipe"]["sha256"]
             or PLATFORM157_STATUS["linux"] != "reviewed-downstream-patches"):
         raise SelectionError("Chromium 157 Linux blocked: review does not validate the exact downstream stack")
+    report_raw = read(repo, evidence["report"]["path"])
+    if digest(report_raw) != evidence["report"]["sha256"]:
+        raise SelectionError("changed Linux157 validation report")
+    report = json.loads(report_raw)
+    if report.get("status") != "verified" or report.get("manifest_sha256") != REVIEW157_SHA256:
+        raise SelectionError("Linux157 validation report identity mismatch")
+    cases = [case for case in report["cases"] if case["platform"] == "linux"]
+    if len(cases) != 2 or [case["domain_substituted"] for case in cases] != [False, True]:
+        raise SelectionError("incomplete Linux157 raw/domain-substituted validation")
+    replacements = {"patches/" + Path(entry["path"]).name: entry for entry in review["overrides"]}
+    expected = [{key: replacements.get(entry["path"], entry)[key] for key in ("path", "sha256")}
+                for entry in review["base_patches"]]
+    expected += [{key: entry[key] for key in ("path", "sha256")} for entry in review["additions"]["linux"]]
+    platform_patches = [{key: entry[key] for key in ("path", "sha256")}
+                        for entry in downstream["platform_overrides"]]
+    for case in cases:
+        replay = case["full_platform_replay"]
+        roundtrip = case["roundtrip"]
+        if (case["status"] != "verified" or case["architectures"] != ["x64", "arm64"]
+                or case["overlay_mode"] != "downstream-nine-patch-recipe"
+                or case["patch_count"] != 226 or replay["patch_count"] != 9
+                or replay["status"] != "verified" or replay["source_manifest"] != downstream["source_manifest"]
+                or roundtrip["status"] != "verified" or roundtrip["patch_count"] != 235
+                or roundtrip["scope"] != "platform9-plus-chromix226"
+                or case["build_verified"] is not False or case["runtime_verified"] is not False
+                or [{key: entry[key] for key in ("path", "sha256")} for entry in case["patches"]] != expected
+                or [{key: entry[key] for key in ("path", "sha256")} for entry in case["predecessors"]
+                    if entry.get("layer") == "linux-downstream"] != platform_patches):
+            raise SelectionError("Linux157 validation does not cover the exact ordered stack")
     recipe = downstream["recipe"]
     for name, expected in recipe["inputs"].items():
         if digest(read(repo, name)) != expected:
@@ -502,7 +531,7 @@ def authenticate_linux157_downstream(repo: Path, downstream: dict, review: dict)
 
 
 def validate_manifest157(manifest: object) -> dict:
-    """Validate isolated 157 schema, retaining the blocked Linux platform's real identity."""
+    """Validate isolated 157 schema, retaining the downstream Linux platform's real identity."""
     def fields(value, expected, label):
         if not isinstance(value, dict) or set(value) != set(expected):
             raise SelectionError("invalid Chromium 157 manifest fields: " + label)

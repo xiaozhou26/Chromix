@@ -244,7 +244,7 @@ def test_source_and_core_version_are_exact(repo157, tmp_path, which, version):
             selection.select(repo, platform, **{which: directory})
 
 
-def test_linux_records_real_156_gitlink_but_fails_closed(repo157):
+def test_linux_records_real_156_gitlink_but_fails_closed(repo157, monkeypatch):
     repo, _ = repo157
     linux = MANIFEST["platforms"]["linux"]
     assert linux["version"] == selection.VERSION156 + "-1"
@@ -252,6 +252,19 @@ def test_linux_records_real_156_gitlink_but_fails_closed(repo157):
     assert linux["core_gitlink"] == selection.CORE156 != selection.CORE157
     assert len(linux["additions"]) + 224 == 226
     set_platform_pins(repo, "linux", selection.VERSION157, selection.CORE157, linux["commit"])
+    historical = subprocess.check_output(["git", "-C", str(ROOT), "show",
+        "63dd0fc5934b7c27d4a1e3439a024a96ad96bba0:" + selection.REVIEW157])
+    (repo / selection.REVIEW157).write_bytes(historical)
+    monkeypatch.setattr(selection, "REVIEW157_SHA256", selection.digest(historical))
+    monkeypatch.setattr(selection, "LINUX157_VALIDATED_REVIEW_SHA256", None)
+    for name in ("build/linux/157.0.8103.78/source.json",):
+        path = repo / name
+        path.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(ROOT / name, path)
+    shutil.copytree(ROOT / "build/linux/157.0.8103.78/patches", repo / "build/linux/157.0.8103.78/patches")
+    pins = repo / "build/ungoogled-revisions.psd1"
+    pins.write_text(pins.read_text().replace('UngoogledLinuxVersion = "157.0.8103.78-1"',
+                                             'UngoogledLinuxVersion = "156.0.8078.79-1"'))
     with pytest.raises(selection.SelectionError, match="Linux blocked"):
         selection.select(repo, "linux")
     with pytest.raises(selection.SelectionError, match="Linux blocked"):

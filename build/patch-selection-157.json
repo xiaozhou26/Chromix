@@ -1128,7 +1128,7 @@
       "version": "156.0.8078.79-1",
       "commit": "6f0aa178c2394fc0a177edc0fd64e41f402a0418",
       "core_gitlink": "28a211ab4ab6b83d919966a4f58a6df23cf4fb29",
-      "selection_status": "blocked-platform-overlay",
+      "selection_status": "reviewed-downstream-patches",
       "additions": [
         {
           "path": "patches/chromium157-additions/0225-managed-profile-controller-link.patch",
@@ -1149,11 +1149,16 @@
           "platform_core_gitlink": "28a211ab4ab6b83d919966a4f58a6df23cf4fb29",
           "core_override": "8c886dffc6ade39d8f7df5d64ace5a8824b455e1",
           "official_platform_tag": null,
+          "review": {
+            "path": "build/linux/157.0.8103.78/source.json",
+            "sha256": "5ad5898d9442cc31b6ed571702f9e88510e9eea144ed544f60187e66e5c948d8"
+          },
           "inputs": {
             "build/linux/157.0.8103.78/source.json": "5ad5898d9442cc31b6ed571702f9e88510e9eea144ed544f60187e66e5c948d8",
-            "tools/linux157_source.py": "342b7c98f191280bc23e9c988b1ffe1f39cdc514f460f0b186ab026bb2d4a9d9",
+            "tools/linux157_source.py": "90de62dd14a7d1a4fac791653fb1535e3e2ea65ee6f32688a29a393e5a806d98",
             "tools/linux157_toolchain.py": "0d5d2bfeaccfea5cf75f874e0f52831773f77419e89ec45b0a36d1cfee324d04",
-            "tools/linux157_build.py": "048e644354c26812c5b0db71e272c53066eb6f1b7d19d68821bb4329cfdb6503",
+            "tools/linux157_build.py": "b7574ad8168193161c2b8283da43dad4104a55de18285c6cb9718c0504a28c18",
+            "build/windows/lite-tarball-files/v8/test/torque/test-torque.tq": "502c92560d745fc94e93ec7b95a1c562a55167f58a2ce79e3d0e4881dfb928c5",
             "build/linux/157.0.8103.78/patches/use-oauth2-client-switches-as-default.patch": "9564c36390f1ca1d08ffe42a81a1088aaba7eec8249ba6ff66a85f0592a282ef",
             "build/linux/157.0.8103.78/patches/fix-compiling-on-arm64.patch": "a2932c2ea04e4822e5d5c3e94f39b779134990c9d417a707a1652702239705a6",
             "build/linux/157.0.8103.78/patches/chromium-138-drop-nodejs-version-check.patch": "48172278ee8bf7c00402c2db3ef37b5514a65fa3403b9b0a028d63ca317a409f",
@@ -1164,7 +1169,7 @@
             "build/linux/157.0.8103.78/patches/chromium-156-revert-crubit-changes.patch": "70c63c2d028c5b4069c16b13152e97ce42785752cf9837cc63bbc0243d3e20d0",
             "build/linux/157.0.8103.78/patches/chromium-156-revert-use-typescript-go.patch": "e1f21b386321371bf76fc0dd5d14c5f142f54f495685e6e7b67313a1d3a0ce6f"
           },
-          "sha256": "42d788d91c0ec2345c253044665af7f623501a73c8bdb627a94d1739790aeb11"
+          "sha256": "14ccc007ff428b42887fbd15b22b2fdd58d3ab35cef5ae3249f92f1339cc1fd9"
         },
         "source_manifest": {
           "path": "build/linux/157.0.8103.78/source.json",
@@ -1227,7 +1232,46 @@
             "sha256": "e1f21b386321371bf76fc0dd5d14c5f142f54f495685e6e7b67313a1d3a0ce6f"
           }
         ],
-        "platform_override_group_sha256": "de72dde4ab150cd1f8805ec1f36d2f0eff4fd5509d0835584ef8e5145ff7d22b"
+        "platform_override_group_sha256": "de72dde4ab150cd1f8805ec1f36d2f0eff4fd5509d0835584ef8e5145ff7d22b",
+        "validation": {
+          "status": "validated",
+          "scope": "source-replay",
+          "review_manifest": {
+            "path": "patches/chromium157/manifest.json",
+            "sha256": "8e25b19e957f3c96d2a308b0d519fd35efbdfefe15d3156bb7540d08dd25abac"
+          },
+          "report": {
+            "path": "patches/chromium157-verification/verified.json",
+            "sha256": "2bdc45ea1c0d3152fdde5fc984abb7722413a702e319a5e6fced36228c7fe32d"
+          },
+          "replayed_recipe_sha256": "42d788d91c0ec2345c253044665af7f623501a73c8bdb627a94d1739790aeb11",
+          "recipe_integration": {
+            "recipe_sha256": "14ccc007ff428b42887fbd15b22b2fdd58d3ab35cef5ae3249f92f1339cc1fd9",
+            "changed_inputs": {
+              "tools/linux157_source.py": {
+                "before_sha256": "342b7c98f191280bc23e9c988b1ffe1f39cdc514f460f0b186ab026bb2d4a9d9",
+                "sha256": "90de62dd14a7d1a4fac791653fb1535e3e2ea65ee6f32688a29a393e5a806d98"
+              },
+              "build/windows/lite-tarball-files/v8/test/torque/test-torque.tq": {
+                "before_sha256": null,
+                "sha256": "502c92560d745fc94e93ec7b95a1c562a55167f58a2ce79e3d0e4881dfb928c5"
+              },
+              "tools/linux157_build.py": {
+                "before_sha256": "048e644354c26812c5b0db71e272c53066eb6f1b7d19d68821bb4329cfdb6503",
+                "sha256": "b7574ad8168193161c2b8283da43dad4104a55de18285c6cb9718c0504a28c18"
+              }
+            },
+            "review": "Source helper adds exact lite Torque payload binding/copy, explicit source-manifest identity, and fail-closed fresh route/checkpoint validation. Build helper binds Linux amd64 host Go1.27.1 to its complete GOROOT, checks binary/compiler identity, and compiles/runs a standard-library probe using the copied Go executable before passing its bound environment to the build. Toolchain helper, source manifest, GN/source patches and all nine platform replacements are unchanged. This reviewed helper delta extends recipe identity, not the original patch replay or compilation/runtime evidence.",
+            "base_commit": "98f97fb23a97b41140c8a2d50e72ad7ad403a9b8"
+          },
+          "patch_count": 226,
+          "platform_patch_count": 9,
+          "roundtrip_patch_count": 235,
+          "architectures": [
+            "x64",
+            "arm64"
+          ]
+        }
       }
     }
   }

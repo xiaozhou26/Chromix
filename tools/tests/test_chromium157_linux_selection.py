@@ -1,14 +1,12 @@
-"""Exact Linux157 recipe authentication; final patch-review activation is test-only."""
+"""Production Linux157 composition, replay authentication, and historical fail-closed tests."""
 from __future__ import annotations
 
 import copy
-import importlib.util
 import json
 from pathlib import Path
 import re
 import shutil
 import subprocess
-import sys
 
 import pytest
 
@@ -16,7 +14,7 @@ from tools import patch_selection as selection
 from tools.tests.test_patch_selection import clone_repo, set_platform_pins
 
 ROOT = Path(__file__).resolve().parents[2]
-LINUX_IMPLEMENTATION = "d1edf19bd5074f9473d89dc91a6c6d833d15ecc3"
+LINUX_IMPLEMENTATION = "98f97fb23a97b41140c8a2d50e72ad7ad403a9b8"
 MANIFEST = json.loads((ROOT / selection.MANIFEST157).read_bytes())
 DOWNSTREAM = MANIFEST["platforms"]["linux"]["downstream"]
 
@@ -36,19 +34,9 @@ def linux_repo(tmp_path, monkeypatch):
     repo = clone_repo(tmp_path)
     shutil.copy2(ROOT / selection.MANIFEST157, repo / selection.MANIFEST157)
     for name, expected in DOWNSTREAM["recipe"]["inputs"].items():
-        raw = blob(name)
+        raw = (ROOT / name).read_bytes() if name == "tools/linux157_build.py" else blob(name)
         assert selection.digest(raw) == expected
         store(repo, name, raw)
-    # Exercise the Linux agent's actual pin parser without editing production platform tools.
-    store(repo, "tools/platform_pins.py", blob("tools/platform_pins.py"))
-    modules = {}
-    for name in ("linux157_source", "platform_pins"):
-        spec = importlib.util.spec_from_file_location(name, repo / ("tools/" + name + ".py"))
-        module = importlib.util.module_from_spec(spec)
-        spec.loader.exec_module(module)
-        modules[name] = module
-        monkeypatch.setitem(sys.modules, name, module)
-    monkeypatch.setattr(selection, "load_pins", modules["platform_pins"].load_pins)
     set_platform_pins(repo, "linux", selection.VERSION157, selection.CORE157,
                       selection.PLATFORM157_COMMITS["linux"])
     path = repo / "build/ungoogled-revisions.psd1"
@@ -59,34 +47,33 @@ def linux_repo(tmp_path, monkeypatch):
 
 
 def activate(repo, monkeypatch):
-    """Synthetic review tests admission logic, not evidence of a real full-stack replay."""
-    review = json.loads((repo / selection.REVIEW157).read_bytes())
-    review["linux_downstream_validation"] = {
-        "status": "validated", "scope": "source-replay",
-        "recipe_sha256": DOWNSTREAM["recipe"]["sha256"],
-        "source_manifest": DOWNSTREAM["source_manifest"],
-        "platform_override_group_sha256": DOWNSTREAM["platform_override_group_sha256"],
-        "patch_count": 226, "architectures": ["x64", "arm64"],
-    }
-    raw = (json.dumps(review, indent=2) + "\n").encode()
-    store(repo, selection.REVIEW157, raw)
-    monkeypatch.setattr(selection, "REVIEW157_SHA256", selection.digest(raw))
-    monkeypatch.setattr(selection, "LINUX157_VALIDATED_REVIEW_SHA256", selection.digest(raw))
-    monkeypatch.setitem(selection.PLATFORM157_STATUS, "linux", "reviewed-downstream-patches")
-    manifest = copy.deepcopy(MANIFEST)
-    manifest["platforms"]["linux"]["selection_status"] = "reviewed-downstream-patches"
-    raw = (json.dumps(manifest, indent=2) + "\n").encode()
-    store(repo, selection.MANIFEST157, raw)
-    monkeypatch.setattr(selection, "MANIFEST157_SHA256", selection.digest(raw))
+    assert selection.LINUX157_VALIDATED_REVIEW_SHA256 == selection.REVIEW157_SHA256
+    assert selection.validate_manifest157(json.loads((repo / selection.MANIFEST157).read_bytes()))
 
 
-def test_real_fresh_recipe_does_not_activate_pending_review(linux_repo):
+def test_real_fresh_recipe_does_not_activate_pending_review(linux_repo, monkeypatch):
     pins = selection.load_pins(linux_repo, "linux")
     assert pins["ChromiumVersion"] == selection.VERSION157
     assert pins["UngoogledLinuxVersion"] == selection.VERSION156 + "-1"
+    old_review = subprocess.check_output(["git", "-C", str(ROOT), "show",
+        "63dd0fc5934b7c27d4a1e3439a024a96ad96bba0:" + selection.REVIEW157])
+    store(linux_repo, selection.REVIEW157, old_review)
+    monkeypatch.setattr(selection, "REVIEW157_SHA256", selection.digest(old_review))
+    monkeypatch.setattr(selection, "LINUX157_VALIDATED_REVIEW_SHA256", None)
     with pytest.raises(selection.SelectionError, match="Linux blocked"):
         selection.select(linux_repo, "linux")
-    assert selection.LINUX157_VALIDATED_REVIEW_SHA256 is None
+
+
+def test_integrated_linux_selection_matches_real_recipe_and_parser():
+    from tools import linux157_source
+    pins = selection.load_pins(ROOT, "linux")
+    identity, patches = selection.select(ROOT, "linux")
+    assert pins["ChromiumVersion"] == selection.VERSION157
+    assert pins["UngoogledLinuxVersion"] == selection.VERSION156 + "-1"
+    assert len(patches) == 226
+    assert identity["selection"]["downstream"]["recipe"] == linux157_source.recipe(ROOT)
+    assert identity["selection"]["core_gitlink"] == selection.CORE156
+    assert identity["selection"]["effective_core_commit"] == selection.CORE157
 
 
 def test_exact_recipe_source_and_nine_override_group_match_actual_implementation(linux_repo):
@@ -97,7 +84,22 @@ def test_exact_recipe_source_and_nine_override_group_match_actual_implementation
         for entry in source["patches"]]
     assert len(DOWNSTREAM["platform_overrides"]) == 9
     assert DOWNSTREAM["platform_override_group_sha256"] == selection.canonical_digest(DOWNSTREAM["platform_overrides"])
-    assert DOWNSTREAM["recipe"]["sha256"] == "42d788d91c0ec2345c253044665af7f623501a73c8bdb627a94d1739790aeb11"
+    assert DOWNSTREAM["recipe"]["sha256"] == "14ccc007ff428b42887fbd15b22b2fdd58d3ab35cef5ae3249f92f1339cc1fd9"
+
+
+def test_precise_host_go_helper_and_previous_unbound_helper_rejected(linux_repo):
+    helper = "tools/linux157_build.py"
+    assert DOWNSTREAM["recipe"]["inputs"][helper] == "b7574ad8168193161c2b8283da43dad4104a55de18285c6cb9718c0504a28c18"
+    delta = DOWNSTREAM["validation"]["recipe_integration"]["changed_inputs"][helper]
+    assert delta == {
+        "before_sha256": "048e644354c26812c5b0db71e272c53066eb6f1b7d19d68821bb4329cfdb6503",
+        "sha256": DOWNSTREAM["recipe"]["inputs"][helper],
+    }
+    old = blob(helper)
+    assert selection.digest(old) == delta["before_sha256"]
+    store(linux_repo, helper, old)
+    with pytest.raises(selection.SelectionError, match="changed Linux157 recipe input"):
+        selection.select(linux_repo, "linux")
 
 
 def test_reviewed_activation_preserves_real_origin_and_effective_core(linux_repo, monkeypatch):
@@ -180,33 +182,66 @@ def test_activated_linux_requires_exact_platform_inventory(linux_repo, monkeypat
         selection.select(linux_repo, "linux")
 
 
-@pytest.mark.parametrize("mutation", ["none", "wrong-hash", "old-review", "status", "scope", "recipe", "group", "arch", "count"])
+@pytest.mark.parametrize("mutation", ["none", "wrong-hash", "old-review", "recipe", "source"])
 def test_review_activation_cannot_be_partial_or_claim_unverified_stack(linux_repo, monkeypatch, mutation):
-    activate(linux_repo, monkeypatch)
     if mutation in ("none", "wrong-hash"):
         monkeypatch.setattr(selection, "LINUX157_VALIDATED_REVIEW_SHA256", None if mutation == "none" else "0" * 64)
     else:
         review = json.loads((linux_repo / selection.REVIEW157).read_bytes())
-        evidence = review["linux_downstream_validation"]
         if mutation == "old-review":
-            del review["linux_downstream_validation"]
-        elif mutation == "status":
-            evidence["status"] = "pending"
-        elif mutation == "scope":
-            evidence["scope"] = "platform-only"
+            del review["linux_downstream"]
         elif mutation == "recipe":
-            evidence["recipe_sha256"] = "0" * 64
-        elif mutation == "group":
-            evidence["platform_override_group_sha256"] = "0" * 64
-        elif mutation == "arch":
-            evidence["architectures"] = ["x64"]
+            review["linux_downstream"]["recipe_sha256"] = "0" * 64
         else:
-            evidence["patch_count"] = 225
-        raw = json.dumps(review).encode()
-        store(linux_repo, selection.REVIEW157, raw)
-        monkeypatch.setattr(selection, "REVIEW157_SHA256", selection.digest(raw))
-        monkeypatch.setattr(selection, "LINUX157_VALIDATED_REVIEW_SHA256", selection.digest(raw))
-    with pytest.raises(selection.SelectionError, match="Linux blocked"):
+            review["linux_downstream"]["source_manifest"]["sha256"] = "0" * 64
+        store(linux_repo, selection.REVIEW157, json.dumps(review).encode())
+    with pytest.raises(selection.SelectionError):
+        selection.select(linux_repo, "linux")
+
+
+@pytest.mark.parametrize("mutation", ["tamper", "missing", "symlink"])
+def test_final_replay_report_is_required_and_hash_bound(linux_repo, mutation):
+    path = linux_repo / DOWNSTREAM["validation"]["report"]["path"]
+    if mutation == "tamper":
+        path.write_bytes(path.read_bytes() + b"\n")
+    elif mutation == "missing":
+        path.unlink()
+    else:
+        path.unlink()
+        path.symlink_to(ROOT / DOWNSTREAM["validation"]["report"]["path"])
+    with pytest.raises(selection.SelectionError):
+        selection.select(linux_repo, "linux")
+
+
+@pytest.mark.parametrize("mutation", ["failed", "arch", "count", "order", "platform-order", "raw-only", "runtime"])
+def test_even_reauthenticated_report_must_cover_exact_stack(linux_repo, monkeypatch, mutation):
+    manifest = copy.deepcopy(MANIFEST)
+    downstream = manifest["platforms"]["linux"]["downstream"]
+    path = linux_repo / downstream["validation"]["report"]["path"]
+    report = json.loads(path.read_bytes())
+    case = report["cases"][0]
+    if mutation == "failed":
+        case["status"] = "failed"
+    elif mutation == "arch":
+        case["architectures"] = ["x64"]
+    elif mutation == "count":
+        case["roundtrip"]["patch_count"] = 234
+    elif mutation == "order":
+        case["patches"].reverse()
+    elif mutation == "platform-order":
+        case["predecessors"].reverse()
+    elif mutation == "raw-only":
+        report["cases"].pop(1)
+    else:
+        case["runtime_verified"] = True
+    raw = json.dumps(report).encode()
+    path.write_bytes(raw)
+    downstream["validation"]["report"]["sha256"] = selection.digest(raw)
+    raw = json.dumps(manifest).encode()
+    store(linux_repo, selection.MANIFEST157, raw)
+    monkeypatch.setattr(selection, "MANIFEST157_SHA256", selection.digest(raw))
+    monkeypatch.setattr(selection, "LINUX157_DOWNSTREAM_SHA256", selection.canonical_digest(downstream))
+    with pytest.raises(selection.SelectionError):
         selection.select(linux_repo, "linux")
 
 

@@ -558,6 +558,10 @@ jobs:
             ${{ runner.temp }}/chromix-build/src/out/Default/args.gn
             ${{ runner.temp }}/chromix-build/src/.chromix-upstream-restored.json
             ${{ runner.temp }}/chromix-build/src/.chromix-restored-patches.json
+            ${{ runner.temp }}/chromix-build/src/.chromix-linux157-*.json
+            ${{ runner.temp }}/chromix-build/src/.chromix-linux157-in-progress
+            ${{ runner.temp }}/chromix-build/linux157-failed.json
+            ${{ runner.temp }}/chromix-build/linux157-compiled.json
             ${{ runner.temp }}/chromix-build/upstream-cache-restore.json
             ${{ runner.temp }}/chromix-build/upstream-cache-preparation.json
             ${{ runner.temp }}/chromix-build/upstream-cache-ninja.json
@@ -1040,6 +1044,10 @@ jobs:
             ${{ runner.temp }}/chromix-build/src/out/Default/args.gn
             ${{ runner.temp }}/chromix-build/src/.chromix-upstream-restored.json
             ${{ runner.temp }}/chromix-build/src/.chromix-restored-patches.json
+            ${{ runner.temp }}/chromix-build/src/.chromix-linux157-*.json
+            ${{ runner.temp }}/chromix-build/src/.chromix-linux157-in-progress
+            ${{ runner.temp }}/chromix-build/linux157-failed.json
+            ${{ runner.temp }}/chromix-build/linux157-compiled.json
             ${{ runner.temp }}/chromix-build/upstream-cache-restore.json
             ${{ runner.temp }}/chromix-build/upstream-cache-preparation.json
             ${{ runner.temp }}/chromix-build/upstream-cache-ninja.json
@@ -1522,6 +1530,10 @@ jobs:
             ${{ runner.temp }}/chromix-build/src/out/Default/args.gn
             ${{ runner.temp }}/chromix-build/src/.chromix-upstream-restored.json
             ${{ runner.temp }}/chromix-build/src/.chromix-restored-patches.json
+            ${{ runner.temp }}/chromix-build/src/.chromix-linux157-*.json
+            ${{ runner.temp }}/chromix-build/src/.chromix-linux157-in-progress
+            ${{ runner.temp }}/chromix-build/linux157-failed.json
+            ${{ runner.temp }}/chromix-build/linux157-compiled.json
             ${{ runner.temp }}/chromix-build/upstream-cache-restore.json
             ${{ runner.temp }}/chromix-build/upstream-cache-preparation.json
             ${{ runner.temp }}/chromix-build/upstream-cache-ninja.json
@@ -2004,6 +2016,10 @@ jobs:
             ${{ runner.temp }}/chromix-build/src/out/Default/args.gn
             ${{ runner.temp }}/chromix-build/src/.chromix-upstream-restored.json
             ${{ runner.temp }}/chromix-build/src/.chromix-restored-patches.json
+            ${{ runner.temp }}/chromix-build/src/.chromix-linux157-*.json
+            ${{ runner.temp }}/chromix-build/src/.chromix-linux157-in-progress
+            ${{ runner.temp }}/chromix-build/linux157-failed.json
+            ${{ runner.temp }}/chromix-build/linux157-compiled.json
             ${{ runner.temp }}/chromix-build/upstream-cache-restore.json
             ${{ runner.temp }}/chromix-build/upstream-cache-preparation.json
             ${{ runner.temp }}/chromix-build/upstream-cache-ninja.json
@@ -2486,6 +2502,10 @@ jobs:
             ${{ runner.temp }}/chromix-build/src/out/Default/args.gn
             ${{ runner.temp }}/chromix-build/src/.chromix-upstream-restored.json
             ${{ runner.temp }}/chromix-build/src/.chromix-restored-patches.json
+            ${{ runner.temp }}/chromix-build/src/.chromix-linux157-*.json
+            ${{ runner.temp }}/chromix-build/src/.chromix-linux157-in-progress
+            ${{ runner.temp }}/chromix-build/linux157-failed.json
+            ${{ runner.temp }}/chromix-build/linux157-compiled.json
             ${{ runner.temp }}/chromix-build/upstream-cache-restore.json
             ${{ runner.temp }}/chromix-build/upstream-cache-preparation.json
             ${{ runner.temp }}/chromix-build/upstream-cache-ninja.json
@@ -2968,6 +2988,10 @@ jobs:
             ${{ runner.temp }}/chromix-build/src/out/Default/args.gn
             ${{ runner.temp }}/chromix-build/src/.chromix-upstream-restored.json
             ${{ runner.temp }}/chromix-build/src/.chromix-restored-patches.json
+            ${{ runner.temp }}/chromix-build/src/.chromix-linux157-*.json
+            ${{ runner.temp }}/chromix-build/src/.chromix-linux157-in-progress
+            ${{ runner.temp }}/chromix-build/linux157-failed.json
+            ${{ runner.temp }}/chromix-build/linux157-compiled.json
             ${{ runner.temp }}/chromix-build/upstream-cache-restore.json
             ${{ runner.temp }}/chromix-build/upstream-cache-preparation.json
             ${{ runner.temp }}/chromix-build/upstream-cache-ninja.json
@@ -3450,6 +3474,10 @@ jobs:
             ${{ runner.temp }}/chromix-build/src/out/Default/args.gn
             ${{ runner.temp }}/chromix-build/src/.chromix-upstream-restored.json
             ${{ runner.temp }}/chromix-build/src/.chromix-restored-patches.json
+            ${{ runner.temp }}/chromix-build/src/.chromix-linux157-*.json
+            ${{ runner.temp }}/chromix-build/src/.chromix-linux157-in-progress
+            ${{ runner.temp }}/chromix-build/linux157-failed.json
+            ${{ runner.temp }}/chromix-build/linux157-compiled.json
             ${{ runner.temp }}/chromix-build/upstream-cache-restore.json
             ${{ runner.temp }}/chromix-build/upstream-cache-preparation.json
             ${{ runner.temp }}/chromix-build/upstream-cache-ninja.json
@@ -3932,6 +3960,10 @@ jobs:
             ${{ runner.temp }}/chromix-build/src/out/Default/args.gn
             ${{ runner.temp }}/chromix-build/src/.chromix-upstream-restored.json
             ${{ runner.temp }}/chromix-build/src/.chromix-restored-patches.json
+            ${{ runner.temp }}/chromix-build/src/.chromix-linux157-*.json
+            ${{ runner.temp }}/chromix-build/src/.chromix-linux157-in-progress
+            ${{ runner.temp }}/chromix-build/linux157-failed.json
+            ${{ runner.temp }}/chromix-build/linux157-compiled.json
             ${{ runner.temp }}/chromix-build/upstream-cache-restore.json
             ${{ runner.temp }}/chromix-build/upstream-cache-preparation.json
             ${{ runner.temp }}/chromix-build/upstream-cache-ninja.json

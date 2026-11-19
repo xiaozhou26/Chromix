@@ -15,6 +15,7 @@ import pytest
 from tools import apply_restored_patches as arp
 from tools import fetch_upstream_cache as fetch
 from tools import install_macos_generators as installer
+from tools import linux157_source
 from tools import macos_restored_generators as gen
 from tools import macos_runtime as runtime
 from tools import platform_pins
@@ -28,6 +29,15 @@ from tools.tests import test_mac154_restore_links as links
 ROOT = Path(__file__).resolve().parents[2]
 FIXTURE = json.loads(gzip.decompress((Path(__file__).parent / "fixtures/macos157_generators.json.gz").read_bytes()))
 NOW = datetime(2026, 11, 19, tzinfo=timezone.utc)
+
+
+def copy_linux_recipe(repo):
+    recipe = linux157_source.recipe(ROOT)
+    for name in recipe["inputs"]:
+        destination = repo / name
+        destination.parent.mkdir(parents=True, exist_ok=True)
+        destination.write_bytes((ROOT / name).read_bytes())
+    assert linux157_source.recipe(repo) == recipe
 
 
 @pytest.mark.parametrize("arch,artifact,size", [("arm64", 14214802687, 11255458166),
@@ -203,8 +213,13 @@ def test_attempt_endpoint_before_any_download(tmp_path, arch):
 @pytest.mark.parametrize("arch", ["x64", "arm64"])
 def test_restore157_keeps_objects_and_exact_receipt(arch):
     helper = restores.RestoreUpstreamCacheTest()
-    helper.setUp()
     try:
+        # The shared setup initializes Linux, whose exact 157 donor is unavailable.
+        with mock.patch.object(helper, "make_cache"):
+            helper.setUp()
+        copy_linux_recipe(helper.repo)
+        assert json.loads((helper.repo / "build/upstream-cache.json").read_text()) == json.loads(
+            (ROOT / "build/upstream-cache.json").read_text())
         helper.make_cache("macos", arch)
         identity, _, _ = restore.identities(helper.repo, "macos", arch)
         assert identity["run_attempt"] == 1
@@ -255,6 +270,7 @@ def test_mac157_manifest_requires_exact_integer_attempt(tmp_path, value):
         path = tmp_path / name
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_bytes((ROOT / name).read_bytes())
+    copy_linux_recipe(tmp_path)
     path = tmp_path / "build/upstream-cache.json"
     manifest = json.loads(path.read_text())
     if value is None:
