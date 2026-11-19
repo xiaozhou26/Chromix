@@ -67,6 +67,11 @@ on:
         required: false
         type: string
         default: '1'
+      macos_compile_release:
+        description: 'macOS only: publish integrity-verified compiled bundles; runtime diagnostics are nonblocking (automatic for 157, never for frozen mac156 recovery)'
+        required: false
+        type: boolean
+        default: false
       use_upstream_cache:
         required: false
         type: boolean
@@ -256,6 +261,7 @@ def run_step(stage: int) -> str:
         id: stage
         env:
           CHROMIX_BUILD_PROFILE: ${{ inputs.build_profile }}
+          CHROMIX_MACOS_COMPILE_RELEASE: ${{ inputs.platform == 'macos' && inputs.macos_compile_release && '1' || '0' }}
           # Mac runtime gates need 45m in addition to packaging/checkpoint reserve.
           CHROMIX_RESERVE_MINUTES: ${{ inputs.platform == 'macos' && '90' || inputs['max-stages'] == 1 && '15' || '45' }}
           CHROMIX_USE_UPSTREAM_CACHE: ${{ inputs.use_upstream_cache && '1' || '0' }}

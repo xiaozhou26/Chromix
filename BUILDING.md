@@ -279,9 +279,9 @@ This includes the bounded version/headless checks, fingerprint dependency
 installation and fingerprint acceptance gate. Linux reserves are unchanged;
 runner disk speed, upload speed and job cancellation can still prevent recovery.
 
-Once a Mac ZIP passes checksum verification, extraction, launcher, smoke and
-fingerprint failures keep the job failed. Before packing a recovery checkpoint,
-Actions uploads a separate `<artifact>-failed-runtime-sN-attempt-M` diagnostic
+Outside the compile-release policy below, once a Mac ZIP passes checksum
+verification, extraction, launcher, smoke and fingerprint failures keep the job
+failed. Before packing a recovery checkpoint, Actions uploads a separate `<artifact>-failed-runtime-sN-attempt-M` diagnostic
 artifact containing the ZIP, `SHA256SUMS`, available runtime/fingerprint reports
 and the stage log. It is not a verified release bundle. The smoke helper records
 stdout, stderr, exit status and timeouts; on macOS timeouts it also attempts
@@ -294,6 +294,34 @@ stale smoke evidence. Select all checkpoint artifact IDs and their exact produce
 attempt when resuming. Donors must come from `main`, or from a manual run on the
 same explicitly selected recovery branch. Existing runs keep their original
 workflow revision and patch set.
+
+### macOS compile-release policy
+
+For macOS x64 and arm64, a validated platform Chromium pin with major **157**
+automatically enables compile-release. Other majors require the reusable
+`build-posix-github.yml` boolean input `macos_compile_release: true` (default
+`false`), or `CHROMIX_MACOS_COMPILE_RELEASE=1` when invoking `ci-stage.sh`
+directly. This is not a new platform-entrypoint dispatch input. Linux ignores
+the switch. Fixed `CHROMIX_UNCHANGED_RESUME` mac156 recovery modes always retain
+their original blocking runtime contract, even with opt-in.
+
+Compilation, safe ZIP extraction/CRC, SHA256 manifest, complete bundle structure,
+Mach-O target architecture, packaged/source version and the live source receipt
+remain mandatory. Source/receipt/cache failures are not suppressed or rewritten.
+Runtime smoke and fingerprint acceptance still run with their existing sandbox
+settings and time limits, but diagnostic failures, missing dependencies and
+incomplete results do not veto an otherwise valid compiled bundle. Integrity is
+checked before and after diagnostics; source/binary integrity failures still block.
+
+The stage emits `finished=true`, `status=compiled` and
+`release_policy=macos-compile-release` only after these integrity checks, allowing
+the normal final bundle and source-receipt uploads. `runtime_verified` stays
+`false` unless both diagnostics pass completely. The separate logs artifact
+retains the original smoke report and `acceptance.json`, including errors and
+failed/incomplete status. A `fingerprint-diagnostics/compile-release-s*/diagnostics.json`
+records command exit codes and missing reports without rewriting native evidence.
+This policy does not claim full fingerprint acceptance and does not change release
+publication, site/SDK defaults, checkpoint preservation or Linux native gates.
 
 ### Platform parallelism and incremental builds
 

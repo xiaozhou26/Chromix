@@ -292,7 +292,8 @@ class LatestMetadataTest(unittest.TestCase):
         old = subprocess.check_output(['git', '-C', str(ROOT), 'show',
                                        'f6da88f:build/posix/ci-stage.sh'], text=True)
         marker = '# ---- completion checks'
-        self.assertEqual(current[current.index(marker):], old[old.index(marker):])
+        from tools.tests.test_posix_completion import MACOS_COMPILE_RELEASE_DISPATCH
+        self.assertEqual(current[current.index(marker):].replace(MACOS_COMPILE_RELEASE_DISPATCH, ''), old[old.index(marker):])
         jobs = yaml.safe_load((ROOT / '.github/workflows/build-posix-github.yml').read_text())['jobs']
         for stage in range(1, 9):
             steps = jobs[f'posix-{stage}']['steps']

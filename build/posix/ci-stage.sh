@@ -278,6 +278,154 @@ if [ "$RC" -ne 0 ]; then
   die "build script failed at stage $STAGE_INDEX (exit $RC)"
 fi
 
+# macOS compile-release keeps diagnostics separate from mandatory integrity checks.
+finish_macos_compile_release() {
+  local evidence="$WORK/fingerprint-diagnostics/compile-release-s$STAGE_INDEX-$(date +%s)-$$"
+  local smoke_rc=0 dependencies_rc=0 fingerprint_rc=0 diagnostic_status
+  mkdir -p "$evidence"
+
+  macos_release_integrity() {
+    python3 - "$REPO" "$SRC" "$WORK/fingerprint-diagnostics/source-final.json" \
+      "$SMOKE_DIR/chromix/Chromium.app" "$DEST_DIST/$ASSET" "$ARCH" "$CHROMIUM_VERSION_PIN" <<'PYINTEGRITY'
+import hashlib
+import json
+from pathlib import Path
+import plistlib
+import sys
+
+repo, src, receipt, app, archive = map(Path, sys.argv[1:6])
+arch, version = sys.argv[6:]
+sys.path.insert(0, str(repo / "tools"))
+from fingerprint_acceptance import check_source
+from verify_patch_stack import load_stack
+from verify_macos_bundle import verify_bundle
+from patch_selection import source_version
+
+if source_version(src) != version:
+    raise ValueError("compiled source version does not match the platform pin")
+inputs, patches = load_stack(repo, platform="macos")
+targets = {entry[0] for _, _, entries in patches for entry in entries}
+source = check_source(receipt, src, inputs, targets)
+verify_bundle(app, arch)
+metadata = plistlib.loads((app / "Contents/Info.plist").read_bytes())
+framework = app / "Contents/Frameworks/Chromium Framework.framework/Versions/Current"
+if metadata.get("CFBundleShortVersionString") != version or framework.resolve(strict=True).name != version:
+    raise ValueError("packaged macOS version does not match the platform pin")
+def sha256(path):
+    with path.open("rb") as stream:
+        return hashlib.file_digest(stream, "sha256").hexdigest()
+archive_hash = sha256(archive)
+if archive.with_name("SHA256SUMS").read_text().splitlines() != [f"{archive_hash}  {archive.name}"]:
+    raise ValueError("macOS bundle checksum manifest must contain exactly the verified asset")
+print(json.dumps({"source": source, "patch_inputs": inputs, "version": version, "arch": arch,
+                  "archive_sha256": archive_hash,
+                  "browser_sha256": sha256(app / "Contents/MacOS/Chromium")}, sort_keys=True))
+PYINTEGRITY
+  }
+
+  # ZIP verification reads every payload (CRC), checks paths, modes and Mach-O slices.
+  python3 "$REPO/tools/verify_macos_bundle.py" --zip "$DEST_DIST/$ASSET" --arch "$ARCH" ||
+    die "macOS compile-release archive integrity failed"
+  macos_release_integrity > "$evidence/integrity-before.json" ||
+    die "macOS compile-release source/bundle integrity failed"
+  if python3 "$REPO/tools/macos_browser_smoke.py" --launcher "$LAUNCHER" \
+      --output "$WORK/runtime-smoke-stage-$STAGE_INDEX" --profile "$SMOKE_DIR/profile" \
+      --chromium-version "$CHROMIUM_VERSION_PIN"; then
+    :
+  else
+    smoke_rc=$?
+    log "macOS runtime smoke diagnostic failed (exit $smoke_rc); retaining report"
+  fi
+  if "$TIMEOUT" -k 15s 300s python3 -m pip install --disable-pip-version-check --timeout 30 --retries 1 \
+      -r "$REPO/tools/fingerprint-requirements.txt"; then
+    BROWSER_HASH="$(python3 -c 'import hashlib,sys; print(hashlib.file_digest(open(sys.argv[1],"rb"),"sha256").hexdigest())' \
+      "$SMOKE_DIR/chromix/Chromium.app/Contents/MacOS/Chromium")" || die "fingerprint browser hash failed"
+    if "$TIMEOUT" -k 30s 2100s python3 "$REPO/tools/fingerprint_acceptance.py" \
+        --browser "$SMOKE_DIR/chromix/Chromium.app/Contents/MacOS/Chromium" \
+        --expected-sha256 "$BROWSER_HASH" --expected-version "$CHROMIUM_VERSION_PIN" \
+        --source-report "$WORK/fingerprint-diagnostics/source-final.json" --source-root "$SRC" \
+        --output-dir "$evidence/fingerprint"; then
+      :
+    else
+      fingerprint_rc=$?
+      log "macOS fingerprint diagnostic failed (exit $fingerprint_rc); retaining report"
+    fi
+  else
+    dependencies_rc=$?
+    log "macOS fingerprint dependencies unavailable (exit $dependencies_rc)"
+  fi
+
+  # Never rewrite acceptance.json, including partial output left by a timeout.
+  diagnostic_status="$(python3 - "$evidence" "$WORK/runtime-smoke-stage-$STAGE_INDEX/report.json" \
+      "$smoke_rc" "$dependencies_rc" "$fingerprint_rc" <<'PYREPORT'
+import json
+from pathlib import Path
+import sys
+
+root, smoke_path = map(Path, sys.argv[1:3])
+smoke_rc, dependencies_rc, fingerprint_rc = map(int, sys.argv[3:])
+errors, gaps = [], []
+def read_report(path):
+    try:
+        value = json.loads(path.read_text())
+        if not isinstance(value, dict):
+            raise ValueError("report must be an object")
+        return value
+    except (OSError, ValueError) as error:
+        gaps.append(str(path) + ": " + str(error))
+        return {}
+smoke = read_report(smoke_path)
+acceptance = read_report(root / "fingerprint/acceptance.json")
+for name, code in (("smoke", smoke_rc), ("dependencies", dependencies_rc), ("fingerprint", fingerprint_rc)):
+    if code:
+        errors.append(f"{name} exited {code}")
+raw_errors = acceptance.get("errors", [])
+if raw_errors:
+    errors.append("fingerprint report contains errors; see unchanged acceptance.json")
+if smoke.get("passed") is not True:
+    gaps.append("native smoke did not pass")
+if acceptance.get("status") != "passed" or acceptance.get("ci_gate_passed") is not True:
+    gaps.append("fingerprint acceptance did not pass completely")
+status = "failed" if errors or acceptance.get("status") == "failed" else "incomplete" if gaps else "passed"
+report = {"schema_version": 1, "policy": "macos-compile-release", "status": status,
+          "runtime_verified": status == "passed", "errors": errors, "gaps": gaps,
+          "smoke_exit_code": smoke_rc, "dependencies_exit_code": dependencies_rc,
+          "fingerprint_exit_code": None if dependencies_rc else fingerprint_rc,
+          "fingerprint_status": acceptance.get("status", "incomplete")}
+(root / "diagnostics.json").write_text(json.dumps(report, indent=2) + "\n")
+# Integrity errors observed by acceptance remain fatal even if later restored.
+integrity_errors = (
+    "a successful source patch-stack verification report is required",
+    "malformed source", "source receipt", "invalid source output hash", "source-final.json",
+    "source changed since its freshness check", "executable SHA-256",
+    "browser executable changed during acceptance", "runner or patch inputs changed during acceptance",
+    "running browser version/hash does not match", "suite used a different browser",
+)
+if any(message in str(raw_errors) for message in integrity_errors):
+    raise SystemExit("fingerprint reported source/binary integrity failure")
+if isinstance(smoke.get("version"), dict) and smoke["version"].get("status") == "version_mismatch":
+    raise SystemExit("native smoke reported a different browser version")
+print(status)
+PYREPORT
+  )" || die "macOS diagnostic integrity failure; reports retained"
+  macos_release_integrity > "$evidence/integrity-after.json" ||
+    die "macOS compile-release final source/bundle integrity failed"
+  cmp -s "$evidence/integrity-before.json" "$evidence/integrity-after.json" ||
+    die "macOS source, patch inputs or bundle changed during diagnostics"
+  emit runtime_diagnostic_status "$diagnostic_status"
+  if [ "$diagnostic_status" = passed ]; then
+    emit runtime_verified true
+  elif [ "$diagnostic_status" = failed ]; then
+    emit runtime_failed true
+  fi
+  rm -rf "$SMOKE_DIR"
+  log "macOS compile-release: integrity verified; runtime diagnostics $diagnostic_status"
+  emit release_policy macos-compile-release
+  emit finished true
+  emit status compiled
+  exit 0
+}
+
 # ---- completion checks -----------------------------------------------------
 if [ "$PLATFORM" = linux ]; then
   [ -x "$OUT/chrome" ] || die "build exited 0 but $OUT/chrome is missing"
@@ -355,6 +503,11 @@ fi
 CHROMIUM_VERSION_PIN="$(python3 "$REPO/tools/platform_pins.py" --repo "$REPO" \
   --platform "$PLATFORM" --field ChromiumVersion)"
 if [ "$PLATFORM" = macos ]; then
+  # Frozen mac156 continuations retain their original blocking runtime contract.
+  if [ -z "$UNCHANGED_HELPER" ] && { [[ "$CHROMIUM_VERSION_PIN" = 157.* ]] ||
+      [ "${CHROMIX_MACOS_COMPILE_RELEASE:-0}" = 1 ]; }; then
+    finish_macos_compile_release
+  fi
   if python3 "$REPO/tools/macos_browser_smoke.py" --launcher "$LAUNCHER" \
       --output "$WORK/runtime-smoke-stage-$STAGE_INDEX" --profile "$SMOKE_DIR/profile" \
       --chromium-version "$CHROMIUM_VERSION_PIN"; then

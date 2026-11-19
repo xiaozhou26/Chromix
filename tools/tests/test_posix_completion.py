@@ -150,7 +150,7 @@ class PosixCompletionTest(unittest.TestCase):
     def complete_fixture(self, platform, corrupt, *, arch="x64", host_arch="x64",
                          verifier_failure=False, unsafe_member=None, smoke_failure=None,
                          gate_failure=None, launcher_failure=None, build_failure=None,
-                         package_failure=None, extract_failure=False):
+                         package_failure=None, extract_failure=False, macos_opt_in=False):
         temp = tempfile.TemporaryDirectory(prefix="chromix completion ")
         self.addCleanup(temp.cleanup)
         root = Path(temp.name)
@@ -261,6 +261,7 @@ class PosixCompletionTest(unittest.TestCase):
                     "TEST_BROWSER_RELATIVE": native_relative, "TEST_PLATFORM": platform,
                     "PYTHONDONTWRITEBYTECODE": "1",
                     "PYTHONOPTIMIZE": "0", "PIP_NO_INDEX": "1", "PIP_CONFIG_FILE": os.devnull})
+        env["CHROMIX_MACOS_COMPILE_RELEASE"] = str(int(macos_opt_in))
         bindir = root / "bin"
         bindir.mkdir()
         self.write_runtime_tools(repo, bindir)
@@ -472,6 +473,11 @@ class PosixCompletionTest(unittest.TestCase):
         elif verifier_failure:
             self.assertEqual(output_lines, ready_outputs)
 
+    def test_linux_ignores_macos_compile_release_opt_in(self):
+        for failure in ("nonzero", "timeout", "dependencies"):
+            with self.subTest(failure=failure):
+                self.complete_fixture("linux", False, gate_failure=failure, macos_opt_in=True)
+
     def test_linux_fingerprint_failures_preserve_checked_bundle_without_finishing(self):
         for failure in ("nonzero", "timeout", "dependencies", "hash"):
             with self.subTest(failure=failure):
@@ -658,6 +664,281 @@ class PosixRuntimeCheckpointTest(unittest.TestCase):
             self.assertEqual((fresh_evidence / "headless.stderr.log").read_text(), "")
             self.assertFalse((restored / "smoke/profile").exists())
             self.assertEqual(report_path.read_bytes(), failed_report)
+
+
+MACOS_COMPILE_RELEASE_DISPATCH = '''  # Frozen mac156 continuations retain their original blocking runtime contract.
+  if [ -z "$UNCHANGED_HELPER" ] && { [[ "$CHROMIUM_VERSION_PIN" = 157.* ]] ||
+      [ "${CHROMIX_MACOS_COMPILE_RELEASE:-0}" = 1 ]; }; then
+    finish_macos_compile_release
+  fi
+'''
+
+
+class MacOSCompileReleaseTest(unittest.TestCase):
+    """Real stage, packager, CRC/Mach-O/source verifiers; only build/probes are offline doubles."""
+
+    def fixture(self, *, arch="x64", version="157.0.8120.1", opt_in=False,
+                failure="fingerprint", damage=None, frozen=False):
+        import plistlib
+        from tools.tests.test_verify_macos_bundle import MacOSBundleTest
+        from tools.tests.test_verify_patch_stack import source_tree, stack
+
+        temporary = tempfile.TemporaryDirectory(prefix="mac compile release ")
+        self.addCleanup(temporary.cleanup)
+        root = Path(temporary.name).resolve()
+        repo, source = source_tree(root)
+        work = root / "work"
+        work.mkdir()
+        src = work / "src"
+        source.rename(src)
+        (repo / "tools").symlink_to(REPO / "tools", target_is_directory=True)
+        (repo / "sdk").symlink_to(REPO / "sdk", target_is_directory=True)
+        for name in ("build/posix/ci-stage.sh", "build/macos/package-macos.sh", "LICENSE"):
+            target = repo / name
+            target.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copy2(REPO / name, target)
+        fonts = root / "fonts"
+        fonts.mkdir()
+        for name in ("fixture.ttf", "fonts.conf.template", "NOTICE", "SOURCE.md"):
+            (fonts / name).write_text("offline packaging fixture\n")
+        (src / "LICENSE").write_text("Chromium license fixture\n")
+        (src / "chrome").mkdir()
+        (src / "chrome/VERSION").write_text("\n".join(
+            f"{key}={value}" for key, value in zip(("MAJOR", "MINOR", "BUILD", "PATCH"), version.split("."))) + "\n")
+        report = work / "fingerprint-diagnostics/source-final.json"
+        report.parent.mkdir()
+        report.write_text(json.dumps(stack.verify(src, repo, platform="macos")))
+        (work / "upstream-cache-restore.json").write_text('{"fixture": "retain cache report"}\n')
+        fixture = MacOSBundleTest()
+        fixture.setUp()
+        self.addCleanup(fixture.doCleanups)
+        fixture.layout(arch)
+        fixture.version.rename(fixture.version.with_name(version))
+        current = fixture.framework / "Versions/Current"
+        current.unlink()
+        current.symlink_to(version)
+        plist = fixture.app / "Contents/Info.plist"
+        plist.write_bytes(plistlib.dumps({"CFBundleExecutable": "Chromium",
+                                        "CFBundleShortVersionString": version}))
+        out = src / "out/Chromix"
+        out.mkdir(parents=True)
+        shutil.copytree(fixture.app, out / "Chromium.app", symlinks=True)
+        build = repo / "build/macos/build.sh"
+        build.write_text("#!/bin/sh\nexit " + ("9" if damage == "compile" else "0") + "\n")
+        build.chmod(0o755)
+        if damage == "source":
+            (src / "file.cc").write_text("changed since source receipt\n")
+        elif damage == "receipt":
+            report.write_text('{"status":"failed","errors":["source check failed"]}\n')
+        elif damage == "missing_receipt":
+            report.unlink()
+        elif damage == "version":
+            plist = out / "Chromium.app/Contents/Info.plist"
+            plist.write_bytes(plistlib.dumps({"CFBundleExecutable": "Chromium",
+                                            "CFBundleShortVersionString": "0.0.0.0"}))
+        elif damage == "source_version":
+            (src / "chrome/VERSION").write_text("MAJOR=156\nMINOR=0\nBUILD=8078\nPATCH=79\n")
+        elif damage == "architecture":
+            from tools.tests.test_verify_macos_bundle import thin
+            (out / "Chromium.app/Contents/MacOS/Chromium").write_bytes(
+                thin("arm64" if arch == "x64" else "x64"))
+        elif damage == "helper":
+            (out / "Chromium.app/Contents/Frameworks/Chromium Framework.framework/Helpers/"
+                   "Chromium Helper.app/Contents/MacOS/Chromium Helper").unlink()
+        elif damage == "cache":
+            (src / ".chromix-upstream-restored.json").write_text('{"fixture":"bad cache receipt"}\n')
+        before_receipt = report.read_bytes() if report.exists() else None
+        bin_dir = root / "bin"
+        bin_dir.mkdir()
+        shim = bin_dir / "python3"
+        shim.write_text(f"#!{sys.executable}\n" + textwrap.dedent('''\
+            import json, os, sys, time, zipfile
+            from pathlib import Path
+            args = sys.argv[1:]
+            name = Path(args[0]).name if args else ""
+            failure = os.environ["FIXTURE_FAILURE"]
+            root = Path(os.environ["FIXTURE_ROOT"])
+            def value(flag):
+                return Path(args[args.index(flag) + 1])
+            if name == "platform_pins.py":
+                print(os.environ["FIXTURE_VERSION"])
+                sys.exit(0)
+            if name.startswith("validate_macos156_"):
+                sys.exit(0)
+            if name == "restore_upstream_cache.py":
+                sys.exit(31)
+            if args[:2] == ["-m", "pip"]:
+                sys.exit(23 if failure == "dependencies" else 0)
+            if name == "macos_browser_smoke.py":
+                output = value("--output")
+                output.mkdir()
+                report = {"passed": failure != "smoke", "errors": ["native smoke failed"] if failure == "smoke" else []}
+                if failure == "runtime_version":
+                    report.update(passed=False, version={"status": "version_mismatch"})
+                (output / "report.json").write_text(json.dumps(report))
+                sys.exit(7 if failure in ("smoke", "runtime_version") else 0)
+            if name == "fingerprint_acceptance.py":
+                output = value("--output-dir")
+                output.mkdir()
+                status = "incomplete" if failure in ("incomplete", "incomplete_zero") else "failed" if failure in ("fingerprint", "source_error") else "passed"
+                errors = ["source changed since its freshness check: file.cc"] if failure == "source_error" else ["device: real fixture failure"] if failure == "fingerprint" else []
+                report = {"status": status, "ci_gate_passed": status == "passed", "errors": errors,
+                          "gaps": ["native probe incomplete"] if status == "incomplete" else []}
+                if failure not in ("missing_report", "timeout"):
+                    raw = json.dumps(report, indent=3) + "\\n"
+                    (output / "acceptance.json").write_text(raw)
+                    (root / "original-acceptance.json").write_text(raw)
+                if failure == "source_after":
+                    value("--source-root").joinpath("file.cc").write_text("changed by probe")
+                if failure == "archive_after":
+                    archive = next((root / "work/dist").glob("*.zip"))
+                    with archive.open("ab") as stream:
+                        stream.write(b"changed after integrity check")
+                if failure == "timeout":
+                    time.sleep(60)
+                sys.exit(17 if failure in ("fingerprint", "source_error", "incomplete", "missing_report") else 0)
+            if name == "verify_macos_bundle.py" and "--zip" in args and os.environ["FIXTURE_DAMAGE"] in ("crc", "unsafe", "sha"):
+                archive = value("--zip")
+                # Damage after the packager has verified it, before stage verification.
+                marker = root / "zip-verified-once"
+                if marker.exists():
+                    if os.environ["FIXTURE_DAMAGE"] == "sha":
+                        archive.with_name("SHA256SUMS").write_text("0" * 64 + "  " + archive.name + "\\n")
+                    elif os.environ["FIXTURE_DAMAGE"] == "unsafe":
+                        with zipfile.ZipFile(archive, "a") as stream:
+                            stream.writestr("../escape", "invalid")
+                    else:
+                        import struct
+                        with zipfile.ZipFile(archive) as stream:
+                            entry = next(e for e in stream.infolist() if e.file_size > 0 and not e.is_dir())
+                        data = bytearray(archive.read_bytes())
+                        offset = entry.header_offset
+                        name_size, extra_size = struct.unpack_from("<HH", data, offset + 26)
+                        data[offset + 30 + name_size + extra_size] ^= 1
+                        archive.write_bytes(data)
+                marker.touch()
+            os.execv(sys.executable, [sys.executable, "-B", *args])
+            '''))
+        shim.chmod(0o755)
+        timeout = bin_dir / "timeout"
+        timeout.write_text(f"#!{sys.executable}\n" + textwrap.dedent('''\
+            import os, sys
+            args = sys.argv[1:]
+            while args[0] in ("-k", "-s"):
+                del args[:2]
+            del args[0]
+            duration = "1s" if any("fingerprint_acceptance.py" in arg for arg in args) else "30s"
+            os.execv(os.environ["REAL_TIMEOUT"], [os.environ["REAL_TIMEOUT"], "-k", "1s", duration, *args])
+            '''))
+        timeout.chmod(0o755)
+        output = root / "github-output"
+        env = {key: value for key, value in os.environ.items() if not key.startswith("CHROMIX_")}
+        env.update(PATH=str(bin_dir) + os.pathsep + env["PATH"], GITHUB_OUTPUT=str(output),
+                   FIXTURE_ROOT=str(root), FIXTURE_VERSION=version, FIXTURE_FAILURE=failure,
+                   FIXTURE_DAMAGE=damage or "", CHROMIX_FONTS_DIR=str(fonts),
+                   REAL_TIMEOUT=shutil.which("timeout"), CHROMIX_MACOS_COMPILE_RELEASE=str(int(opt_in)),
+                   PYTHONDONTWRITEBYTECODE="1")
+        if frozen:
+            env["CHROMIX_UNCHANGED_RESUME"] = "mac156-x64-stage3" if arch == "x64" else "mac156-arm64-stage8"
+        result = subprocess.run(["/bin/bash", str(repo / "build/posix/ci-stage.sh"),
+                                 "--platform", "macos", "--arch", arch, "--workdir", str(work)],
+                                env=env, capture_output=True, text=True, timeout=45)
+        outputs = dict(line.split("=", 1) for line in output.read_text().splitlines())
+        receipts = list(work.glob("fingerprint-diagnostics/compile-release-*/diagnostics.json"))
+        summary = json.loads(receipts[0].read_text()) if receipts else None
+        self.assertEqual(report.read_bytes() if report.exists() else None, before_receipt)
+        self.assertEqual((work / "upstream-cache-restore.json").read_text(), '{"fixture": "retain cache report"}\n')
+        if (root / "original-acceptance.json").exists():
+            acceptance = next(work.glob("fingerprint-diagnostics/**/acceptance.json"))
+            self.assertEqual(acceptance.read_bytes(), (root / "original-acceptance.json").read_bytes())
+        return root, result, outputs, summary
+
+    def assert_final_upload(self, root, result, outputs):
+        import yaml
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertEqual(outputs["finished"], "true")
+        self.assertEqual(outputs["status"], "compiled")
+        self.assertEqual(outputs["release_policy"], "macos-compile-release")
+        jobs = yaml.safe_load((REPO / ".github/workflows/build-posix-github.yml").read_text())["jobs"]
+        for stage in range(1, 9):
+            upload = next(s for s in jobs[f"posix-{stage}"]["steps"] if s.get("name") == "Upload final bundle")
+            self.assertEqual(upload["if"], "steps.stage.outputs.finished == 'true'")
+            steps = jobs[f"posix-{stage}"]["steps"]
+            source_upload = next(s for s in steps if s.get("name") == "Upload fingerprint source receipt")
+            self.assertEqual(source_upload["if"], upload["if"])
+            diagnostics = next(s for s in steps if s.get("name") == "Upload build diagnostics")
+            self.assertEqual(diagnostics["if"], "always()")
+            self.assertIn("/fingerprint-diagnostics/", diagnostics["with"]["path"])
+            # Execute a local upload double only when the real workflow condition is true.
+            destination = root / f"uploaded-s{stage}"
+            command = 'test "$FINISHED" = true && mkdir "$DEST" && cp "$DIST"/*.zip "$DIST/SHA256SUMS" "$DEST/"'
+            sent = subprocess.run(["/bin/bash", "-euc", command], capture_output=True,
+                                  env={**os.environ, "FINISHED": outputs["finished"],
+                                       "DIST": str(root / "work/dist"), "DEST": str(destination)})
+            self.assertEqual(sent.returncode, 0, sent.stderr)
+            for path in (root / "work/dist").glob("*.zip"):
+                self.assertEqual(path.read_bytes(), (destination / path.name).read_bytes())
+
+    def test_native_failure_uploads_compiled_bundle_with_truthful_status_both_architectures(self):
+        for arch in ("x64", "arm64"):
+            for failure in ("fingerprint", "smoke", "incomplete", "timeout", "dependencies", "missing_report", "incomplete_zero", "none"):
+                with self.subTest(arch=arch, failure=failure):
+                    root, result, outputs, summary = self.fixture(arch=arch, failure=failure)
+                    self.assert_final_upload(root, result, outputs)
+                    expected = "passed" if failure == "none" else "incomplete" if failure == "incomplete_zero" else "failed"
+                    self.assertEqual(summary["status"], expected)
+                    self.assertEqual(outputs["runtime_verified"], "true" if failure == "none" else "false")
+                    if failure == "incomplete":
+                        self.assertEqual(summary["fingerprint_status"], "incomplete")
+                    if failure == "timeout":
+                        self.assertEqual(summary["fingerprint_exit_code"], 124)
+
+    def test_integrity_and_build_failures_remain_blocking(self):
+        for damage in ("compile", "cache", "source", "receipt", "missing_receipt", "version",
+                       "source_version", "architecture", "helper", "crc", "unsafe", "sha"):
+            with self.subTest(damage=damage):
+                _, result, outputs, _ = self.fixture(damage=damage)
+                self.assertNotEqual(result.returncode, 0, result.stdout + result.stderr)
+                self.assertEqual(outputs["finished"], "false")
+                self.assertNotIn("release_policy", outputs)
+        for failure in ("source_after", "source_error", "archive_after", "runtime_version"):
+            with self.subTest(failure=failure):
+                _, result, outputs, _ = self.fixture(failure=failure)
+                self.assertNotEqual(result.returncode, 0, result.stdout + result.stderr)
+                self.assertEqual(outputs["finished"], "false")
+
+    def test_explicit_opt_in_and_frozen_history_scope(self):
+        for version in ("156.0.8078.79", "158.0.8200.1"):
+            for opt_in in (False, True):
+                with self.subTest(version=version, opt_in=opt_in):
+                    root, result, outputs, _ = self.fixture(version=version, opt_in=opt_in)
+                    if opt_in:
+                        self.assert_final_upload(root, result, outputs)
+                    else:
+                        self.assertNotEqual(result.returncode, 0)
+                        self.assertEqual(outputs["finished"], "false")
+        for arch in ("x64", "arm64"):
+            with self.subTest(frozen=arch):
+                _, result, outputs, _ = self.fixture(arch=arch, version="156.0.8078.79", opt_in=True, frozen=True)
+                self.assertNotEqual(result.returncode, 0)
+                self.assertEqual(outputs["finished"], "false")
+                self.assertIn("fingerprint regression gate failed", result.stderr)
+
+    def test_generated_workflow_scopes_opt_in_without_continue_on_error(self):
+        import yaml
+        path = REPO / ".github/workflows/build-posix-github.yml"
+        before = path.read_bytes()
+        subprocess.run([sys.executable, "tools/gen_posix_workflow.py"], cwd=REPO, check=True, capture_output=True)
+        self.assertEqual(before, path.read_bytes())
+        workflow = yaml.safe_load(before)
+        inputs = workflow.get("on", workflow.get(True))["workflow_call"]["inputs"]
+        self.assertEqual(inputs["macos_compile_release"]["default"], False)
+        self.assertEqual(inputs["macos_compile_release"]["type"], "boolean")
+        for number in range(1, 9):
+            stage = next(s for s in workflow["jobs"][f"posix-{number}"]["steps"] if s.get("id") == "stage")
+            self.assertNotIn("continue-on-error", stage)
+            self.assertEqual(stage["env"]["CHROMIX_MACOS_COMPILE_RELEASE"],
+                             "${{ inputs.platform == 'macos' && inputs.macos_compile_release && '1' || '0' }}")
 
 
 if __name__ == "__main__":

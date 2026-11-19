@@ -668,7 +668,9 @@ class WorkflowTest(unittest.TestCase):
         self.assertEqual(before, path.read_bytes())
         stage = (ROOT / 'build/posix/ci-stage.sh').read_text()
         baseline = subprocess.check_output(['git', '-C', str(ROOT), 'show', 'e52742b:build/posix/ci-stage.sh']).decode()
-        self.assertEqual(stage.split('# ---- completion checks')[1], baseline.split('# ---- completion checks')[1])
+        from tools.tests.test_posix_completion import MACOS_COMPILE_RELEASE_DISPATCH
+        self.assertEqual(stage.split('# ---- completion checks')[1].replace(MACOS_COMPILE_RELEASE_DISPATCH, ''),
+                         baseline.split('# ---- completion checks')[1])
         self.assertLess(stage.index('unchanged_check before'), stage.index('# Cache opt-in'))
         self.assertIn('handoff() {\n  unchanged_check after', stage)
         subprocess.run(['bash', '-n', str(ROOT / 'build/posix/ci-stage.sh')], check=True)

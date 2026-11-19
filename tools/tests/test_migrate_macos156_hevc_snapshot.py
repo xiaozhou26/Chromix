@@ -203,7 +203,8 @@ class MigrationTest(unittest.TestCase):
         stage = (ROOT / 'build/posix/ci-stage.sh').read_text()
         old = subprocess.check_output(['git', '-C', str(ROOT), 'show', 'f6da88f:build/posix/ci-stage.sh'], text=True)
         marker = '# ---- completion checks'
-        self.assertEqual(stage[stage.index(marker):], old[old.index(marker):])
+        from tools.tests.test_posix_completion import MACOS_COMPILE_RELEASE_DISPATCH
+        self.assertEqual(stage[stage.index(marker):].replace(MACOS_COMPILE_RELEASE_DISPATCH, ''), old[old.index(marker):])
 
 
 if __name__ == '__main__':
