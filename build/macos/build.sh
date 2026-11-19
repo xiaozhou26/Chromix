@@ -81,6 +81,13 @@ printf '==> Build profile: %s\n' "$BUILD_PROFILE"
 python3 "$REPO/tools/merge_gn_args.py" --build-profile "$BUILD_PROFILE" "$OUT/args.gn" "${GN_INPUTS[@]}"
 python3 "$REPO/tools/bootstrap_gn.py" --src "$SRC" --out "$OUT"
 "$OUT/gn" gen "$OUT" --fail-on-unused-args
-chromix_report_upstream_plan chrome
+if chromix_report_upstream_plan chrome; then
+  :
+else
+  PLAN_RC=$?
+  cat "$WORK/upstream-cache-plan.log" >&2
+  echo "macOS Ninja plan failed (exit $PLAN_RC); refusing compilation" >&2
+  exit "$PLAN_RC"
+fi
 chromix_build_restored_target macos "${CHROMIX_JOBS:-$(sysctl -n hw.ncpu)}" chrome
 printf '==> Done: %s\n' "$OUT/Chromium.app"

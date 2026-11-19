@@ -90,6 +90,47 @@ if [ "$PLATFORM" = macos ]; then
   if [ "$BINDGEN_NATIVE" != 1 ]; then
     python3 tools/rust/build_bindgen.py --skip-test
   fi
+  if [ "$(cat "$REPO/CHROMIUM_MACOS_VERSION")" = 157.0.8103.78 ]; then
+    # Resource replacement removes the donor's host-built Crubit executable.
+    probe_crubit() {
+      python3 - "$REPO" "$SRC" "$ARCH" <<'PYCRUBIT'
+import os
+from pathlib import Path
+import subprocess
+import sys
+sys.path.insert(0, sys.argv[1])
+from tools.prepare_restored_build import binary_architectures
+src = Path(sys.argv[2])
+path = src / "third_party/rust-toolchain/crubit/bin/cc_bindings_from_rs"
+if any(part.is_symlink() for part in (path, *path.parents) if part.is_relative_to(src)):
+    print("unsafe macOS Crubit executable path", file=sys.stderr)
+    raise SystemExit(2)
+if not path.is_file() or not os.access(path, os.X_OK):
+    raise SystemExit("macOS Crubit executable is missing")
+if sys.argv[3] not in binary_architectures(path, "macos"):
+    raise SystemExit("macOS Crubit executable does not match the native host")
+try:
+    subprocess.run([str(path), "--help"], check=True, timeout=30,
+                   stdout=subprocess.DEVNULL,
+                   env={k: v for k, v in os.environ.items() if not k.startswith("DYLD_")})
+except (OSError, subprocess.SubprocessError) as error:
+    raise SystemExit(f"macOS Crubit native probe failed: {error}")
+PYCRUBIT
+    }
+    if probe_crubit; then
+      :
+    else
+      CRUBIT_RC=$?
+      [ "$CRUBIT_RC" -ne 2 ] || exit "$CRUBIT_RC"
+      if [ "${GITHUB_ACTIONS:-}" != true ]; then
+        echo "macOS Crubit build is restricted to GitHub Actions" >&2
+        exit 1
+      fi
+      echo "==> Building native macOS Crubit with the verified upstream recipe"
+      bash "$WORK/tooling/ungoogled-chromium-macos/build_crubit.sh"
+      probe_crubit
+    fi
+  fi
 else
   if [ "$ARCH" = x64 ]; then SYSROOT_ARCH=amd64; else SYSROOT_ARCH=arm64; fi
   if [ "$COMPILERS_NATIVE" != 1 ]; then
