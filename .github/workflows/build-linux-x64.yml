@@ -36,9 +36,9 @@ on:
         options: [staged, single]
         default: staged
       use_upstream_cache:
-        description: 'Require pinned full upstream source + out/Default reuse; false permits cold builds'
+        description: 'Linux157 requires false: exact downstream fresh source; no upstream donor'
         type: boolean
-        default: true
+        default: false
   push:
     branches: [main]
     paths:
@@ -74,6 +74,7 @@ on:
       - 'sdk/python/pyproject.toml'
       - '.github/workflows/build-linux-x64.yml'
       - '.github/workflows/build-posix-github.yml'
+      - 'tools/linux157_*.py'
       - 'tools/platform_pins.py'
       - 'CHROMIUM_LINUX_VERSION'
       - 'CHROMIUM_VERSION'
@@ -103,5 +104,5 @@ jobs:
       resume_tree_stage: ${{ inputs.resume_tree_stage || '7' }}
       resume_attempt: ${{ inputs.resume_attempt || '1' }}
       resume_artifact_ids: ${{ inputs.resume_artifact_ids || '' }}
-      use_upstream_cache: ${{ github.event_name != 'workflow_dispatch' || inputs.use_upstream_cache }}
+      use_upstream_cache: ${{ github.event_name == 'workflow_dispatch' && inputs.use_upstream_cache }}
     secrets: inherit

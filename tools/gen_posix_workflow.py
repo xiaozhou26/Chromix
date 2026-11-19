@@ -571,8 +571,14 @@ LINUX_FAILURE = """      - name: Upload failed Linux runtime bundle
               if path.is_dir():
                   shutil.rmtree(path)
           PY
-          python3 tools/verify_linux_checkpoint.py --workdir "$WORK" --arch '${{ inputs.arch }}' \\
-            > "${RUNNER_TEMP}/chromix-logs/checkpoint-identity-s%(stage)d.json"
+          if [ "${CHROMIUM_VERSION:-}" = 157.0.8103.78 ]; then
+            CHROMIX_USE_UPSTREAM_CACHE=0 python3 tools/linux157_source.py --phase checkpoint \\
+              --workdir "$WORK" --arch '${{ inputs.arch }}' \\
+              > "${RUNNER_TEMP}/chromix-logs/checkpoint-identity-s%(stage)d.json"
+          else
+            python3 tools/verify_linux_checkpoint.py --workdir "$WORK" --arch '${{ inputs.arch }}' \\
+              > "${RUNNER_TEMP}/chromix-logs/checkpoint-identity-s%(stage)d.json"
+          fi
           bash build/posix/ci-parts.sh "$WORK" "$WORK/.snapshot-stage-%(stage)d"
           echo "upload_snapshot=true" >> "$GITHUB_OUTPUT"
 
@@ -605,6 +611,10 @@ FINAL_UPLOADS = """      - name: Upload final bundle
             ${{ runner.temp }}/chromix-build/src/out/Default/args.gn
             ${{ runner.temp }}/chromix-build/src/.chromix-upstream-restored.json
             ${{ runner.temp }}/chromix-build/src/.chromix-restored-patches.json
+            ${{ runner.temp }}/chromix-build/src/.chromix-linux157-*.json
+            ${{ runner.temp }}/chromix-build/src/.chromix-linux157-in-progress
+            ${{ runner.temp }}/chromix-build/linux157-failed.json
+            ${{ runner.temp }}/chromix-build/linux157-compiled.json
             ${{ runner.temp }}/chromix-build/upstream-cache-restore.json
             ${{ runner.temp }}/chromix-build/upstream-cache-preparation.json
             ${{ runner.temp }}/chromix-build/upstream-cache-ninja.json
@@ -776,6 +786,19 @@ def job(stage: int) -> str:
     parts.append(NODE_PY)
     parts.append(PIN_VERSION)
     parts.append(SDK_PREFLIGHT)
+    parts.append("""      - name: Validate exact Linux157 fresh source route
+        if: inputs.platform == 'linux' && env.CHROMIUM_VERSION == '157.0.8103.78'
+        env:
+          CHROMIX_USE_UPSTREAM_CACHE: ${{ inputs.use_upstream_cache && '1' || '0' }}
+        run: |
+          set -euo pipefail
+          test '${{ inputs.resume_migration }}' = ''
+          test '${{ inputs.resume_run_id }}' = ''
+          test "$(uname -m)" = x86_64
+          python3 tools/linux157_source.py --phase route --arch '${{ inputs.arch }}' \\
+            > "${RUNNER_TEMP}/chromix-logs/linux157-recipe.json"
+
+""")
     if stage == 1:
         parts.append(RESUME_STEPS)
     if stage > 1:

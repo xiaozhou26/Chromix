@@ -23,6 +23,8 @@ MANIFEST = "build/linux/157.0.8103.78/source.json"
 MANIFEST_SHA256 = "5ad5898d9442cc31b6ed571702f9e88510e9eea144ed544f60187e66e5c948d8"
 RECEIPT = ".chromix-linux157-source.json"
 IN_PROGRESS = ".chromix-linux157-in-progress"
+LITE_PATH = "build/windows/lite-tarball-files/v8/test/torque/test-torque.tq"
+LITE_SHA256 = "502c92560d745fc94e93ec7b95a1c562a55167f58a2ce79e3d0e4881dfb928c5"
 PATCH_OPTIONS = ("-p1", "--fuzz=0", "--batch", "--forward", "--get=0",
                  "--no-backup-if-mismatch", "--reject-file=-")
 
@@ -76,13 +78,16 @@ def validate_pins(pins: dict, repo: Path = ROOT) -> dict:
 def recipe(repo: Path = ROOT) -> dict:
     manifest = load_manifest(repo)
     files = [MANIFEST, "tools/linux157_source.py", "tools/linux157_toolchain.py",
-             "tools/linux157_build.py"]
+             "tools/linux157_build.py", LITE_PATH]
+    if digest(regular(repo, LITE_PATH).read_bytes()) != LITE_SHA256:
+        raise ValueError("changed Linux157 lite payload")
     files += [entry["path"] for entry in manifest["patches"]]
     inputs = {name: digest(regular(repo, name).read_bytes()) for name in files}
     return {"kind": "linux157-downstream-fresh", "chromium_version": VERSION,
             "core_commit": CORE, "platform_commit": PLATFORM, "platform_ref": BASE_REF,
             "platform_core_gitlink": BASE_CORE, "core_override": CORE,
-            "official_platform_tag": None, "inputs": inputs,
+            "official_platform_tag": None,
+            "review": {"path": MANIFEST, "sha256": MANIFEST_SHA256}, "inputs": inputs,
             "sha256": digest(json.dumps(inputs, sort_keys=True).encode())}
 
 
@@ -274,10 +279,27 @@ def prepare(work: Path, arch: str, repo: Path = ROOT) -> None:
     subprocess.run([sys.executable, str(core / "utils/prune_binaries.py"), str(src),
                     str(core / "pruning.list")], check=True)
     (src / IN_PROGRESS).write_text("chromix-patches\n")
+    lite = regular(repo, LITE_PATH).read_bytes()
+    if digest(lite) != LITE_SHA256:
+        raise ValueError("changed Linux157 lite payload")
+    lite_target = "v8/test/torque/test-torque.tq"
+    if (src / lite_target).exists():
+        if regular(src, lite_target).read_bytes() != lite:
+            raise ValueError("unexpected source archive Torque payload")
+    else:
+        parent = src
+        for part in lite_target.split("/")[:-1]:
+            parent = parent / part
+            if parent.is_symlink():
+                raise ValueError("linked source lite payload parent")
+        if (src / lite_target).is_symlink():
+            raise ValueError("linked source lite payload")
+        (src / lite_target).parent.mkdir(parents=True, exist_ok=True)
+        (src / lite_target).write_bytes(lite)
     subprocess.run([str(repo / "build/apply-patches.sh"), str(src)],
                    env=dict(env, CHROMIX_PATCH_PLATFORM="linux"), check=True)
     receipt = json.loads(regular(src, RECEIPT).read_bytes())
-    watched = set(load_manifest(repo)["final_outputs"])
+    watched = set(load_manifest(repo)["final_outputs"]) | {lite_target}
     for _, raw in patch_selection.select(repo, "linux", src=src, core=core)[1]:
         watched.update(re.findall(r"^diff --git a/\S+ b/(\S+)$", raw.decode(), re.M))
     outputs = {}
@@ -295,10 +317,47 @@ def prepare(work: Path, arch: str, repo: Path = ROOT) -> None:
     (src / ".chromix-source-ready").write_text("linux157-fresh|" + arch + "|" + recipe(repo)["sha256"] + "\n")
 
 
+def validate_route(repo: Path = ROOT, arch: str = "x64") -> dict:
+    try:
+        from .platform_pins import load_pins
+    except ImportError:
+        from platform_pins import load_pins
+    validate_pins(load_pins(repo, "linux"), repo)
+    if arch not in ("x64", "arm64"):
+        raise ValueError("unsupported Linux157 target")
+    if (os.environ.get("CHROMIX_USE_UPSTREAM_CACHE", "0") != "0"
+            or os.environ.get("CHROMIX_UPSTREAM_CACHE_DIR")):
+        raise ValueError("Linux157 requires explicit fresh mode without a donor cache")
+    return recipe(repo)
+
+
+def checkpoint(work: Path, arch: str, repo: Path = ROOT) -> dict:
+    try:
+        from . import patch_selection
+    except ImportError:
+        import patch_selection
+    validate_route(repo, arch)
+    work = work.resolve()
+    src = work / "src"
+    receipt = verify_receipt(src, repo)
+    selection, _ = patch_selection.select(repo, "linux", src=src)
+    if (receipt.get("stage") != "chromix-applied" or receipt.get("target_arch") != arch
+            or receipt.get("chromix_selection") != selection
+            or regular(src, ".chromix-source-ready").read_text().strip() !=
+            "linux157-fresh|" + arch + "|" + recipe(repo)["sha256"]
+            or (src / ".chromix-domain-substitution-in-progress").exists()):
+        raise ValueError("incomplete or changed Linux157 checkpoint")
+    get_platform(work / "tooling/ungoogled-chromium",
+                 work / "tooling/ungoogled-chromium-portablelinux", repo)
+    return {"schema_version": 1, "status": "verified", "platform": "linux", "arch": arch,
+            "recipe": recipe(repo), "source_verified": True, "runtime_verified": False,
+            "output": "src/out/Chromix", "qualification": "same-recipe fresh checkpoint, not build success"}
+
+
 def main(argv=None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--repo", type=Path, default=ROOT)
-    parser.add_argument("--phase", choices=("identity", "prepare", "verify", "init-subrepos", "get-platform", "apply-platform"), required=True)
+    parser.add_argument("--phase", choices=("identity", "route", "checkpoint", "prepare", "verify", "init-subrepos", "get-platform", "apply-platform"), required=True)
     parser.add_argument("--workdir", type=Path)
     parser.add_argument("--src", type=Path)
     parser.add_argument("--core", type=Path)
@@ -308,6 +367,10 @@ def main(argv=None) -> int:
     try:
         if args.phase == "identity":
             result = recipe(args.repo)
+        elif args.phase == "route":
+            result = validate_route(args.repo, args.arch)
+        elif args.phase == "checkpoint" and args.workdir:
+            result = checkpoint(args.workdir, args.arch, args.repo)
         elif args.phase == "prepare" and args.workdir:
             prepare(args.workdir, args.arch, args.repo)
             result = verify_receipt(args.workdir / "src", args.repo)

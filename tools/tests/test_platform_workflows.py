@@ -48,7 +48,7 @@ class PlatformWorkflowTest(unittest.TestCase):
                 self.assertEqual(set(events(workflow)), {'push', 'workflow_dispatch'})
                 self.assertEqual(events(workflow)['push']['branches'], ['main'])
                 dispatch = events(workflow)['workflow_dispatch']['inputs']
-                self.assertTrue(dispatch['use_upstream_cache']['default'])
+                self.assertEqual(dispatch['use_upstream_cache']['default'], platform != 'linux')
                 modes = ['staged', 'single', 'verify'] if name == 'build-linux-arm64' else ['staged', 'single']
                 for key, choices, default in (
                     ('build_profile', ['fast', 'release'], 'fast'),
@@ -78,8 +78,12 @@ class PlatformWorkflowTest(unittest.TestCase):
                                  (platform, arch, artifact))
                 self.assertEqual(inputs['max-stages'], "${{ inputs.build_mode == 'single' && 1 || 8 }}")
                 self.assertEqual(inputs['build_profile'], "${{ inputs.build_profile || 'fast' }}")
-                self.assertIn("github.event_name != 'workflow_dispatch' || inputs.use_upstream_cache",
-                              inputs['use_upstream_cache'])
+                cache_expression = ("github.event_name == 'workflow_dispatch' && inputs.use_upstream_cache"
+                                    if platform == 'linux' else
+                                    "github.event_name != 'workflow_dispatch' || inputs.use_upstream_cache")
+                self.assertIn(cache_expression, inputs['use_upstream_cache'])
+                if name == 'build-linux-arm64':
+                    self.assertEqual(inputs['runner'], 'ubuntu-24.04')
                 if runner:
                     self.assertEqual(inputs['runner'], runner)
                 paths = events(workflow)['push']['paths']

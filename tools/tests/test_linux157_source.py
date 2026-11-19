@@ -30,6 +30,9 @@ def clone_recipe(tmp_path):
     root = tmp_path / "repo"
     shutil.copytree(ROOT / "build/linux/157.0.8103.78", root / "build/linux/157.0.8103.78")
     (root / "tools").mkdir()
+    lite = root / source.LITE_PATH
+    lite.parent.mkdir(parents=True, exist_ok=True)
+    shutil.copy2(ROOT / source.LITE_PATH, lite)
     for name in ("linux157_source.py", "linux157_toolchain.py", "linux157_build.py"):
         shutil.copy2(ROOT / "tools" / name, root / "tools" / name)
     return root

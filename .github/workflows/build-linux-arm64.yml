@@ -36,9 +36,9 @@ on:
         options: [staged, single, verify]
         default: staged
       use_upstream_cache:
-        description: 'Build only: require pinned full upstream reuse; verify requires true and never restores a tree'
+        description: 'Linux157 builds require false; legacy verify requires true and never restores a tree'
         type: boolean
-        default: true
+        default: false
   push:
     branches: [main]
     paths:
@@ -74,6 +74,7 @@ on:
       - 'sdk/python/pyproject.toml'
       - '.github/workflows/build-linux-arm64.yml'
       - '.github/workflows/build-posix-github.yml'
+      - 'tools/linux157_*.py'
       - 'tools/platform_pins.py'
       - 'CHROMIUM_LINUX_VERSION'
       - 'CHROMIUM_VERSION'
@@ -95,7 +96,7 @@ jobs:
     with:
       platform: linux
       arch: arm64
-      runner: ${{ github.event_name == 'workflow_dispatch' && !inputs.use_upstream_cache && 'ubuntu-24.04-arm' || 'ubuntu-24.04' }}
+      runner: ubuntu-24.04
       artifact: chromix-linux-arm64
       max-stages: ${{ inputs.build_mode == 'single' && 1 || 8 }}
       build_profile: ${{ inputs.build_profile || 'fast' }}
@@ -104,7 +105,7 @@ jobs:
       resume_tree_stage: ${{ inputs.resume_tree_stage || '7' }}
       resume_attempt: ${{ inputs.resume_attempt || '1' }}
       resume_artifact_ids: ${{ inputs.resume_artifact_ids || '' }}
-      use_upstream_cache: ${{ github.event_name != 'workflow_dispatch' || inputs.use_upstream_cache }}
+      use_upstream_cache: ${{ github.event_name == 'workflow_dispatch' && inputs.use_upstream_cache }}
     secrets: inherit
 
   reverify:

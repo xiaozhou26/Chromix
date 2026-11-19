@@ -104,6 +104,10 @@ unchanged_check() {
 handoff() {
   unchanged_check after
   log "stage $STAGE_INDEX: $*; snapshotting unfinished work"
+  if [ "${LINUX157_FRESH:-0}" -eq 1 ]; then
+    python3 "$REPO/tools/linux157_source.py" --phase checkpoint --repo "$REPO" \
+      --workdir "$WORK" --arch "$ARCH" || die "Linux157 checkpoint is incomplete; retain failed source diagnostics"
+  fi
   mkdir -p "$SNAPSHOT_DIR"
   bash "$REPO/build/posix/ci-parts.sh" "$WORK" "$SNAPSHOT_DIR"
   emit upload_snapshot true
@@ -147,7 +151,17 @@ elif [ -e "$WORK/fingerprint-diagnostics/mac156-x64-stage3-resume.json" ] ||
   die "unchanged mac156 receipt requires the dedicated continuation mode"
 fi
 
-# Cache opt-in is mandatory in CI; helper APIs still report optional misses.
+LINUX157_FRESH=0
+if [ "$PLATFORM" = linux ] && [ -f "$REPO/CHROMIUM_LINUX_VERSION" ]; then
+  read -r LINUX_VERSION < "$REPO/CHROMIUM_LINUX_VERSION"
+  if [ "$LINUX_VERSION" = 157.0.8103.78 ]; then
+    python3 "$REPO/tools/linux157_source.py" --phase route --repo "$REPO" --arch "$ARCH" ||
+      die "Linux157 fresh route identity/cache policy failed"
+    LINUX157_FRESH=1
+  fi
+fi
+
+# Historical donor mode remains mandatory when explicitly selected.
 if [ "${CHROMIX_USE_UPSTREAM_CACHE:-0}" = 1 ]; then
   # Own snapshots take precedence, but cold snapshots cannot satisfy this mode.
   if [ "$STAGE_INDEX" -eq 1 ] && [ -z "$FROM_SNAPSHOT" ] && [ ! -e "$SRC" ]; then
@@ -224,7 +238,10 @@ fi
 if [ -f "$SRC/.chromix-domain-substitution-in-progress" ]; then
   die "domain substitution was interrupted; use a clean work directory"
 fi
-if [ -f "$SRC/.chromix-source-ready" ]; then
+if [ "$LINUX157_FRESH" -eq 1 ]; then
+  # The bounded fresh helper owns both preparation and official tool provisioning.
+  :
+elif [ -f "$SRC/.chromix-source-ready" ]; then
   # prepare-ungoogled.sh revalidates version pins, commits, and patch hash on rerun.
   :
 else
@@ -261,6 +278,9 @@ fi
 # Guard the external process, not a sourced function: child errexit stays enabled.
 RC=0
 BUILD_COMMAND=(env CHROMIX_SKIP_DEPS=1 CHROMIX_WORKDIR="$WORK" "$BUILD_SCRIPT" "$WORK" "$ARCH")
+if [ "$LINUX157_FRESH" -eq 1 ]; then
+  BUILD_COMMAND=(python3 "$REPO/tools/linux157_build.py" --repo "$REPO" --workdir "$WORK" --arch "$ARCH")
+fi
 if [ -n "$UNCHANGED_HELPER" ]; then
   BUILD_COMMAND=(python3 "$UNCHANGED_HELPER"
     --mode compile --repo "$REPO" --workdir "$WORK" --stage "$STAGE_INDEX")

@@ -330,6 +330,18 @@ jobs:
       - name: Verify complete Mac SDK contents
         if: runner.os == 'macOS' && inputs.use_upstream_cache
         run: python3 tools/inspect_macos_sdk.py --report "${RUNNER_TEMP}/chromix-logs/sdk-content.json"
+      - name: Validate exact Linux157 fresh source route
+        if: inputs.platform == 'linux' && env.CHROMIUM_VERSION == '157.0.8103.78'
+        env:
+          CHROMIX_USE_UPSTREAM_CACHE: ${{ inputs.use_upstream_cache && '1' || '0' }}
+        run: |
+          set -euo pipefail
+          test '${{ inputs.resume_migration }}' = ''
+          test '${{ inputs.resume_run_id }}' = ''
+          test "$(uname -m)" = x86_64
+          python3 tools/linux157_source.py --phase route --arch '${{ inputs.arch }}' \
+            > "${RUNNER_TEMP}/chromix-logs/linux157-recipe.json"
+
       - name: Validate selected POSIX checkpoint
         id: resume
         if: inputs.resume_run_id != ''
@@ -582,8 +594,14 @@ jobs:
               if path.is_dir():
                   shutil.rmtree(path)
           PY
-          python3 tools/verify_linux_checkpoint.py --workdir "$WORK" --arch '${{ inputs.arch }}' \
-            > "${RUNNER_TEMP}/chromix-logs/checkpoint-identity-s1.json"
+          if [ "${CHROMIUM_VERSION:-}" = 157.0.8103.78 ]; then
+            CHROMIX_USE_UPSTREAM_CACHE=0 python3 tools/linux157_source.py --phase checkpoint \
+              --workdir "$WORK" --arch '${{ inputs.arch }}' \
+              > "${RUNNER_TEMP}/chromix-logs/checkpoint-identity-s1.json"
+          else
+            python3 tools/verify_linux_checkpoint.py --workdir "$WORK" --arch '${{ inputs.arch }}' \
+              > "${RUNNER_TEMP}/chromix-logs/checkpoint-identity-s1.json"
+          fi
           bash build/posix/ci-parts.sh "$WORK" "$WORK/.snapshot-stage-1"
           echo "upload_snapshot=true" >> "$GITHUB_OUTPUT"
 
@@ -664,6 +682,10 @@ jobs:
             ${{ runner.temp }}/chromix-build/src/out/Default/args.gn
             ${{ runner.temp }}/chromix-build/src/.chromix-upstream-restored.json
             ${{ runner.temp }}/chromix-build/src/.chromix-restored-patches.json
+            ${{ runner.temp }}/chromix-build/src/.chromix-linux157-*.json
+            ${{ runner.temp }}/chromix-build/src/.chromix-linux157-in-progress
+            ${{ runner.temp }}/chromix-build/linux157-failed.json
+            ${{ runner.temp }}/chromix-build/linux157-compiled.json
             ${{ runner.temp }}/chromix-build/upstream-cache-restore.json
             ${{ runner.temp }}/chromix-build/upstream-cache-preparation.json
             ${{ runner.temp }}/chromix-build/upstream-cache-ninja.json
@@ -861,6 +883,18 @@ jobs:
       - name: Verify complete Mac SDK contents
         if: runner.os == 'macOS' && inputs.use_upstream_cache
         run: python3 tools/inspect_macos_sdk.py --report "${RUNNER_TEMP}/chromix-logs/sdk-content.json"
+      - name: Validate exact Linux157 fresh source route
+        if: inputs.platform == 'linux' && env.CHROMIUM_VERSION == '157.0.8103.78'
+        env:
+          CHROMIX_USE_UPSTREAM_CACHE: ${{ inputs.use_upstream_cache && '1' || '0' }}
+        run: |
+          set -euo pipefail
+          test '${{ inputs.resume_migration }}' = ''
+          test '${{ inputs.resume_run_id }}' = ''
+          test "$(uname -m)" = x86_64
+          python3 tools/linux157_source.py --phase route --arch '${{ inputs.arch }}' \
+            > "${RUNNER_TEMP}/chromix-logs/linux157-recipe.json"
+
       - name: Record exact mac156 handoff producer attempt
         if: inputs.resume_migration == 'mac156-arm64-hevc' || inputs.resume_migration == 'mac156-x64-stage3' || inputs.resume_migration == 'mac156-x64-stage2' || inputs.resume_migration == 'mac156-arm64-stage1' || inputs.resume_migration == 'mac156-arm64-stage8' || inputs.resume_migration == 'mac156-x64-stage8'
         env:
@@ -988,8 +1022,14 @@ jobs:
               if path.is_dir():
                   shutil.rmtree(path)
           PY
-          python3 tools/verify_linux_checkpoint.py --workdir "$WORK" --arch '${{ inputs.arch }}' \
-            > "${RUNNER_TEMP}/chromix-logs/checkpoint-identity-s2.json"
+          if [ "${CHROMIUM_VERSION:-}" = 157.0.8103.78 ]; then
+            CHROMIX_USE_UPSTREAM_CACHE=0 python3 tools/linux157_source.py --phase checkpoint \
+              --workdir "$WORK" --arch '${{ inputs.arch }}' \
+              > "${RUNNER_TEMP}/chromix-logs/checkpoint-identity-s2.json"
+          else
+            python3 tools/verify_linux_checkpoint.py --workdir "$WORK" --arch '${{ inputs.arch }}' \
+              > "${RUNNER_TEMP}/chromix-logs/checkpoint-identity-s2.json"
+          fi
           bash build/posix/ci-parts.sh "$WORK" "$WORK/.snapshot-stage-2"
           echo "upload_snapshot=true" >> "$GITHUB_OUTPUT"
 
@@ -1070,6 +1110,10 @@ jobs:
             ${{ runner.temp }}/chromix-build/src/out/Default/args.gn
             ${{ runner.temp }}/chromix-build/src/.chromix-upstream-restored.json
             ${{ runner.temp }}/chromix-build/src/.chromix-restored-patches.json
+            ${{ runner.temp }}/chromix-build/src/.chromix-linux157-*.json
+            ${{ runner.temp }}/chromix-build/src/.chromix-linux157-in-progress
+            ${{ runner.temp }}/chromix-build/linux157-failed.json
+            ${{ runner.temp }}/chromix-build/linux157-compiled.json
             ${{ runner.temp }}/chromix-build/upstream-cache-restore.json
             ${{ runner.temp }}/chromix-build/upstream-cache-preparation.json
             ${{ runner.temp }}/chromix-build/upstream-cache-ninja.json
@@ -1267,6 +1311,18 @@ jobs:
       - name: Verify complete Mac SDK contents
         if: runner.os == 'macOS' && inputs.use_upstream_cache
         run: python3 tools/inspect_macos_sdk.py --report "${RUNNER_TEMP}/chromix-logs/sdk-content.json"
+      - name: Validate exact Linux157 fresh source route
+        if: inputs.platform == 'linux' && env.CHROMIUM_VERSION == '157.0.8103.78'
+        env:
+          CHROMIX_USE_UPSTREAM_CACHE: ${{ inputs.use_upstream_cache && '1' || '0' }}
+        run: |
+          set -euo pipefail
+          test '${{ inputs.resume_migration }}' = ''
+          test '${{ inputs.resume_run_id }}' = ''
+          test "$(uname -m)" = x86_64
+          python3 tools/linux157_source.py --phase route --arch '${{ inputs.arch }}' \
+            > "${RUNNER_TEMP}/chromix-logs/linux157-recipe.json"
+
       - name: Record exact mac156 handoff producer attempt
         if: inputs.resume_migration == 'mac156-arm64-hevc' || inputs.resume_migration == 'mac156-x64-stage3' || inputs.resume_migration == 'mac156-x64-stage2' || inputs.resume_migration == 'mac156-arm64-stage1' || inputs.resume_migration == 'mac156-arm64-stage8' || inputs.resume_migration == 'mac156-x64-stage8'
         env:
@@ -1394,8 +1450,14 @@ jobs:
               if path.is_dir():
                   shutil.rmtree(path)
           PY
-          python3 tools/verify_linux_checkpoint.py --workdir "$WORK" --arch '${{ inputs.arch }}' \
-            > "${RUNNER_TEMP}/chromix-logs/checkpoint-identity-s3.json"
+          if [ "${CHROMIUM_VERSION:-}" = 157.0.8103.78 ]; then
+            CHROMIX_USE_UPSTREAM_CACHE=0 python3 tools/linux157_source.py --phase checkpoint \
+              --workdir "$WORK" --arch '${{ inputs.arch }}' \
+              > "${RUNNER_TEMP}/chromix-logs/checkpoint-identity-s3.json"
+          else
+            python3 tools/verify_linux_checkpoint.py --workdir "$WORK" --arch '${{ inputs.arch }}' \
+              > "${RUNNER_TEMP}/chromix-logs/checkpoint-identity-s3.json"
+          fi
           bash build/posix/ci-parts.sh "$WORK" "$WORK/.snapshot-stage-3"
           echo "upload_snapshot=true" >> "$GITHUB_OUTPUT"
 
@@ -1476,6 +1538,10 @@ jobs:
             ${{ runner.temp }}/chromix-build/src/out/Default/args.gn
             ${{ runner.temp }}/chromix-build/src/.chromix-upstream-restored.json
             ${{ runner.temp }}/chromix-build/src/.chromix-restored-patches.json
+            ${{ runner.temp }}/chromix-build/src/.chromix-linux157-*.json
+            ${{ runner.temp }}/chromix-build/src/.chromix-linux157-in-progress
+            ${{ runner.temp }}/chromix-build/linux157-failed.json
+            ${{ runner.temp }}/chromix-build/linux157-compiled.json
             ${{ runner.temp }}/chromix-build/upstream-cache-restore.json
             ${{ runner.temp }}/chromix-build/upstream-cache-preparation.json
             ${{ runner.temp }}/chromix-build/upstream-cache-ninja.json
@@ -1673,6 +1739,18 @@ jobs:
       - name: Verify complete Mac SDK contents
         if: runner.os == 'macOS' && inputs.use_upstream_cache
         run: python3 tools/inspect_macos_sdk.py --report "${RUNNER_TEMP}/chromix-logs/sdk-content.json"
+      - name: Validate exact Linux157 fresh source route
+        if: inputs.platform == 'linux' && env.CHROMIUM_VERSION == '157.0.8103.78'
+        env:
+          CHROMIX_USE_UPSTREAM_CACHE: ${{ inputs.use_upstream_cache && '1' || '0' }}
+        run: |
+          set -euo pipefail
+          test '${{ inputs.resume_migration }}' = ''
+          test '${{ inputs.resume_run_id }}' = ''
+          test "$(uname -m)" = x86_64
+          python3 tools/linux157_source.py --phase route --arch '${{ inputs.arch }}' \
+            > "${RUNNER_TEMP}/chromix-logs/linux157-recipe.json"
+
       - name: Record exact mac156 handoff producer attempt
         if: inputs.resume_migration == 'mac156-arm64-hevc' || inputs.resume_migration == 'mac156-x64-stage3' || inputs.resume_migration == 'mac156-x64-stage2' || inputs.resume_migration == 'mac156-arm64-stage1' || inputs.resume_migration == 'mac156-arm64-stage8' || inputs.resume_migration == 'mac156-x64-stage8'
         env:
@@ -1800,8 +1878,14 @@ jobs:
               if path.is_dir():
                   shutil.rmtree(path)
           PY
-          python3 tools/verify_linux_checkpoint.py --workdir "$WORK" --arch '${{ inputs.arch }}' \
-            > "${RUNNER_TEMP}/chromix-logs/checkpoint-identity-s4.json"
+          if [ "${CHROMIUM_VERSION:-}" = 157.0.8103.78 ]; then
+            CHROMIX_USE_UPSTREAM_CACHE=0 python3 tools/linux157_source.py --phase checkpoint \
+              --workdir "$WORK" --arch '${{ inputs.arch }}' \
+              > "${RUNNER_TEMP}/chromix-logs/checkpoint-identity-s4.json"
+          else
+            python3 tools/verify_linux_checkpoint.py --workdir "$WORK" --arch '${{ inputs.arch }}' \
+              > "${RUNNER_TEMP}/chromix-logs/checkpoint-identity-s4.json"
+          fi
           bash build/posix/ci-parts.sh "$WORK" "$WORK/.snapshot-stage-4"
           echo "upload_snapshot=true" >> "$GITHUB_OUTPUT"
 
@@ -1882,6 +1966,10 @@ jobs:
             ${{ runner.temp }}/chromix-build/src/out/Default/args.gn
             ${{ runner.temp }}/chromix-build/src/.chromix-upstream-restored.json
             ${{ runner.temp }}/chromix-build/src/.chromix-restored-patches.json
+            ${{ runner.temp }}/chromix-build/src/.chromix-linux157-*.json
+            ${{ runner.temp }}/chromix-build/src/.chromix-linux157-in-progress
+            ${{ runner.temp }}/chromix-build/linux157-failed.json
+            ${{ runner.temp }}/chromix-build/linux157-compiled.json
             ${{ runner.temp }}/chromix-build/upstream-cache-restore.json
             ${{ runner.temp }}/chromix-build/upstream-cache-preparation.json
             ${{ runner.temp }}/chromix-build/upstream-cache-ninja.json
@@ -2079,6 +2167,18 @@ jobs:
       - name: Verify complete Mac SDK contents
         if: runner.os == 'macOS' && inputs.use_upstream_cache
         run: python3 tools/inspect_macos_sdk.py --report "${RUNNER_TEMP}/chromix-logs/sdk-content.json"
+      - name: Validate exact Linux157 fresh source route
+        if: inputs.platform == 'linux' && env.CHROMIUM_VERSION == '157.0.8103.78'
+        env:
+          CHROMIX_USE_UPSTREAM_CACHE: ${{ inputs.use_upstream_cache && '1' || '0' }}
+        run: |
+          set -euo pipefail
+          test '${{ inputs.resume_migration }}' = ''
+          test '${{ inputs.resume_run_id }}' = ''
+          test "$(uname -m)" = x86_64
+          python3 tools/linux157_source.py --phase route --arch '${{ inputs.arch }}' \
+            > "${RUNNER_TEMP}/chromix-logs/linux157-recipe.json"
+
       - name: Record exact mac156 handoff producer attempt
         if: inputs.resume_migration == 'mac156-arm64-hevc' || inputs.resume_migration == 'mac156-x64-stage3' || inputs.resume_migration == 'mac156-x64-stage2' || inputs.resume_migration == 'mac156-arm64-stage1' || inputs.resume_migration == 'mac156-arm64-stage8' || inputs.resume_migration == 'mac156-x64-stage8'
         env:
@@ -2206,8 +2306,14 @@ jobs:
               if path.is_dir():
                   shutil.rmtree(path)
           PY
-          python3 tools/verify_linux_checkpoint.py --workdir "$WORK" --arch '${{ inputs.arch }}' \
-            > "${RUNNER_TEMP}/chromix-logs/checkpoint-identity-s5.json"
+          if [ "${CHROMIUM_VERSION:-}" = 157.0.8103.78 ]; then
+            CHROMIX_USE_UPSTREAM_CACHE=0 python3 tools/linux157_source.py --phase checkpoint \
+              --workdir "$WORK" --arch '${{ inputs.arch }}' \
+              > "${RUNNER_TEMP}/chromix-logs/checkpoint-identity-s5.json"
+          else
+            python3 tools/verify_linux_checkpoint.py --workdir "$WORK" --arch '${{ inputs.arch }}' \
+              > "${RUNNER_TEMP}/chromix-logs/checkpoint-identity-s5.json"
+          fi
           bash build/posix/ci-parts.sh "$WORK" "$WORK/.snapshot-stage-5"
           echo "upload_snapshot=true" >> "$GITHUB_OUTPUT"
 
@@ -2288,6 +2394,10 @@ jobs:
             ${{ runner.temp }}/chromix-build/src/out/Default/args.gn
             ${{ runner.temp }}/chromix-build/src/.chromix-upstream-restored.json
             ${{ runner.temp }}/chromix-build/src/.chromix-restored-patches.json
+            ${{ runner.temp }}/chromix-build/src/.chromix-linux157-*.json
+            ${{ runner.temp }}/chromix-build/src/.chromix-linux157-in-progress
+            ${{ runner.temp }}/chromix-build/linux157-failed.json
+            ${{ runner.temp }}/chromix-build/linux157-compiled.json
             ${{ runner.temp }}/chromix-build/upstream-cache-restore.json
             ${{ runner.temp }}/chromix-build/upstream-cache-preparation.json
             ${{ runner.temp }}/chromix-build/upstream-cache-ninja.json
@@ -2485,6 +2595,18 @@ jobs:
       - name: Verify complete Mac SDK contents
         if: runner.os == 'macOS' && inputs.use_upstream_cache
         run: python3 tools/inspect_macos_sdk.py --report "${RUNNER_TEMP}/chromix-logs/sdk-content.json"
+      - name: Validate exact Linux157 fresh source route
+        if: inputs.platform == 'linux' && env.CHROMIUM_VERSION == '157.0.8103.78'
+        env:
+          CHROMIX_USE_UPSTREAM_CACHE: ${{ inputs.use_upstream_cache && '1' || '0' }}
+        run: |
+          set -euo pipefail
+          test '${{ inputs.resume_migration }}' = ''
+          test '${{ inputs.resume_run_id }}' = ''
+          test "$(uname -m)" = x86_64
+          python3 tools/linux157_source.py --phase route --arch '${{ inputs.arch }}' \
+            > "${RUNNER_TEMP}/chromix-logs/linux157-recipe.json"
+
       - name: Record exact mac156 handoff producer attempt
         if: inputs.resume_migration == 'mac156-arm64-hevc' || inputs.resume_migration == 'mac156-x64-stage3' || inputs.resume_migration == 'mac156-x64-stage2' || inputs.resume_migration == 'mac156-arm64-stage1' || inputs.resume_migration == 'mac156-arm64-stage8' || inputs.resume_migration == 'mac156-x64-stage8'
         env:
@@ -2612,8 +2734,14 @@ jobs:
               if path.is_dir():
                   shutil.rmtree(path)
           PY
-          python3 tools/verify_linux_checkpoint.py --workdir "$WORK" --arch '${{ inputs.arch }}' \
-            > "${RUNNER_TEMP}/chromix-logs/checkpoint-identity-s6.json"
+          if [ "${CHROMIUM_VERSION:-}" = 157.0.8103.78 ]; then
+            CHROMIX_USE_UPSTREAM_CACHE=0 python3 tools/linux157_source.py --phase checkpoint \
+              --workdir "$WORK" --arch '${{ inputs.arch }}' \
+              > "${RUNNER_TEMP}/chromix-logs/checkpoint-identity-s6.json"
+          else
+            python3 tools/verify_linux_checkpoint.py --workdir "$WORK" --arch '${{ inputs.arch }}' \
+              > "${RUNNER_TEMP}/chromix-logs/checkpoint-identity-s6.json"
+          fi
           bash build/posix/ci-parts.sh "$WORK" "$WORK/.snapshot-stage-6"
           echo "upload_snapshot=true" >> "$GITHUB_OUTPUT"
 
@@ -2694,6 +2822,10 @@ jobs:
             ${{ runner.temp }}/chromix-build/src/out/Default/args.gn
             ${{ runner.temp }}/chromix-build/src/.chromix-upstream-restored.json
             ${{ runner.temp }}/chromix-build/src/.chromix-restored-patches.json
+            ${{ runner.temp }}/chromix-build/src/.chromix-linux157-*.json
+            ${{ runner.temp }}/chromix-build/src/.chromix-linux157-in-progress
+            ${{ runner.temp }}/chromix-build/linux157-failed.json
+            ${{ runner.temp }}/chromix-build/linux157-compiled.json
             ${{ runner.temp }}/chromix-build/upstream-cache-restore.json
             ${{ runner.temp }}/chromix-build/upstream-cache-preparation.json
             ${{ runner.temp }}/chromix-build/upstream-cache-ninja.json
@@ -2891,6 +3023,18 @@ jobs:
       - name: Verify complete Mac SDK contents
         if: runner.os == 'macOS' && inputs.use_upstream_cache
         run: python3 tools/inspect_macos_sdk.py --report "${RUNNER_TEMP}/chromix-logs/sdk-content.json"
+      - name: Validate exact Linux157 fresh source route
+        if: inputs.platform == 'linux' && env.CHROMIUM_VERSION == '157.0.8103.78'
+        env:
+          CHROMIX_USE_UPSTREAM_CACHE: ${{ inputs.use_upstream_cache && '1' || '0' }}
+        run: |
+          set -euo pipefail
+          test '${{ inputs.resume_migration }}' = ''
+          test '${{ inputs.resume_run_id }}' = ''
+          test "$(uname -m)" = x86_64
+          python3 tools/linux157_source.py --phase route --arch '${{ inputs.arch }}' \
+            > "${RUNNER_TEMP}/chromix-logs/linux157-recipe.json"
+
       - name: Record exact mac156 handoff producer attempt
         if: inputs.resume_migration == 'mac156-arm64-hevc' || inputs.resume_migration == 'mac156-x64-stage3' || inputs.resume_migration == 'mac156-x64-stage2' || inputs.resume_migration == 'mac156-arm64-stage1' || inputs.resume_migration == 'mac156-arm64-stage8' || inputs.resume_migration == 'mac156-x64-stage8'
         env:
@@ -3018,8 +3162,14 @@ jobs:
               if path.is_dir():
                   shutil.rmtree(path)
           PY
-          python3 tools/verify_linux_checkpoint.py --workdir "$WORK" --arch '${{ inputs.arch }}' \
-            > "${RUNNER_TEMP}/chromix-logs/checkpoint-identity-s7.json"
+          if [ "${CHROMIUM_VERSION:-}" = 157.0.8103.78 ]; then
+            CHROMIX_USE_UPSTREAM_CACHE=0 python3 tools/linux157_source.py --phase checkpoint \
+              --workdir "$WORK" --arch '${{ inputs.arch }}' \
+              > "${RUNNER_TEMP}/chromix-logs/checkpoint-identity-s7.json"
+          else
+            python3 tools/verify_linux_checkpoint.py --workdir "$WORK" --arch '${{ inputs.arch }}' \
+              > "${RUNNER_TEMP}/chromix-logs/checkpoint-identity-s7.json"
+          fi
           bash build/posix/ci-parts.sh "$WORK" "$WORK/.snapshot-stage-7"
           echo "upload_snapshot=true" >> "$GITHUB_OUTPUT"
 
@@ -3100,6 +3250,10 @@ jobs:
             ${{ runner.temp }}/chromix-build/src/out/Default/args.gn
             ${{ runner.temp }}/chromix-build/src/.chromix-upstream-restored.json
             ${{ runner.temp }}/chromix-build/src/.chromix-restored-patches.json
+            ${{ runner.temp }}/chromix-build/src/.chromix-linux157-*.json
+            ${{ runner.temp }}/chromix-build/src/.chromix-linux157-in-progress
+            ${{ runner.temp }}/chromix-build/linux157-failed.json
+            ${{ runner.temp }}/chromix-build/linux157-compiled.json
             ${{ runner.temp }}/chromix-build/upstream-cache-restore.json
             ${{ runner.temp }}/chromix-build/upstream-cache-preparation.json
             ${{ runner.temp }}/chromix-build/upstream-cache-ninja.json
@@ -3297,6 +3451,18 @@ jobs:
       - name: Verify complete Mac SDK contents
         if: runner.os == 'macOS' && inputs.use_upstream_cache
         run: python3 tools/inspect_macos_sdk.py --report "${RUNNER_TEMP}/chromix-logs/sdk-content.json"
+      - name: Validate exact Linux157 fresh source route
+        if: inputs.platform == 'linux' && env.CHROMIUM_VERSION == '157.0.8103.78'
+        env:
+          CHROMIX_USE_UPSTREAM_CACHE: ${{ inputs.use_upstream_cache && '1' || '0' }}
+        run: |
+          set -euo pipefail
+          test '${{ inputs.resume_migration }}' = ''
+          test '${{ inputs.resume_run_id }}' = ''
+          test "$(uname -m)" = x86_64
+          python3 tools/linux157_source.py --phase route --arch '${{ inputs.arch }}' \
+            > "${RUNNER_TEMP}/chromix-logs/linux157-recipe.json"
+
       - name: Record exact mac156 handoff producer attempt
         if: inputs.resume_migration == 'mac156-arm64-hevc' || inputs.resume_migration == 'mac156-x64-stage3' || inputs.resume_migration == 'mac156-x64-stage2' || inputs.resume_migration == 'mac156-arm64-stage1' || inputs.resume_migration == 'mac156-arm64-stage8' || inputs.resume_migration == 'mac156-x64-stage8'
         env:
@@ -3424,8 +3590,14 @@ jobs:
               if path.is_dir():
                   shutil.rmtree(path)
           PY
-          python3 tools/verify_linux_checkpoint.py --workdir "$WORK" --arch '${{ inputs.arch }}' \
-            > "${RUNNER_TEMP}/chromix-logs/checkpoint-identity-s8.json"
+          if [ "${CHROMIUM_VERSION:-}" = 157.0.8103.78 ]; then
+            CHROMIX_USE_UPSTREAM_CACHE=0 python3 tools/linux157_source.py --phase checkpoint \
+              --workdir "$WORK" --arch '${{ inputs.arch }}' \
+              > "${RUNNER_TEMP}/chromix-logs/checkpoint-identity-s8.json"
+          else
+            python3 tools/verify_linux_checkpoint.py --workdir "$WORK" --arch '${{ inputs.arch }}' \
+              > "${RUNNER_TEMP}/chromix-logs/checkpoint-identity-s8.json"
+          fi
           bash build/posix/ci-parts.sh "$WORK" "$WORK/.snapshot-stage-8"
           echo "upload_snapshot=true" >> "$GITHUB_OUTPUT"
 
@@ -3506,6 +3678,10 @@ jobs:
             ${{ runner.temp }}/chromix-build/src/out/Default/args.gn
             ${{ runner.temp }}/chromix-build/src/.chromix-upstream-restored.json
             ${{ runner.temp }}/chromix-build/src/.chromix-restored-patches.json
+            ${{ runner.temp }}/chromix-build/src/.chromix-linux157-*.json
+            ${{ runner.temp }}/chromix-build/src/.chromix-linux157-in-progress
+            ${{ runner.temp }}/chromix-build/linux157-failed.json
+            ${{ runner.temp }}/chromix-build/linux157-compiled.json
             ${{ runner.temp }}/chromix-build/upstream-cache-restore.json
             ${{ runner.temp }}/chromix-build/upstream-cache-preparation.json
             ${{ runner.temp }}/chromix-build/upstream-cache-ninja.json
