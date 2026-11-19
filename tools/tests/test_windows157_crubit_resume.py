@@ -21,7 +21,8 @@ import windows157_crubit_resume as resume
 import gen_windows_arm64_workflow as generator
 from test_windows157 import pe_dll, put, host_tree, FILES
 
-AUDIT = json.loads(gzip.decompress((ROOT / 'tools/tests/fixtures/windows157_crubit_checkpoint.json.gz').read_bytes()))
+HISTORICAL_AUDIT = json.loads(gzip.decompress((ROOT / 'tools/tests/fixtures/windows157_crubit_checkpoint.json.gz').read_bytes()))
+AUDIT = json.loads(gzip.decompress((ROOT / 'tools/tests/fixtures/windows157_crubit_retry2.json.gz').read_bytes()))['metadata']
 SOURCE = json.loads(gzip.decompress((ROOT / 'tools/tests/fixtures/windows157_crubit_source.json.gz').read_bytes()))
 NOW = datetime(2026, 11, 19, 16, tzinfo=timezone.utc)
 
@@ -57,21 +58,21 @@ def cargo_json(data):
 
 
 def test_actual_rust_sources_distinguish_host_build_install_and_target_dir():
-    for source in AUDIT['sources'].values():
+    for source in HISTORICAL_AUDIT['sources'].values():
         assert hashlib.sha256(source['text'].encode()).hexdigest() == source['sha256']
-    rust = AUDIT['sources']['tools/rust/build_rust.py']['text']
+    rust = HISTORICAL_AUDIT['sources']['tools/rust/build_rust.py']['text']
     assert "self._env['CARGO_HOME'] = CARGO_HOME_DIR" in rust
     assert "xpy.run('install', xpy_args)" in rust
-    bindgen = AUDIT['sources']['tools/rust/build_bindgen.py']['text']
+    bindgen = HISTORICAL_AUDIT['sources']['tools/rust/build_bindgen.py']['text']
     assert "f'--target={RustTargetTriple()}'" in bindgen
     assert "os.path.join(build_dir, RustTargetTriple(), 'release'" in bindgen
-    crubit = AUDIT['sources']['tools/rust/build_crubit.py']['text']
+    crubit = HISTORICAL_AUDIT['sources']['tools/rust/build_crubit.py']['text']
     assert "release_dir = os.path.join(target_dir, 'release')" in crubit
-    assert tools.CRUBIT_BIN_SHA256 == AUDIT['sources'][tools.CRUBIT_BIN_MANIFEST]['sha256']
+    assert tools.CRUBIT_BIN_SHA256 == HISTORICAL_AUDIT['sources'][tools.CRUBIT_BIN_MANIFEST]['sha256']
     assert any('source ready: ' + '|'.join((tools.VERSION, tools.CORE, tools.WINDOWS, resume.PREPARE_KEY)) in l
-               for l in AUDIT['phase_log'])
-    assert any('Finished `release` profile' in l for l in AUDIT['phase_log'])
-    assert any('out\\crubit\\release\\cc_bindings_from_rs.exe' in l for l in AUDIT['phase_log'])
+               for l in HISTORICAL_AUDIT['phase_log'])
+    assert any('Finished `release` profile' in l for l in HISTORICAL_AUDIT['phase_log'])
+    assert any('out\\crubit\\release\\cc_bindings_from_rs.exe' in l for l in HISTORICAL_AUDIT['phase_log'])
 
 
 def test_explicit_target_json_output_and_wrong_arch_refused(tmp_path):
@@ -114,7 +115,7 @@ def test_prepare_real_cargo_layout_installs_verified_bytes_without_clean(tmp_pat
     put(src / 'out/Chromix/args.gn', 'target_cpu="x64"\nhost_cpu="x64"\nchrome_pgo_phase=2\n')
     root = src / tools.CRUBIT_ROOT
     (root / 'bin/cc_bindings_from_rs.exe').unlink()
-    put(root / 'lib/third_party/crubit' / tools.CRUBIT_BIN_MANIFEST, AUDIT['sources'][tools.CRUBIT_BIN_MANIFEST]['text'])
+    put(root / 'lib/third_party/crubit' / tools.CRUBIT_BIN_MANIFEST, HISTORICAL_AUDIT['sources'][tools.CRUBIT_BIN_MANIFEST]['text'])
     for name in tools.TOOLING: put(work / 'tooling/ungoogled-chromium-windows' / name, FILES['windows/' + name]['text'])
     for name in ('rustc.exe', 'cargo.exe'): executable(src / 'third_party/rust-toolchain/bin' / name)
     target = src / 'out/crubit'
@@ -146,7 +147,7 @@ def test_prepare_real_cargo_layout_installs_verified_bytes_without_clean(tmp_pat
 
 def test_real_latest_two_volumes_and_producer_attempt():
     assert resume.metadata(Client(), NOW) == resume.manifest()
-    assert [a['id'] for a in resume.manifest()['artifacts']] == [14541953586, 14541992786]
+    assert [a['id'] for a in resume.manifest()['artifacts']] == [14554780574, 14554246738]
 
 
 @pytest.mark.parametrize('mutation', ['attempt', 'sha', 'job', 'upload', 'expired', 'size', 'digest', 'extra', 'missing', 'later'])
@@ -193,7 +194,7 @@ def recipe(tmp_path_factory):
 
 
 def test_linux_only_main_change_preserves_exact_windows_donor_recipe(recipe):
-    donor = json.loads(subprocess.check_output(['git', '-C', str(ROOT), 'show', resume.DONOR_SHA + ':build/patch-selection-157.json']))
+    donor = json.loads(subprocess.check_output(['git', '-C', str(ROOT), 'show', resume.RECIPE_SHA + ':build/patch-selection-157.json']))
     current = json.loads((ROOT / 'build/patch-selection-157.json').read_text())
     assert donor != current
     assert resume.windows_recipe(donor) == resume.windows_recipe(current)
@@ -202,7 +203,7 @@ def test_linux_only_main_change_preserves_exact_windows_donor_recipe(recipe):
     assert actual == resume.PREPARE_KEY
     assert (recipe / resume.HELPER).read_bytes() == (ROOT / resume.HELPER).read_bytes()
     assert (recipe / 'build/windows/ci-stage.ps1').read_bytes().replace(b'\r\n', b'\n') == subprocess.check_output(
-        ['git', '-C', str(ROOT), 'show', resume.DONOR_SHA + ':build/windows/ci-stage.ps1'])
+        ['git', '-C', str(ROOT), 'show', resume.RECIPE_SHA + ':build/windows/ci-stage.ps1'])
     assert b'\r\n' in (recipe / 'build/windows/lite-tarball-files/v8/test/torque/test-torque.tq').read_bytes()
 
 
@@ -325,7 +326,7 @@ def test_cargo_install_does_not_touch_arm64_cache_path():
 
 
 def test_frozen_recipe_comparison_rejects_windows_change_not_linux_change():
-    donor = json.loads(subprocess.check_output(['git', '-C', str(ROOT), 'show', resume.DONOR_SHA + ':build/patch-selection-157.json']))
+    donor = json.loads(subprocess.check_output(['git', '-C', str(ROOT), 'show', resume.RECIPE_SHA + ':build/patch-selection-157.json']))
     changed = deepcopy(donor)
     changed['platforms']['linux']['downstream']['note-test-only'] = 'different platform'
     assert resume.windows_recipe(changed) == resume.windows_recipe(donor)
@@ -333,75 +334,14 @@ def test_frozen_recipe_comparison_rejects_windows_change_not_linux_change():
     assert resume.windows_recipe(changed) != resume.windows_recipe(donor)
 
 
-REVIEWED_MAC_COMMIT = "fe50df0c124556f3a1a90196403a850fda68592e"
 
-
-def platform_trees():
-    head = subprocess.check_output(['git', '-C', str(ROOT), 'rev-parse', 'HEAD'], text=True).strip()
-    return head, resume.git_tree('git', ROOT, resume.MAIN_BASE), resume.git_tree('git', ROOT, head)
-
-
-def test_main_reviewed_mac_inputs_are_exact_content_transitions():
-    head, base, tree = platform_trees()
-    assert set(resume.REVIEWED_PLATFORM_INPUTS) == {
-        'tools/macos_restored_generators.py',
-        'tools/tests/fixtures/macos157_official_typescript.json.gz',
-        'tools/tests/test_macos157_official_typescript.py',
-    }
-    for name, (before, after) in resume.REVIEWED_PLATFORM_INPUTS.items():
-        assert resume.digest(resume.blob('git', ROOT, REVIEWED_MAC_COMMIT, name)) == after
-        assert resume.digest(resume.blob('git', ROOT, head, name)) == after
-        assert resume.digest((ROOT / name).read_bytes()) == after
-        if before is None:
-            assert name not in base
-        else:
-            assert resume.digest(resume.blob('git', ROOT, resume.MAIN_BASE, name)) == before
-    resume.reviewed_changes('git', ROOT, head, base, tree)
-    # The exception is optional: the original Windows-only consumer remains valid.
+def test_current_main_base_includes_reviewed_platform_inputs_without_wildcards():
+    assert resume.MAIN_BASE == "1d9b9c89aecc4f6c33a6b0386dd179e8e7b27078"
+    assert resume.REVIEWED_PLATFORM_INPUTS == {}
+    base = resume.git_tree('git', ROOT, resume.MAIN_BASE)
     resume.reviewed_changes('git', ROOT, resume.MAIN_BASE, base, base)
-
-
-@pytest.mark.parametrize('name', [
-    'tools/macos_restored_generators.py',
-    'tools/tests/fixtures/macos157_official_typescript.json.gz',
-    'tools/tests/test_macos157_official_typescript.py',
-])
-@pytest.mark.parametrize('mutation', ['content', 'deleted', 'mode', 'preimage'])
-def test_reviewed_platform_tuple_rejects_tampering(name, mutation):
-    head, base, tree = platform_trees()
-    original = resume.blob
-    if mutation == 'deleted':
-        del tree[name]
-        if name not in base:
-            base[name] = ('100644', 'blob', '0' * 40)
-    elif mutation == 'mode':
-        tree[name] = ('120000', 'blob', tree[name][2])
-    elif mutation == 'preimage' and name not in base:
-        base[name] = ('100644', 'blob', '0' * 40)
-    def changed_blob(git, repo, revision, path):
-        data = original(git, repo, revision, path)
-        if path == name and ((mutation == 'content' and revision == head)
-                             or (mutation == 'preimage' and revision == resume.MAIN_BASE)):
-            return data + b'changed'
-        return data
-    with mock.patch.object(resume, 'blob', side_effect=changed_blob), pytest.raises(ValueError, match='platform input'):
-        resume.reviewed_changes('git', ROOT, head, base, tree)
-
-
-@pytest.mark.parametrize('name', ['tools/macos_unreviewed.py', 'tools/tests/test_unreviewed.py',
-                                  'tools/linux157_toolchain.py', 'build/windows/prepare-ungoogled.ps1'])
-def test_other_platform_or_windows_changes_still_require_individual_review(name):
-    head, base, tree = platform_trees()
-    tree[name] = ('100644', 'blob', 'f' * 40)
-    with pytest.raises(ValueError, match='outside reviewed'):
-        resume.reviewed_changes('git', ROOT, head, base, tree)
-
-
-def test_reviewed_platform_exception_keeps_tracked_checkout_validation():
-    head, _, _ = platform_trees()
-    # Dirty source still fails after committed Git blobs pass the exception gate.
-    with mock.patch.object(resume, '_inventory', return_value=set(resume.git_tree('git', ROOT, head))), \
-            mock.patch.object(resume.files, '_tracked', side_effect=ValueError('tracked bytes changed')) as tracked:
-        with pytest.raises(ValueError, match='tracked bytes changed'):
-            resume.checkout_identity(ROOT, head)
-        tracked.assert_called_once()
+    for name in ('tools/macos_restored_generators.py', 'tools/linux157_build.py',
+                 'tools/tests/test_unreviewed.py', 'build/windows/prepare-ungoogled.ps1'):
+        changed = dict(base, **{name: ('100644', 'blob', 'f' * 40)})
+        with pytest.raises(ValueError, match='outside reviewed'):
+            resume.reviewed_changes('git', ROOT, resume.MAIN_BASE, base, changed)

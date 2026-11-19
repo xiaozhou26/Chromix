@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import argparse
+from contextlib import contextmanager
+import ctypes
 import hashlib
 import json
 import os
@@ -10,6 +12,8 @@ import re
 from pathlib import Path
 import shutil
 import struct
+import stat
+import tempfile
 import subprocess
 import sys
 
@@ -47,7 +51,7 @@ MINIBRANCH = b"MINIBRANCH_BASE_VERSION=\n"
 def file(path: Path) -> Path:
     metagen.local(path)
     if not path.is_file() or path.stat().st_nlink != 1 or path.stat().st_size == 0:
-        raise ValueError("missing, empty or linked Windows157 dependency: " + str(path))
+        raise ValueError("invalid Windows157 dependency: " + json.dumps(file_evidence(path), sort_keys=True))
     return path
 
 
@@ -140,6 +144,126 @@ def cargo_environment(rust: Path, target: Path) -> dict:
     return environment
 
 
+def file_evidence(path: Path) -> dict:
+    result = {"path": str(path), "exists": path.exists(), "is_symlink": path.is_symlink()}
+    try:
+        info = path.lstat()
+        result.update(size=info.st_size, nlink=info.st_nlink, mode=info.st_mode,
+                      device=info.st_dev, inode=info.st_ino,
+                      reparse=bool(getattr(info, "st_file_attributes", 0) & 0x400))
+    except OSError as error:
+        result["stat_error"] = type(error).__name__
+    return result
+
+
+def cargo_aliases(path: Path) -> list[Path]:
+    if (path.name != "cc_bindings_from_rs.exe" or path.parent.name != "release"
+            or path.parent.parent.name != HOST_TRIPLE or path.parent.parent.parent.name != "crubit"
+            or path.parent.parent.parent.parent.name != "out"):
+        raise ValueError("Cargo hardlink exemption requires the exact host release output")
+    metagen.local(path)
+    try:
+        info = path.stat()
+    except OSError as error:
+        raise ValueError("unverified Cargo output file: " + json.dumps(file_evidence(path), sort_keys=True)) from error
+    if not stat.S_ISREG(info.st_mode) or info.st_size == 0 or info.st_nlink not in (1, 2):
+        raise ValueError("unverified Cargo output file: " + json.dumps(file_evidence(path), sort_keys=True))
+    if info.st_nlink == 1:
+        return []
+    directory = path.parent / "build/cc_bindings_from_rs"
+    metagen.local(directory)
+    aliases = []
+    for candidate in directory.glob("*/out/cc_bindings_from_rs.exe"):
+        if not re.fullmatch("[0-9a-f]{16}", candidate.parent.parent.name):
+            continue
+        metagen.local(candidate)
+        if candidate.samefile(path):
+            aliases.append(candidate)
+    if len(aliases) != 1 or aliases[0].stat().st_nlink != 2:
+        raise ValueError("Cargo hardlink lacks exactly one owned build output alias")
+    return aliases
+
+
+@contextmanager
+def locked_file(path: Path):
+    """Deny Windows writes/deletes through every hardlink while copying."""
+    metagen.local(path)
+    if os.name == "nt":
+        import msvcrt
+        from ctypes import wintypes
+        kernel = ctypes.WinDLL("kernel32", use_last_error=True)
+        create = kernel.CreateFileW
+        create.argtypes = [wintypes.LPCWSTR, wintypes.DWORD, wintypes.DWORD, ctypes.c_void_p,
+                           wintypes.DWORD, wintypes.DWORD, wintypes.HANDLE]
+        create.restype = wintypes.HANDLE
+        close = kernel.CloseHandle
+        close.argtypes = [wintypes.HANDLE]
+        close.restype = wintypes.BOOL
+        # FILE_SHARE_READ excludes write/delete access on the underlying NTFS file.
+        handle = create(str(path), 0x80000000, 1, None, 3, 0x00200000, None)
+        if handle == ctypes.c_void_p(-1).value:
+            raise OSError(ctypes.get_last_error(), "cannot lock Cargo output against external writers", str(path))
+        class FileAttributeTagInfo(ctypes.Structure):
+            _fields_ = [("attributes", wintypes.DWORD), ("tag", wintypes.DWORD)]
+        query = kernel.GetFileInformationByHandleEx
+        query.argtypes = [wintypes.HANDLE, ctypes.c_int, ctypes.c_void_p, wintypes.DWORD]
+        query.restype = wintypes.BOOL
+        attributes = FileAttributeTagInfo()
+        if not query(handle, 9, ctypes.byref(attributes), ctypes.sizeof(attributes)):
+            error = ctypes.get_last_error()
+            close(handle)
+            raise OSError(error, "cannot inspect locked Cargo handle", str(path))
+        if attributes.attributes & 0x400:
+            close(handle)
+            raise ValueError("locked Cargo handle is a reparse point")
+        try:
+            fd = msvcrt.open_osfhandle(handle, os.O_RDONLY | os.O_BINARY)
+        except BaseException:
+            close(handle)
+            raise
+    else:
+        fd = os.open(path, os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0))
+    with os.fdopen(fd, "rb") as stream:
+        yield stream
+
+
+def file_identity(info) -> tuple:
+    return (info.st_dev, info.st_ino, info.st_mode, info.st_nlink, info.st_size,
+            info.st_mtime_ns, info.st_ctime_ns)
+
+
+@contextmanager
+def private_cargo_output(path: Path):
+    aliases = cargo_aliases(path)
+    with locked_file(path) as source:
+        before = file_identity(os.fstat(source.fileno()))
+        if not stat.S_ISREG(os.fstat(source.fileno()).st_mode):
+            raise ValueError("locked Cargo output is not a regular file")
+        if before != file_identity(path.stat()) or cargo_aliases(path) != aliases:
+            raise ValueError("Cargo output changed before private copy")
+        with tempfile.TemporaryDirectory(prefix=".chromix-crubit-private-", dir=path.parent) as temporary:
+            private = Path(temporary) / "cc_bindings_from_rs.exe"
+            hasher = hashlib.sha256()
+            with private.open("xb") as output:
+                for chunk in iter(lambda: source.read(1024 * 1024), b""):
+                    hasher.update(chunk)
+                    output.write(chunk)
+                output.flush()
+                os.fsync(output.fileno())
+            if (file_identity(os.fstat(source.fileno())) != before or file_identity(path.stat()) != before
+                    or cargo_aliases(path) != aliases):
+                raise ValueError("Cargo output changed during private copy")
+            pe_executable(private)
+            print(json.dumps({"cargo_private_copy": file_evidence(private), "source": file_evidence(path),
+                              "owned_aliases": [str(alias) for alias in aliases], "pe": "AMD64-PE32+",
+                              "sha256": hasher.hexdigest()}, sort_keys=True))
+            if sha(private) != hasher.hexdigest() or private.stat().st_nlink != 1:
+                raise ValueError("private Cargo copy identity mismatch")
+            yield private
+            if file_identity(os.fstat(source.fileno())) != before or file_identity(path.stat()) != before:
+                raise ValueError("Cargo output changed while publishing private copy")
+
+
 def cargo_output(stdout: str, src: Path, target: Path) -> Path:
     expected = target / HOST_TRIPLE / "release/cc_bindings_from_rs.exe"
     manifest = src / CRUBIT_ROOT / "lib/third_party/crubit" / CRUBIT_BIN_MANIFEST
@@ -161,7 +285,10 @@ def cargo_output(stdout: str, src: Path, target: Path) -> Path:
         matches.append(expected)
     if finished != [True] or len(matches) != 1:
         raise ValueError("Crubit Cargo build lacks one authenticated host binary result")
-    pe_executable(expected)
+    print(json.dumps({"cargo_output": file_evidence(expected), "target_root": str(target),
+                      "manifest_path": str(manifest), "json_executable": str(matches[0])}, sort_keys=True))
+    with private_cargo_output(expected):
+        pass
     return expected
 
 
@@ -198,12 +325,23 @@ def prepare(src: Path, work: Path) -> None:
                         "--manifest-path", str(root / "lib/third_party/crubit/Cargo.toml"),
                         "--target-dir", str(target)], cwd=src, env=environment, check=True,
                         stdout=subprocess.PIPE, text=True, timeout=3600)
+        evidence = work / "fingerprint-diagnostics"
+        evidence.mkdir(parents=True, exist_ok=True)
+        with tempfile.NamedTemporaryFile(prefix="crubit-cargo-", suffix=".jsonl", dir=evidence,
+                                         mode="w", encoding="utf-8", delete=False) as report:
+            report.write(result.stdout)
         built = cargo_output(result.stdout, src, target)
-        digest = sha(built)
         executable.parent.mkdir(parents=True, exist_ok=True)
-        shutil.copy2(built, executable)
-        if sha(executable) != digest or sha(built) != digest:
-            raise ValueError("Crubit compiler output changed during installation")
+        if executable.exists():
+            raise ValueError("Crubit install destination appeared concurrently")
+        with private_cargo_output(built) as private:
+            digest = sha(private)
+            with private.open("rb") as source, executable.open("xb") as destination:
+                shutil.copyfileobj(source, destination)
+                destination.flush()
+                os.fsync(destination.fileno())
+            if sha(executable) != digest:
+                raise ValueError("Crubit private output changed during installation")
         for dll in rust.glob("*.dll"):
             metagen.validate_library(file(dll))
             shutil.copy2(dll, executable.parent / dll.name)
