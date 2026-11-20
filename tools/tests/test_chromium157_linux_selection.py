@@ -14,7 +14,7 @@ from tools import patch_selection as selection
 from tools.tests.test_patch_selection import clone_repo, set_platform_pins
 
 ROOT = Path(__file__).resolve().parents[2]
-LINUX_IMPLEMENTATION = "92b19bee79a57172e32d16260de90b250b9c5393"
+LINUX_IMPLEMENTATION = "2777e38b3d674a0ed4d206c76b9afea7c81ec828"
 MANIFEST = json.loads((ROOT / selection.MANIFEST157).read_bytes())
 DOWNSTREAM = MANIFEST["platforms"]["linux"]["downstream"]
 
@@ -84,12 +84,12 @@ def test_exact_recipe_source_and_nine_override_group_match_actual_implementation
         for entry in source["patches"]]
     assert len(DOWNSTREAM["platform_overrides"]) == 9
     assert DOWNSTREAM["platform_override_group_sha256"] == selection.canonical_digest(DOWNSTREAM["platform_overrides"])
-    assert DOWNSTREAM["recipe"]["sha256"] == "3b9f1c944dc8a7469632f5747847a4573c7b2183f5602fbd860a7cbcb8072b1f"
+    assert DOWNSTREAM["recipe"]["sha256"] == "7b7bfbf785429a25d22a26ce9fde4cf5aa3347eeee9fb773472973fb4c67051f"
 
 
 def test_precise_host_go_helper_and_previous_unbound_helper_rejected(linux_repo):
     helper = "tools/linux157_build.py"
-    assert DOWNSTREAM["recipe"]["inputs"][helper] == "2235fbdcfd3ce7b027f0ccbdc08e70bbb992c6e2c0b63ef2669b331efa197a1c"
+    assert DOWNSTREAM["recipe"]["inputs"][helper] == "ccac0e3a4926a755734f22dfa4bd1109d7a0553232b5741fc5dfb8a959821640"
     delta = DOWNSTREAM["validation"]["recipe_integration"]["changed_inputs"][helper]
     assert delta == {
         "before_sha256": "048e644354c26812c5b0db71e272c53066eb6f1b7d19d68821bb4329cfdb6503",
@@ -242,7 +242,10 @@ def test_locale_review_preserves_old_prefix_and_rejects_generic_restore(linux_re
     selected, raw = selection.select(linux_repo, "linux")
     delta = DOWNSTREAM["validation"]["recipe_integration"]["locale_recovery"]
     old = donor["source_receipt"]["chromix_selection"]
-    locale.recipe_delta(donor["source_receipt"]["recipe"], DOWNSTREAM["recipe"])
+    historical = json.loads(blob(selection.MANIFEST157, "35e2db1b0687a4525017f5ec8fd3820823aef8ff"))["platforms"]["linux"]["downstream"]["recipe"]
+    locale.recipe_delta(donor["source_receipt"]["recipe"], historical)
+    with pytest.raises(ValueError, match="not reviewed"):
+        locale.recipe_delta(donor["source_receipt"]["recipe"], DOWNSTREAM["recipe"])
     assert selected["patches"][:-3] == old["patches"]
     assert selected["series_sha256"] != delta["series_sha256"]["linux"]
     assert selected["series_sha256"] != old["series_sha256"]
@@ -293,7 +296,10 @@ def test_real_selector_authenticates_only_exact_locale_profiles(arch, run, stage
     donor = locale.load(ROOT, arch)
     with pytest.raises(ValueError, match="require unchanged old226 plus exact two additions"):
         locale.validate_additions(selected, raw, donor, ROOT)
-    locale.recipe_delta(donor["source_receipt"]["recipe"], DOWNSTREAM["recipe"])
+    historical = json.loads(blob(selection.MANIFEST157, "35e2db1b0687a4525017f5ec8fd3820823aef8ff"))["platforms"]["linux"]["downstream"]["recipe"]
+    locale.recipe_delta(donor["source_receipt"]["recipe"], historical)
+    with pytest.raises(ValueError, match="not reviewed"):
+        locale.recipe_delta(donor["source_receipt"]["recipe"], DOWNSTREAM["recipe"])
     expected = locale.expected(arch, ROOT)
     assert (expected["run_id"], expected["stage"], expected["artifacts"][0]["id"]) == (run, stage, artifact)
     assert locale.load(ROOT) == locale.load(ROOT, "x64")
@@ -331,6 +337,48 @@ def test_unknown_arm_profile_identity_rejected(mutation):
         delta["donor"]["arch"] = "x64"
     else:
         delta["profile"]["sha256"] = "0" * 64
+    with pytest.raises(selection.SelectionError, match="downstream recipe"):
+        selection.validate_manifest157(manifest)
+
+
+def test_current_ua_preflight_binds_latest228_and_preserves_locale():
+    from tools import linux157_ua as ua
+    from tools import linux157_locale as locale
+    from tools import linux157_checkpoint as prior
+    selected, raw = selection.select(ROOT, "linux")
+    donor = ua.load(ROOT)
+    assert ua.validate_additions(selected, raw, donor, ROOT) == donor["migration"]["additions"]
+    ua.recipe_delta(donor["source_receipt"]["recipe"], DOWNSTREAM["recipe"], ROOT)
+    assert selected["patches"][:-1] == donor["source_receipt"]["chromix_selection"]["patches"]
+    assert selected["patches"][-1]["sha256"] == "dd22d5decfdb675477ce8d1379b7b1eaf2153f5cd0fb6dbb2de47135fc8a9561"
+    assert [Path(p["path"]).name[:5] for p in selected["patches"][-3:-1]] == ["0236-", "0237-"]
+    assert (donor["run_id"], donor["artifact"]["id"]) == (44630942999, 14584551831)
+    with pytest.raises(ValueError, match="cannot change"):
+        prior.compatible_selection(donor["source_receipt"]["chromix_selection"], selected)
+    for arch in ("x64", "arm64"):
+        with pytest.raises(ValueError, match="unavailable"):
+            locale.validate_additions(selected, raw, locale.load(ROOT, arch), ROOT)
+    with pytest.raises(ValueError, match="x64"):
+        ua.expected("arm64", ROOT)
+
+
+@pytest.mark.parametrize("mutation", ["donor", "patch", "source", "old-count", "profile", "extra-helper"])
+def test_unreviewed_ua_scope_rejected(mutation):
+    manifest = copy.deepcopy(MANIFEST)
+    downstream = manifest["platforms"]["linux"]["downstream"]
+    delta = downstream["validation"]["recipe_integration"]["ua_recovery"]
+    if mutation == "donor":
+        delta["donor"]["run_id"] = 44578881741
+    elif mutation == "patch":
+        delta["source_migration"]["additions"][0]["sha256"] = "0" * 64
+    elif mutation == "source":
+        delta["source_migration"]["additions"][0]["target"] = "base/unreviewed.h"
+    elif mutation == "old-count":
+        delta["source_migration"]["old_patch_count"] = 226
+    elif mutation == "profile":
+        delta["checkpoint_manifest"]["sha256"] = "0" * 64
+    else:
+        downstream["recipe"]["inputs"]["tools/unreviewed_ua.py"] = "0" * 64
     with pytest.raises(selection.SelectionError, match="downstream recipe"):
         selection.validate_manifest157(manifest)
 
