@@ -596,7 +596,7 @@ try {
     calls = ["preflight", "disk", "vs", "sdk"]
     if failure != "none":
         calls = calls[:calls.index(failure) + 1]
-    gate = "snapshot_safe=false" if strict else "snapshot_safe=true"
+    gate = "snapshot_safe=false"
     assert state["events"] == ["finished=false", "upload_parts=false", gate,
                                *("preflight:" + name for name in calls)]
 
@@ -1221,3 +1221,58 @@ def test_windows155_workflow_input_guard_executes(tmp_path, mutation):
                 "fast": {"CHROMIX_BUILD_PROFILE": "fast"}}[mutation])
     result = run_powershell(tmp_path, "try {\n" + guard + "\n} catch { exit 1 }\nexit 0\n", env)
     assert result.returncode == (0 if mutation == "valid" else 1), result.stderr
+
+
+def test_snapshot_gate_waits_for_restore_and_archive_publication():
+    source = STAGE.read_text()
+    start = source.index('Write-OutVar finished false\nWrite-OutVar upload_parts false')
+    restore = source.index('throw "7z restore failed"', start)
+    assert 'snapshot_safe true' not in source[start:restore]
+    enable = source.index('if ($FromArtifact) { Write-OutVar snapshot_safe true }', restore)
+    assert source.index('required upstream cache: restore receipt missing;', restore) < enable
+    save = source[source.index('function Save-Handoff {'):source.index('function Assert-CiScripts {')]
+    assert save.index('Write-OutVar snapshot_safe false') < save.index('ci-parts.ps1')
+    assert save.index('ci-parts.ps1') < save.index('Write-OutVar upload_parts true')
+    assert save.index('ci-parts.ps1') < save.index('Write-OutVar snapshot_safe true')
+
+
+@pytest.mark.parametrize('mode', ['unrestored', 'no-marker', 'pack-failure', 'move-failure', 'no-volumes', 'success'])
+def test_snapshot_packer_removes_stale_and_partial_uploads(tmp_path, mode):
+    work = tmp_path / 'root/chromix'
+    work.mkdir(parents=True)
+    if mode not in ('unrestored', 'no-marker'):
+        (work / 'src').mkdir()
+        with (work / 'src/input').open('wb') as stream:
+            stream.truncate(1024 ** 3)
+    parts = tmp_path / 'parts'
+    (parts / 'p1').mkdir(parents=True)
+    (parts / 'p1/old-stage6.7z.001').write_bytes(b'donor')
+    script = r'''
+function Get-Command { [pscustomobject]@{Source='Invoke-Fake7zip'} }
+function Get-PSDrive { [pscustomobject]@{Free=100GB} }
+function Invoke-Fake7zip {
+  if ($env:TEST_MODE -ne 'no-volumes') {
+    [IO.File]::WriteAllText((Join-Path $env:TEST_ROOT 'parts/stage/tree.7z.001'), 'new-volume')
+    [IO.File]::WriteAllText((Join-Path $env:TEST_ROOT 'parts/stage/tree.7z.002'), 'new-volume-2')
+  }
+  $global:LASTEXITCODE = $(if ($env:TEST_MODE -eq 'pack-failure') { 2 } else { 0 })
+}
+function Move-Item {
+  param($Path, $Destination)
+  if ($env:TEST_MODE -eq 'move-failure' -and $Path.EndsWith('.002')) { throw 'move failed' }
+  Microsoft.PowerShell.Management\Move-Item $Path $Destination
+}
+$failed = $false
+try {
+  & $env:TEST_HELPER -Root (Join-Path $env:TEST_ROOT 'root') -PartsDir (Join-Path $env:TEST_ROOT 'parts') -Arch $(if ($env:TEST_MODE -eq 'no-marker') { 'arm64' } else { 'x64' })
+} catch { $failed = $true }
+Write-Output "FAILED=$failed"
+'''
+    result = run_powershell(tmp_path, script, dict(TEST_ROOT=str(tmp_path), TEST_MODE=mode,
+                            TEST_HELPER=str(ROOT / 'build/windows/ci-parts.ps1')))
+    assert result.returncode == 0, result.stderr
+    assert ('FAILED=False' if mode == 'success' else 'FAILED=True') in result.stdout
+    if mode == 'success':
+        assert sorted(p.name for p in parts.rglob('*') if p.is_file()) == ['tree.7z.001', 'tree.7z.002']
+    else:
+        assert not parts.exists()

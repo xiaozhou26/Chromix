@@ -114,6 +114,11 @@ function Start-Process {
     if ($env:TERMINATION_MODE -eq 'Throw') { throw 'taskkill launch denied' }
     return New-MockProcess 'taskkill' 24681 ([int]$env:TASKKILL_EXIT)
   }
+  $logIndex = [Array]::IndexOf($ArgumentList, '/log')
+  if ($logIndex -lt 0) { throw 'missing native log argument' }
+  $log = $ArgumentList[$logIndex + 1].Trim('"')
+  [IO.File]::WriteAllBytes($log, [byte[]](255, 254, 65, 0, 13, 0, 10, 0))
+  [IO.File]::WriteAllBytes(($log -replace '[.]log$', '_000_package.log'), [byte[]](0, 128, 255, 13, 10))
   if ($env:SETUP_EXIT -eq 'Throw') { throw 'process launch failed' }
   if ($env:INSTALL_FILES -eq 'yes') {
     New-Item -ItemType Directory -Path $env:SDK -Force | Out-Null
@@ -158,7 +163,7 @@ class WindowsSdkSourceTest(unittest.TestCase):
             self.assertIn(f'https://download.microsoft.com/download/{guid}/', source)
             self.assertIn(digest, source)
         for marker in ('#requires -Version 5.1', 'Import-PowerShellDataFile',
-                       '$setup.WaitForExit(1800000)', '$terminator.WaitForExit(10000)',
+                       '$setup.WaitForExit($InstallTimeoutMinutes * 60000)', '$terminator.WaitForExit(10000)',
                        '@("/PID", "$($setup.Id)", "/T", "/F")',
                        '"/features", "+", "/quiet", "/norestart"'):
             self.assertIn(marker, source)
@@ -202,6 +207,7 @@ class WindowsSdkBehaviorTest(unittest.TestCase):
             env={**os.environ, 'HELPER': str(HELPER), 'SDK': str(self.sdk),
                  'WINDOWSSDKDIR': str(self.sdk), 'DOWNLOAD': str(self.download),
                  'TEMPLATE': str(self.template), 'CALLS': str(self.calls),
+                 'DIAGNOSTICS': str(self.root / 'diagnostics'),
                  'ARCH': 'arm64', 'CHROMIUM': '', 'DOWNLOAD_MODE': 'ok', 'CURL_EXIT': '0',
                  'SIGNATURE_STATUS': 'Valid',
                  'SIGNER_SUBJECT': 'CN=Microsoft Corporation, O=Microsoft Corporation, C=US',
@@ -213,7 +219,7 @@ class WindowsSdkBehaviorTest(unittest.TestCase):
 
     def invoke(self, install=False, **environment):
         return self.run_ps(r'''
-& $env:HELPER -Arch $env:ARCH -ChromiumVersion $env:CHROMIUM -DownloadDir $env:DOWNLOAD ''' + ('-Install' if install else '') + r'''
+& $env:HELPER -Arch $env:ARCH -ChromiumVersion $env:CHROMIUM -DownloadDir $env:DOWNLOAD -DiagnosticsDir $env:DIAGNOSTICS ''' + ('-Install' if install else '') + r'''
 Write-Output "SDK_ROOT=$env:WINDOWSSDKDIR"
 Write-Output 'CONTINUED'
 ''', **environment)
@@ -302,7 +308,7 @@ Write-Output "SDK_ROOT=$env:WINDOWSSDKDIR"
         wrapper = self.root / 'ci wrapper/ci-stage.ps1'
         wrapper.parent.mkdir()
         shutil.copyfile(HELPER, wrapper.parent / HELPER.name)
-        wrapper.write_text('$Arch = $env:ARCH\n$Root = $env:DOWNLOAD\n'
+        wrapper.write_text('$Arch = $env:ARCH\n$Root = $env:DOWNLOAD\n$WorkDir = $env:DIAGNOSTICS\n'
                            '$Revisions = @{ ChromiumVersion = $env:CHROMIUM }\n'
                            + function + '\nInstall-WindowsSdk\n')
         for arch, chromium in (('x64', '157.0.8103.78'), ('arm64', '157.0.8103.78'),
@@ -396,7 +402,7 @@ foreach ($relative in ($env:REQUIRED_FILES | ConvertFrom-Json)) {
             setup = events[3]['data']
             self.assertFalse(setup['wait'])
             self.assertTrue(setup['passthru'])
-            self.assertEqual(setup['arguments'], ['/features', '+', '/quiet', '/norestart',
+            self.assertEqual(setup['arguments'][:6], ['/features', '+', '/quiet', '/norestart',
                                                  '/installpath', f'"{self.sdk}"'])
             self.assertEqual(events[4]['data'], {'kind': 'setup', 'milliseconds': 1800000})
             self.assertFalse(Path(setup['path']).exists())
@@ -444,7 +450,7 @@ foreach ($relative in ($env:REQUIRED_FILES | ConvertFrom-Json)) {
             self.assert_failure(self.invoke(True, **environment), message)
 
     def test_failed_or_unknown_installer_exit_rejected_even_if_files_appear(self):
-        for exit_code in ('1603', '1641', '1', 'null'):
+        for exit_code in ('15605', '1603', '1641', '1', 'null'):
             self.assert_failure(self.invoke(True, SETUP_EXIT=exit_code), 'installation failed')
             self.assertEqual([event['name'] for event in self.events()],
                              ['curl', 'signature', 'hash', 'setup', 'wait', 'dispose'])
@@ -467,6 +473,37 @@ foreach ($relative in ($env:REQUIRED_FILES | ConvertFrom-Json)) {
                 self.assertIn('Unable to confirm termination', result.stdout)
             (self.sdk / f'Include/{SDK_VERSION}/um/Windows.h').unlink()
             self.calls.unlink()
+
+    def test_native_logs_preserved_byte_for_byte_on_failure_without_retry(self):
+        for exit_code in ('15605', '1603', '0'):
+            with self.subTest(exit_code=exit_code):
+                result = self.invoke(True, SETUP_EXIT=exit_code, INSTALL_FILES='no')
+                self.assert_failure(result, 'verification failed' if exit_code == '0' else 'installation failed')
+                setups = [event['data'] for event in self.events() if event['name'] == 'setup']
+                self.assertEqual(len(setups), 1)
+                arguments = setups[0]['arguments']
+                log = Path(arguments[arguments.index('/log') + 1].strip('"'))
+                self.assertEqual(log.read_bytes(), bytes((255, 254, 65, 0, 13, 0, 10, 0)))
+                self.assertEqual(log.with_name('winsdksetup_000_package.log').read_bytes(),
+                                 bytes((0, 128, 255, 13, 10)))
+                report = json.loads((log.parent / 'installation.json').read_text(encoding='utf-8-sig'))
+                self.assertEqual(report['exit_code'], int(exit_code))
+                self.assertEqual(report['arch'], 'arm64')
+                self.assertTrue(report['failure'])
+                self.assertIn('disk_before', report)
+                self.assertIn('disk_after', report)
+                self.assertEqual(len(report['native_logs']), 2)
+                self.assertFalse(Path(setups[0]['path']).exists())
+                self.calls.unlink()
+
+    def test_probe_timeout_is_bounded_and_preserves_native_logs(self):
+        result = self.run_ps('& $env:HELPER -Arch arm64 -Install -InstallTimeoutMinutes 15 '
+                             '-DownloadDir $env:DOWNLOAD -DiagnosticsDir $env:DIAGNOSTICS',
+                             SETUP_COMPLETES='no')
+        self.assert_failure(result, 'timed out after 15 minutes')
+        waits = [e['data'] for e in self.events() if e['name'] == 'wait']
+        self.assertEqual(waits[0], {'kind': 'setup', 'milliseconds': 900000})
+        self.assertEqual(len(list((self.root / 'diagnostics').rglob('winsdksetup.log'))), 1)
 
     def test_success_exit_with_incomplete_files_still_fails(self):
         for exit_code in ('0', '3010'):

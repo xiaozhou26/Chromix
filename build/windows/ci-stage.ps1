@@ -568,8 +568,10 @@ function Save-Handoff {
   if ($Arch -eq "arm64" -or (Test-Path (Join-Path $WorkDir ".chromix-target-arch"))) {
     & "$PSScriptRoot\assert-target-arch.ps1" -WorkDir $WorkDir -Arch $Arch -Initialize
   }
-  Write-OutVar upload_parts true
+  Write-OutVar snapshot_safe false
   . "$PSScriptRoot\ci-parts.ps1" -Root $Root -PartsDir $PartsDir -Mode $Mode -Arch $Arch
+  Write-OutVar upload_parts true
+  Write-OutVar snapshot_safe true
 }
 
 function Assert-CiScripts {
@@ -654,7 +656,8 @@ function Initialize-VisualStudio {
 
 function Install-WindowsSdk {
   & "$PSScriptRoot\ensure-windows-sdk.ps1" -Arch $Arch `
-    -ChromiumVersion $Revisions.ChromiumVersion -DownloadDir $Root -Install
+    -ChromiumVersion $Revisions.ChromiumVersion -DownloadDir $Root -Install `
+    -DiagnosticsDir (Join-Path $WorkDir "fingerprint-diagnostics\windows-sdk")
 }
 
 function Invoke-BoundedBrowser {
@@ -819,7 +822,7 @@ function Verify-FinalBundle {
 Write-Host "==> Chromix CI stage $StageIndex | Chromium $($Revisions.ChromiumVersion) | remaining $(Get-RemainingMin) min"
 Write-OutVar finished false
 Write-OutVar upload_parts false
-Write-OutVar snapshot_safe $(if ($FromSynced -or $env:CHROMIX_WINDOWS_VERIFY_SOURCE_REPO -or $env:CHROMIX_WINDOWS_VERIFY_SOURCE_SHA) { "false" } else { "true" })
+Write-OutVar snapshot_safe false
 Assert-CiScripts
 Free-Disk
 Initialize-VisualStudio
@@ -1033,6 +1036,9 @@ if ($RequireUpstreamCache -and -not $RestoredUpstream -and
   throw "required upstream cache: restore receipt missing; refusing cold preparation or compilation"
 }
 
+# SDK/preflight and archive/receipt failures cannot publish an unrestored tree.
+if ($FromArtifact) { Write-OutVar snapshot_safe true }
+
 $VerifyRestoredSource = $false
 if ($FreshSource -and -not $FromSynced) {
   if ($StageIndex -ne 1 -or (Test-Path $Src)) { throw "$FreshLabel first fresh entry requires an empty stage1 workdir" }
@@ -1144,6 +1150,7 @@ if (-not $CompiledRecovery) {
   }
 }
 if ($FromSynced) { Write-OutVar snapshot_safe true }
+if (-not $FromSynced -and -not $FromArtifact) { Write-OutVar snapshot_safe true }
 $UngoogledTooling = Join-Path $WorkDir "tooling\ungoogled-chromium"
 $WindowsTooling = Join-Path $WorkDir "tooling\ungoogled-chromium-windows"
 if ($VerifyRestoredSource) {

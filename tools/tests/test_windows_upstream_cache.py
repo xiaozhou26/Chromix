@@ -122,8 +122,7 @@ class WindowsUpstreamCacheRegressionTest(unittest.TestCase):
     def test_snapshot_outputs_fail_closed_but_keep_small_diagnostics(self):
         import yaml
 
-        self.assertIn('Write-OutVar snapshot_safe $(if ($FromSynced -or $env:CHROMIX_WINDOWS_VERIFY_SOURCE_REPO -or '
-                      '$env:CHROMIX_WINDOWS_VERIFY_SOURCE_SHA) { "false" } else { "true" })\nAssert-CiScripts', self.stage)
+        self.assertIn('Write-OutVar snapshot_safe false\nAssert-CiScripts', self.stage)
         tracked_start = self.stage.index("function Invoke-Tracked {")
         tracked_end = self.stage.index("function Get-FreeGB", tracked_start)
         tracked = self.stage[tracked_start:tracked_end]
@@ -1552,6 +1551,7 @@ $UseUpstreamCache = $env:MOCK_USE -eq "1"
 $UpstreamRunId = ""
 $UpstreamCacheDir = Join-Path $Repo "cache"
 $Revisions = @{ ChromiumVersion = "fixture"; UngoogledCommit = "core" }
+function Write-OutVar($key, $value) { Write-Host "outvar $key=$value" }
 function Get-RemainingMin { return [int]$env:MOCK_MINUTES }
 function Save-Handoff { param($Mode); Add-Content -LiteralPath $env:MOCK_CALLS -Value "handoff:$Mode" }
 function Invoke-Tracked {

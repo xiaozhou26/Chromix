@@ -4,6 +4,8 @@ param(
   [ValidateSet("x64", "arm64")][string]$Arch = "x64",
   [string]$ChromiumVersion = "",
   [string]$DownloadDir = "",
+  [string]$DiagnosticsDir = "",
+  [ValidateRange(1, 30)][int]$InstallTimeoutMinutes = 30,
   [switch]$Install
 )
 $ErrorActionPreference = "Stop"
@@ -86,7 +88,18 @@ if ($missing.Count -gt 0) {
   # Only this invocation's private download directory is removed.
   $staging = Join-Path $DownloadDir ("chromix-windows-sdk-" + [guid]::NewGuid().ToString("N"))
   New-Item -ItemType Directory -Path $staging | Out-Null
+  if (-not $DiagnosticsDir) { $DiagnosticsDir = Join-Path $DownloadDir "chromix-sdk-diagnostics" }
+  $diagnostics = Join-Path ([IO.Path]::GetFullPath($DiagnosticsDir)) ([guid]::NewGuid().ToString("N"))
+  $setupExit = $null
+  $hash = $null
+  $failure = $null
+  $diskBefore = @()
+  $started = [DateTime]::UtcNow.ToString("o")
   try {
+    New-Item -ItemType Directory -Path $diagnostics -Force | Out-Null
+    $setupLog = Join-Path $diagnostics "winsdksetup.log"
+    $diskBefore = @(Get-PSDrive -PSProvider FileSystem | Select-Object Name, Root, Used, Free)
+    Write-Host "==> Windows SDK native installer logs: $diagnostics"
     $installer = Join-Path $staging "winsdksetup.exe"
     Write-Host "==> Downloading Microsoft Windows SDK $SdkRelease installer"
     & curl.exe --disable --fail --location --silent --show-error `
@@ -109,13 +122,14 @@ if ($missing.Count -gt 0) {
     Write-Host "==> Installing verified Microsoft Windows SDK $SdkRelease for $Arch"
     # '+' selects all SDK features, including ARM64 libraries, UWP and Debugging Tools.
     $setup = Start-Process -FilePath $installer -ArgumentList @(
-      "/features", "+", "/quiet", "/norestart", "/installpath", ('"{0}"' -f $sdk.TrimEnd('\'))
+      "/features", "+", "/quiet", "/norestart", "/installpath", ('"{0}"' -f $sdk.TrimEnd('\')),
+      "/log", ('"{0}"' -f $setupLog)
     ) -PassThru
     try {
       # Retain the process handle for a reliable exit code and PID ownership.
       $null = $setup.Handle
-      if (-not $setup.WaitForExit(1800000)) {
-        Write-Warning "Windows SDK installation timed out after 30 minutes; attempting to terminate installer PID $($setup.Id)"
+      if (-not $setup.WaitForExit($InstallTimeoutMinutes * 60000)) {
+        Write-Warning "Windows SDK installation timed out after $InstallTimeoutMinutes minutes; attempting to terminate installer PID $($setup.Id)"
         try {
           $terminator = Start-Process -FilePath (Join-Path $env:SystemRoot "System32\taskkill.exe") `
             -ArgumentList @("/PID", "$($setup.Id)", "/T", "/F") -PassThru
@@ -132,7 +146,7 @@ if ($missing.Count -gt 0) {
         } catch {
           Write-Warning "Unable to confirm termination of Windows SDK installer PID $($setup.Id): $($_.Exception.Message)"
         }
-        throw "Windows SDK installation timed out after 30 minutes (PID $($setup.Id)); SDK is not ready"
+        throw "Windows SDK installation timed out after $InstallTimeoutMinutes minutes (PID $($setup.Id)); SDK is not ready"
       }
       $setupExit = $setup.ExitCode
     } finally {
@@ -144,8 +158,31 @@ if ($missing.Count -gt 0) {
     if ($missing.Count -gt 0) {
       throw "Windows SDK $SdkVersion verification failed after installation:`n$($missing -join "`n")"
     }
+  } catch {
+    $failure = $_.Exception.Message
+    throw
   } finally {
-    Remove-Item -LiteralPath $staging -Recurse -Force
+    try {
+      # Burn writes its bundle and package logs here; never rewrite their contents.
+      $nativeLogs = @(Get-ChildItem -LiteralPath $diagnostics -Filter "*.log" -File -ErrorAction SilentlyContinue)
+      if ($failure -and $nativeLogs.Count -eq 0) { Write-Warning "SDK failure produced no native installer log in $diagnostics" }
+      $report = [ordered]@{
+        started_utc = $started; ended_utc = [DateTime]::UtcNow.ToString("o")
+        arch = $Arch; sdk_version = $SdkVersion; sdk_release = $SdkRelease
+        installer_url = $InstallerUrl; installer_sha256_expected = $InstallerSha256
+        installer_sha256_actual = $hash; exit_code = $setupExit; failure = $failure
+        sdk_root = $sdk; temp = $env:TEMP; tmp = $env:TMP; staging = $staging
+        native_logs = @($nativeLogs.Name); disk_before = $diskBefore
+        disk_after = @(Get-PSDrive -PSProvider FileSystem | Select-Object Name, Root, Used, Free)
+        run_id = $env:GITHUB_RUN_ID; attempt = $env:GITHUB_RUN_ATTEMPT
+        job = $env:GITHUB_JOB; sha = $env:GITHUB_SHA
+      }
+      [IO.File]::WriteAllText((Join-Path $diagnostics "installation.json"), ($report | ConvertTo-Json -Depth 6))
+    } catch {
+      Write-Warning "Unable to save SDK diagnostic summary: $($_.Exception.Message)"
+    } finally {
+      Remove-Item -LiteralPath $staging -Recurse -Force
+    }
   }
 }
 $env:WINDOWSSDKDIR = $sdk

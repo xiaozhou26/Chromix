@@ -1,0 +1,58 @@
+name: probe-win157-arm64-sdk
+run-name: Windows157 ARM64 SDK installation and binary probe (no source restore)
+
+'on':
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+
+concurrency:
+  group: probe-win157-arm64-sdk-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  probe:
+    if: github.ref == 'refs/heads/main'
+    runs-on: windows-2022
+    timeout-minutes: 30
+    env:
+      PYTHONUTF8: '1'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+          architecture: x64
+      - name: Install pinned Microsoft SDK and verify ARM64 binaries
+        timeout-minutes: 20
+        shell: powershell
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $diagnostics = Join-Path $env:RUNNER_TEMP 'win157-arm64-sdk'
+          New-Item -ItemType Directory -Force -Path $diagnostics | Out-Null
+          $report = Join-Path $diagnostics 'probe-status.json'
+          $status = @{ status = 'started'; run_id = $env:GITHUB_RUN_ID; attempt = $env:GITHUB_RUN_ATTEMPT; sha = $env:GITHUB_SHA }
+          $status | ConvertTo-Json | Set-Content -LiteralPath $report -Encoding UTF8
+          try {
+            & build/windows/ensure-windows-sdk.ps1 -Arch arm64 -ChromiumVersion '157.0.8103.78' -Install -InstallTimeoutMinutes 15 -DownloadDir $env:RUNNER_TEMP -DiagnosticsDir $diagnostics
+            python -X utf8 tools/windows157_sdk_probe.py --sdk "$env:WINDOWSSDKDIR" --report "$diagnostics\sdk-binaries.json"
+            if ($LASTEXITCODE -ne 0) { throw 'SDK binary verification failed; do not resume source' }
+            $status.status = 'verified'
+          } catch {
+            $status.status = 'failed'
+            $status.error = $_.Exception.Message
+            throw
+          } finally {
+            $status | ConvertTo-Json | Set-Content -LiteralPath $report -Encoding UTF8
+          }
+      - name: Upload complete SDK diagnostics including original installer logs
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: win157-arm64-sdk-${{ github.run_id }}-attempt-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/win157-arm64-sdk/
+          if-no-files-found: error
+          retention-days: 14

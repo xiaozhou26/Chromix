@@ -26,74 +26,86 @@ $ErrorActionPreference = "Stop"
 if ($Arch -cnotin @("x64", "arm64")) { throw "Arch/CHROMIX_TARGET_ARCH must be x64 or arm64" }
 $MaxSlots = 4
 $workDir = Join-Path $Root "chromix"
+# Never expose previous or partially packed volumes as this invocation's snapshot.
+if (Test-Path -LiteralPath $PartsDir) { Remove-Item -LiteralPath $PartsDir -Recurse -Force }
 if ($Arch -eq "arm64" -or (Test-Path (Join-Path $workDir ".chromix-target-arch"))) {
   & "$PSScriptRoot\assert-target-arch.ps1" -WorkDir $workDir -Arch $Arch -RequireMarker
 }
 
-Remove-Item $PartsDir -Recurse -Force -ErrorAction SilentlyContinue
-New-Item -ItemType Directory -Force -Path "$PartsDir\stage" | Out-Null
-foreach ($i in 1..$MaxSlots) { New-Item -ItemType Directory -Force -Path "$PartsDir\p$i" | Out-Null }
-
-function Get-FreeGB { [math]::Round((Get-PSDrive C).Free / 1GB, 1) }
-
-function Resolve-7Zip {
-  $cmd = Get-Command 7z.exe -ErrorAction SilentlyContinue
-  if ($cmd) { return $cmd.Source }
-  $installed = "$env:ProgramFiles\7-Zip\7z.exe"
-  if (Test-Path $installed) { return $installed }
-  throw "7z.exe is not available"
+if ($Mode -eq "Synced" -and -not (Test-Path -LiteralPath (Join-Path $workDir "src") -PathType Container)) {
+  throw "Cannot snapshot an unrestored source tree"
 }
-
-function Get-TreeGB {
-  param([string]$Path, [string]$ArchiveMode)
-  $rootItem = Get-Item $Path -ErrorAction SilentlyContinue
-  if (-not $rootItem) { return 0 }
-  $items = Get-ChildItem $Path -Recurse -Force -File -ErrorAction SilentlyContinue
-  [math]::Round(($items | Measure-Object Length -Sum).Sum / 1GB, 1)
-}
-
-$SevenZip = Resolve-7Zip
-$freeBefore = Get-FreeGB
-$inputGB = Get-TreeGB -Path $Root -ArchiveMode $Mode
-if ($inputGB -le 0) {
-  Write-Host "==> no build tree files found under $Root; skipping empty handoff"
-  exit 0
-}
-$minFreeGB = if ($Mode -eq "Unsynced") {
-  [math]::Max(12, [math]::Ceiling($inputGB + 5))
-} else {
-  [math]::Max(24, [math]::Ceiling(($inputGB * 0.25) + 5))
-}
-Write-Host "==> handoff input: $inputGB GB; minimum free space: $minFreeGB GB"
-if ($freeBefore -lt $minFreeGB) {
-  throw "only $freeBefore GB free - need at least $minFreeGB GB to create the $Mode handoff"
-}
-
-Write-Host "==> packing $Root into 7z volumes at $PartsDir (mode: $Mode; disk: $freeBefore GB free)"
-$sw = [Diagnostics.Stopwatch]::StartNew()
-Push-Location $Root
+$packed = $false
 try {
-  if (-not (Test-Path "chromix")) { throw "$Root\chromix does not exist" }
-  & $SevenZip a -v9g -mx=1 -mtc=on "$PartsDir\stage\tree.7z" chromix
-  $rc = $LASTEXITCODE
-  if ($rc -gt 1) { throw "7z volume creation failed (exit $rc)" }
-  if ($rc -eq 1) {
-    Write-Host "==> 7z completed with warnings (some files skipped)"
-    $global:LASTEXITCODE = 0
-  }
-} finally { Pop-Location }
-Write-Host "==> packed in $([int]$sw.Elapsed.TotalMinutes) min; disk now: $(Get-FreeGB) GB free"
+  New-Item -ItemType Directory -Force -Path "$PartsDir\stage" | Out-Null
+  foreach ($i in 1..$MaxSlots) { New-Item -ItemType Directory -Force -Path "$PartsDir\p$i" | Out-Null }
 
-$vols = @(Get-ChildItem "$PartsDir\stage\tree.7z.*" | Sort-Object Name)
-if ($vols.Count -gt $MaxSlots) {
-  throw "$($vols.Count) volumes exceed the $MaxSlots upload slots (~$([math]::Round(($vols | Measure-Object Length -Sum).Sum/1GB,1)) GB total) - tree too large to hand off"
+  function Get-FreeGB { [math]::Round((Get-PSDrive C).Free / 1GB, 1) }
+
+  function Resolve-7Zip {
+    $cmd = Get-Command 7z.exe -ErrorAction SilentlyContinue
+    if ($cmd) { return $cmd.Source }
+    $installed = "$env:ProgramFiles\7-Zip\7z.exe"
+    if (Test-Path $installed) { return $installed }
+    throw "7z.exe is not available"
+  }
+
+  function Get-TreeGB {
+    param([string]$Path, [string]$ArchiveMode)
+    $rootItem = Get-Item $Path -ErrorAction SilentlyContinue
+    if (-not $rootItem) { return 0 }
+    $items = Get-ChildItem $Path -Recurse -Force -File -ErrorAction SilentlyContinue
+    [math]::Round(($items | Measure-Object Length -Sum).Sum / 1GB, 1)
+  }
+
+  $SevenZip = Resolve-7Zip
+  $freeBefore = Get-FreeGB
+  $inputGB = Get-TreeGB -Path $Root -ArchiveMode $Mode
+  if ($inputGB -le 0) {
+    throw "No build tree files found under $Root; refusing empty handoff"
+  }
+  $minFreeGB = if ($Mode -eq "Unsynced") {
+    [math]::Max(12, [math]::Ceiling($inputGB + 5))
+  } else {
+    [math]::Max(24, [math]::Ceiling(($inputGB * 0.25) + 5))
+  }
+  Write-Host "==> handoff input: $inputGB GB; minimum free space: $minFreeGB GB"
+  if ($freeBefore -lt $minFreeGB) {
+    throw "only $freeBefore GB free - need at least $minFreeGB GB to create the $Mode handoff"
+  }
+
+  Write-Host "==> packing $Root into 7z volumes at $PartsDir (mode: $Mode; disk: $freeBefore GB free)"
+  $sw = [Diagnostics.Stopwatch]::StartNew()
+  Push-Location $Root
+  try {
+    if (-not (Test-Path "chromix")) { throw "$Root\chromix does not exist" }
+    & $SevenZip a -v9g -mx=1 -mtc=on "$PartsDir\stage\tree.7z" chromix
+    $rc = $LASTEXITCODE
+    if ($rc -gt 1) { throw "7z volume creation failed (exit $rc)" }
+    if ($rc -eq 1) {
+      Write-Host "==> 7z completed with warnings (some files skipped)"
+      $global:LASTEXITCODE = 0
+    }
+  } finally { Pop-Location }
+  Write-Host "==> packed in $([int]$sw.Elapsed.TotalMinutes) min; disk now: $(Get-FreeGB) GB free"
+
+  $vols = @(Get-ChildItem "$PartsDir\stage\tree.7z.*" | Sort-Object Name)
+  if ($vols.Count -eq 0) { throw "7z produced no snapshot volumes" }
+  if ($vols.Count -gt $MaxSlots) {
+    throw "$($vols.Count) volumes exceed the $MaxSlots upload slots (~$([math]::Round(($vols | Measure-Object Length -Sum).Sum/1GB,1)) GB total) - tree too large to hand off"
+  }
+  Write-Host "==> $($vols.Count) volumes, distributing round-robin into p1..p$MaxSlots"
+  for ($i = 0; $i -lt $vols.Count; $i++) {
+    $slot = ($i % $MaxSlots) + 1
+    Move-Item $vols[$i].FullName "$PartsDir\p$slot\"
+  }
+  Get-ChildItem $PartsDir\p1, $PartsDir\p2, $PartsDir\p3, $PartsDir\p4 |
+    ForEach-Object { Write-Host "    $($_.FullName)  $([math]::Round($_.Length/1GB, 2)) GB" }
+  Remove-Item "$PartsDir\stage" -Recurse -Force -ErrorAction SilentlyContinue
+  Write-Host "==> disk after packing: $(Get-FreeGB) GB free"
+  $packed = $true
+} finally {
+  if (-not $packed -and (Test-Path -LiteralPath $PartsDir)) {
+    Remove-Item -LiteralPath $PartsDir -Recurse -Force
+  }
 }
-Write-Host "==> $($vols.Count) volumes, distributing round-robin into p1..p$MaxSlots"
-for ($i = 0; $i -lt $vols.Count; $i++) {
-  $slot = ($i % $MaxSlots) + 1
-  Move-Item $vols[$i].FullName "$PartsDir\p$slot\"
-}
-Get-ChildItem $PartsDir\p1, $PartsDir\p2, $PartsDir\p3, $PartsDir\p4 |
-  ForEach-Object { Write-Host "    $($_.FullName)  $([math]::Round($_.Length/1GB, 2)) GB" }
-Remove-Item "$PartsDir\stage" -Recurse -Force -ErrorAction SilentlyContinue
-Write-Host "==> disk after packing: $(Get-FreeGB) GB free"

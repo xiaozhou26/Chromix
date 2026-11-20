@@ -131,7 +131,7 @@ def test_prerestored_entry_is_fail_closed_and_cannot_reextract():
                     "$arm64MigrationReceipt.donor_job_id -ne 113438156537"):
         assert binding in guard
     assert 'if (-not $FromArtifact -and -not $FromSynced -and $StageIndex -gt 1)' in guard
-    assert 'snapshot_safe $(if ($FromSynced -or' in text
+    assert 'Write-OutVar snapshot_safe false\nAssert-CiScripts' in text
     extraction = text[text.index("if ($FromArtifact) {", start):text.index("if ($env:CHROMIX_WINDOWS_VERIFY_SOURCE_REPO", start)]
     assert '$FromSynced' not in extraction
     assert '7z restore failed' in extraction
