@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
   "status": "verified",
-  "manifest_sha256": "ca3c49ce3f469b6ef85c3bd669e8d68487ce8eb5a13c7b32ed9d71da9a6db990",
+  "manifest_sha256": "637e507bbd3b48ec5fe1bd89e9b2177097bdf9214cb70569ddfdb2fb96ca8dd0",
   "qualification": "Exact-source structural replay; all nine Linux downstream platform replacements and complete Chromix stacks. Core is intersecting-file subset only. No compilation/runtime, full GN/link or production selector/helper integration is claimed.",
   "historical_root224_and156_bytes_unchanged": true,
   "added_lines_preserved": [
@@ -6957,7 +6957,7 @@
       "overlay_mode": "downstream-nine-patch-recipe",
       "build_verified": false,
       "runtime_verified": false,
-      "expected_patch_count": 230,
+      "expected_patch_count": 232,
       "patches": [
         {
           "path": "patches/0001-base-BUILD-gn.patch",
@@ -9480,17 +9480,35 @@
         },
         {
           "path": "patches/chromium157-additions/0239-linux-disabled-private-verification-token-protocol.patch",
-          "sha256": "e13445e9782b72a400ff8e4c5bd42c7162db033252c1245b1c828cbf05cbdbb4",
+          "sha256": "bdc9b0a2dacc62f31d2a34c2b634b25783f8ad2f48f6af144463e93b048acfe9",
           "status": "applied",
           "preimages": {
-            "chrome/browser/devtools/inspector_protocol_config.json": "449d07d778c0a65bf4ba6d6324dd540ec31a47f96bd6113f19c9871f3d100ca7",
-            "content/browser/devtools/protocol_config.json": "1b613ae8f136895502117c37e8ae298d8c5aa465451dc1088483df35d4e7d4ef",
             "third_party/blink/public/devtools_protocol/domains/Storage.pdl": "890c5f2c2cdb4d685f53244d66e201ebf47a49a1ff47b488329dc6f87bd40477"
           },
           "postimages": {
-            "chrome/browser/devtools/inspector_protocol_config.json": "b5dcd72c16b4f41fd586860218b6bf8e8340b4446039bb6febcb4c423127a5b3",
-            "content/browser/devtools/protocol_config.json": "d6583c5f4da418a214756c50fd0e7e9d8975bb53c05740983e6ad431678c0fbe",
             "third_party/blink/public/devtools_protocol/domains/Storage.pdl": "f98ead822a7b34660096807d3886535b99f3de5806dc21a61c543683ab98dc7f"
+          }
+        },
+        {
+          "path": "patches/chromium157-additions/0240-linux-disabled-private-verification-token-chrome-config.patch",
+          "sha256": "cf0c7e35e891104f495f6c72492082279ca942b2a98c7e079e6e36f2a2abf1c9",
+          "status": "applied",
+          "preimages": {
+            "chrome/browser/devtools/inspector_protocol_config.json": "449d07d778c0a65bf4ba6d6324dd540ec31a47f96bd6113f19c9871f3d100ca7"
+          },
+          "postimages": {
+            "chrome/browser/devtools/inspector_protocol_config.json": "b5dcd72c16b4f41fd586860218b6bf8e8340b4446039bb6febcb4c423127a5b3"
+          }
+        },
+        {
+          "path": "patches/chromium157-additions/0241-linux-disabled-private-verification-token-content-config.patch",
+          "sha256": "f2ab0307d06cf25765141fd96c0d83850f307fceb1fc1dc308b4faa34d8de9af",
+          "status": "applied",
+          "preimages": {
+            "content/browser/devtools/protocol_config.json": "1b613ae8f136895502117c37e8ae298d8c5aa465451dc1088483df35d4e7d4ef"
+          },
+          "postimages": {
+            "content/browser/devtools/protocol_config.json": "d6583c5f4da418a214756c50fd0e7e9d8975bb53c05740983e6ad431678c0fbe"
           }
         }
       ],
@@ -10006,12 +10024,12 @@
           "sha256": "d338adf0c712319a3b8efa666f57d378c6cef3bb31a027681a87e97694346417"
         }
       },
-      "patch_count": 230,
+      "patch_count": 232,
       "roundtrip": {
         "status": "verified",
         "method": "reverse-forward-exact-bytes",
-        "patch_count": 239,
-        "scope": "platform9-plus-chromix230",
+        "patch_count": 241,
+        "scope": "platform9-plus-chromix232",
         "initial": {
           "base/BUILD.gn": "2619e16bd05092597a911f7b0f9e51c3363d7a7267527d79150165fb873aa9aa",
           "base/i18n/icubridge/default_icu_locale.h": "f415c2354ec91b6a69bdda447a6fc160d744cf1cfa2ed15b82d759c30080c04b",
@@ -10443,7 +10461,7 @@
       "overlay_mode": "downstream-nine-patch-recipe",
       "build_verified": false,
       "runtime_verified": false,
-      "expected_patch_count": 230,
+      "expected_patch_count": 232,
       "patches": [
         {
           "path": "patches/0001-base-BUILD-gn.patch",
@@ -12966,17 +12984,35 @@
         },
         {
           "path": "patches/chromium157-additions/0239-linux-disabled-private-verification-token-protocol.patch",
-          "sha256": "e13445e9782b72a400ff8e4c5bd42c7162db033252c1245b1c828cbf05cbdbb4",
+          "sha256": "bdc9b0a2dacc62f31d2a34c2b634b25783f8ad2f48f6af144463e93b048acfe9",
           "status": "applied",
           "preimages": {
-            "chrome/browser/devtools/inspector_protocol_config.json": "449d07d778c0a65bf4ba6d6324dd540ec31a47f96bd6113f19c9871f3d100ca7",
-            "content/browser/devtools/protocol_config.json": "1b613ae8f136895502117c37e8ae298d8c5aa465451dc1088483df35d4e7d4ef",
             "third_party/blink/public/devtools_protocol/domains/Storage.pdl": "890c5f2c2cdb4d685f53244d66e201ebf47a49a1ff47b488329dc6f87bd40477"
           },
           "postimages": {
-            "chrome/browser/devtools/inspector_protocol_config.json": "b5dcd72c16b4f41fd586860218b6bf8e8340b4446039bb6febcb4c423127a5b3",
-            "content/browser/devtools/protocol_config.json": "d6583c5f4da418a214756c50fd0e7e9d8975bb53c05740983e6ad431678c0fbe",
             "third_party/blink/public/devtools_protocol/domains/Storage.pdl": "f98ead822a7b34660096807d3886535b99f3de5806dc21a61c543683ab98dc7f"
+          }
+        },
+        {
+          "path": "patches/chromium157-additions/0240-linux-disabled-private-verification-token-chrome-config.patch",
+          "sha256": "cf0c7e35e891104f495f6c72492082279ca942b2a98c7e079e6e36f2a2abf1c9",
+          "status": "applied",
+          "preimages": {
+            "chrome/browser/devtools/inspector_protocol_config.json": "449d07d778c0a65bf4ba6d6324dd540ec31a47f96bd6113f19c9871f3d100ca7"
+          },
+          "postimages": {
+            "chrome/browser/devtools/inspector_protocol_config.json": "b5dcd72c16b4f41fd586860218b6bf8e8340b4446039bb6febcb4c423127a5b3"
+          }
+        },
+        {
+          "path": "patches/chromium157-additions/0241-linux-disabled-private-verification-token-content-config.patch",
+          "sha256": "f2ab0307d06cf25765141fd96c0d83850f307fceb1fc1dc308b4faa34d8de9af",
+          "status": "applied",
+          "preimages": {
+            "content/browser/devtools/protocol_config.json": "1b613ae8f136895502117c37e8ae298d8c5aa465451dc1088483df35d4e7d4ef"
+          },
+          "postimages": {
+            "content/browser/devtools/protocol_config.json": "d6583c5f4da418a214756c50fd0e7e9d8975bb53c05740983e6ad431678c0fbe"
           }
         }
       ],
@@ -13492,12 +13528,12 @@
           "sha256": "d338adf0c712319a3b8efa666f57d378c6cef3bb31a027681a87e97694346417"
         }
       },
-      "patch_count": 230,
+      "patch_count": 232,
       "roundtrip": {
         "status": "verified",
         "method": "reverse-forward-exact-bytes",
-        "patch_count": 239,
-        "scope": "platform9-plus-chromix230",
+        "patch_count": 241,
+        "scope": "platform9-plus-chromix232",
         "initial": {
           "base/BUILD.gn": "a4a7c9b2663f2fe6fe529329fb60b523e73ace09363b7b4c4e27b196eb2a5b0d",
           "base/i18n/icubridge/default_icu_locale.h": "f415c2354ec91b6a69bdda447a6fc160d744cf1cfa2ed15b82d759c30080c04b",

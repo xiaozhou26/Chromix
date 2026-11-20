@@ -5,7 +5,7 @@
   "core_tag_object": "33eece1eb0b5286bf71e732fbbad7a46faface5a",
   "core_peeled_commit": "8c886dffc6ade39d8f7df5d64ace5a8824b455e1",
   "chromium_commit": "4b3d0dabb8250b6f152d2d85d79e7706e309d087",
-  "scope": "Append Linux-only0239 to synchronize the already disabled downstream PVT implementation with source PDL and protocol generation configs. No stubs, no unrelated CDP removals; retain root224,156 and every prior157 patch byte and checkpoint profile.",
+  "scope": "Append Linux-only0239/0240/0241 to synchronize the already disabled downstream PVT implementation with source PDL and protocol generation configs. No stubs, no unrelated CDP removals; retain root224,156 and every prior157 patch byte and checkpoint profile. Split6302b91 into three single-source patches without changing any source pre/postimage.",
   "verification_limits": [
     "Full Linux downstream platform sequence is replayed, nine patches covering all36 target files. Core replay is the exact intersecting-file subset, not all827 core sections.",
     "Linux x64 complete timezone_controller.cc, default_icu_locale.cc and icu4c_tag_converter.cc compile with the restored official commands; relocatable link resolves new setter/converter symbols. No full browser link or runtime execution. Complete user_agent_utils.cc additionally verified before/after0238 with exact run44630942999 donor command.",
@@ -64,7 +64,7 @@
     "0236": "Forward-declare and friend only blink::TimeZoneController in DefaultIcuLocaleSetterKey. Constructor remains private; existing authorized callers unchanged.",
     "0237": "Keep first-language parsing, ICU validity guards and initialization order. Convert validated ICU locale through IcuLocaleConverter and call SetDefaultIcuLocale to update both holder and ICU. No DevTools override acquisition or timezone policy changes.",
     "0238": "user_agent_utils.cc constructs base::Version but its transitive version_info.h only forward-declares the class. Include its defining base/version.h directly; preserve all UA normalization and override behavior.",
-    "0239": "Linux156 downstream PVT removal rebased to157 deletes all five StorageHandler methods but omits PDL/config changes. Core157 and Windows/macOS do not remove PVT. Remove only these five experimental commands, two exclusive types and one event on Linux; keep all other schema and handlers unchanged."
+    "0239/0240/0241": "Linux156 downstream PVT removal rebased to157 deletes all five StorageHandler methods but omits PDL/config changes. Core157 and Windows/macOS do not remove PVT. Remove only these five experimental commands, two exclusive types and one event on Linux; keep all other schema and handlers unchanged. One source file per patch; concatenated diffs exactly equal the original0239 bytes."
   },
   "upstream_duplicate_checks": {
     "managed_profile": "Exact157 core still removes managed_profile_creation_controller sources;0225 remains needed. Verified exactly one final .cc entry.",
@@ -74,7 +74,7 @@
     "canvas": "Upstream157 initialization CHECK and shuffle call retained; no duplicate helper definition introduced."
   },
   "platform_patch_counts": {
-    "linux": 230,
+    "linux": 232,
     "macos": 231,
     "windows": 235
   },
@@ -109,7 +109,17 @@
       },
       {
         "path": "patches/chromium157-additions/0239-linux-disabled-private-verification-token-protocol.patch",
-        "sha256": "e13445e9782b72a400ff8e4c5bd42c7162db033252c1245b1c828cbf05cbdbb4",
+        "sha256": "bdc9b0a2dacc62f31d2a34c2b634b25783f8ad2f48f6af144463e93b048acfe9",
+        "kind": "linux-disabled-feature-protocol"
+      },
+      {
+        "path": "patches/chromium157-additions/0240-linux-disabled-private-verification-token-chrome-config.patch",
+        "sha256": "cf0c7e35e891104f495f6c72492082279ca942b2a98c7e079e6e36f2a2abf1c9",
+        "kind": "linux-disabled-feature-protocol"
+      },
+      {
+        "path": "patches/chromium157-additions/0241-linux-disabled-private-verification-token-content-config.patch",
+        "sha256": "f2ab0307d06cf25765141fd96c0d83850f307fceb1fc1dc308b4faa34d8de9af",
         "kind": "linux-disabled-feature-protocol"
       }
     ],
@@ -261,21 +271,21 @@
     "recipe_sha256": "42d788d91c0ec2345c253044665af7f623501a73c8bdb627a94d1739790aeb11",
     "qualification": "Authorized old platform baseline plus exact157 core override and all nine downstream replacements; not an official portablelinux157 tag."
   },
-  "review_manifest_sha256": "ca3c49ce3f469b6ef85c3bd669e8d68487ce8eb5a13c7b32ed9d71da9a6db990",
+  "review_manifest_sha256": "637e507bbd3b48ec5fe1bd89e9b2177097bdf9214cb70569ddfdb2fb96ca8dd0",
   "linux_full_platform_coverage": {
     "raw_source_files": 210,
     "platform_files": 36,
     "core_sections": 43,
     "platform_patches": 9,
     "platform_sections": 36,
-    "chromix_patches": 230,
-    "combined_roundtrip_patches": 239,
+    "chromix_patches": 232,
+    "combined_roundtrip_patches": 241,
     "domain_modes": [
       "raw",
       "substituted"
     ],
     "post_core_preimages": "Every36 platform source bytes must equal independently audited fixture before any replacement.",
-    "sequential_checks": "Each of9 exact pre/post SHA256 maps plus final_outputs checked; all9 platform reverse/forward and combined239 reverse/forward verified.",
+    "sequential_checks": "Each of9 exact pre/post SHA256 maps plus final_outputs checked; all9 platform reverse/forward and combined241 reverse/forward verified.",
     "policy": "Retains157 native WebBundle/IFT and Rust/Crubit assertions, Node version check and native TypeScript recipe. Full GN/link compatibility remains unverified."
   },
   "regression_tests": {
@@ -284,14 +294,15 @@
     "groups": {
       "full_157_protocol_selector_locale_ua_and_historical156": "785 passed,26 skipped",
       "final_protocol_tests": "8 passed,2 skipped",
-      "latest_donor_native_tests": "2 passed,8 deselected"
+      "latest_donor_native_tests": "2 passed,8 deselected",
+      "split_single_source_followup": "805 passed, 27 skipped in 281.90s (0:04:41)"
     },
     "skip_reason": "Optional native/donor environment variables and historical unsupported macOS155 cases; real latest donor native tests are run separately.",
     "negative_checks": [
       "exact five abstract methods reproduced before repair",
       "all unrelated parsed protocol declarations and JSON domains unchanged",
       "Linux-only addition rejected for macOS/Windows",
-      "old226/228/229 recovery rejects230; historical229 UA positive validation retained",
+      "old226/228/229 recovery rejects232; historical229 UA positive validation retained",
       "all previous patch bytes unchanged"
     ],
     "native_separate_passed": 2
@@ -491,7 +502,7 @@
       }
     },
     "native_status": "verified",
-    "migration_policy": "Existing226/228/229 checkpoint admissions are unchanged and must reject230. No donor migration, push or dispatch authorized here.",
+    "migration_policy": "Existing226/228/229 checkpoint admissions are unchanged and must reject232. No donor migration, push or dispatch authorized here.",
     "native": {
       "donor_run": 44660206036,
       "donor_artifact": 14608249261,
@@ -637,6 +648,79 @@
     "regression_results": {
       "local": "8 passed,2 skipped",
       "native": "2 passed,8 deselected"
+    },
+    "split_review": {
+      "baseline_commit": "6302b915abe3b805f756db466ff2721038978131",
+      "old_patch_count": 229,
+      "new_patch_count": 232,
+      "combined_roundtrip_count": 241,
+      "patches": [
+        {
+          "path": "patches/chromium157-additions/0239-linux-disabled-private-verification-token-protocol.patch",
+          "sha256": "bdc9b0a2dacc62f31d2a34c2b634b25783f8ad2f48f6af144463e93b048acfe9",
+          "kind": "linux-disabled-feature-protocol"
+        },
+        {
+          "path": "patches/chromium157-additions/0240-linux-disabled-private-verification-token-chrome-config.patch",
+          "sha256": "cf0c7e35e891104f495f6c72492082279ca942b2a98c7e079e6e36f2a2abf1c9",
+          "kind": "linux-disabled-feature-protocol"
+        },
+        {
+          "path": "patches/chromium157-additions/0241-linux-disabled-private-verification-token-content-config.patch",
+          "sha256": "f2ab0307d06cf25765141fd96c0d83850f307fceb1fc1dc308b4faa34d8de9af",
+          "kind": "linux-disabled-feature-protocol"
+        }
+      ],
+      "source_pre_postimages_unchanged": true,
+      "native_evidence_unchanged": true,
+      "fixture_sha256_unchanged": "a53ab5f689310b352acbf4d32b641cfb6e1c46156de64416a83e5491c3b7e86f",
+      "qualification": "Original native and229/230 donor evidence remains historical and valid for identical source bytes. Current232 six-case raw/substituted full replay is regenerated; no lint exemption.",
+      "donor_roundtrip": {
+        "status": "verified",
+        "donor_run": 44660206036,
+        "old_count": 229,
+        "new_count": 232,
+        "source_count": 172,
+        "old_and_new_full_reverse_forward": true,
+        "source_and_out_untouched": true,
+        "out_file_count": 236482
+      },
+      "lint": "tools/check_patches.py unchanged; all root224 and selected Linux232/Windows235/macOS231 checks passed",
+      "historical_file_count_unchanged": 345,
+      "evidence_files": {
+        "split-replay.json": {
+          "sha256": "2bca5a29a04e78b7071f074a1ea1e8fdbb1b06fcc0b691c18eb7dd46d29917cf",
+          "bytes": 1521932
+        },
+        "split-donor-roundtrip.json": {
+          "sha256": "b3408619a8ea6736a646531b8d12193a273dc8ea68bcc1204c6d0cbbb04eaedd",
+          "bytes": 23156
+        },
+        "split-donor-roundtrip.py": {
+          "sha256": "83c14bce771c78fc2e65374ab2e8fcae1cbdd2249ae70f5c2d41cea4d2982c34",
+          "bytes": 3106
+        },
+        "split-lint.log": {
+          "sha256": "12677ddc4210807e197377bd29e983682d88684fd5f60ca984a010ba30ad8994",
+          "bytes": 2201
+        },
+        "split-check-patches-tests.log": {
+          "sha256": "49675a6a8d90f5a69033379a43757eea5c03a277003a20e3d68c52ed44850995",
+          "bytes": 99
+        },
+        "split-protocol-tests.log": {
+          "sha256": "1b94f643a7e5d86355b9789320353ca7c7893585ebf87d08155c2c8666731d8a",
+          "bytes": 110
+        },
+        "split-tests.log": {
+          "sha256": "2fb86e4d344f8c6f69217346eff4c44bd93bef2b7f10915dc2849fd5b3d0a6eb",
+          "bytes": 1004
+        }
+      },
+      "test_check_patches": "18 passed",
+      "source_fixture_policy": "Exact210 source fixture and source-manifest bytes remain unchanged because the split adds no source files or source changes; existing fixture SHA256 binding revalidated. Current patch identities and counts are bound in both manifests and regenerated six-case replay.",
+      "protocol_tests": "10 passed,2 skipped",
+      "regression_tests": "805 passed, 27 skipped in 281.90s (0:04:41)"
     }
   }
 }

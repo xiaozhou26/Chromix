@@ -194,17 +194,20 @@ def verify():
     for entry in list(overrides.values()) + list(additions.values()):
         raw = checked(entry)
         targets = [target for target, _, _ in arp.transform_patch(raw, set(), [])[1]]
+        assert len(targets) == 1, entry["path"]
         if entry.get("kind") == "linux-disabled-feature-protocol":
-            assert entry["path"] == "patches/chromium157-additions/0239-linux-disabled-private-verification-token-protocol.patch"
-            assert targets == [
-                "third_party/blink/public/devtools_protocol/domains/Storage.pdl",
-                "chrome/browser/devtools/inspector_protocol_config.json",
-                "content/browser/devtools/protocol_config.json",
-            ]
+            protocol_targets = {
+                "0239-linux-disabled-private-verification-token-protocol.patch":
+                    "third_party/blink/public/devtools_protocol/domains/Storage.pdl",
+                "0240-linux-disabled-private-verification-token-chrome-config.patch":
+                    "chrome/browser/devtools/inspector_protocol_config.json",
+                "0241-linux-disabled-private-verification-token-content-config.patch":
+                    "content/browser/devtools/protocol_config.json",
+            }
+            assert targets == [protocol_targets[Path(entry["path"]).name]]
             assert entry in manifest["additions"]["linux"]
             assert all(entry not in manifest["additions"][platform] for platform in ("macos", "windows"))
             continue
-        assert len(targets) == 1, entry["path"]
         if entry.get("kind") == "locale-api-compatibility":
             assert entry["path"] in {
                 "patches/chromium157-additions/0236-timezone-default-locale-setter-key.patch",
@@ -251,7 +254,7 @@ def verify():
                           "domain_substituted": substituted, "status": "failed",
                           "overlay_mode": "downstream-nine-patch-recipe" if platform == "linux" else "actual-platform",
                           "build_verified": False, "runtime_verified": False,
-                          "expected_patch_count": {"linux": 230, "windows": 235, "macos": 231}[platform],
+                          "expected_patch_count": {"linux": 232, "windows": 235, "macos": 231}[platform],
                           "patches": [], "predecessors": []}
                 results.append(result)
                 try:
@@ -352,7 +355,7 @@ def verify():
                     result.update(status="verified", patch_count=len(prepared),
                                   roundtrip={"status": "verified", "method": "reverse-forward-exact-bytes",
                                              "patch_count": len(roundtrip_patches),
-                                             "scope": "platform9-plus-chromix230" if platform == "linux" else "chromix-stack",
+                                             "scope": "platform9-plus-chromix232" if platform == "linux" else "chromix-stack",
                                              "initial": roundtrip_initial, "final": final})
                     for key in ("stage", "current_patch", "current_file"):
                         del result[key]

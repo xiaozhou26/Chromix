@@ -1196,7 +1196,17 @@
       },
       {
         "path": "patches/chromium157-additions/0239-linux-disabled-private-verification-token-protocol.patch",
-        "sha256": "e13445e9782b72a400ff8e4c5bd42c7162db033252c1245b1c828cbf05cbdbb4",
+        "sha256": "bdc9b0a2dacc62f31d2a34c2b634b25783f8ad2f48f6af144463e93b048acfe9",
+        "kind": "linux-disabled-feature-protocol"
+      },
+      {
+        "path": "patches/chromium157-additions/0240-linux-disabled-private-verification-token-chrome-config.patch",
+        "sha256": "cf0c7e35e891104f495f6c72492082279ca942b2a98c7e079e6e36f2a2abf1c9",
+        "kind": "linux-disabled-feature-protocol"
+      },
+      {
+        "path": "patches/chromium157-additions/0241-linux-disabled-private-verification-token-content-config.patch",
+        "sha256": "f2ab0307d06cf25765141fd96c0d83850f307fceb1fc1dc308b4faa34d8de9af",
         "kind": "linux-disabled-feature-protocol"
       }
     ],

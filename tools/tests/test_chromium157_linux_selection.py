@@ -70,7 +70,7 @@ def test_integrated_linux_selection_matches_real_recipe_and_parser():
     identity, patches = selection.select(ROOT, "linux")
     assert pins["ChromiumVersion"] == selection.VERSION157
     assert pins["UngoogledLinuxVersion"] == selection.VERSION156 + "-1"
-    assert len(patches) == 230
+    assert len(patches) == 232
     assert identity["selection"]["downstream"]["recipe"] == linux157_source.recipe(ROOT)
     assert identity["selection"]["core_gitlink"] == selection.CORE156
     assert identity["selection"]["effective_core_commit"] == selection.CORE157
@@ -257,7 +257,7 @@ def test_locale_review_preserves_old_prefix_and_rejects_generic_restore(linux_re
         prior.compatible_selection(old, selected)
     with pytest.raises(ValueError, match="only"):
         postgn.delta(donor["source_receipt"]["recipe"], DOWNSTREAM["recipe"])
-    assert len(raw) == 230
+    assert len(raw) == 232
 
 
 def test_old_locale_preflight_rejects_unmigrated_ua_addition():
@@ -465,7 +465,7 @@ def test_reviewed_activation_preserves_real_origin_and_effective_core(linux_repo
     activate(linux_repo, monkeypatch)
     identity, patches = selection.select(linux_repo, "linux")
     chosen = identity["selection"]
-    assert len(patches) == 230
+    assert len(patches) == 232
     assert chosen["core_commit"] == chosen["effective_core_commit"] == selection.CORE157
     assert chosen["core_gitlink"] == selection.CORE156 != selection.CORE157
     assert chosen["platform_version"] == "156.0.8078.79-1"

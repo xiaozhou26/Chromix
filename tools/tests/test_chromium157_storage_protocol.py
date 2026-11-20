@@ -16,7 +16,11 @@ from tools.tests.test_chromium157_locale_api import fixture, verifier
 
 ROOT = Path(__file__).resolve().parents[2]
 BASELINE = "3da74546373f3351029064d79fe85e3d3cb4497f"
-PATCH = "patches/chromium157-additions/0239-linux-disabled-private-verification-token-protocol.patch"
+PATCHES = (
+    "patches/chromium157-additions/0239-linux-disabled-private-verification-token-protocol.patch",
+    "patches/chromium157-additions/0240-linux-disabled-private-verification-token-chrome-config.patch",
+    "patches/chromium157-additions/0241-linux-disabled-private-verification-token-content-config.patch",
+)
 PDL = "third_party/blink/public/devtools_protocol/domains/Storage.pdl"
 CONFIGS = ("chrome/browser/devtools/inspector_protocol_config.json",
            "content/browser/devtools/protocol_config.json")
@@ -56,10 +60,35 @@ def test_exact_append_preserves_all_old_bytes_and_platform_scope():
                     for entry in old["base_patches"]] + old_platform["additions"]
         selected, raw = selection.select(ROOT, platform)
         assert selected["patches"][:len(previous)] == previous
-        assert len(raw) == {"linux": 230, "macos": 231, "windows": 235}[platform]
-        assert [name for name, _ in raw[len(previous):]] == ([PATCH] if platform == "linux" else [])
-    assert PATCH not in (ROOT / "patches/series").read_text()
-    assert PATCH not in (ROOT / selection.MANIFEST156).read_text()
+        assert len(raw) == {"linux": 232, "macos": 231, "windows": 235}[platform]
+        assert [name for name, _ in raw[len(previous):]] == (list(PATCHES) if platform == "linux" else [])
+    for patch in PATCHES:
+        assert patch not in (ROOT / "patches/series").read_text()
+        assert patch not in (ROOT / selection.MANIFEST156).read_text()
+
+
+def test_real_selected_stacks_pass_unmodified_patch_linter():
+    from tools import check_patches
+
+    report = check_patches.Report()
+    check_patches.check_selected_stacks(report, ROOT)
+    assert report.failures == []
+
+
+def test_single_source_split_preserves_original_diff_and_native_evidence():
+    original = subprocess.check_output([
+        "git", "-C", str(ROOT), "show", "6302b915abe3b805f756db466ff2721038978131:" + PATCHES[0]])
+    parts = [(ROOT / name).read_bytes() for name in PATCHES]
+    assert b"".join(parts) == original
+    for raw, target in zip(parts, (PDL, *CONFIGS), strict=True):
+        assert raw.count(b"diff --git ") == 1
+        assert [name for name, _, _ in verifier().arp.transform_patch(raw, set(), [])[1]] == [target]
+    old_review = json.loads(subprocess.check_output([
+        "git", "-C", str(ROOT), "show",
+        "6302b915abe3b805f756db466ff2721038978131:patches/chromium157-verification/review.json"]))
+    review = json.loads((ROOT / "patches/chromium157-verification/review.json").read_bytes())
+    for key in ("source_files", "native", "generation_commands"):
+        assert review["storage_protocol_evidence"][key] == old_review["storage_protocol_evidence"][key]
 
 
 @pytest.mark.parametrize("substituted", [False, True])
@@ -77,13 +106,16 @@ def test_only_previously_disabled_pvt_schema_is_removed(tmp_path, substituted):
         path = tmp_path / name
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_bytes(initial[name])
-    raw, targets = verify.arp.transform_patch((ROOT / PATCH).read_bytes(), listed, rules)
-    assert [target for target, _, _ in targets] == [PDL, *CONFIGS]
+    prepared = []
     env = {key: value for key, value in os.environ.items() if not key.startswith("GIT_")}
     env.update(GIT_CONFIG_NOSYSTEM="1", GIT_CONFIG_GLOBAL=os.devnull,
                GIT_CEILING_DIRECTORIES=str(tmp_path.parent))
-    verify.apply(tmp_path, raw, env, check=True)
-    verify.apply(tmp_path, raw, env)
+    for patch, target in zip(PATCHES, (PDL, *CONFIGS), strict=True):
+        raw, targets = verify.arp.transform_patch((ROOT / patch).read_bytes(), listed, rules)
+        assert [name for name, _, _ in targets] == [target]
+        verify.apply(tmp_path, raw, env, check=True)
+        verify.apply(tmp_path, raw, env)
+        prepared.append(raw)
     before = declarations(initial[PDL].decode())
     removed = {("command", name) for name in COMMANDS} | {("type", name) for name in TYPES} | {
         ("event", name) for name in EVENTS}
@@ -99,8 +131,9 @@ def test_only_previously_disabled_pvt_schema_is_removed(tmp_path, substituted):
         assert json.loads((tmp_path / name).read_bytes()) == expected
     final = {name: (tmp_path / name).read_bytes() for name in initial}
     for reverse in (True, False):
-        verify.apply(tmp_path, raw, env, check=True, reverse=reverse)
-        verify.apply(tmp_path, raw, env, reverse=reverse)
+        for raw in reversed(prepared) if reverse else prepared:
+            verify.apply(tmp_path, raw, env, check=True, reverse=reverse)
+            verify.apply(tmp_path, raw, env, reverse=reverse)
         assert {name: (tmp_path / name).read_bytes() for name in initial} == (initial if reverse else final)
 
 
@@ -132,12 +165,12 @@ def test_full_replay_and_fixed_source_identities_cover_protocol():
         assert case["status"] == case["roundtrip"]["status"] == "verified"
         assert case["patch_count"] == selection.PATCH_COUNTS157[case["platform"]]
         if case["platform"] == "linux":
-            assert case["roundtrip"]["patch_count"] == 239
-            entry = case["patches"][-1]
-            assert entry["path"] == PATCH
-            for name, hashes in evidence["source_files"].items():
-                assert entry["preimages"][name] == hashes["pre_sha256"]
-                assert entry["postimages"][name] == hashes["post_sha256"]
+            assert case["roundtrip"]["patch_count"] == 241
+            for entry, patch, name in zip(case["patches"][-3:], PATCHES, (PDL, *CONFIGS), strict=True):
+                assert entry["path"] == patch
+                hashes = evidence["source_files"][name]
+                assert entry["preimages"] == {name: hashes["pre_sha256"]}
+                assert entry["postimages"] == {name: hashes["post_sha256"]}
 
 
 @pytest.mark.parametrize("platform", ["macos", "windows"])
@@ -148,7 +181,7 @@ def test_protocol_patch_cannot_be_selected_for_enabled_platform(platform):
         selection.validate_manifest157(manifest)
 
 
-def test_old_ua_checkpoint_routes_reject_new230_stack():
+def test_old_ua_checkpoint_routes_reject_new232_stack():
     from tools import linux157_ua
 
     selected, raw = selection.select(ROOT, "linux")
