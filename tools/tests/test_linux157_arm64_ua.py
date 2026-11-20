@@ -76,14 +76,17 @@ def test_actual_metadata_mutations_fail_closed(attack):
 
 
 def test_recipe_delta_specific_to_each_donor():
+    from tools import linux157_storage
+    historical = linux157_storage.load()['source_receipt']['recipe']
     for arch in ('x64', 'arm64'):
         old = ua.load(arch=arch)['source_receipt']['recipe']
-        ua.recipe_delta(old, source.recipe(), arch=arch)
-        bad = copy.deepcopy(source.recipe())
+        ua.recipe_delta(old, historical, arch=arch)
+        bad = copy.deepcopy(historical)
         bad['inputs']['tools/linux157_locale.py'] = '0'*64
         with pytest.raises(ValueError): ua.recipe_delta(old, bad, arch=arch)
+        with pytest.raises(ValueError): ua.recipe_delta(old, source.recipe(), arch=arch)
     with pytest.raises(ValueError):
-        ua.recipe_delta(ua.load(arch='arm64')['source_receipt']['recipe'], source.recipe(), arch='x64')
+        ua.recipe_delta(ua.load(arch='arm64')['source_receipt']['recipe'], historical, arch='x64')
 
 
 def test_generated_stage4_chain_and_native_gate():

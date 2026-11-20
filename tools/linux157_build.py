@@ -17,13 +17,13 @@ try:
     from . import linux157_toolchain as toolchain
     from . import linux157_gn as host_gn
     from . import linux157_libclang as libclang
-    from . import linux157_ua as ua_recovery
+    from . import linux157_storage as storage_recovery
 except ImportError:
     import linux157_source as source
     import linux157_toolchain as toolchain
     import linux157_gn as host_gn
     import linux157_libclang as libclang
-    import linux157_ua as ua_recovery
+    import linux157_storage as storage_recovery
 
 
 GO_VERSION = "go1.27.1"
@@ -170,16 +170,16 @@ def build(work: Path, arch: str, repo: Path = source.ROOT) -> None:
                     "--repo", str(repo), "--core", str(core), "--platform-tooling", str(tooling),
                     "--platform", "linux", "--output", str(report)], check=True, env=env)
     shutil.copy2(report, diagnostic / "source-final.json")
-    ua_recovery.verify(work, arch, repo)
+    storage_recovery.verify_current(work, arch, repo)
     gn_identity = host_gn.prepare(src, out, env=env)
     (diagnostic / "linux157-host-gn.json").write_text(json.dumps(gn_identity, indent=2) + "\n")
-    # The UA-only migration preserves the admitted generated graph and object cache.
+    # The source-only migration preserves the admitted generated graph and object cache.
     source.regular(out, "build.ninja")
     libclang.prepare(src, repo)
     # Metagen's gn-desc lookup falls back to PATH after core prunes buildtools/linux64.
     env["PATH"] = str(out) + os.pathsep + env["PATH"]
     env["PYTHONDONTWRITEBYTECODE"] = "1"
-    ninja = str(ua_recovery.verify_ninja(work, repo))
+    ninja = str(storage_recovery.verify_current_ninja(work, repo))
     jobs = os.environ.get("CHROMIX_JOBS", str(os.cpu_count() or 2))
     if not jobs.isdecimal() or int(jobs) <= 0:
         raise ValueError("invalid Linux157 job count")

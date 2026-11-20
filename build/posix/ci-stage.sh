@@ -153,6 +153,18 @@ fi
 
 LINUX157_FRESH=0
 LINUX157_RECOVERY=0
+case "${CHROMIX_LINUX157_STORAGE_RECOVERY:-0}" in
+  0) ;;
+  1)
+    [ "$PLATFORM:$ARCH:${CHROMIX_LINUX157_ARM64_STORAGE_STAGE5_RECOVERY:-0}" = linux:arm64:1 ] ||
+      die "Storage recovery requires exact ARM stage5 donor"
+    [ "$STAGE_INDEX" -ge 6 ] && [ "$STAGE_INDEX" -le 8 ] ||
+      die "Storage continuation requires logical stages6 through8"
+    [ "${CHROMIX_LINUX157_UA_RECOVERY:-0}:${CHROMIX_LINUX157_PRE_GN_RECOVERY:-0}:${CHROMIX_LINUX157_POST_GN_RECOVERY:-0}:${CHROMIX_LINUX157_LOCALE_RECOVERY:-0}" = 0:0:0:0 ] ||
+      die "Storage recovery cannot be combined with historical donor routes"
+    LINUX157_RECOVERY=1 ;;
+  *) die "invalid Storage recovery opt-in" ;;
+esac
 case "${CHROMIX_LINUX157_UA_RECOVERY:-0}" in
   0) ;;
   1)

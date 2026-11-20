@@ -80,7 +80,11 @@ def test_extra_target_or_old_source_tampering_fails_closed(tmp_path):
 
 
 def test_migration_recipe_cannot_change_existing_locale_identity():
-    old=ua.load()['source_receipt']['recipe'];current=source.recipe();ua.recipe_delta(old,current)
+    from tools import linux157_storage
+    old=ua.load()['source_receipt']['recipe']
+    current=linux157_storage.load()['source_receipt']['recipe']
+    ua.recipe_delta(old,current)
+    with pytest.raises(ValueError):ua.recipe_delta(old,source.recipe())
     bad=copy.deepcopy(current);bad['inputs']['tools/linux157_locale.py']='0'*64
     with pytest.raises(ValueError,match='inherited'):ua.recipe_delta(old,bad)
     bad=copy.deepcopy(current);bad['inputs']['build/linux/157.0.8103.78/locale-checkpoint.json']='0'*64

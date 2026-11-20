@@ -14,7 +14,7 @@ import yaml
 
 from tools import linux157_source as source
 from tools import linux157_build as build
-from tools import linux157_ua as checkpoint
+from tools import linux157_storage as checkpoint
 
 ROOT = Path(__file__).resolve().parents[2]
 
@@ -149,7 +149,7 @@ def test_checkpoint_requires_exact_ready_selection_and_provenance(tmp_path):
     selection = {'selection': {'fixture': '157'}}
     receipt = {'stage': 'chromix-applied', 'target_arch': 'arm64', 'chromix_selection': selection}
     from tools import patch_selection
-    with mock.patch.object(checkpoint, 'verify'), \
+    with mock.patch.object(checkpoint, 'verify_current'), \
             mock.patch.object(source, 'validate_route', return_value=identity), \
             mock.patch.object(source, 'verify_receipt', return_value=receipt), \
             mock.patch.object(source, 'get_platform', return_value=identity) as origin, \

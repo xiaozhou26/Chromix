@@ -194,7 +194,7 @@ def test_current_builder_checks_postgn_proof_without_repeating_args_repair(tmp_p
          mock.patch.object(build,'prepare_host_go',return_value={}), \
          mock.patch.object(build.shutil,'which',return_value=sys.executable), \
          mock.patch.object(build.subprocess,'run',side_effect=run), \
-         mock.patch.object(build.ua_recovery,'verify',side_effect=lambda *a:order.append('read-postgn-proof')), \
+         mock.patch.object(build.storage_recovery,'verify_current',side_effect=lambda *a:order.append('read-postgn-proof')), \
          mock.patch.object(build.host_gn,'prepare',side_effect=ValueError('stop-before-GN')):
         with pytest.raises(ValueError,match='stop-before-GN'):build.build(work,'arm64')
     assert order==['verify-migrated-source','verified-tools','source-proof','read-postgn-proof']

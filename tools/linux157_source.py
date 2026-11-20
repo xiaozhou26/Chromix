@@ -85,7 +85,8 @@ def recipe(repo: Path = ROOT) -> dict:
              "build/linux/157.0.8103.78/locale-checkpoint.json",
              "build/linux/157.0.8103.78/arm64-locale-checkpoint.json", "tools/linux157_ua.py",
              "build/linux/157.0.8103.78/ua-checkpoint.json",
-             "build/linux/157.0.8103.78/arm64-ua-checkpoint.json", LITE_PATH]
+             "build/linux/157.0.8103.78/arm64-ua-checkpoint.json",
+             "tools/linux157_storage.py", "build/linux/157.0.8103.78/arm64-storage-checkpoint.json", LITE_PATH]
     if digest(regular(repo, LITE_PATH).read_bytes()) != LITE_SHA256:
         raise ValueError("changed Linux157 lite payload")
     files += [entry["path"] for entry in manifest["patches"]]
@@ -256,9 +257,9 @@ def prepare(work: Path, arch: str, repo: Path = ROOT) -> None:
     src = work / "src"
     if src.exists():
         try:
-            from .linux157_ua import verify as verify_migrated
+            from .linux157_storage import verify_current as verify_migrated
         except ImportError:
-            from linux157_ua import verify as verify_migrated
+            from linux157_storage import verify_current as verify_migrated
         verify_migrated(work, arch, repo)
         receipt = verify_receipt(src, repo)
         expected_ready = "linux157-fresh|" + arch + "|" + recipe(repo)["sha256"]
@@ -294,9 +295,9 @@ def checkpoint(work: Path, arch: str, repo: Path = ROOT) -> dict:
     work = work.resolve()
     src = work / "src"
     try:
-        from .linux157_ua import verify as verify_migrated
+        from .linux157_storage import verify_current as verify_migrated
     except ImportError:
-        from linux157_ua import verify as verify_migrated
+        from linux157_storage import verify_current as verify_migrated
     verify_migrated(work, arch, repo)
     receipt = verify_receipt(src, repo)
     selection, _ = patch_selection.select(repo, "linux", src=src)
