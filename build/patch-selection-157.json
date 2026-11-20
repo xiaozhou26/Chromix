@@ -1191,7 +1191,7 @@
           },
           "inputs": {
             "build/linux/157.0.8103.78/source.json": "5ad5898d9442cc31b6ed571702f9e88510e9eea144ed544f60187e66e5c948d8",
-            "tools/linux157_source.py": "4391c9a670757f03ab86fd43100994e9cc10dde2b5c25390709420e7a3c1e268",
+            "tools/linux157_source.py": "401b7d4abc70bc3adf93f30793553f52f87427d958adbbee04b3a47f38b09750",
             "tools/linux157_toolchain.py": "539a28814632a79333adefe55d2f8bd6b8e37455aaf43f2b506175d3b733954a",
             "tools/linux157_build.py": "ccac0e3a4926a755734f22dfa4bd1109d7a0553232b5741fc5dfb8a959821640",
             "tools/linux157_gn.py": "bdf432f04eaa7665d93026724deadf2eaa6127c27d5ee4533e29140e27f88805",
@@ -1204,8 +1204,9 @@
             "tools/linux157_locale.py": "724bbdcfb856ef7986a7e0fd63e99270dffd4da78392db7bbe6196f289d0f37c",
             "build/linux/157.0.8103.78/locale-checkpoint.json": "42a6d9d6e9d40812cb4bee4077768213987586387f7f8816e08b9bd066993208",
             "build/linux/157.0.8103.78/arm64-locale-checkpoint.json": "825e7d02d900f808b72e014cbcc708b2417d2e21b4c0a9898da72db7010f14a2",
-            "tools/linux157_ua.py": "a147310f5e12e090042268157064653149c2486024b253c3e9c4df5b3e4b7d7c",
+            "tools/linux157_ua.py": "0349d455719e0deca1b6cf4200b55dc5cec69d269f38ca50a3c0e799d9dcd33e",
             "build/linux/157.0.8103.78/ua-checkpoint.json": "0441b32c8e2d296e09bbaa279dd20e0e67d75e85f0a5ebcb753dd3369cb6fd11",
+            "build/linux/157.0.8103.78/arm64-ua-checkpoint.json": "91d518c0062b216b9365b5efde24760faa485299219a36573793fc959aee0c0a",
             "build/windows/lite-tarball-files/v8/test/torque/test-torque.tq": "502c92560d745fc94e93ec7b95a1c562a55167f58a2ce79e3d0e4881dfb928c5",
             "build/linux/157.0.8103.78/patches/use-oauth2-client-switches-as-default.patch": "9564c36390f1ca1d08ffe42a81a1088aaba7eec8249ba6ff66a85f0592a282ef",
             "build/linux/157.0.8103.78/patches/fix-compiling-on-arm64.patch": "a2932c2ea04e4822e5d5c3e94f39b779134990c9d417a707a1652702239705a6",
@@ -1217,7 +1218,7 @@
             "build/linux/157.0.8103.78/patches/chromium-156-revert-crubit-changes.patch": "70c63c2d028c5b4069c16b13152e97ce42785752cf9837cc63bbc0243d3e20d0",
             "build/linux/157.0.8103.78/patches/chromium-156-revert-use-typescript-go.patch": "e1f21b386321371bf76fc0dd5d14c5f142f54f495685e6e7b67313a1d3a0ce6f"
           },
-          "sha256": "7b7bfbf785429a25d22a26ce9fde4cf5aa3347eeee9fb773472973fb4c67051f"
+          "sha256": "89daf4e70a64fc7641e4d70ce61759cfd1eb289d7697d0c7c3b4870cbc3b2f41"
         },
         "source_manifest": {
           "path": "build/linux/157.0.8103.78/source.json",
@@ -1294,11 +1295,11 @@
           },
           "replayed_recipe_sha256": "42d788d91c0ec2345c253044665af7f623501a73c8bdb627a94d1739790aeb11",
           "recipe_integration": {
-            "recipe_sha256": "7b7bfbf785429a25d22a26ce9fde4cf5aa3347eeee9fb773472973fb4c67051f",
+            "recipe_sha256": "89daf4e70a64fc7641e4d70ce61759cfd1eb289d7697d0c7c3b4870cbc3b2f41",
             "changed_inputs": {
               "tools/linux157_source.py": {
                 "before_sha256": "342b7c98f191280bc23e9c988b1ffe1f39cdc514f460f0b186ab026bb2d4a9d9",
-                "sha256": "4391c9a670757f03ab86fd43100994e9cc10dde2b5c25390709420e7a3c1e268"
+                "sha256": "401b7d4abc70bc3adf93f30793553f52f87427d958adbbee04b3a47f38b09750"
               },
               "build/windows/lite-tarball-files/v8/test/torque/test-torque.tq": {
                 "before_sha256": null,
@@ -1354,11 +1355,15 @@
               },
               "tools/linux157_ua.py": {
                 "before_sha256": null,
-                "sha256": "a147310f5e12e090042268157064653149c2486024b253c3e9c4df5b3e4b7d7c"
+                "sha256": "0349d455719e0deca1b6cf4200b55dc5cec69d269f38ca50a3c0e799d9dcd33e"
               },
               "build/linux/157.0.8103.78/ua-checkpoint.json": {
                 "before_sha256": null,
                 "sha256": "0441b32c8e2d296e09bbaa279dd20e0e67d75e85f0a5ebcb753dd3369cb6fd11"
+              },
+              "build/linux/157.0.8103.78/arm64-ua-checkpoint.json": {
+                "before_sha256": null,
+                "sha256": "91d518c0062b216b9365b5efde24760faa485299219a36573793fc959aee0c0a"
               }
             },
             "review": "Source helper adds exact lite Torque payload binding/copy, explicit source-manifest identity, and fail-closed fresh route/checkpoint validation. Build helper binds Linux amd64 host Go1.27.1 to its complete GOROOT, checks binary/compiler identity, and compiles/runs a standard-library probe using the copied Go executable before passing its bound environment to the build. The subsequent exact pruning-recovery delta below updates all three helpers. Source manifest, GN/source patches and all nine platform replacements remain unchanged. This reviewed helper delta extends recipe identity, not the original patch replay or compilation/runtime evidence. The subsequent GN recovery delta admits only two exact pre-GN checkpoints, disables fresh preparation, binds the official host GN compiler/bootstrap inputs, and removes only three hash-bound obsolete args; original patch replay scope is unchanged. The subsequent libclang recovery delta binds the full official DEPS package and a separate latest post-GN donor manifest. Prior pre-GN evidence remains immutable; no source patch bytes or original replay claims change. Locale recovery is a separately reviewed source delta: exact0236/0237 are appended after the unchanged old stack. Only the dedicated compiled-checkpoint transaction may migrate226 to228; historical pre/post-GN tool-only admission remains unchanged and rejects this source delta.",
@@ -1917,6 +1922,118 @@
               "review_delta_sha256": "d70d38ec88032c3781b9e9f932f4b244934eaa8f1b10427f6d805d67c71ba166",
               "private_replay_sha256": "125744105de3fe0c133e590e3673375d69ef7408d5b57c04d02e2f738645091b",
               "qualification": "Only exact latest ICU-compiled x64 old228 donor may migrate through0238 to229. Sole source change adds base/version.h; no UA behavior or locale patch change. Require full old228/new229 private reverse-forward, exact pre/post source hashes, canonical root/effective series and all raw patch bytes. Preserve old ICU/locale provenance and generated GN/PGO/Ninja/object state. Previous generic/preGN/postGN/locale admission remains unchanged and rejects229. No ARM donor or old226 fallback."
+            },
+            "arm64_ua_profile": {
+              "baseline_commit": "4a3afe76585488e8190e348e90f5248571fa4b24",
+              "implementation_commit": "fba691946d77a138977d25605ff3b771ea95faca",
+              "previous_recipe_sha256": "7b7bfbf785429a25d22a26ce9fde4cf5aa3347eeee9fb773472973fb4c67051f",
+              "recipe_sha256": "89daf4e70a64fc7641e4d70ce61759cfd1eb289d7697d0c7c3b4870cbc3b2f41",
+              "changed_inputs": {
+                "tools/linux157_source.py": {
+                  "before_sha256": "4391c9a670757f03ab86fd43100994e9cc10dde2b5c25390709420e7a3c1e268",
+                  "sha256": "401b7d4abc70bc3adf93f30793553f52f87427d958adbbee04b3a47f38b09750"
+                },
+                "tools/linux157_ua.py": {
+                  "before_sha256": "a147310f5e12e090042268157064653149c2486024b253c3e9c4df5b3e4b7d7c",
+                  "sha256": "0349d455719e0deca1b6cf4200b55dc5cec69d269f38ca50a3c0e799d9dcd33e"
+                },
+                "build/linux/157.0.8103.78/arm64-ua-checkpoint.json": {
+                  "before_sha256": null,
+                  "sha256": "91d518c0062b216b9365b5efde24760faa485299219a36573793fc959aee0c0a"
+                }
+              },
+              "profile": {
+                "path": "build/linux/157.0.8103.78/arm64-ua-checkpoint.json",
+                "sha256": "91d518c0062b216b9365b5efde24760faa485299219a36573793fc959aee0c0a"
+              },
+              "donor": {
+                "run_id": 44639133090,
+                "job_id": 135965300642,
+                "head_sha": "35e2db1b0687a4525017f5ec8fd3820823aef8ff",
+                "stage": 3,
+                "attempt": 1,
+                "continuation_stage": 4,
+                "artifact": {
+                  "digest": "sha256:8054de376729ad6e28fc6d8797145b1b53b7f3bf009ed36744b993885ed4b2e8",
+                  "expires_at": "2026-11-23T01:52:00Z",
+                  "id": 14594220250,
+                  "name": "chromix-linux-arm64-tree-s3-attempt-1-part1",
+                  "size_in_bytes": 4381724895
+                }
+              },
+              "source_migration": {
+                "additions": [
+                  {
+                    "after": "e57250a03c34a9abc8b63f74bb85cf82d5b3ec8c5c9402aa4a1145f639ca5b87",
+                    "before": "0d8fa98a2620ebee4be45eb9490b71fa0863fbeef5eefb0d2463c5dc18b9bdce",
+                    "patch": "patches/chromium157-additions/0238-user-agent-version-header.patch",
+                    "sha256": "dd22d5decfdb675477ce8d1379b7b1eaf2153f5cd0fb6dbb2de47135fc8a9561",
+                    "target": "components/embedder_support/user_agent_utils.cc"
+                  }
+                ],
+                "new_patch_count": 229,
+                "old_patch_count": 228
+              },
+              "inherited_integration_inputs": {
+                "build/linux/157.0.8103.78/arm64-locale-checkpoint.json": "825e7d02d900f808b72e014cbcc708b2417d2e21b4c0a9898da72db7010f14a2",
+                "build/linux/157.0.8103.78/libclang.json": "31e7f007180a568dc88e03ae573b3a58c3fc6aef6834504a8e750280d2c3244e",
+                "build/linux/157.0.8103.78/locale-checkpoint.json": "42a6d9d6e9d40812cb4bee4077768213987586387f7f8816e08b9bd066993208",
+                "build/linux/157.0.8103.78/patches/chromium-138-drop-nodejs-version-check.patch": "48172278ee8bf7c00402c2db3ef37b5514a65fa3403b9b0a028d63ca317a409f",
+                "build/linux/157.0.8103.78/patches/chromium-153-revert-hermetic-python.patch": "f224514a21dcd53f444398055a24a46e43af71e71dc6292dd86c0d9c09001d88",
+                "build/linux/157.0.8103.78/patches/chromium-154-use-system-tsc.patch": "23fcfaeb3a719ec355a38a28e632b846cc7a24993851b82d4c142fd332b46e88",
+                "build/linux/157.0.8103.78/patches/chromium-155-use-system-esbuild.patch": "3cb7ea96ca9dfde0d038c5f97739eec27eb092ff6d4bf3d77c3c8d896980d834",
+                "build/linux/157.0.8103.78/patches/chromium-156-remove-private-verification-tokens.patch": "e95993ab3fd758b71aabbe329a9b6a50360082c70c6610749f76e66f3a37a1b3",
+                "build/linux/157.0.8103.78/patches/chromium-156-revert-crubit-changes.patch": "70c63c2d028c5b4069c16b13152e97ce42785752cf9837cc63bbc0243d3e20d0",
+                "build/linux/157.0.8103.78/patches/chromium-156-revert-use-typescript-go.patch": "e1f21b386321371bf76fc0dd5d14c5f142f54f495685e6e7b67313a1d3a0ce6f",
+                "build/linux/157.0.8103.78/patches/fix-compiling-on-arm64.patch": "a2932c2ea04e4822e5d5c3e94f39b779134990c9d417a707a1652702239705a6",
+                "build/linux/157.0.8103.78/patches/use-oauth2-client-switches-as-default.patch": "9564c36390f1ca1d08ffe42a81a1088aaba7eec8249ba6ff66a85f0592a282ef",
+                "build/linux/157.0.8103.78/post-gn-checkpoints.json": "f3f06013790fd784fb2801b1876a8525dc5cbf5d34f67443b8da94d5175f1959",
+                "build/linux/157.0.8103.78/pre-gn-checkpoints.json": "a644c2bdd1ea5756320fe34e822dd9864bf57812388a5c434b64c20832da73c3",
+                "build/linux/157.0.8103.78/source.json": "5ad5898d9442cc31b6ed571702f9e88510e9eea144ed544f60187e66e5c948d8",
+                "build/linux/157.0.8103.78/ua-checkpoint.json": "0441b32c8e2d296e09bbaa279dd20e0e67d75e85f0a5ebcb753dd3369cb6fd11",
+                "build/windows/lite-tarball-files/v8/test/torque/test-torque.tq": "502c92560d745fc94e93ec7b95a1c562a55167f58a2ce79e3d0e4881dfb928c5",
+                "tools/linux157_build.py": "ccac0e3a4926a755734f22dfa4bd1109d7a0553232b5741fc5dfb8a959821640",
+                "tools/linux157_checkpoint.py": "c3da7c80314cc166677ad2b9b624786f6b70874d5799717597a58822d5a19d36",
+                "tools/linux157_gn.py": "bdf432f04eaa7665d93026724deadf2eaa6127c27d5ee4533e29140e27f88805",
+                "tools/linux157_libclang.py": "6cf4300879cb494f2e9413e4152b5a10d5d6650a11e57fc5c7034a23b5cad710",
+                "tools/linux157_locale.py": "724bbdcfb856ef7986a7e0fd63e99270dffd4da78392db7bbe6196f289d0f37c",
+                "tools/linux157_postgn.py": "a3948e9cbbe5c549de59933f226183e6c5bfa83dc3137525d380da57f61394f9",
+                "tools/linux157_source.py": "4391c9a670757f03ab86fd43100994e9cc10dde2b5c25390709420e7a3c1e268",
+                "tools/linux157_toolchain.py": "539a28814632a79333adefe55d2f8bd6b8e37455aaf43f2b506175d3b733954a",
+                "tools/linux157_ua.py": "a147310f5e12e090042268157064653149c2486024b253c3e9c4df5b3e4b7d7c"
+              },
+              "x64_default": {
+                "profile": {
+                  "path": "build/linux/157.0.8103.78/ua-checkpoint.json",
+                  "sha256": "0441b32c8e2d296e09bbaa279dd20e0e67d75e85f0a5ebcb753dd3369cb6fd11"
+                },
+                "donor": {
+                  "arch": "x64",
+                  "run_id": 44630942999,
+                  "job_id": 135937091377,
+                  "stage": 1,
+                  "attempt": 1,
+                  "head_sha": "b14a0160001d35ed5de83c59521d2e35383cd4eb",
+                  "workflow_path": ".github/workflows/build-linux157-x64-locale-resume.yml",
+                  "artifact": {
+                    "digest": "sha256:e4120c00740d549f4111f959f3ad0e6b85d0d2ff3cf78c790ec65f75372b3d5b",
+                    "expires_at": "2026-11-22T23:26:58Z",
+                    "id": 14584551831,
+                    "name": "chromix-linux-x64-tree-s1-attempt-1-part1",
+                    "size_in_bytes": 3455564702
+                  }
+                }
+              },
+              "preserved_x64_inputs": {
+                ".github/workflows/build-linux157-x64-ua-resume.yml": "ddac129a2d68d3af8499a5cf4ed774255a3b3f41a4feb5bc2aef68e922788d2c",
+                ".github/workflows/build-linux157-x64-ua-stages.yml": "f30cf789522fd02008c0fb91a4a9b2cdae30715ea7db52a0005a4d6a02a4b35c",
+                ".github/workflows/build-posix-github.yml": "2de23af533e20441b1cb8cf4127208453efb1352736c017e63a9640ae66a395e",
+                "build/linux/157.0.8103.78/ua-checkpoint.json": "0441b32c8e2d296e09bbaa279dd20e0e67d75e85f0a5ebcb753dd3369cb6fd11",
+                "tools/gen_linux157_ua_workflow.py": "93434b0fc1539b1f33b9226bedc658db1ea8c37a53fd01a850a6b0986623d577"
+              },
+              "review_delta_sha256": "0940f2346d513e0b9a61dfdef042f827aaa1950c928f92efca709a143d2d0fd0",
+              "prior_private_replay_sha256": "bdcc560958a19cb9e06412bd44e898c4f8699c139ad330dd3821592d48ecf1e1",
+              "qualification": "Only fixed ARM stage3 donor continues at logical stage4. Default x64 profile and caller/stages/default workflow bytes remain unchanged. Per-architecture exact inherited input sets prevent donor cross-use; unknown architectures reject. Reuse full old228/new229 reverse-forward, canonical series/raw patch authentication and single-file atomic transaction. Preserve ICU proof chain, GN/PGO/Ninja/object state and final native ARM runtime gate. Prior private replay did not publish; current selector binding needs its own transaction verification."
             }
           },
           "patch_count": 229,

@@ -14,7 +14,7 @@ from tools import patch_selection as selection
 from tools.tests.test_patch_selection import clone_repo, set_platform_pins
 
 ROOT = Path(__file__).resolve().parents[2]
-LINUX_IMPLEMENTATION = "2777e38b3d674a0ed4d206c76b9afea7c81ec828"
+LINUX_IMPLEMENTATION = "fba691946d77a138977d25605ff3b771ea95faca"
 MANIFEST = json.loads((ROOT / selection.MANIFEST157).read_bytes())
 DOWNSTREAM = MANIFEST["platforms"]["linux"]["downstream"]
 
@@ -84,7 +84,7 @@ def test_exact_recipe_source_and_nine_override_group_match_actual_implementation
         for entry in source["patches"]]
     assert len(DOWNSTREAM["platform_overrides"]) == 9
     assert DOWNSTREAM["platform_override_group_sha256"] == selection.canonical_digest(DOWNSTREAM["platform_overrides"])
-    assert DOWNSTREAM["recipe"]["sha256"] == "7b7bfbf785429a25d22a26ce9fde4cf5aa3347eeee9fb773472973fb4c67051f"
+    assert DOWNSTREAM["recipe"]["sha256"] == "89daf4e70a64fc7641e4d70ce61759cfd1eb289d7697d0c7c3b4870cbc3b2f41"
 
 
 def test_precise_host_go_helper_and_previous_unbound_helper_rejected(linux_repo):
@@ -358,8 +358,8 @@ def test_current_ua_preflight_binds_latest228_and_preserves_locale():
     for arch in ("x64", "arm64"):
         with pytest.raises(ValueError, match="unavailable"):
             locale.validate_additions(selected, raw, locale.load(ROOT, arch), ROOT)
-    with pytest.raises(ValueError, match="x64"):
-        ua.expected("arm64", ROOT)
+    with pytest.raises(ValueError, match="unsupported"):
+        ua.expected("aarch64", ROOT)
 
 
 @pytest.mark.parametrize("mutation", ["donor", "patch", "source", "old-count", "profile", "extra-helper"])
@@ -379,6 +379,58 @@ def test_unreviewed_ua_scope_rejected(mutation):
         delta["checkpoint_manifest"]["sha256"] = "0" * 64
     else:
         downstream["recipe"]["inputs"]["tools/unreviewed_ua.py"] = "0" * 64
+    with pytest.raises(selection.SelectionError, match="downstream recipe"):
+        selection.validate_manifest157(manifest)
+
+
+@pytest.mark.parametrize("arch,run,stage,artifact", [
+    ("x64", 44630942999, 1, 14584551831),
+    ("arm64", 44639133090, 3, 14594220250),
+])
+def test_current_ua_profiles_have_exact_distinct_donor_contracts(arch, run, stage, artifact):
+    from tools import linux157_ua as ua
+    selected, raw = selection.select(ROOT, "linux")
+    donor = ua.load(ROOT, arch)
+    assert ua.validate_additions(selected, raw, donor, ROOT) == donor["migration"]["additions"]
+    ua.recipe_delta(donor["source_receipt"]["recipe"], DOWNSTREAM["recipe"], ROOT, arch)
+    expected = ua.expected(arch, ROOT)
+    assert (expected["run_id"], expected["stage"], expected["artifacts"][0]["id"]) == (run, stage, artifact)
+    assert ua.load(ROOT) == ua.load(ROOT, "x64")
+    if arch == "arm64":
+        assert donor["continuation_stage"] == 4
+    other = "x64" if arch == "arm64" else "arm64"
+    with pytest.raises(ValueError):
+        ua.recipe_delta(donor["source_receipt"]["recipe"], DOWNSTREAM["recipe"], ROOT, other)
+
+
+@pytest.mark.parametrize("arch", ["aarch64", "ARM64", "x86", "linux", "", None])
+def test_unknown_ua_profile_never_falls_back(arch):
+    from tools import linux157_ua as ua
+    with pytest.raises(ValueError, match="unsupported"):
+        ua.load(ROOT, arch)
+    with pytest.raises(ValueError, match="unsupported"):
+        ua.expected(arch, ROOT)
+
+
+def test_x64_ua_profile_and_workflows_are_unchanged():
+    delta = DOWNSTREAM["validation"]["recipe_integration"]["arm64_ua_profile"]
+    for name, digest in delta["preserved_x64_inputs"].items():
+        assert selection.digest(blob(name, delta["baseline_commit"])) == digest
+        assert selection.digest((ROOT / name).read_bytes()) == digest
+
+
+@pytest.mark.parametrize("mutation", ["stage", "artifact", "arch", "profile-hash"])
+def test_unknown_arm_ua_profile_identity_rejected(mutation):
+    manifest = copy.deepcopy(MANIFEST)
+    delta = manifest["platforms"]["linux"]["downstream"]["validation"]["recipe_integration"]["arm64_ua_profile"]
+    if mutation == "stage":
+        delta["donor"]["stage"] = 2
+    elif mutation == "artifact":
+        delta["donor"]["artifact"]["id"] = 14583218428
+    elif mutation == "arch":
+        delta["donor"]["arch"] = "x64"
+    else:
+        delta["profile"]["sha256"] = "0" * 64
     with pytest.raises(selection.SelectionError, match="downstream recipe"):
         selection.validate_manifest157(manifest)
 
