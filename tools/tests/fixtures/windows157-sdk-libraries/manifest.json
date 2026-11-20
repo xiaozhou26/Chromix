@@ -1,0 +1,399 @@
+{
+  "run_id": 44812745460,
+  "source_sha": "8ec007cf649de67df828b0765c6fab59db057326",
+  "llvm_nm": "Apple LLVM 21.0.0, all 12 complete libraries exit 0",
+  "sources": [
+    "https://learn.microsoft.com/en-us/windows/win32/debug/pe-format#archive-library-file-format",
+    "https://github.com/llvm/llvm-project/blob/main/llvm/lib/Object/Archive.cpp",
+    "https://github.com/llvm/llvm-project/blob/main/llvm/lib/Object/ArchiveWriter.cpp"
+  ],
+  "full_results": [
+    {
+      "relative": "Lib/10.0.28000.0/um/x86/kernel32.lib",
+      "size": 329914,
+      "sha256": "b96b66fa8ddb5ac84d94e83d1990244bc6ccfdcb32886fa2981bcb49be67ef41",
+      "object_machines": {
+        "0x014c": 1371
+      },
+      "member_flags": {
+        "coff_characteristics:0x0100": 3,
+        "import_type_info:0x000c": 1368
+      },
+      "padding_bytes": {
+        "0a": 692
+      },
+      "ec_symbol_members": 0
+    },
+    {
+      "relative": "Lib/10.0.28000.0/um/x86/user32.lib",
+      "size": 182658,
+      "sha256": "9ba74b4fa0cb33a177bf2ec81f50098f43cb357f39624a47c2342448fda908b0",
+      "object_machines": {
+        "0x014c": 806
+      },
+      "member_flags": {
+        "coff_characteristics:0x0100": 3,
+        "import_type_info:0x0000": 21,
+        "import_type_info:0x000c": 780,
+        "import_type_info:0x0008": 2
+      },
+      "padding_bytes": {
+        "0a": 409
+      },
+      "ec_symbol_members": 0
+    },
+    {
+      "relative": "Lib/10.0.28000.0/ucrt/x86/ucrt.lib",
+      "size": 299244,
+      "sha256": "ccd3dad2a72ad555a320b855eea24eb9b6fc2d216473bd794ae7831bde00913d",
+      "object_machines": {
+        "0x014c": 1419
+      },
+      "member_flags": {
+        "coff_characteristics:0x0100": 42,
+        "import_type_info:0x0008": 1375,
+        "import_type_info:0x000a": 2
+      },
+      "padding_bytes": {
+        "00": 730
+      },
+      "ec_symbol_members": 0
+    },
+    {
+      "relative": "Lib/10.0.28000.0/ucrt/x86/libucrt.lib",
+      "size": 40586520,
+      "sha256": "169e2c5a9ca5c4b3beccd9b8d5dc21b39ee1ce4b2bcf1c6ad866327dac68f748",
+      "object_machines": {
+        "0x014c": 771
+      },
+      "member_flags": {
+        "coff_characteristics:0x0000": 771
+      },
+      "padding_bytes": {
+        "0a": 398
+      },
+      "ec_symbol_members": 0
+    },
+    {
+      "relative": "Lib/10.0.28000.0/um/x64/kernel32.lib",
+      "size": 311908,
+      "sha256": "8ba8dab9adec752047d4f136852e8136d01836bff39bbb56a20ac5f2d56415d8",
+      "object_machines": {
+        "0x8664": 1399
+      },
+      "member_flags": {
+        "coff_characteristics:0x0000": 3,
+        "import_type_info:0x0004": 1396
+      },
+      "padding_bytes": {
+        "0a": 655
+      },
+      "ec_symbol_members": 0
+    },
+    {
+      "relative": "Lib/10.0.28000.0/um/x64/user32.lib",
+      "size": 170460,
+      "sha256": "2d61cf1c120cf8c58d70a883232c65f3ebde0c7d9657f5bb37fa74c879d456af",
+      "object_machines": {
+        "0x8664": 814
+      },
+      "member_flags": {
+        "coff_characteristics:0x0000": 3,
+        "import_type_info:0x0000": 21,
+        "import_type_info:0x0004": 790
+      },
+      "padding_bytes": {
+        "0a": 391
+      },
+      "ec_symbol_members": 0
+    },
+    {
+      "relative": "Lib/10.0.28000.0/ucrt/x64/ucrt.lib",
+      "size": 285588,
+      "sha256": "7ef4eac926bf597d2f243f16cdfed7e0db22cb3ca34a1d7e088a84c994a03d66",
+      "object_machines": {
+        "0x8664": 1392
+      },
+      "member_flags": {
+        "coff_characteristics:0x0000": 42,
+        "import_type_info:0x0004": 1348,
+        "import_type_info:0x0006": 2
+      },
+      "padding_bytes": {
+        "00": 679
+      },
+      "ec_symbol_members": 0
+    },
+    {
+      "relative": "Lib/10.0.28000.0/ucrt/x64/libucrt.lib",
+      "size": 43298182,
+      "sha256": "9d9c74fc00d0d43b3ded5328d1f197e919236645dfaf80a84ece1f1b99465a1e",
+      "object_machines": {
+        "0x8664": 784
+      },
+      "member_flags": {
+        "coff_characteristics:0x0000": 782,
+        "coff_characteristics:0x1000": 2
+      },
+      "padding_bytes": {
+        "0a": 387
+      },
+      "ec_symbol_members": 0
+    },
+    {
+      "relative": "Lib/10.0.28000.0/um/arm64/kernel32.lib",
+      "size": 652320,
+      "sha256": "bc40b3959db3ba93ee0f816d639e33835301f2662cbd63406e30f7f6c97fd8df",
+      "object_machines": {
+        "0xaa64": 1397,
+        "0xa641": 1396
+      },
+      "member_flags": {
+        "coff_characteristics:0x0000": 3,
+        "import_type_info:0x0010": 1396,
+        "import_type_info:0x0004": 1394
+      },
+      "padding_bytes": {
+        "0a": 915
+      },
+      "ec_symbol_members": 1399
+    },
+    {
+      "relative": "Lib/10.0.28000.0/um/arm64/user32.lib",
+      "size": 355176,
+      "sha256": "3148a7760721ece06698482f4d72d323b9e460aa3cbe0ba25ada62a38e69d5e7",
+      "object_machines": {
+        "0xaa64": 814,
+        "0xa641": 811
+      },
+      "member_flags": {
+        "coff_characteristics:0x0000": 3,
+        "import_type_info:0x0010": 790,
+        "import_type_info:0x0000": 42,
+        "import_type_info:0x0004": 790
+      },
+      "padding_bytes": {
+        "0a": 554
+      },
+      "ec_symbol_members": 814
+    },
+    {
+      "relative": "Lib/10.0.28000.0/ucrt/arm64/ucrt.lib",
+      "size": 563640,
+      "sha256": "c2c1328647f4454f71a68e8e194f89eef7d3fdf2661192ab8d87fba395ee13fa",
+      "object_machines": {
+        "0xaa64": 1387,
+        "0xa641": 1350
+      },
+      "member_flags": {
+        "coff_characteristics:0x0000": 42,
+        "import_type_info:0x0004": 1343,
+        "import_type_info:0x0010": 1348,
+        "import_type_info:0x0006": 4
+      },
+      "padding_bytes": {
+        "00": 1377
+      },
+      "ec_symbol_members": 1392
+    },
+    {
+      "relative": "Lib/10.0.28000.0/ucrt/arm64/libucrt.lib",
+      "size": 87129944,
+      "sha256": "16460a1fecc793e7346c8d25e715855cca5a2d104f1825494d187fef408f52df",
+      "object_machines": {
+        "0xaa64": 730,
+        "0xa641": 731,
+        "0x8664": 5
+      },
+      "member_flags": {
+        "coff_characteristics:0x0000": 1462,
+        "coff_characteristics:0x1000": 4
+      },
+      "padding_bytes": {
+        "0a": 737
+      },
+      "ec_symbol_members": 719
+    }
+  ],
+  "fixtures": [
+    {
+      "file": "Lib_10.0.28000.0_um_x86_kernel32.lib.gz",
+      "arch": "x86",
+      "kind": "complete original library",
+      "source_sha256": "b96b66fa8ddb5ac84d94e83d1990244bc6ccfdcb32886fa2981bcb49be67ef41",
+      "raw_sha256": "b96b66fa8ddb5ac84d94e83d1990244bc6ccfdcb32886fa2981bcb49be67ef41",
+      "gzip_sha256": "fcc3bf047bf0dffef886769f767fef472156e040da36ded3d4a3445332da7557",
+      "raw_size": 329914,
+      "extracted_objects": []
+    },
+    {
+      "file": "Lib_10.0.28000.0_um_x86_user32.lib.gz",
+      "arch": "x86",
+      "kind": "complete original library",
+      "source_sha256": "9ba74b4fa0cb33a177bf2ec81f50098f43cb357f39624a47c2342448fda908b0",
+      "raw_sha256": "9ba74b4fa0cb33a177bf2ec81f50098f43cb357f39624a47c2342448fda908b0",
+      "gzip_sha256": "4cec3831762e9d1647c91a4572202654abb3917e470a753927ac502cf16f3a44",
+      "raw_size": 182658,
+      "extracted_objects": []
+    },
+    {
+      "file": "Lib_10.0.28000.0_ucrt_x86_ucrt.lib.gz",
+      "arch": "x86",
+      "kind": "complete original library",
+      "source_sha256": "ccd3dad2a72ad555a320b855eea24eb9b6fc2d216473bd794ae7831bde00913d",
+      "raw_sha256": "ccd3dad2a72ad555a320b855eea24eb9b6fc2d216473bd794ae7831bde00913d",
+      "gzip_sha256": "5b6511bc7ca8632a24e3b8a42e0dae22201e0401df44ee5425ab6c6d33d1b48b",
+      "raw_size": 299244,
+      "extracted_objects": []
+    },
+    {
+      "file": "Lib_10.0.28000.0_ucrt_x86_libucrt.lib.gz",
+      "arch": "x86",
+      "kind": "original object bytes; reconstructed minimal archive tables and short member names",
+      "source_sha256": "169e2c5a9ca5c4b3beccd9b8d5dc21b39ee1ce4b2bcf1c6ad866327dac68f748",
+      "raw_sha256": "385a5d389013de33254d8ba86b099dd8f3c420c5172870ddcd730f6b9d34d76b",
+      "gzip_sha256": "b4e05e209135358887284270a5c9f7bb2cc6ed42346dcc63b3902cf9c5e9badb",
+      "raw_size": 1334,
+      "extracted_objects": [
+        {
+          "source_offset": 22106770,
+          "length": 1115,
+          "sha256": "960ef46f2efc806e460f71af93bf79098bb46eec7e21f6a092d6d7e43f28f367",
+          "machine": "0x14c",
+          "flags": "0x0"
+        }
+      ]
+    },
+    {
+      "file": "Lib_10.0.28000.0_um_x64_kernel32.lib.gz",
+      "arch": "x64",
+      "kind": "complete original library",
+      "source_sha256": "8ba8dab9adec752047d4f136852e8136d01836bff39bbb56a20ac5f2d56415d8",
+      "raw_sha256": "8ba8dab9adec752047d4f136852e8136d01836bff39bbb56a20ac5f2d56415d8",
+      "gzip_sha256": "1aeb1e11d1c9ec73d5c2511478686b159762b8a07f143afe4883a1c7536f65d3",
+      "raw_size": 311908,
+      "extracted_objects": []
+    },
+    {
+      "file": "Lib_10.0.28000.0_um_x64_user32.lib.gz",
+      "arch": "x64",
+      "kind": "complete original library",
+      "source_sha256": "2d61cf1c120cf8c58d70a883232c65f3ebde0c7d9657f5bb37fa74c879d456af",
+      "raw_sha256": "2d61cf1c120cf8c58d70a883232c65f3ebde0c7d9657f5bb37fa74c879d456af",
+      "gzip_sha256": "4bfce7288c37725e9a0359caa517dfbe79bfa6cd9f2c093711089bd5973a54ee",
+      "raw_size": 170460,
+      "extracted_objects": []
+    },
+    {
+      "file": "Lib_10.0.28000.0_ucrt_x64_ucrt.lib.gz",
+      "arch": "x64",
+      "kind": "complete original library",
+      "source_sha256": "7ef4eac926bf597d2f243f16cdfed7e0db22cb3ca34a1d7e088a84c994a03d66",
+      "raw_sha256": "7ef4eac926bf597d2f243f16cdfed7e0db22cb3ca34a1d7e088a84c994a03d66",
+      "gzip_sha256": "9da5c2966a69710ac31d3157e866768a76308cd7f711ecdb38f9e4ca02bd85d1",
+      "raw_size": 285588,
+      "extracted_objects": []
+    },
+    {
+      "file": "Lib_10.0.28000.0_ucrt_x64_libucrt.lib.gz",
+      "arch": "x64",
+      "kind": "original object bytes; reconstructed minimal archive tables and short member names",
+      "source_sha256": "9d9c74fc00d0d43b3ded5328d1f197e919236645dfaf80a84ece1f1b99465a1e",
+      "raw_sha256": "0e9e2dfe0f568041e676062b13b4b6b172ec5fe4332cf9e4d7c2766f41729174",
+      "gzip_sha256": "14f186637dd7dbe98542eca1130074a94581a3512af053b28e378f9b49362f52",
+      "raw_size": 2046,
+      "extracted_objects": [
+        {
+          "source_offset": 24439854,
+          "length": 978,
+          "sha256": "a005562e5113945b3d9e4683ff0d20dc9124f025edc87b741064838665f50f5a",
+          "machine": "0x8664",
+          "flags": "0x0"
+        },
+        {
+          "source_offset": 43244194,
+          "length": 776,
+          "sha256": "ae9e2830aa383dc68d99a0af695eee28ba75d41cdb14569be53c79500dde6a02",
+          "machine": "0x8664",
+          "flags": "0x1000"
+        }
+      ]
+    },
+    {
+      "file": "Lib_10.0.28000.0_um_arm64_kernel32.lib.gz",
+      "arch": "arm64",
+      "kind": "complete original library",
+      "source_sha256": "bc40b3959db3ba93ee0f816d639e33835301f2662cbd63406e30f7f6c97fd8df",
+      "raw_sha256": "bc40b3959db3ba93ee0f816d639e33835301f2662cbd63406e30f7f6c97fd8df",
+      "gzip_sha256": "8f4b9dd11e8676f210c1edeacf125932c4c27c6c61eb6017882a33915174e1bf",
+      "raw_size": 652320,
+      "extracted_objects": []
+    },
+    {
+      "file": "Lib_10.0.28000.0_um_arm64_user32.lib.gz",
+      "arch": "arm64",
+      "kind": "complete original library",
+      "source_sha256": "3148a7760721ece06698482f4d72d323b9e460aa3cbe0ba25ada62a38e69d5e7",
+      "raw_sha256": "3148a7760721ece06698482f4d72d323b9e460aa3cbe0ba25ada62a38e69d5e7",
+      "gzip_sha256": "a35476572b5bb145d90cc0a8cccc94562181232e1f729135b2d3b0aa1f85b9df",
+      "raw_size": 355176,
+      "extracted_objects": []
+    },
+    {
+      "file": "Lib_10.0.28000.0_ucrt_arm64_ucrt.lib.gz",
+      "arch": "arm64",
+      "kind": "complete original library",
+      "source_sha256": "c2c1328647f4454f71a68e8e194f89eef7d3fdf2661192ab8d87fba395ee13fa",
+      "raw_sha256": "c2c1328647f4454f71a68e8e194f89eef7d3fdf2661192ab8d87fba395ee13fa",
+      "gzip_sha256": "8c4a2c0ba9ea5e2cf5057389fff668415dfc0c44f8ef26477a19e7d183313bd6",
+      "raw_size": 563640,
+      "extracted_objects": []
+    },
+    {
+      "file": "Lib_10.0.28000.0_ucrt_arm64_libucrt.lib.gz",
+      "arch": "arm64",
+      "kind": "original object bytes; reconstructed minimal archive tables and short member names",
+      "source_sha256": "16460a1fecc793e7346c8d25e715855cca5a2d104f1825494d187fef408f52df",
+      "raw_sha256": "11ba894721eb8c280c6b89fec7f8dea2c4d228db1f6715108b95e4f4770d67ed",
+      "gzip_sha256": "c39b2518bcc1de2d3593781889787950fcf3f3bdf2e91dd13095bfc245599e78",
+      "raw_size": 7034,
+      "extracted_objects": [
+        {
+          "source_offset": 87077240,
+          "length": 1678,
+          "sha256": "16e53b1565cc6af5b6fa58a043155b612e380ef02140577269c46a223cf6c1c6",
+          "machine": "0x8664",
+          "flags": "0x0"
+        },
+        {
+          "source_offset": 86256308,
+          "length": 2058,
+          "sha256": "81d24217d728e1f45742634612edf2e52dc511ca5f6a0c97e6a46d0253a9387e",
+          "machine": "0xa641",
+          "flags": "0x0"
+        },
+        {
+          "source_offset": 80385860,
+          "length": 367,
+          "sha256": "faa3b70330640a2e72f79519efd76e527d0f54fe20f05a418a4521bf09ba0cb4",
+          "machine": "0xa641",
+          "flags": "0x1000"
+        },
+        {
+          "source_offset": 23312600,
+          "length": 2002,
+          "sha256": "a573b6ad61d7e94c2f543075a6e3648da74a5bbb80ff8d8e804d324fb61866e5",
+          "machine": "0xaa64",
+          "flags": "0x0"
+        },
+        {
+          "source_offset": 19222190,
+          "length": 363,
+          "sha256": "e0c7008e65783905cca4efcc8b28a818244f6d099a266412dd0d0e09aa9d8bd4",
+          "machine": "0xaa64",
+          "flags": "0x1000"
+        }
+      ]
+    }
+  ]
+}

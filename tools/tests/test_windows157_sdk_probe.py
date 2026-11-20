@@ -25,12 +25,18 @@ def member(name, data):
 
 
 def library(arch, kind='coff'):
-    data = bytearray(56 if kind == 'bigobj' else 20)
-    if kind in ('import', 'bigobj'):
-        struct.pack_into('<HHHH', data, 0, 0, 0xffff, 2 if kind == 'bigobj' else 0, probe.MACHINES[arch])
+    if kind == 'import':
+        strings = b'function\0sdk.dll\0'
+        data = struct.pack('<HHHHIIHH', 0, 0xffff, 0, probe.MACHINES[arch], 0, len(strings), 0, 4) + strings
+    elif kind == 'bigobj':
+        data = bytearray(96)
+        struct.pack_into('<HHHH', data, 0, 0, 0xffff, 2, probe.MACHINES[arch])
+        data[12:28] = probe.BIGOBJ_MAGIC
+        struct.pack_into('<I', data, 44, 1)
     else:
-        struct.pack_into('<H', data, 0, probe.MACHINES[arch])
-    return b'!<arch>\n' + member('/', b'table') + member('//', b'long names') + member('/0', data)
+        data = bytearray(60)
+        struct.pack_into('<HH', data, 0, probe.MACHINES[arch], 1)
+    return b'!<arch>\n' + member('//', b'fobj\0') + member('/0', data)
 
 
 @pytest.mark.parametrize('arch', ['x86', 'x64', 'arm64'])
@@ -41,7 +47,7 @@ def test_library_checks_all_supported_member_types(tmp_path, arch, kind):
     result = probe.check_library(path, arch)
     assert result['object_machines'] == {f'0x{probe.MACHINES[arch]:04x}': 1}
     assert len(result['sha256']) == 64
-    expected_flags = {} if kind == 'bigobj' else {('import_type_info' if kind == 'import' else 'coff_characteristics') + ':0x0000': 1}
+    expected_flags = {'bigobj_flags:0x0000': 1} if kind == 'bigobj' else {('import_type_info:0x0004' if kind == 'import' else 'coff_characteristics:0x0000'): 1}
     assert result['member_flags'] == expected_flags
     with pytest.raises(ValueError, match='wrong COFF'):
         probe.check_library(path, 'x64' if arch == 'arm64' else 'arm64')
@@ -248,7 +254,7 @@ def test_capture_collects_every_original_library_without_approving_failure(tmp_p
     relative = Path(f'Lib/{probe.SDK_VERSION}/ucrt/x86/ucrt.lib')
     if failure == 'padding':
         payload = bytearray(library('x86'))
-        payload[73] = 0
+        payload[73] = 0xff
         (sdk / relative).write_bytes(payload)
     elif failure == 'missing':
         (sdk / relative).unlink()
@@ -273,7 +279,7 @@ def test_capture_collects_every_original_library_without_approving_failure(tmp_p
     if failure in ('padding', 'machine'):
         assert len(failed) == 1
     if failure == 'padding':
-        assert 'pad_hex=00' in failed[0]['parser']['error']
+        assert 'pad_hex=ff' in failed[0]['parser']['error']
         assert 'pad_offset=73' in failed[0]['parser']['error']
     assert json.loads(report.read_text())['status'] == ('verified' if failure == 'none' else 'failed')
 
@@ -290,8 +296,8 @@ def test_capture_refuses_to_overwrite_previous_evidence(tmp_path):
     assert sentinel.read_bytes() == b'old evidence'
 
 
-@pytest.mark.parametrize('value', [0, 0xff, 0x20])
-def test_unobserved_padding_still_fails_with_byte_and_offset(tmp_path, value):
+@pytest.mark.parametrize('value', [0xff, 0x20, 0x01])
+def test_unknown_padding_still_fails_with_byte_and_offset(tmp_path, value):
     payload = bytearray(library('x86'))
     payload[73] = value
     path = tmp_path / 'unobserved.lib'
@@ -305,3 +311,124 @@ def test_odd_member_eof_is_not_silently_treated_as_padding(tmp_path):
     path.write_bytes(library('x86') + member('last.obj/', b'x' * 21)[:-1])
     with pytest.raises(ValueError, match='archive member outside file'):
         probe.check_library(path, 'x86')
+
+
+REAL_LIBRARIES = ROOT / 'tools/tests/fixtures/windows157-sdk-libraries'
+REAL_MANIFEST = json.loads((REAL_LIBRARIES / 'manifest.json').read_text())
+
+
+def real_library(name):
+    import gzip
+    import hashlib
+    entry = next(item for item in REAL_MANIFEST['fixtures'] if item['file'] == name)
+    compressed = (REAL_LIBRARIES / name).read_bytes()
+    assert hashlib.sha256(compressed).hexdigest() == entry['gzip_sha256']
+    raw = gzip.decompress(compressed)
+    assert len(raw) == entry['raw_size']
+    assert hashlib.sha256(raw).hexdigest() == entry['raw_sha256']
+    return raw
+
+
+def archive_members(raw):
+    offset = 8
+    while offset < len(raw):
+        size = int(raw[offset + 48:offset + 58])
+        yield offset, raw[offset:offset + 16].decode().strip(), size
+        offset += 60 + size + size % 2
+
+
+@pytest.mark.parametrize('entry', REAL_MANIFEST['fixtures'], ids=lambda entry: entry['file'])
+def test_fixed_hash_real_sdk_libraries_parse_structurally(tmp_path, entry):
+    raw = real_library(entry['file'])
+    path = tmp_path / 'real.lib'
+    path.write_bytes(raw)
+    result = probe.check_library(path, entry['arch'])
+    assert result['sha256'] == entry['raw_sha256']
+    if entry['kind'] == 'complete original library':
+        expected = next(item for item in REAL_MANIFEST['full_results'] if item['sha256'] == entry['source_sha256'])
+        for key in ('object_machines', 'member_flags', 'padding_bytes', 'ec_symbol_members'):
+            assert result[key] == expected[key]
+    else:
+        import hashlib
+        objects = [raw[o + 60:o + 60 + n] for o, name, n in archive_members(raw) if name not in ('/', '//', '/<ECSYMBOLS>/')]
+        assert sorted(hashlib.sha256(data).hexdigest() for data in objects) == sorted(item['sha256'] for item in entry['extracted_objects'])
+
+
+@pytest.mark.parametrize('value', [1, 0x20, 0xff])
+def test_real_nul_padding_rejects_random_bytes(tmp_path, value):
+    raw = bytearray(real_library('Lib_10.0.28000.0_ucrt_x86_ucrt.lib.gz'))
+    assert raw[107541] == 0
+    raw[107541] = value
+    path = tmp_path / 'bad.lib'
+    path.write_bytes(raw)
+    with pytest.raises(ValueError, match='invalid archive padding'):
+        probe.check_library(path, 'x86')
+
+
+@pytest.mark.parametrize('mutation', ['ec-count', 'ec-index', 'ec-unknown', 'second-offset', 'duplicate-offset',
+                                      'native-ec', 'ec-unknown-machine', 'x64-unindexed', 'longname', 'import-size',
+                                      'import-version', 'import-strings', 'section-range', 'symbols-range', 'truncate'])
+def test_real_arm64_archive_rejects_corrupt_tables_and_objects(tmp_path, mutation):
+    raw = bytearray(real_library('Lib_10.0.28000.0_ucrt_arm64_ucrt.lib.gz'))
+    members = list(archive_members(raw))
+    ec = next(o for o, name, _ in members if name == '/<ECSYMBOLS>/')
+    second = [o for o, name, _ in members if name == '/'][1]
+    objects = [o for o, name, _ in members if name not in ('/', '//', '/<ECSYMBOLS>/')]
+    imports = [o for o in objects if raw[o + 60:o + 64] == b'\0\0\xff\xff']
+    ec_object = next(o for o in imports if struct.unpack_from('<H', raw, o + 66)[0] == 0xa641)
+    native = objects[0]
+    if mutation == 'ec-count':
+        struct.pack_into('<I', raw, ec + 60, 0xffffffff)
+    elif mutation == 'ec-index':
+        struct.pack_into('<H', raw, ec + 64, 0)
+    elif mutation == 'ec-unknown':
+        raw[ec:ec + 16] = b'/<UNKNOWN>/     '
+    elif mutation == 'second-offset':
+        struct.pack_into('<I', raw, second + 64, objects[0] + 1)
+    elif mutation == 'duplicate-offset':
+        raw[second + 68:second + 72] = raw[second + 64:second + 68]
+    elif mutation == 'native-ec':
+        struct.pack_into('<H', raw, native + 60, 0xa641)
+    elif mutation == 'ec-unknown-machine':
+        struct.pack_into('<H', raw, ec_object + 66, 0xa64e)
+    elif mutation == 'x64-unindexed':
+        struct.pack_into('<H', raw, native + 60, 0x8664)
+    elif mutation == 'longname':
+        raw[native:native + 16] = b'/999999999      '
+    elif mutation == 'import-size':
+        struct.pack_into('<I', raw, imports[0] + 72, 0xffffffff)
+    elif mutation == 'import-version':
+        struct.pack_into('<H', raw, imports[0] + 64, 3)
+    elif mutation == 'import-strings':
+        size = int(raw[imports[0] + 48:imports[0] + 58])
+        raw[imports[0] + 59 + size] = 1
+    elif mutation == 'section-range':
+        struct.pack_into('<I', raw, native + 60 + 20 + 20, 0xffffff00)
+    elif mutation == 'symbols-range':
+        struct.pack_into('<I', raw, native + 60 + 8, 0xffffff00)
+    elif mutation == 'truncate':
+        raw.pop()
+    path = tmp_path / 'corrupt.lib'
+    path.write_bytes(raw)
+    with pytest.raises(ValueError):
+        probe.check_library(path, 'arm64')
+
+
+def test_ec_map_is_never_accepted_as_x64_or_x86(tmp_path):
+    path = tmp_path / 'mixed.lib'
+    path.write_bytes(real_library('Lib_10.0.28000.0_um_arm64_user32.lib.gz'))
+    for arch in ('x86', 'x64'):
+        with pytest.raises(ValueError, match='EC symbol map requires ARM64'):
+            probe.check_library(path, arch)
+
+
+@pytest.mark.parametrize('mutation', ['uuid', 'version', 'sections', 'metadata'])
+def test_bigobj_structural_bounds(tmp_path, mutation):
+    raw = bytearray(library('arm64', 'bigobj'))
+    offset = next(o + 60 for o, name, _ in archive_members(raw) if name == '/0')
+    position = {'uuid': 12, 'version': 4, 'sections': 44, 'metadata': 28}[mutation]
+    raw[offset + position] ^= 0xff
+    path = tmp_path / 'bigobj.lib'
+    path.write_bytes(raw)
+    with pytest.raises(ValueError):
+        probe.check_library(path, 'arm64')

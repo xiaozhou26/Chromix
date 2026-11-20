@@ -34,50 +34,187 @@ MIDL_IDENTITY = {
 MACHINES = {'x86': 0x14C, 'x64': 0x8664, 'arm64': 0xAA64}
 
 
+BIGOBJ_MAGIC = bytes.fromhex('c7a1bad1eebaa94baf20faf66aa4dcb8')
+
+
+def _symbol_names(data, start, count):
+    if count > len(data) - start:
+        raise ValueError('symbol names exceed archive table')
+    for _ in range(count):
+        end = data.find(b'\0', start)
+        if end <= start:
+            raise ValueError('missing or empty archive symbol name')
+        start = end + 1
+    if data[start:] not in (b'', b'\0'):
+        raise ValueError('unexpected trailing symbol table data')
+
+
+def _indices(data, start, count, code):
+    width = struct.calcsize(code)
+    if start < 0 or count > (len(data) - start) // width:
+        raise ValueError('archive symbol index array is truncated')
+    return [value[0] for value in struct.iter_unpack(code, data[start:start + count * width])]
+
+
+def _object_identity(data):
+    if len(data) < 20:
+        raise ValueError('truncated COFF member')
+    machine, sections, _, symbols, count, optional, flags = struct.unpack_from('<HHIIIHH', data)
+    header_size, symbol_size = 20, 18
+    if data[:4] == b'\0\0\xff\xff':
+        version, machine = struct.unpack_from('<HH', data, 4)
+        if version == 0:
+            size, _, flags = struct.unpack_from('<IHH', data, 12)
+            name_type = (flags >> 2) & 7
+            if size != len(data) - 20 or flags >> 5 or flags & 3 > 2 or name_type > 4:
+                raise ValueError('invalid COFF import header')
+            strings = data[20:].split(b'\0')
+            if (len(strings) != (4 if name_type == 4 or (machine == 0xa641 and name_type == 0) else 3) or
+                    strings[-1] or not all(strings[:-1])):
+                raise ValueError('invalid COFF import names')
+            return machine, 'import_type_info', flags
+        if version != 2 or len(data) < 56 or data[12:28] != BIGOBJ_MAGIC:
+            raise ValueError('unknown anonymous COFF member')
+        if any(data[28:44]):
+            raise ValueError('unsupported BigObj metadata')
+        sections, symbols, count = struct.unpack_from('<III', data, 44)
+        header_size, symbol_size, optional, flags = 56, 20, 0, 0
+    if optional or not sections or sections > (len(data) - header_size) // 40:
+        raise ValueError('invalid COFF section headers')
+    section_end = header_size + sections * 40
+    for i in range(sections):
+        section = header_size + i * 40
+        size, raw, relocs, lines, reloc_count, line_count, characteristics = struct.unpack_from('<IIIIHHI', data, section + 16)
+        if raw and (raw < section_end or size > len(data) - raw):
+            raise ValueError('COFF section data outside member')
+        if reloc_count == 0xffff and characteristics & 0x01000000:
+            if relocs < section_end or relocs + 10 > len(data):
+                raise ValueError('truncated COFF extended relocation count')
+            reloc_count = struct.unpack_from('<I', data, relocs)[0]
+        if reloc_count and (relocs < section_end or reloc_count > (len(data) - relocs) // 10):
+            raise ValueError('COFF relocations outside member')
+        if line_count and (lines < section_end or line_count > (len(data) - lines) // 6):
+            raise ValueError('COFF line numbers outside member')
+    if symbols:
+        if symbols < section_end or count > (len(data) - symbols - 4) // symbol_size:
+            raise ValueError('COFF symbols outside member')
+        string_start = symbols + count * symbol_size
+        string_size = struct.unpack_from('<I', data, string_start)[0]
+        if string_size < 4 or string_size > len(data) - string_start:
+            raise ValueError('COFF string table outside member')
+    elif count:
+        raise ValueError('COFF symbol count without symbol table')
+    return machine, 'bigobj_flags' if header_size == 56 else 'coff_characteristics', flags
+
+
 def check_library(path, arch):
-    """Check every object/import member, excluding archive linker/name tables."""
+    """Validate bounded COFF archives, including the ARM64EC symbol map."""
     size = path.stat().st_size
-    counts = Counter()
-    flags = Counter()
-    with path.open('rb') as stream:
-        if stream.read(8) != b'!<arch>\n':
-            raise ValueError(f'not a COFF library: {path}')
-        while stream.tell() < size:
-            header_offset = stream.tell()
-            header = stream.read(60)
-            if len(header) != 60 or header[58:] != b'`\n':
-                raise ValueError(f'invalid archive member header: {path}')
-            name = header[:16].decode('ascii').strip()
-            length = int(header[48:58].decode('ascii').strip())
-            start = stream.tell()
-            end = start + length
-            if length < 0 or end + (length % 2) > size:
-                raise ValueError(f'archive member outside file: {path}; header_offset={header_offset}; '
-                                 f'member={name!r}; data_end={end}; file_size={size}')
-            if name not in ('/', '//'):
-                data = stream.read(min(length, 56))
-                if len(data) < 20:
-                    raise ValueError(f'truncated COFF member: {path}: {name}')
-                machine = struct.unpack_from('<H', data)[0]
-                kind = 'coff_characteristics'
-                if data[:4] == b'\0\0\xff\xff':
-                    machine = struct.unpack_from('<H', data, 6)[0]
-                    kind = 'import_type_info' if struct.unpack_from('<H', data, 4)[0] == 0 else None
-                if kind:
-                    flags[f'{kind}:0x{struct.unpack_from("<H", data, 18)[0]:04x}'] += 1
-                if machine != MACHINES[arch]:
-                    raise ValueError(f'wrong COFF machine: {path}: {name}: 0x{machine:04x}, expected {arch}')
-                counts[f'0x{machine:04x}'] += 1
-            stream.seek(end)
-            if length % 2:
-                padding = stream.read(1)
-                if padding != b'\n':
-                    raise ValueError(f'invalid archive padding: {path}; header_offset={header_offset}; '
-                                     f'member={name!r}; data_size={length}; pad_offset={end}; '
-                                     f'pad_hex={padding.hex()}; file_size={size}')
-    if not counts:
+    if not 8 <= size <= 128 * 1024 ** 2:
+        raise ValueError(f'invalid library size: {path}')
+    blob = path.read_bytes()
+    if len(blob) != size or blob[:8] != b'!<arch>\n':
+        raise ValueError(f'not a COFF library: {path}')
+    members, linkers, long_names, ec_data = {}, [], None, None
+    padding_counts = Counter()
+    offset = 8
+    while offset < size:
+        header_offset = offset
+        header = blob[offset:offset + 60]
+        if len(header) != 60 or header[58:] != b'`\n' or offset % 2:
+            raise ValueError(f'invalid archive member header: {path}; offset={offset}')
+        name = header[:16].decode('ascii').rstrip(' ')
+        raw_size = header[48:58].rstrip(b' ')
+        if not raw_size.isdigit():
+            raise ValueError('invalid archive decimal size')
+        length = int(raw_size)
+        start, end = offset + 60, offset + 60 + length
+        if end + length % 2 > size:
+            raise ValueError(f'archive member outside file: {path}; header_offset={offset}; member={name!r}')
+        data = blob[start:end]
+        if name in ('/', '//', '/<ECSYMBOLS>/'):
+            if members:
+                raise ValueError('archive metadata after object members')
+            if name == '/':
+                if len(linkers) >= 2 or long_names is not None or ec_data is not None:
+                    raise ValueError('misplaced archive linker table')
+                linkers.append(data)
+            elif name == '//':
+                if long_names is not None or ec_data is not None:
+                    raise ValueError('duplicate or misplaced archive long names')
+                long_names = data
+            else:
+                if arch != 'arm64' or ec_data is not None or len(linkers) != 2:
+                    raise ValueError('EC symbol map requires ARM64 and two linker tables')
+                ec_data = data
+        else:
+            if name.startswith('/'):
+                if not name[1:].isdigit() or long_names is None:
+                    raise ValueError(f'unknown archive member: {name!r}')
+                index = int(name[1:])
+                if (index >= len(long_names) or (index and long_names[index - 1] != 0) or
+                        long_names.find(b'\0', index) <= index):
+                    raise ValueError('invalid archive long name offset')
+            elif not name.endswith('/') or len(name) < 2:
+                raise ValueError('invalid archive short name')
+            members[offset] = _object_identity(data)
+        offset = end + length % 2
+        if length % 2:
+            pad = blob[end:end + 1]
+            # Microsoft SDK UCRT archives use NUL; other SDK libraries use IMAGE_ARCHIVE_PAD (LF).
+            if pad not in (b'\0', b'\n'):
+                raise ValueError(f'invalid archive padding: {path}; header_offset={header_offset}; '
+                                 f'member={name!r}; data_size={length}; pad_offset={end}; '
+                                 f'pad_hex={pad.hex()}; file_size={size}')
+            padding_counts[pad.hex()] += 1
+    if not members:
         raise ValueError(f'no COFF objects in library: {path}')
-    return {'size': size, 'sha256': sha256(path), 'object_machines': dict(counts), 'member_flags': dict(flags)}
+    regular, ec, offsets = set(), set(), []
+    if linkers:
+        if len(linkers) != 2 or any(len(table) < 4 for table in linkers):
+            raise ValueError('COFF archive requires two complete linker tables')
+        first, second = linkers
+        count = struct.unpack_from('>I', first)[0]
+        first_offsets = _indices(first, 4, count, '>I')
+        _symbol_names(first, 4 + count * 4, count)
+        if not set(first_offsets) <= members.keys():
+            raise ValueError('first linker table points outside object members')
+        count = struct.unpack_from('<I', second)[0]
+        offsets = _indices(second, 4, count, '<I')
+        if len(offsets) != len(members) or set(offsets) != members.keys():
+            raise ValueError('second linker table must index every object exactly once')
+        cursor = 4 + count * 4
+        if cursor + 4 > len(second):
+            raise ValueError('truncated second linker table')
+        symbols = struct.unpack_from('<I', second, cursor)[0]
+        indices = _indices(second, cursor + 4, symbols, '<H')
+        if any(not 1 <= i <= count for i in indices):
+            raise ValueError('ordinary symbol index outside member table')
+        _symbol_names(second, cursor + 4 + symbols * 2, symbols)
+        regular = {offsets[i - 1] for i in indices} | set(first_offsets)
+    if ec_data is not None:
+        if len(ec_data) < 4:
+            raise ValueError('truncated EC symbol map')
+        count = struct.unpack_from('<I', ec_data)[0]
+        indices = _indices(ec_data, 4, count, '<H')
+        if not count or any(not 1 <= i <= len(offsets) for i in indices):
+            raise ValueError('EC symbol index outside member table')
+        _symbol_names(ec_data, 4 + count * 2, count)
+        ec = {offsets[i - 1] for i in indices}
+    counts, flags = Counter(), Counter()
+    for offset, (machine, kind, flag) in members.items():
+        if machine != MACHINES[arch]:
+            # LLVM's EC map covers ARM64EC and x64 objects, never the ordinary ARM64 symbol view.
+            allowed_ec = (arch == 'arm64' and ec_data is not None and offset not in regular and
+                          (machine == 0xa641 or (machine == 0x8664 and offset in ec)))
+            if not allowed_ec:
+                raise ValueError(f'wrong COFF machine: {path}; offset={offset}; machine=0x{machine:04x}; expected {arch}')
+        counts[f'0x{machine:04x}'] += 1
+        flags[f'{kind}:0x{flag:04x}'] += 1
+    if f'0x{MACHINES[arch]:04x}' not in counts:
+        raise ValueError('archive lacks native target objects')
+    return {'size': size, 'sha256': sha256(path), 'object_machines': dict(counts), 'member_flags': dict(flags),
+            'padding_bytes': dict(padding_counts), 'ec_symbol_members': len(ec)}
 
 
 def required_libraries():
