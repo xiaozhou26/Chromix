@@ -23,6 +23,11 @@ import windows157_crubit_resume as origin
 MANIFEST = "build/windows/windows157-stage3-checkpoint.json"
 MANIFEST_SHA256 = "f097a99e383d855987eac7e9c9fe5c66d353abfbb155d3949ee2ca38256c0d71"
 WORKFLOW = "build-win-x64-157-compiled-resume"
+ARCH = "x64"
+OUTPUT = "out/Chromix"
+PGO_SELECTOR = "win64"
+FIRST_STAGE = 4
+DONOR_RUN = "44591948738"
 RECEIPT = ".chromix-windows157-compiled-migration.json"
 PENDING = ".chromix-windows157-compiled-in-progress"
 BLOCKER = ".chromix-layer-in-progress"
@@ -33,8 +38,8 @@ TARGETS = ("base/i18n/icubridge/default_icu_locale.h",
            "components/embedder_support/user_agent_utils.cc")
 RECOVERY_CODE = {
     "tools/windows157_ninja_state.py": "3709b6dd13acd547637c880ad46de3a46cbb3d1b97ca5e1dfdcb02cb3c284d9f",
-    "build/windows/ci-stage.ps1": "33ed7d7ee77573dc9aa5269a5599b31311cda454468a43046ed92651f6d9b438",
-    "tools/gen_windows_arm64_workflow.py": "76b16bb6ce60f0014ac71a8c161534d033aefbacc90aadba146c59c13c78e899",
+    "build/windows/ci-stage.ps1": "41b3687231d946faed780f2257e1ffec6772864cb67659e74f88690d62620d56",
+    "tools/gen_windows_arm64_workflow.py": "bcfa855361b524480ed317575a29aa4d588f40e0e1c1e12f2411062b87280554",
     ".github/workflows/build-win-x64-157-compiled-resume.yml": "b626dd46ddb75d767bbfca485dfff6ad19d0999a0c665615ea8244c8506de7ee"
 }
 RECIPE_FILES = ("build/args.windows.gn", "build/windows/lite-tarball-files/v8/test/torque/test-torque.tq",
@@ -61,7 +66,7 @@ def load(repo):
 
 def expected(m):
     return dict(repository=m["repository"], head_sha=m["head_sha"], run_id=m["run_id"],
-                stage=3, attempt=1, job_id=m["job_id"], arch="x64", workflow=Path(m["workflow_path"]).stem,
+                stage=m["stage"], attempt=1, job_id=m["job_id"], arch=ARCH, workflow=Path(m["workflow_path"]).stem,
                 artifacts=[{k: v for k, v in a.items() if k != "expires_at"} | {"expired": False}
                            for a in m["artifacts"]])
 
@@ -186,14 +191,38 @@ def validate_selection(repo, m):
     return selected, raw
 
 
+def windows_recipe_projection(manifest):
+    return {**{key: value for key, value in manifest.items() if key != "platforms"},
+            "platforms": {"windows": manifest["platforms"]["windows"]}}
+
+
+def scoped_recipe(repo, git):
+    name = "build/patch-selection-157.json"
+    current = json.loads(files._file(repo, name).read_bytes())
+    base = json.loads(origin.blob(git, repo, RECIPE_BASE, name))
+    if windows_recipe_projection(current) != windows_recipe_projection(base):
+        raise ValueError("Windows recipe projection changed")
+    selector = files._file(repo, "tools/patch_selection.py").read_bytes().replace(b"\r\n", b"\n")
+    if digest(selector) != "b166df7e3eb15bbc36ca0710c5dd052d16722102afd268770af036fd55c2b6af":
+        raise ValueError("unreviewed Windows selector implementation")
+    selected, raw = selected_recipe(repo)
+    for name, data in raw:
+        if data != origin.blob(git, repo, RECIPE_BASE, name):
+            raise ValueError("Windows selected patch changed: " + name)
+    return digest(json.dumps(windows_recipe_projection(current), sort_keys=True, separators=(",", ":")).encode())
+
+
 def checkout(repo):
     git = files._host_git((repo,))
     head, tree = files._tree(git, repo, os.environ.get("GITHUB_SHA") or None)
     files._tracked(repo, tree)
-    # Scoped dependencies are pinned to exact reviewed blobs, not a repository-wide path exemption.
+    scoped_recipe(repo, git)
+    # Only the frozen Windows recipe executes; other platform orchestration is not an input.
     base = origin.git_tree(git, repo, RECIPE_BASE)
-    scoped = set(RECIPE_FILES) | {name for name in base if name.startswith("build/windows/")
-                                 and name != "build/windows/ci-stage.ps1"}
+    scope = {name for name in set(base) | set(tree) if name.startswith("build/windows/")}
+    scope -= {"build/windows/ci-stage.ps1", "build/windows/windows157-stage3-checkpoint.json",
+              "build/windows/windows157-arm64-stage6-checkpoint.json"}
+    scoped = set(RECIPE_FILES) | scope
     for name in scoped:
         if tree.get(name) != base.get(name):
             raise ValueError("unreviewed Windows preparation tool input: " + name)
@@ -283,7 +312,7 @@ def retained_gn_contract(view, work):
         keys.extend(key for key in order if key not in keys)
         values.update(parsed)
     expected = "\n".join([merge_gn_args.GENERATED_HEADER, *[values[key] for key in keys]]) + "\n"
-    if files._file(work / "src", "out/Chromix/args.gn").read_text() != expected:
+    if files._file(work / "src", f"{OUTPUT}/args.gn").read_text() != expected:
         raise ValueError("retained compiled GN arguments differ from exact recipe")
 
 
@@ -313,7 +342,7 @@ def compiled_contract(work, m, *, migrated=False):
     if tools.sha(src / "build/toolchain/win/midl.py") != "466824620fd2348229c24d477d114e4c7acc0a5e75a8f1b162729809a0dfccde":
         raise ValueError("compiled repaired/domain-substituted MIDL mismatch")
     tools.metagen.validate_sources(src, m["version"])
-    out = files._safe(src / "out/Chromix", directory=True)
+    out = files._safe(src / OUTPUT, directory=True)
     for name in ("build.ninja", "args.gn", "gn.exe", ".ninja_log", ".ninja_deps"):
         if files._file(out, name).stat().st_size == 0:
             raise ValueError("compiled checkpoint lacks retained GN/Ninja state")
@@ -325,11 +354,11 @@ def compiled_contract(work, m, *, migrated=False):
         values = re.findall(r"(?m)^\s*" + key + r"\s*=\s*([^\r\n#]+)", args)
         if [v.strip() for v in values] != [expected_value]:
             raise ValueError("compiled native PGO2 argument mismatch: " + key)
-    for relative in ("out/Chromix/gn.exe", "third_party/ninja/ninja.exe", "third_party/rust-toolchain/bin/bindgen.exe",
+    for relative in (f"{OUTPUT}/gn.exe", "third_party/ninja/ninja.exe", "third_party/rust-toolchain/bin/bindgen.exe",
                      tools.CRUBIT_ROOT + "/bin/cc_bindings_from_rs.exe"):
         tools.pe_executable(src / relative)
-    profile = src / "chrome/build/pgo_profiles" / tools.PGO["x64"]
-    if tools.file(src / "chrome/build/win64.pgo.txt").read_text().strip() != profile.name:
+    profile = src / "chrome/build/pgo_profiles" / tools.PGO[ARCH]
+    if tools.file(src / f"chrome/build/{PGO_SELECTOR}.pgo.txt").read_text().strip() != profile.name:
         raise ValueError("compiled PGO selector mismatch")
     if tools.file(Path(str(profile) + ".chromix-sha256")).read_text().strip() != tools.sha(profile):
         raise ValueError("compiled PGO bytes/proof mismatch")
@@ -392,7 +421,9 @@ def private_migration(src, stack):
             path = src / name
             if (path.read_bytes() if path.exists() else None) != raw or info and path.stat().st_mtime_ns != info.st_mtime_ns:
                 raise ValueError("source changed during private migration")
-        return before, revised
+        # Scratch normalization must not rewrite untouched cached CRLF source bytes.
+        published = {name: revised[name] if name in TARGETS else before[name][0] for name in names}
+        return before, published
 
 
 def atomic_bytes(path, raw, mode=None):
@@ -461,6 +492,14 @@ def source_stack(repo, work, m):
     return identity, stack, core, tooling
 
 
+def additional_protected(work, m):
+    return set()
+
+
+def receipt_binding(work, m):
+    return {}
+
+
 def preflight(repo, view, work, m):
     src = work / "src"
     if (work / RECEIPT).exists():
@@ -468,14 +507,16 @@ def preflight(repo, view, work, m):
     out = compiled_contract(work, m)
     retained_gn_contract(view, work)
     state = output_state(src / "out")
-    host_paths = ("out/Chromix/gn.exe", "third_party/ninja/ninja.exe", "third_party/rust-toolchain/bin/bindgen.exe",
+    host_paths = (f"{OUTPUT}/gn.exe", "third_party/ninja/ninja.exe", "third_party/rust-toolchain/bin/bindgen.exe",
                   tools.CRUBIT_ROOT + "/bin/cc_bindings_from_rs.exe", "third_party/llvm-build/Release+Asserts/bin/clang-cl.exe",
                   "third_party/llvm-build/Release+Asserts/bin/llvm-profdata.exe")
     host_state = files._capture(src, host_paths)
     host_hashes = {name: tools.sha(src / name) for name in host_paths}
-    protected = files._capture(src, {"out/Chromix/args.gn", "out/Chromix/build.ninja", "out/Chromix/.ninja_log",
-                                    "out/Chromix/.ninja_deps", "chrome/build/pgo_profiles/" + tools.PGO["x64"],
-                                    "chrome/build/pgo_profiles/" + tools.PGO["x64"] + ".chromix-sha256"})
+    protected = files._capture(src, {f"{OUTPUT}/args.gn", f"{OUTPUT}/build.ninja", f"{OUTPUT}/.ninja_log",
+                                    f"{OUTPUT}/.ninja_deps", "chrome/build/pgo_profiles/" + tools.PGO[ARCH],
+                                    f"chrome/build/{PGO_SELECTOR}.pgo.txt"}
+                                   | ({"chrome/build/pgo_profiles/" + tools.PGO[ARCH] + ".chromix-sha256"}
+                                      if ARCH == "x64" else set()) | additional_protected(work, m))
     original_state = files._capture(src, set(m["source_receipt"]["outputs"]) | set(TARGETS)
                                    | {".chromix-source-ready", ".chromix-patches", ".chromix-patch-selection"})
     verify_hashes(src, m["source_receipt"]["outputs"])
@@ -504,7 +545,7 @@ def preflight(repo, view, work, m):
 def migrate(repo, view, work, m, target_sha):
     verified = preflight(repo, view, work, m)
     src = work / "src"
-    out = src / "out/Chromix"
+    out = src / OUTPUT
     before, revised = verified["before"], verified["revised"]
     identity, state = verified["identity"], verified["state"]
     host_state, host_hashes = verified["host_state"], verified["host_hashes"]
@@ -528,11 +569,15 @@ def migrate(repo, view, work, m, target_sha):
               "qualification": "Complete affected source bytes and full patch stack; not full Chromium attestation",
               "domain_substituted": True, "patch_count": 235, "identity": identity,
               "outputs": {n: digest(raw) if raw is not None else None for n, raw in revised.items()}}
-    receipt = dict(schema_version=1, status="migrated", phase="compiled-pgo2-gn-ninja-retained", arch="x64",
+    receipt = dict(schema_version=1, status="migrated", phase="compiled-pgo2-gn-ninja-retained", arch=ARCH,
                    version=m["version"], donor=expected(m), target_sha=target_sha, preparation_key=key,
                    previous_preparation_key=m["old_preparation_key"], changed_source_files=list(TARGETS),
                    source=report, output_files=len(state), outputs_preserved=True, host_hashes=host_hashes,
                    prior_source_receipts=observed_receipts,
+                   output_directory=OUTPUT,
+                   output_state_sha256=digest(json.dumps(state, sort_keys=True, separators=(",", ":")).encode()),
+                   protected_hashes={name: tools.sha(src / name) for name in protected},
+                   binding=receipt_binding(work, m),
                    ninja_state=verified["ninja_state"],
                    consumer_run_id=os.environ.get("GITHUB_RUN_ID"), consumer_attempt=os.environ.get("GITHUB_RUN_ATTEMPT"))
     atomic_bytes(work / RECEIPT, (json.dumps(receipt, sort_keys=True, indent=2) + "\n").encode())
@@ -558,6 +603,9 @@ def resume(repo, view, work, m, sha):
     if (receipt.get("status") != "migrated" or receipt.get("target_sha") != sha or receipt.get("donor") != expected(m)
             or receipt.get("preparation_key") != key or receipt.get("changed_source_files") != list(TARGETS)
             or receipt.get("source", {}).get("patch_count") != 235
+            or receipt.get("arch") != ARCH
+            or receipt.get("output_directory", "out/Chromix" if ARCH == "x64" else None) != OUTPUT
+            or receipt.get("binding", {} if ARCH == "x64" else None) != receipt_binding(work, m)
             or receipt.get("consumer_run_id") != os.environ.get("GITHUB_RUN_ID")
             or receipt.get("consumer_attempt") != os.environ.get("GITHUB_RUN_ATTEMPT")):
         raise ValueError("compiled continuation identity mismatch")
@@ -598,7 +646,7 @@ def consumer():
             or not re.fullmatch("[0-9a-f]{40}", os.environ.get("GITHUB_SHA", ""))
             or not re.fullmatch(r"[1-9][0-9]*", os.environ.get("GITHUB_RUN_ID", ""))
             or not re.fullmatch(r"[1-9][0-9]*", os.environ.get("GITHUB_RUN_ATTEMPT", ""))
-            or os.environ.get("GITHUB_RUN_ID") == "44591948738"):
+            or os.environ.get("GITHUB_RUN_ID") == DONOR_RUN):
         raise ValueError("compiled recovery requires its main-only stage4..12 workflow")
 
 
@@ -628,7 +676,7 @@ def main():
             view = work.parent / VIEW
             recipe_view(repo, view, git)
             if args.phase == "migrate":
-                if os.environ.get("GITHUB_JOB") != "build-4" or not args.origin or not args.download:
+                if os.environ.get("GITHUB_JOB") != f"build-{FIRST_STAGE}" or not args.origin or not args.download:
                     raise ValueError("compiled migration requires exact donor download at stage4")
                 checked_download(m, json.loads(args.origin.read_text()), json.loads(args.download.read_text()))
                 result = migrate(repo, view, work, m, sha)
@@ -642,7 +690,7 @@ def main():
         failure = {"status": "rejected", "phase": args.phase, "error_type": type(error).__name__,
                    "error": str(error)}
         if args.workdir:
-            log = args.workdir / "src/out/Chromix/.ninja_log"
+            log = args.workdir / "src" / OUTPUT / ".ninja_log"
             if log.is_file() and not log.is_symlink():
                 with log.open("rb") as stream:
                     prefix = stream.read(64)

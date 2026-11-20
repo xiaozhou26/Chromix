@@ -28,14 +28,17 @@ $ErrorActionPreference = "Stop"
 if ($Arch -cnotin @("x64", "arm64")) { throw "Arch/CHROMIX_TARGET_ARCH must be x64 or arm64" }
 $Repo = (Resolve-Path "$PSScriptRoot\..\..").Path
 if ($CompiledRecovery) {
-  if (-not $FreshNative -or -not $FromSynced -or $FromArtifact -or $CrubitRecovery -or
-      $Arch -ne "x64" -or $StageIndex -lt 4 -or $StageIndex -gt 12) {
-    throw "Compiled Windows157 recovery requires preserved native x64 stage4..12"
+  $compiledArm = $Arch -eq "arm64"
+  if (-not $FromSynced -or $FromArtifact -or $CrubitRecovery -or $StageIndex -gt 12 -or
+      ($compiledArm -and ($FreshNative -or $StageIndex -lt 7)) -or
+      (-not $compiledArm -and (-not $FreshNative -or $StageIndex -lt 4))) {
+    throw "Compiled Windows157 recovery requires preserved x64 stage4..12 or ARM64 cache stage7..12"
   }
+  $compiledHelper = if ($compiledArm) { "windows157_arm64_compiled_resume.py" } else { "windows157_compiled_resume.py" }
   $compiledReport = Join-Path $env:RUNNER_TEMP ("compiled-continuation-" + [Guid]::NewGuid().ToString('N') + ".json")
-  python (Join-Path $Repo "tools\windows157_compiled_resume.py") --phase resume --repo $Repo --workdir C:\c\chromix --report $compiledReport
+  python (Join-Path $Repo "tools\$compiledHelper") --phase resume --repo $Repo --workdir C:\c\chromix --report $compiledReport
   if ($LASTEXITCODE -ne 0) { throw "Compiled source/checkpoint admission failed" }
-  $Repo = "C:\c\windows157-compiled-recipe"
+  $Repo = if ($compiledArm) { "C:\c\windows157-arm64-compiled-recipe" } else { "C:\c\windows157-compiled-recipe" }
 }
 
 if ($CrubitRecovery) {
@@ -1193,7 +1196,7 @@ if (-not $CompiledRecovery) {
 }
 $env:PATH = "$(Join-Path $Src 'third_party\ninja');$(Join-Path $Src 'third_party\node\win');$env:PATH"
 $Ninja = Join-Path $Src "third_party\ninja\ninja.exe"
-if ($RestoredUpstream) {
+if ($RestoredUpstream -and -not $CompiledRecovery) {
   $Ninja = & python (Join-Path $Repo "tools\restore_ninja.py") --workdir $WorkDir --platform windows --arch $Arch
   if ($LASTEXITCODE -ne 0 -or -not $Ninja) { throw "restored Ninja compatibility check failed" }
   $env:NINJA = $Ninja
@@ -1241,7 +1244,7 @@ for relative, keys in RESTORED.items():
     python tools\rust\build_bindgen.py --skip-test
     if ($LASTEXITCODE -ne 0) { throw "bindgen build failed" }
   }
-  if ($RestoredUpstream) {
+  if ($RestoredUpstream -and -not $CompiledRecovery) {
     python (Join-Path $Repo "tools\prepare_restored_build.py") --phase finish `
       --platform windows --arch $Arch --workdir $WorkDir
     if ($LASTEXITCODE -ne 0) { throw "restored build preparation failed (exit $LASTEXITCODE)" }
