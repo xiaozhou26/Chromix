@@ -1,0 +1,151 @@
+{
+  "run_id": 44805916373,
+  "attempt": 1,
+  "source_sha": "63ba8d966c3fd555bc1ed2a75752836c2136acf1",
+  "installation": {
+    "sdk_version": "10.0.28000.0",
+    "sdk_release": "10.0.28000.2705",
+    "installer_sha256_expected": "b534d37a1f3140c8be1298ed88855b8cbddc35d2626c4d0afd39f186a4b578e3",
+    "installer_sha256_actual": "B534D37A1F3140C8BE1298ED88855B8CBDDC35D2626C4D0AFD39F186A4B578E3",
+    "exit_code": 0
+  },
+  "binary_records": [
+    {
+      "path": "C:\\Program Files (x86)\\Windows Kits\\10\\bin\\10.0.28000.0\\x64\\rc.exe",
+      "expected_arch": "x64",
+      "machine": 34404,
+      "size": 55792,
+      "sha256": "89c1cf330befb84d617f91f6ba56e618c95f8b5b6feb3176d575d9960f90a863",
+      "product_version": "10.0.28000.2705"
+    },
+    {
+      "path": "C:\\Program Files (x86)\\Windows Kits\\10\\bin\\10.0.28000.0\\x64\\midl.exe",
+      "expected_arch": "x64",
+      "machine": 34404,
+      "size": 154056,
+      "sha256": "7e8ab31406275501c337b32cbca079da2954e181bb7a3606a9908d588088513c",
+      "product_version": "8.1.628.1"
+    }
+  ],
+  "msi_log": {
+    "name": "winsdksetup_022_package_WindowsSDKforWindowsStoreAppsTools_x86_en_us.log",
+    "sha256": "340064ea3a13a986f302edaba33f265ffef201e892d620b823a406df09312cc8",
+    "lines": [
+      {
+        "line": 865,
+        "text": "MSI (s) (B8:B8) [19:53:40:283]: Executing op: ComponentRegister(ComponentId={23C25388-38ED-72CC-55D9-3B1EF499FC2E},KeyPath=C:\\Program Files (x86)\\Windows Kits\\10\\bin\\10.0.28000.0\\x64\\midl.exe,State=3,,Disk=1,SharedDllRefCount=0,BinaryType=0)"
+      },
+      {
+        "line": 1624,
+        "text": "MSI (s) (B8:B8) [19:53:41:647]: Executing op: SetTargetFolder(Folder=C:\\Program Files (x86)\\Windows Kits\\10\\bin\\10.0.28000.0\\x64\\)"
+      },
+      {
+        "line": 1626,
+        "text": "MSI (s) (B8:B8) [19:53:41:647]: Executing op: FileCopy(SourceName=midl.exe,SourceCabKey=fil23c2538838ed72cc55d93b1ef499fc2e,DestName=midl.exe,Attributes=512,FileSize=154056,PerTick=65536,,VerifyMedia=1,,,,,CheckCRC=0,Version=8.1.628.1,Language=1033,InstallMode=58982400,,,,,,,)"
+      },
+      {
+        "line": 1627,
+        "text": "MSI (s) (B8:B8) [19:53:41:647]: File: C:\\Program Files (x86)\\Windows Kits\\10\\bin\\10.0.28000.0\\x64\\midl.exe;\tTo be installed;\tWon't patch;\tNo existing file"
+      },
+      {
+        "line": 2734,
+        "text": "MSI (s) (B8:B8) [19:53:43:313]: Executing op: RegOpenKey(Root=-1,Key=Software\\Classes\\Installer\\Dependencies\\Microsoft.Windows.WindowsSDKforWindowsStoreAppsTools.x86.10.28000,,BinaryType=0,,)"
+      },
+      {
+        "line": 2735,
+        "text": "MSI (s) (B8:B8) [19:53:43:313]: Executing op: RegAddValue(Name=Version,Value=10.1.28000.2705,)"
+      },
+      {
+        "line": 2736,
+        "text": "MSI (s) (B8:B8) [19:53:43:313]: Executing op: RegAddValue(,Value={8EB65EF3-DCA2-FAD1-49DD-E522C112F1CF},)"
+      },
+      {
+        "line": 2857,
+        "text": "Property(S): ProductCode = {8EB65EF3-DCA2-FAD1-49DD-E522C112F1CF}"
+      },
+      {
+        "line": 2859,
+        "text": "Property(S): ProductName = Windows SDK for Windows Store Apps Tools"
+      },
+      {
+        "line": 2860,
+        "text": "Property(S): ProductVersion = 10.1.28000.2705"
+      }
+    ]
+  },
+  "additional_msi_logs": [
+    {
+      "name": "winsdksetup_003_package_SDKDebuggers_x86_en_us.log",
+      "sha256": "ab2980494d268161906e4500b10a379d6b0b41fbb38ff48cc29d588848ea75e8",
+      "lines": [
+        {
+          "line": 10659,
+          "text": "MSI (s) (B8:C0) [19:53:03:804]: Executing op: FileCopy(SourceName=dbghelp.dll,SourceCabKey=fil63bc9df5c34c9cf0d34718b9ab1793bd,DestName=dbghelp.dll,Attributes=512,FileSize=1372616,PerTick=65536,,VerifyMedia=1,,,,,CheckCRC=0,Version=10.0.28000.2705,Language=1033,InstallMode=58982400,,,,,,,)"
+        },
+        {
+          "line": 11796,
+          "text": "MSI (s) (B8:C0) [19:53:06:672]: Executing op: FileCopy(SourceName=dbghelp.dll,SourceCabKey=filfb53ea2a0e8cd4ed3cecf59eb0ad62c5,DestName=dbghelp.dll,Attributes=512,FileSize=735688,PerTick=65536,,VerifyMedia=1,,,,,CheckCRC=0,Version=10.0.28000.2705,Language=1033,InstallMode=58982400,,,,,,,)"
+        },
+        {
+          "line": 12155,
+          "text": "Property(S): ProductName = SDK Debuggers"
+        },
+        {
+          "line": 12156,
+          "text": "Property(S): ProductVersion = 10.1.28000.2705"
+        }
+      ]
+    },
+    {
+      "name": "winsdksetup_060_package_WindowsSDKDesktopLibsx64_x86_en_us.log",
+      "sha256": "5d6bfd879bdd9d411240c684aa926cbb6e884708100ee227a379876e14b8bf4c",
+      "lines": [
+        {
+          "line": 2668,
+          "text": "Property(S): ProductName = Windows SDK Desktop Libs x64"
+        },
+        {
+          "line": 2669,
+          "text": "Property(S): ProductVersion = 10.1.28000.2705"
+        }
+      ]
+    },
+    {
+      "name": "winsdksetup_065_package_WindowsSDKDesktopLibsarm64_x86_en_us.log",
+      "sha256": "1455692c986edda9902cc417f086c6cd7382bac01173c7212863f9455b4159c0",
+      "lines": [
+        {
+          "line": 2584,
+          "text": "Property(S): ProductName = Windows SDK Desktop Libs arm64"
+        },
+        {
+          "line": 2585,
+          "text": "Property(S): ProductVersion = 10.1.28000.2705"
+        }
+      ]
+    },
+    {
+      "name": "winsdksetup_039_package_UniversalCRTHeadersLibrariesandSources_x86_en_us.log",
+      "sha256": "32190fb50c59b36dfb7d4ae258769c5926102e8eddf05c5158ceb0a4e41fa8eb",
+      "lines": [
+        {
+          "line": 2436,
+          "text": "MSI (s) (B8:64) [19:53:54:150]: Executing op: ComponentRegister(ComponentId={CD9BCA91-D11C-02B5-BBDA-06FF40C55404},KeyPath=C:\\Program Files (x86)\\Windows Kits\\10\\Lib\\10.0.28000.0\\ucrt\\x64\\libucrt.lib,State=3,,Disk=1,SharedDllRefCount=0,BinaryType=0)"
+        },
+        {
+          "line": 2454,
+          "text": "MSI (s) (B8:64) [19:53:54:150]: Executing op: ComponentRegister(ComponentId={F8C3DEC5-FC7B-B981-741D-D8D9C058F091},KeyPath=C:\\Program Files (x86)\\Windows Kits\\10\\Lib\\10.0.28000.0\\ucrt\\arm64\\libucrt.lib,State=3,,Disk=1,SharedDllRefCount=0,BinaryType=0)"
+        },
+        {
+          "line": 5594,
+          "text": "Property(S): ProductName = Universal CRT Headers Libraries and Sources"
+        },
+        {
+          "line": 5595,
+          "text": "Property(S): ProductVersion = 10.1.28000.2705"
+        }
+      ]
+    }
+  ],
+  "coff_evidence": "Not collected: native probe stopped at midl.exe before checking libraries; MSI BinaryType is not a COFF machine."
+}
