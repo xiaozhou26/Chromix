@@ -17,7 +17,7 @@ except ImportError:
 
 source = engine.source
 MANIFEST = 'build/linux/157.0.8103.78/x64-pvt-link-checkpoint.json'
-MANIFEST_SHA256 = '8f8a04894ad625d490364a663ac421da21ad3b5e3de44e6ce2bc07fe34fbceea'
+MANIFEST_SHA256 = 'bcc6f630679fbcea57d5e2803b034d5208d03289d2776b7c0b4d5ffd6ac101ba'
 HELPER = 'tools/linux157_x64_pvt_link.py'
 BINDING = 'x64_pvt_link_profile'
 

@@ -2291,11 +2291,123 @@
                 "actual-onephase-final.json": "4cec3befe68abfd9e1ef6289e8039b219283627ae2953f4cde421d0cebd1ccfc"
               },
               "qualification": "Independent exact x64 stage1 donor continues at stage2 through the authenticated wrapper for restore/source/build/upload. Binding fixes helper/profile/engine plus all four route inputs. No shared recipe inputs are added, changed or removed; ARM engine/profile/callers remain frozen. The explicit process context restores ARM defaults on exit and authenticates again after success. Prior isolated data binding evidence is not production activation; current shared-repo admission must be verified independently. Full old229/new232 private replay and original output/source protections remain mandatory."
+            },
+            "x64_pvt_link_profile": {
+              "manifest": {
+                "path": "build/linux/157.0.8103.78/x64-pvt-link-checkpoint.json",
+                "sha256": "bcc6f630679fbcea57d5e2803b034d5208d03289d2776b7c0b4d5ffd6ac101ba"
+              },
+              "helper": {
+                "path": "tools/linux157_x64_pvt_link.py",
+                "sha256": "0641c2ffe8f90475714497566f04d4bc8ce61669c68276ce2a40f1c68a7e5053"
+              },
+              "engine": {
+                "path": "tools/linux157_pvt_link.py",
+                "sha256": "51c9a9c6468cee226184235f22fd6468e178feee0d1b71809acf3c33d2bab903"
+              },
+              "route_inputs": {
+                "build/posix/ci-stage.sh": "27b4a0b3883cf5948932594589b7477ccc8d1969bee29f81e703b0f561e0c80c",
+                "tools/gen_linux157_x64_pvt_link_workflow.py": "c58e3ab8cb99e7858b53af1c614952baecd393c74e5acabfdfddc66e1f6b8a94",
+                ".github/workflows/build-linux157-x64-pvt-link-resume.yml": "b5a3594ccfe0f49ebe72f9377b9a7d48d1114abf19f551b0ec1c2daa42d5b772",
+                ".github/workflows/build-linux157-x64-pvt-link-stages.yml": "44622675669113d534525d29239391addf2aee598749b65c7c05af0f9532763f"
+              },
+              "recipe_sha256": "f72b67654204d0447a1f3732463382a6f0a7a16877ee35b2c51d00c22ca8adc2",
+              "run_id": 44712280809,
+              "job_id": 136206704039,
+              "head_sha": "fa32bca2d2c67e04c5ababa434e03941ed8ac1d0",
+              "arch": "x64",
+              "stage": 2,
+              "attempt": 1,
+              "continuation_stage": 3,
+              "old_patch_count": 232,
+              "new_patch_count": 233
+            },
+            "x64_pvt_link_profile_review": {
+              "baseline_commit": "fa32bca2d2c67e04c5ababa434e03941ed8ac1d0",
+              "route_commit": "d7c54a65614689eeabbd3aba3e13b49f0150df49",
+              "shared_recipe_sha256": "f72b67654204d0447a1f3732463382a6f0a7a16877ee35b2c51d00c22ca8adc2",
+              "global_recipe_delta": {
+                "added": {},
+                "changed": {},
+                "removed": []
+              },
+              "profile_binding_sha256": "7d60bcebab44574dacf776a3f472487513f5e79612048e88ff0803f32cc318ea",
+              "donor": {
+                "arch": "x64",
+                "run_id": 44712280809,
+                "job_id": 136206704039,
+                "stage": 2,
+                "attempt": 1,
+                "continuation_stage": 3,
+                "head_sha": "fa32bca2d2c67e04c5ababa434e03941ed8ac1d0",
+                "workflow_path": ".github/workflows/build-linux157-x64-storage-resume.yml",
+                "artifact": {
+                  "digest": "sha256:318b1c7b4f79d38e20629a5d533612b6c6586f4476c054b9e470f25a096c64b3",
+                  "expires_at": "2026-11-23T11:18:23Z",
+                  "id": 14624172635,
+                  "name": "chromix-linux-x64-tree-s2-attempt-1-part1",
+                  "size_in_bytes": 4502236810
+                }
+              },
+              "source_migration": {
+                "additions": [
+                  {
+                    "patch": "patches/chromium157-additions/0242-linux-disabled-private-verification-token-factory-dependency.patch",
+                    "sha256": "8f737d17fc5689e7fdb5893b0c72ad6e0fbae2dbecd9549284f5f1b9b938a137",
+                    "targets": [
+                      "chrome/browser/browsing_data/chrome_browsing_data_remover_delegate_factory.cc"
+                    ]
+                  }
+                ],
+                "new_patch_count": 233,
+                "old_patch_count": 232,
+                "sources": {
+                  "chrome/browser/browsing_data/chrome_browsing_data_remover_delegate_factory.cc": {
+                    "after": "9a15070321a1a959262f9f857d195e782512f1dda6208b3ca07443a262845ae1",
+                    "before": "6d30fc730f5b9bc379742e9c377dc4fd663e233ea8fe43d303e93d6dd8c0a573"
+                  }
+                },
+                "status": "verified"
+              },
+              "output_tree": {
+                "entries": 233149,
+                "sha256": "55d56e4c446a78eb6b5da617e34360d33322b0fbcd73fb602eba64d9225423e1"
+              },
+              "link_cache": {
+                "bytes": 1661708776,
+                "entries": 62541,
+                "files": 62541,
+                "identity": {
+                  "entries": 62541,
+                  "sha256": "e45b44c66460059a4e96c00fed62d6c5a5bec214793bb7a67806492d0fab0510"
+                },
+                "path": "src/out/Chromix/thinlto-cache"
+              },
+              "historical_selection": {
+                "patch_count": 232,
+                "series_sha256": "f2b5ee866f0b0947283a51ea916e4bdc6bb764eafe004143b48600820c18a848",
+                "identity_sha256": "c100240aa2bcd6b200faac5a77b696bf248e17ee1c97db2334b0c8f8414a8bd8"
+              },
+              "evidence_sha256": {
+                "review-delta.json": "755be700c4841ca6cb6fc38d0247e6df7d960ec0d919a3a3a3ad5a4fb54baa1a",
+                "source233-report.json": "c668249edd52c844fdfc0de9c885cf7ae7ad50c22909d31762fcdf6fe4dee161",
+                "archive-preservation.json": "729187c6a5154fd69030e5631516a9b25fe77fe6906b03589a81b2c3dfa52aaf"
+              },
+              "verification_limits": {
+                "source_only_replay_and_guarded_publication": true,
+                "archive_output_records_preserved": true,
+                "local_output_inode_verified": false,
+                "full_output_admission_verified": false,
+                "full_checkpoint_verified": false,
+                "completion_marker_authorized_by_local_evidence": false,
+                "runtime_verified": false
+              },
+              "qualification": "Independent exact x64 stage2 link-tree profile continues at stage3. Only0242 removes the disabled PVT service factory include and dependency; full old232 prefix/raw bytes and canonical series remain mandatory. Old x64 Storage profile stays an immutable232 contract and cannot admit233. Shared recipe and ARM inputs have zero delta. Source-only clone evidence retains blockers and never calls full admit or writes completion marker. Two read-only archive scans preserve233149 output records including62541 ThinLTO entries; they do not verify local output inodes or full compiled-tree admission. Cloud restore/full-output admission and continued build remain required."
             }
           },
-          "patch_count": 232,
+          "patch_count": 233,
           "platform_patch_count": 9,
-          "roundtrip_patch_count": 241,
+          "roundtrip_patch_count": 242,
           "architectures": [
             "x64",
             "arm64"
@@ -2341,6 +2453,20 @@
             "patch_count": 229,
             "platform_patch_count": 9,
             "roundtrip_patch_count": 238
+          },
+          "previous_storage_patch_review": {
+            "commit": "fa32bca2d2c67e04c5ababa434e03941ed8ac1d0",
+            "review_manifest": {
+              "path": "patches/chromium157/manifest.json",
+              "sha256": "637e507bbd3b48ec5fe1bd89e9b2177097bdf9214cb70569ddfdb2fb96ca8dd0"
+            },
+            "report": {
+              "path": "patches/chromium157-verification/verified.json",
+              "sha256": "2bca5a29a04e78b7071f074a1ea1e8fdbb1b06fcc0b691c18eb7dd46d29917cf"
+            },
+            "patch_count": 232,
+            "platform_patch_count": 9,
+            "roundtrip_patch_count": 241
           }
         }
       }

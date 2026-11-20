@@ -21,7 +21,7 @@ from tools.tests.test_linux157_storage import patch
 ROOT = link.source.ROOT
 
 
-def test_exact_latest_stage2_identity_and_pending_review():
+def test_exact_latest_stage2_identity_and_verified233_review():
     m = link.load()
     assert (m['run_id'], m['job_id'], m['stage'], m['attempt'], m['continuation_stage']) == (44712280809, 136206704039, 2, 1, 3)
     assert m['head_sha'] == 'fa32bca2d2c67e04c5ababa434e03941ed8ac1d0'
@@ -31,14 +31,19 @@ def test_exact_latest_stage2_identity_and_pending_review():
     assert len(m['source_receipt']['chromix_selection']['patches']) == 232
     assert m['storage_proof']['new_patch_count'] == 232
     assert m['migration']['new_patch_count'] == 233
+    assert link.review(m)['status'] == 'verified'
+    assert m['migration']['additions'] == [{'patch': 'patches/chromium157-additions/0242-linux-disabled-private-verification-token-factory-dependency.patch',
+        'sha256': '8f737d17fc5689e7fdb5893b0c72ad6e0fbae2dbecd9549284f5f1b9b938a137', 'targets': [link.TARGET]}]
     assert m['failure']['candidate_source'] == link.TARGET
     assert m['failure']['completed_targets'] == m['failure']['total_targets'] == 7557
     assert m['target_recipe'] == link.source.recipe()
     assert wrapper.MANIFEST not in link.source.recipe()['inputs']
 
 
-def test_pending_review_refuses_before_tree_write(tmp_path):
-    if link.load()['migration']['status'] == 'verified': pytest.skip('parent has sealed actual patch review')
+def test_pending_review_refuses_before_tree_write(tmp_path, monkeypatch):
+    m=copy.deepcopy(link.load());m['migration']['status']='pending-parent-review'
+    monkeypatch.setattr(link,'load',lambda *args: m)
+    monkeypatch.setattr(wrapper,'load',lambda *args: m)
     with pytest.raises(ValueError, match='strict parent review'):
         link.admit(tmp_path, 'x64', link.expected('x64'))
     with pytest.raises(ValueError, match='strict parent review'):
@@ -269,6 +274,8 @@ def test_transaction_failure_preserves_pending_and_linkcache(tmp_path,monkeypatc
 
 
 def test_pending_restore_never_downloads_even_if_chrome_exists(tmp_path,monkeypatch):
+    m=copy.deepcopy(link.load());m['migration']['status']='pending-parent-review'
+    monkeypatch.setattr(link,'load',lambda *args: m)
     def forbidden(*args,**kwargs):pytest.fail('pending review attempted network or publication')
     monkeypatch.setattr(link.subprocess,'run',forbidden)
     with pytest.raises(ValueError,match='strict parent review'):link.restore(tmp_path/'absent','x64')
@@ -291,3 +298,61 @@ def test_actual_archive_output_and_source232_proof():
     link.prior.verify_files(work/'src',m['source_final']['outputs'])
     link.verify_storage_chain(work,m)
     assert link.tools.file_hash(work/'src'/link.TARGET)==m['failure']['candidate_source_sha256']
+
+
+def test_formal233_old232_prefix_and_canonical_series():
+    m=link.load();selected,raw=link.patch_selection.select(ROOT,'linux')
+    assert len(raw)==233
+    assert selected['patches'][:232]==m['source_receipt']['chromix_selection']['patches']
+    assert selected['series_sha256']!=m['source_receipt']['chromix_selection']['series_sha256']
+    assert link.validate_additions(selected,raw,m)==m['migration']['additions']
+
+
+@pytest.mark.parametrize('attack',['prefix','old-series','new-series','patch-sha','source-scope','extra-source','count'])
+def test_formal233_contract_rejects_drift(attack):
+    m=copy.deepcopy(link.load());selected,raw=link.patch_selection.select(ROOT,'linux')
+    if attack=='prefix':selected['patches'][5]['sha256']='0'*64
+    elif attack=='old-series':m['source_receipt']['chromix_selection']['series_sha256']=selected['series_sha256']
+    elif attack=='new-series':selected['series_sha256']=m['source_receipt']['chromix_selection']['series_sha256']
+    elif attack=='patch-sha':m['migration']['additions'][0]['sha256']='0'*64
+    elif attack=='source-scope':m['migration']['additions'][0]['targets']=['out/Chromix/chrome']
+    elif attack=='extra-source':m['migration']['sources']['extra.cc']=m['migration']['sources'][link.TARGET]
+    elif attack=='count':m['migration']['new_patch_count']=234
+    with pytest.raises(ValueError):link.validate_additions(selected,raw,m)
+
+
+def test_production_partial_output_cannot_match_full_donor_identity(tmp_path):
+    src,_,_=fixture(tmp_path)
+    partial=link.snapshot_outputs(src/'out')
+    m=link.load()
+    assert link.output_identity(partial)!=m['output_tree']
+    cache={n:v for n,v in partial.items() if n.startswith('Chromix/thinlto-cache/')}
+    assert link.output_identity(cache)!=m['link_cache']['identity']
+
+
+def test_actual_source233_evidence_is_not_full_output_admission():
+    location=os.environ.get('CHROMIX_PVT233_AUDIT')
+    if not location:pytest.skip('requires actual source-only233 audit')
+    root=Path(location);report=json.loads((root/'source233-report.json').read_bytes())
+    assert report['old_patch_count']==232 and report['new_patch_count']==233
+    assert report['old_and_new_full_private_reverse_forward'] is True
+    assert report['post_publication_full233_reverse_forward'] is True
+    assert report['production_admit_called'] is False
+    assert report['full_output_migration_pass'] is False
+    assert report['local_output_inode_verified'] is False
+    work=Path(report['source_clone']);assert (work/'src'/link.PENDING).exists()
+    assert not (work/'src'/link.MARKER).exists()
+    with pytest.raises(ValueError,match='incomplete storage migration'):
+        link.verify(work,'x64')
+    assert link.tools.file_hash(work/'src'/link.TARGET)==link.load()['migration']['sources'][link.TARGET]['after']
+
+
+def test_production_full_output_and_transaction_gates_are_byte_unchanged():
+    import ast
+    baseline=subprocess.check_output(['git','-C',str(ROOT),'show','d7c54a6:tools/linux157_pvt_link.py'],text=True)
+    current=(ROOT/'tools/linux157_pvt_link.py').read_text()
+    def bodies(text):
+        return {node.name:ast.get_source_segment(text,node) for node in ast.parse(text).body if isinstance(node,ast.FunctionDef)}
+    before,after=bodies(baseline),bodies(current)
+    for name in ('admit','verify','snapshot_outputs','output_identity','private_migration','publish_sources','verify_storage_chain','restore'):
+        assert after[name]==before[name],name

@@ -536,11 +536,11 @@ def x64_storage_repo(linux_repo):
     paths = [binding[key]["path"] for key in ("helper", "manifest")]
     paths += list(binding["route_inputs"])
     for name in paths:
-        store(linux_repo, name, (ROOT / name).read_bytes())
+        store(linux_repo, name, blob(name, "fa32bca2d2c67e04c5ababa434e03941ed8ac1d0"))
     return linux_repo
 
 
-def test_real_x64_storage_binding_keeps_shared_recipe_and_arm_default():
+def test_real_x64_storage_binding_keeps_shared_recipe_and_arm_default(x64_storage_repo):
     from tools import linux157_x64_storage as x64
     from tools import linux157_storage as arm
     from tools import linux157_source as source
@@ -548,19 +548,22 @@ def test_real_x64_storage_binding_keeps_shared_recipe_and_arm_default():
     assert DOWNSTREAM["recipe"] == baseline["platforms"]["linux"]["downstream"]["recipe"] == source.recipe(ROOT)
     assert x64.HELPER not in DOWNSTREAM["recipe"]["inputs"]
     assert x64.MANIFEST not in DOWNSTREAM["recipe"]["inputs"]
-    assert x64.authenticate(ROOT) == selection.select(ROOT, "linux")[0]
+    with pytest.raises(ValueError, match="parent selector review"):
+        x64.authenticate(ROOT)
+    repo = x64_storage_repo
+    assert x64.authenticate(repo) == selection.select(repo, "linux")[0]
     defaults = arm.load, arm.verify_current, arm.verify_current_ninja
-    with x64.profile(ROOT) as active:
-        donor = active.load(ROOT, "x64")
-        selected, raw = selection.select(ROOT, "linux")
+    with x64.profile(repo) as active:
+        donor = active.load(repo, "x64")
+        selected, raw = selection.select(repo, "linux")
         with pytest.raises(ValueError, match="unchanged full old229"):
-            active.validate_additions(selected, raw, donor, ROOT)
+            active.validate_additions(selected, raw, donor, repo)
         historical, historical_raw = historical_storage_selection(donor)
-        active.validate_additions(historical, historical_raw, donor, ROOT)
-        active.recipe_delta(donor["source_receipt"]["recipe"], source.recipe(ROOT), ROOT, "x64")
+        active.validate_additions(historical, historical_raw, donor, repo)
+        active.recipe_delta(donor["source_receipt"]["recipe"], source.recipe(repo), repo, "x64")
         assert (donor["run_id"], donor["stage"], donor["continuation_stage"]) == (44687163614, 1, 2)
         with pytest.raises(ValueError):
-            active.load(ROOT, "arm64")
+            active.load(repo, "arm64")
     assert (arm.load, arm.verify_current, arm.verify_current_ninja) == defaults
     assert arm.load(ROOT)["run_id"] == 44660206036
 
@@ -597,6 +600,78 @@ def test_x64_profile_unknown_binding_rejected(field):
     profile[field] = None
     with pytest.raises(selection.SelectionError, match="downstream recipe"):
         selection.validate_manifest157(manifest)
+
+
+@pytest.fixture
+def pvt_link_repo(linux_repo):
+    profile = DOWNSTREAM["validation"]["recipe_integration"]["x64_pvt_link_profile"]
+    for name in [profile[key]["path"] for key in ("helper", "engine", "manifest")] + list(profile["route_inputs"]):
+        store(linux_repo, name, (ROOT / name).read_bytes())
+    return linux_repo
+
+
+def test_current_pvt233_profile_requires_exact_prefix_and_zero_recipe_delta():
+    from tools import linux157_x64_pvt_link as wrapper
+    from tools import linux157_pvt_link as link
+    from tools import linux157_storage as arm
+    selected, raw = selection.select(ROOT, "linux")
+    assert wrapper.authenticate(ROOT) == selected
+    donor = wrapper.load(ROOT)
+    assert selected["patches"][:232] == donor["source_receipt"]["chromix_selection"]["patches"]
+    assert link.validate_additions(selected, raw, donor, ROOT) == donor["migration"]["additions"]
+    link.recipe_delta(DOWNSTREAM["recipe"], DOWNSTREAM["recipe"], ROOT)
+    assert donor["target_recipe"] == DOWNSTREAM["recipe"]
+    for key in ("helper", "engine", "manifest"):
+        assert wrapper.binding(ROOT)[key]["path"] not in DOWNSTREAM["recipe"]["inputs"]
+    original = arm.verify_current, arm.verify_current_ninja, link.load
+    with wrapper.profile(ROOT):
+        assert link.load(ROOT)["run_id"] == 44712280809
+        with pytest.raises(ValueError):
+            link.load(ROOT, "arm64")
+    assert (arm.verify_current, arm.verify_current_ninja, link.load) == original
+    assert arm.load(ROOT)["arch"] == "arm64"
+
+
+@pytest.mark.parametrize("name", [
+    *[DOWNSTREAM["validation"]["recipe_integration"]["x64_pvt_link_profile"][key]["path"]
+      for key in ("helper", "engine", "manifest")],
+    *DOWNSTREAM["validation"]["recipe_integration"]["x64_pvt_link_profile"]["route_inputs"],
+])
+@pytest.mark.parametrize("mutation", ["tamper", "missing", "symlink"])
+def test_pvt_profile_actual_input_drift_rejected(pvt_link_repo, name, mutation):
+    from tools import linux157_x64_pvt_link as wrapper
+    repo = pvt_link_repo
+    assert wrapper.authenticate(repo)
+    path = repo / name
+    if mutation == "tamper":
+        path.write_bytes(path.read_bytes() + b"\n")
+    elif mutation == "missing":
+        path.unlink()
+    else:
+        path.unlink()
+        path.symlink_to(ROOT / name)
+    with pytest.raises(ValueError):
+        wrapper.authenticate(repo)
+
+
+@pytest.mark.parametrize("mutation", ["patch-hash", "wrong-target", "old-prefix", "raw-bytes", "count"])
+def test_real_pvt233_contract_never_accepts_unknown_sources(mutation):
+    from tools import linux157_x64_pvt_link as wrapper
+    from tools import linux157_pvt_link as link
+    selected, raw = selection.select(ROOT, "linux")
+    donor = copy.deepcopy(wrapper.load(ROOT))
+    if mutation == "patch-hash":
+        donor["migration"]["additions"][0]["sha256"] = "0" * 64
+    elif mutation == "wrong-target":
+        donor["migration"]["additions"][0]["targets"] = ["base/unreviewed.cc"]
+    elif mutation == "old-prefix":
+        selected["patches"][0]["sha256"] = "0" * 64
+    elif mutation == "raw-bytes":
+        raw[-1] = (raw[-1][0], raw[-1][1] + b"unreviewed")
+    else:
+        donor["migration"]["new_patch_count"] = 234
+    with pytest.raises(ValueError):
+        link.validate_additions(selected, raw, donor, ROOT)
 
 
 def test_reviewed_activation_preserves_real_origin_and_effective_core(linux_repo, monkeypatch):

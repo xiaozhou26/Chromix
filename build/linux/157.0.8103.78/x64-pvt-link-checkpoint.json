@@ -653,11 +653,24 @@
     "path": "src/out/Chromix/thinlto-cache"
   },
   "migration": {
-    "additions": [],
+    "additions": [
+      {
+        "patch": "patches/chromium157-additions/0242-linux-disabled-private-verification-token-factory-dependency.patch",
+        "sha256": "8f737d17fc5689e7fdb5893b0c72ad6e0fbae2dbecd9549284f5f1b9b938a137",
+        "targets": [
+          "chrome/browser/browsing_data/chrome_browsing_data_remover_delegate_factory.cc"
+        ]
+      }
+    ],
     "new_patch_count": 233,
     "old_patch_count": 232,
-    "sources": {},
-    "status": "pending-parent-review"
+    "sources": {
+      "chrome/browser/browsing_data/chrome_browsing_data_remover_delegate_factory.cc": {
+        "after": "9a15070321a1a959262f9f857d195e782512f1dda6208b3ca07443a262845ae1",
+        "before": "6d30fc730f5b9bc379742e9c377dc4fd663e233ea8fe43d303e93d6dd8c0a573"
+      }
+    },
+    "status": "verified"
   },
   "ninja": {
     "host": [
