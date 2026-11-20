@@ -26,6 +26,8 @@ MAX_STAGES=8
 FROM_SNAPSHOT=""
 DEADLINE_EPOCH=0
 RESERVE_MINUTES="${CHROMIX_RESERVE_MINUTES:-45}"
+LINUX157_SOURCE=(python3 "$REPO/tools/linux157_source.py")
+LINUX157_BUILD=(python3 "$REPO/tools/linux157_build.py")
 
 while [ $# -gt 0 ]; do
   case "$1" in
@@ -105,7 +107,7 @@ handoff() {
   unchanged_check after
   log "stage $STAGE_INDEX: $*; snapshotting unfinished work"
   if [ "${LINUX157_FRESH:-0}" -eq 1 ]; then
-    python3 "$REPO/tools/linux157_source.py" --phase checkpoint --repo "$REPO" \
+    "${LINUX157_SOURCE[@]}" --phase checkpoint --repo "$REPO" \
       --workdir "$WORK" --arch "$ARCH" || die "Linux157 checkpoint is incomplete; retain failed source diagnostics"
   fi
   mkdir -p "$SNAPSHOT_DIR"
@@ -153,6 +155,20 @@ fi
 
 LINUX157_FRESH=0
 LINUX157_RECOVERY=0
+case "${CHROMIX_LINUX157_X64_STORAGE_RECOVERY:-0}" in
+  0) ;;
+  1)
+    [ "$PLATFORM:$ARCH:${CHROMIX_LINUX157_X64_STORAGE_STAGE1_RECOVERY:-0}" = linux:x64:1 ] ||
+      die "x64 Storage recovery requires exact stage1 donor"
+    [ "$STAGE_INDEX" -ge 2 ] && [ "$STAGE_INDEX" -le 8 ] ||
+      die "x64 Storage continuation requires logical stages2 through8"
+    [ "${CHROMIX_LINUX157_STORAGE_RECOVERY:-0}:${CHROMIX_LINUX157_UA_RECOVERY:-0}:${CHROMIX_LINUX157_PRE_GN_RECOVERY:-0}:${CHROMIX_LINUX157_POST_GN_RECOVERY:-0}:${CHROMIX_LINUX157_LOCALE_RECOVERY:-0}" = 0:0:0:0:0 ] ||
+      die "x64 Storage cannot combine historical or ARM routes"
+    LINUX157_SOURCE=(python3 "$REPO/tools/linux157_x64_storage.py" --command source)
+    LINUX157_BUILD=(python3 "$REPO/tools/linux157_x64_storage.py" --command build)
+    LINUX157_RECOVERY=1 ;;
+  *) die "invalid x64 Storage recovery opt-in" ;;
+esac
 case "${CHROMIX_LINUX157_STORAGE_RECOVERY:-0}" in
   0) ;;
   1)
@@ -198,13 +214,13 @@ fi
 if [ "$PLATFORM" = linux ] && [ -f "$REPO/CHROMIUM_LINUX_VERSION" ]; then
   read -r LINUX_VERSION < "$REPO/CHROMIUM_LINUX_VERSION"
   if [ "$LINUX_VERSION" = 157.0.8103.78 ]; then
-    python3 "$REPO/tools/linux157_source.py" --phase route --repo "$REPO" --arch "$ARCH" ||
+    "${LINUX157_SOURCE[@]}" --phase route --repo "$REPO" --arch "$ARCH" ||
       die "Linux157 fresh route identity/cache policy failed"
     [ "$LINUX157_RECOVERY" = 1 ] ||
       die "Linux157 requires a dedicated exact checkpoint recovery workflow"
     [ "${CHROMIX_BUILD_PROFILE:-release}" = fast ] || die "Linux157 recovery preserves the fast donor profile"
     [ -d "$SRC" ] || die "Linux157 prepared donor must be restored before the stage; fresh fallback forbidden"
-    python3 "$REPO/tools/linux157_source.py" --phase checkpoint --repo "$REPO" \
+    "${LINUX157_SOURCE[@]}" --phase checkpoint --repo "$REPO" \
       --workdir "$WORK" --arch "$ARCH" || die "Linux157 migration/source checkpoint proof failed"
     LINUX157_FRESH=1
   fi
@@ -331,7 +347,7 @@ fi
 RC=0
 BUILD_COMMAND=(env CHROMIX_SKIP_DEPS=1 CHROMIX_WORKDIR="$WORK" "$BUILD_SCRIPT" "$WORK" "$ARCH")
 if [ "$LINUX157_FRESH" -eq 1 ]; then
-  BUILD_COMMAND=(python3 "$REPO/tools/linux157_build.py" --repo "$REPO" --workdir "$WORK" --arch "$ARCH")
+  BUILD_COMMAND=("${LINUX157_BUILD[@]}" --repo "$REPO" --workdir "$WORK" --arch "$ARCH")
 fi
 if [ -n "$UNCHANGED_HELPER" ]; then
   BUILD_COMMAND=(python3 "$UNCHANGED_HELPER"

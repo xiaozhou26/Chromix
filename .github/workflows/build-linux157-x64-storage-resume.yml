@@ -1,0 +1,34 @@
+name: build-linux157-x64-storage-resume
+run-name: Linux157 x64 compiled stage1 44687163614 to logical stage2 Storage repair
+
+on:
+  workflow_dispatch:
+    inputs:
+      compile_jobs:
+        description: 'Ninja jobs; exact stage1 donor and three single-source232 additions are fixed'
+        type: string
+        default: auto
+
+permissions:
+  actions: read
+  contents: read
+
+concurrency:
+  group: linux157-x64-storage-resume-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  resume:
+    name: Linux157 x64 (latest stage1 compiled tree, continue stage2)
+    uses: ./.github/workflows/build-linux157-x64-storage-stages.yml
+    with:
+      platform: linux
+      arch: x64
+      runner: ubuntu-22.04
+      artifact: chromix-linux-x64
+      max-stages: 8
+      build_profile: fast
+      compile_jobs: ${{ inputs.compile_jobs || 'auto' }}
+      use_upstream_cache: false
+      linux157_storage_recovery: true
+    secrets: inherit
