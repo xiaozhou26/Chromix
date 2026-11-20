@@ -124,6 +124,7 @@ def test_probe_workflow_is_manual_small_and_always_uploads_whole_diagnostics():
     assert run['timeout-minutes'] == 20 and run['shell'] == 'powershell'
     assert "-Arch arm64 -ChromiumVersion '157.0.8103.78' -Install -InstallTimeoutMinutes 15" in run['run']
     assert run['run'].index('ensure-windows-sdk.ps1') < run['run'].index('windows157_sdk_probe.py')
+    assert '--capture-libraries "$diagnostics\\sdk-libraries"' in run['run']
     assert 'if ($LASTEXITCODE -ne 0)' in run['run'] and 'finally' in run['run']
     assert steps[3]['if'] == '${{ always() }}'
     assert steps[3]['with']['path'] == '${{ runner.temp }}/win157-arm64-sdk/'
@@ -238,3 +239,69 @@ def test_msi_registration_binds_product_component_version_and_path(tmp_path, mon
     else:
         with pytest.raises(ValueError):
             probe.midl_registration(path)
+
+
+@pytest.mark.parametrize('failure', ['none', 'padding', 'missing', 'machine', 'pe'])
+def test_capture_collects_every_original_library_without_approving_failure(tmp_path, monkeypatch, failure):
+    sdk = tmp_path / 'sdk'
+    fixture_sdk(sdk)
+    relative = Path(f'Lib/{probe.SDK_VERSION}/ucrt/x86/ucrt.lib')
+    if failure == 'padding':
+        payload = bytearray(library('x86'))
+        payload[73] = 0
+        (sdk / relative).write_bytes(payload)
+    elif failure == 'missing':
+        (sdk / relative).unlink()
+    elif failure == 'machine':
+        (sdk / relative).write_bytes(library('arm64'))
+    original = {str(path.relative_to(sdk)): path.read_bytes() for path in sdk.rglob('*.lib')}
+    monkeypatch.setattr(probe.sys, 'platform', 'win32')
+    monkeypatch.setattr(probe, 'product_version', lambda path: '8.1.628.1' if path.name == 'midl.exe' else '10.0.28000.2705')
+    monkeypatch.setattr(probe, 'check_midl_identity', lambda *args: None)
+    if failure == 'pe':
+        (sdk / f'bin/{probe.SDK_VERSION}/x64/rc.exe').write_bytes(b'bad PE')
+    destination, report = tmp_path / 'diagnostics', tmp_path / 'report.json'
+    rc = probe.main(['--sdk', str(sdk), '--report', str(report), '--capture-libraries', str(destination)])
+    assert rc == (0 if failure == 'none' else 1)
+    manifest = json.loads((destination / 'manifest.json').read_text())
+    assert manifest['purpose'] == 'diagnostic-only' and len(manifest['files']) == 12
+    assert manifest['status'] == ('incomplete' if failure == 'missing' else 'captured')
+    for name, data in original.items():
+        assert (destination / name).read_bytes() == data == (sdk / name).read_bytes()
+    assert len(list(destination.rglob('*.lib'))) == len(original)
+    failed = [record for record in manifest['files'] if record.get('parser', {}).get('status') == 'failed']
+    if failure in ('padding', 'machine'):
+        assert len(failed) == 1
+    if failure == 'padding':
+        assert 'pad_hex=00' in failed[0]['parser']['error']
+        assert 'pad_offset=73' in failed[0]['parser']['error']
+    assert json.loads(report.read_text())['status'] == ('verified' if failure == 'none' else 'failed')
+
+
+def test_capture_refuses_to_overwrite_previous_evidence(tmp_path):
+    sdk = tmp_path / 'sdk'
+    fixture_sdk(sdk)
+    destination = tmp_path / 'capture'
+    destination.mkdir()
+    sentinel = destination / 'manifest.json'
+    sentinel.write_bytes(b'old evidence')
+    with pytest.raises(FileExistsError):
+        probe.capture_libraries(sdk, destination)
+    assert sentinel.read_bytes() == b'old evidence'
+
+
+@pytest.mark.parametrize('value', [0, 0xff, 0x20])
+def test_unobserved_padding_still_fails_with_byte_and_offset(tmp_path, value):
+    payload = bytearray(library('x86'))
+    payload[73] = value
+    path = tmp_path / 'unobserved.lib'
+    path.write_bytes(payload)
+    with pytest.raises(ValueError, match=f'pad_hex={value:02x}'):
+        probe.check_library(path, 'x86')
+
+
+def test_odd_member_eof_is_not_silently_treated_as_padding(tmp_path):
+    path = tmp_path / 'truncated.lib'
+    path.write_bytes(library('x86') + member('last.obj/', b'x' * 21)[:-1])
+    with pytest.raises(ValueError, match='archive member outside file'):
+        probe.check_library(path, 'x86')

@@ -38,7 +38,7 @@ jobs:
           $status | ConvertTo-Json | Set-Content -LiteralPath $report -Encoding UTF8
           try {
             & build/windows/ensure-windows-sdk.ps1 -Arch arm64 -ChromiumVersion '157.0.8103.78' -Install -InstallTimeoutMinutes 15 -DownloadDir $env:RUNNER_TEMP -DiagnosticsDir $diagnostics
-            python -X utf8 tools/windows157_sdk_probe.py --sdk "$env:WINDOWSSDKDIR" --report "$diagnostics\sdk-binaries.json"
+            python -X utf8 tools/windows157_sdk_probe.py --sdk "$env:WINDOWSSDKDIR" --report "$diagnostics\sdk-binaries.json" --capture-libraries "$diagnostics\sdk-libraries"
             if ($LASTEXITCODE -ne 0) { throw 'SDK binary verification failed; do not resume source' }
             $status.status = 'verified'
           } catch {

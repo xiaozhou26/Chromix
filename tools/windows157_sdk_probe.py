@@ -6,6 +6,8 @@ import json
 import os
 from pathlib import Path
 import re
+import shutil
+import stat
 import struct
 import subprocess
 import sys
@@ -41,6 +43,7 @@ def check_library(path, arch):
         if stream.read(8) != b'!<arch>\n':
             raise ValueError(f'not a COFF library: {path}')
         while stream.tell() < size:
+            header_offset = stream.tell()
             header = stream.read(60)
             if len(header) != 60 or header[58:] != b'`\n':
                 raise ValueError(f'invalid archive member header: {path}')
@@ -49,7 +52,8 @@ def check_library(path, arch):
             start = stream.tell()
             end = start + length
             if length < 0 or end + (length % 2) > size:
-                raise ValueError(f'archive member outside file: {path}')
+                raise ValueError(f'archive member outside file: {path}; header_offset={header_offset}; '
+                                 f'member={name!r}; data_end={end}; file_size={size}')
             if name not in ('/', '//'):
                 data = stream.read(min(length, 56))
                 if len(data) < 20:
@@ -65,11 +69,67 @@ def check_library(path, arch):
                     raise ValueError(f'wrong COFF machine: {path}: {name}: 0x{machine:04x}, expected {arch}')
                 counts[f'0x{machine:04x}'] += 1
             stream.seek(end)
-            if length % 2 and stream.read(1) != b'\n':
-                raise ValueError(f'invalid archive padding: {path}')
+            if length % 2:
+                padding = stream.read(1)
+                if padding != b'\n':
+                    raise ValueError(f'invalid archive padding: {path}; header_offset={header_offset}; '
+                                     f'member={name!r}; data_size={length}; pad_offset={end}; '
+                                     f'pad_hex={padding.hex()}; file_size={size}')
     if not counts:
         raise ValueError(f'no COFF objects in library: {path}')
     return {'size': size, 'sha256': sha256(path), 'object_machines': dict(counts), 'member_flags': dict(flags)}
+
+
+def required_libraries():
+    for arch in MACHINES:
+        for component, names in (('um', ('kernel32.lib', 'user32.lib')),
+                                 ('ucrt', ('ucrt.lib', 'libucrt.lib'))):
+            for name in names:
+                yield Path(f'Lib/{SDK_VERSION}/{component}/{arch}/{name}'), arch
+
+
+def capture_libraries(sdk, destination):
+    """Preserve original files and all parser outcomes; never grant SDK approval."""
+    destination.mkdir(parents=True, exist_ok=False)
+    manifest = {'status': 'collecting', 'purpose': 'diagnostic-only', 'sdk_release': SDK_RELEASE,
+                'run_id': os.environ.get('GITHUB_RUN_ID'), 'attempt': os.environ.get('GITHUB_RUN_ATTEMPT'),
+                'sha': os.environ.get('GITHUB_SHA'), 'files': []}
+    total = 0
+    errors = []
+    try:
+        for relative, arch in required_libraries():
+            source = sdk / relative
+            record = {'relative': relative.as_posix(), 'source': str(source), 'expected_arch': arch}
+            manifest['files'].append(record)
+            try:
+                info = source.lstat()
+                if (not stat.S_ISREG(info.st_mode) or source.is_symlink() or
+                        getattr(info, 'st_file_attributes', 0) & 0x400 or
+                        not 0 < info.st_size <= 128 * 1024 ** 2):
+                    raise ValueError('library must be a nonempty regular file of at most 128 MiB')
+                if total + info.st_size > 512 * 1024 ** 2:
+                    raise ValueError('library diagnostic capture exceeds 512 MiB')
+                total += info.st_size
+                target = destination / relative
+                target.parent.mkdir(parents=True, exist_ok=True)
+                record.update(size=info.st_size, sha256=sha256(source))
+                with source.open('rb') as reader, target.open('xb') as writer:
+                    shutil.copyfileobj(reader, writer, 1024 * 1024)
+                if target.stat().st_size != info.st_size or sha256(target) != record['sha256']:
+                    raise ValueError('library diagnostic copy identity mismatch')
+                record['capture_status'] = 'copied'
+                try:
+                    record['parser'] = {'status': 'verified', **check_library(target, arch)}
+                except Exception as error:
+                    record['parser'] = {'status': 'failed', 'error': str(error)}
+            except Exception as error:
+                record.update(capture_status='failed', capture_error=str(error))
+                errors.append(str(error))
+        manifest['status'] = 'incomplete' if errors else 'captured'
+    finally:
+        (destination / 'manifest.json').write_text(json.dumps(manifest, indent=2) + '\n', encoding='utf-8')
+    if errors:
+        raise ValueError(f'library diagnostic capture incomplete: {len(errors)} files failed')
 
 
 def midl_registration(path):
@@ -156,20 +216,18 @@ def verify(sdk, report):
             check_midl_identity(sdk, path, record)
         elif relative.startswith('bin/') and not record['product_version'].startswith('10.0.28000.'):
             raise ValueError(f'host tool is not SDK 28000: {path}')
-    for arch in MACHINES:
-        for component, names in (('um', ('kernel32.lib', 'user32.lib')),
-                                 ('ucrt', ('ucrt.lib', 'libucrt.lib'))):
-            for name in names:
-                path = sdk / f'Lib/{SDK_VERSION}/{component}/{arch}/{name}'
-                record = {'path': str(path), 'expected_arch': arch}
-                report['files'].append(record)
-                record.update(check_library(path, arch))
+    for relative, arch in required_libraries():
+        path = sdk / relative
+        record = {'path': str(path), 'expected_arch': arch}
+        report['files'].append(record)
+        record.update(check_library(path, arch))
 
 
 def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--sdk', required=True, type=Path)
     parser.add_argument('--report', required=True, type=Path)
+    parser.add_argument('--capture-libraries', type=Path, help='diagnostic-only raw library copies, even on failure')
     args = parser.parse_args(argv)
     report = {'status': 'started', 'sdk_version': SDK_VERSION, 'sdk_release': SDK_RELEASE, 'files': []}
     result = 0
@@ -181,6 +239,13 @@ def main(argv=None):
         print(f'SDK probe failed: {error}', file=sys.stderr)
         result = 1
     finally:
+        if args.capture_libraries:
+            try:
+                capture_libraries(args.sdk, args.capture_libraries)
+                report['library_diagnostics'] = str(args.capture_libraries / 'manifest.json')
+            except Exception as error:
+                report.update(status='failed', capture_error=str(error))
+                result = 1
         args.report.parent.mkdir(parents=True, exist_ok=True)
         args.report.write_text(json.dumps(report, indent=2) + '\n', encoding='utf-8')
     return result
