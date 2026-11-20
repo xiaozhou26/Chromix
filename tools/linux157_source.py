@@ -84,7 +84,8 @@ def recipe(repo: Path = ROOT) -> dict:
              "build/linux/157.0.8103.78/post-gn-checkpoints.json", "tools/linux157_locale.py",
              "build/linux/157.0.8103.78/locale-checkpoint.json",
              "build/linux/157.0.8103.78/arm64-locale-checkpoint.json", "tools/linux157_ua.py",
-             "build/linux/157.0.8103.78/ua-checkpoint.json", LITE_PATH]
+             "build/linux/157.0.8103.78/ua-checkpoint.json",
+             "build/linux/157.0.8103.78/arm64-ua-checkpoint.json", LITE_PATH]
     if digest(regular(repo, LITE_PATH).read_bytes()) != LITE_SHA256:
         raise ValueError("changed Linux157 lite payload")
     files += [entry["path"] for entry in manifest["patches"]]

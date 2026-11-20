@@ -49,7 +49,8 @@ def test_exact_latest_donor_includes_icu_fix_and_compiled_progress():
     assert m['files']['src/.chromix-linux157-locale-migration.json']
     assert m['migration']['new_patch_count']==229
     assert [p['target'] for p in m['migration']['additions']]==['components/embedder_support/user_agent_utils.cc']
-    with pytest.raises(ValueError,match='x64'):ua.expected('arm64')
+    assert ua.expected('arm64')['run_id'] == 44639133090
+    assert ua.expected('arm64')['stage'] == 3
 
 
 @pytest.mark.parametrize('field',['run_id','attempt','stage','job_id','head_sha','arch'])

@@ -156,7 +156,12 @@ LINUX157_RECOVERY=0
 case "${CHROMIX_LINUX157_UA_RECOVERY:-0}" in
   0) ;;
   1)
-    [ "$PLATFORM:$ARCH" = linux:x64 ] || die "UA recovery requires exact Linux x64 donor"
+    case "$PLATFORM:$ARCH:${CHROMIX_LINUX157_ARM64_UA_STAGE3_RECOVERY:-0}" in
+      linux:x64:0) ;;
+      linux:arm64:1)
+        [ "$STAGE_INDEX" -ge 4 ] || die "ARM UA continuation must start at logical stage4" ;;
+      *) die "UA recovery requires an exact architecture donor route" ;;
+    esac
     [ "${CHROMIX_LINUX157_PRE_GN_RECOVERY:-0}:${CHROMIX_LINUX157_POST_GN_RECOVERY:-0}:${CHROMIX_LINUX157_LOCALE_RECOVERY:-0}" = 0:0:0 ] ||
       die "UA recovery cannot be combined with historical donor routes"
     LINUX157_RECOVERY=1 ;;

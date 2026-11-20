@@ -33,6 +33,8 @@ except ImportError:
 
 MANIFEST = "build/linux/157.0.8103.78/ua-checkpoint.json"
 MANIFEST_SHA256 = "0441b32c8e2d296e09bbaa279dd20e0e67d75e85f0a5ebcb753dd3369cb6fd11"
+ARM64_MANIFEST = "build/linux/157.0.8103.78/arm64-ua-checkpoint.json"
+ARM64_MANIFEST_SHA256 = "91d518c0062b216b9365b5efde24760faa485299219a36573793fc959aee0c0a"
 TARGETS = ("components/embedder_support/user_agent_utils.cc",)
 OLD_COUNT = 228
 NEW_COUNT = 229
@@ -41,14 +43,15 @@ MARKER = ".chromix-linux157-ua-migration.json"
 PENDING = ".chromix-linux157-ua-migration-in-progress"
 BACKUP = "linux157-ua-origin"
 CHANGED = {"tools/linux157_source.py", "tools/linux157_build.py", "tools/linux157_locale.py"}
-ADDED = {"tools/linux157_ua.py", MANIFEST, "build/linux/157.0.8103.78/arm64-locale-checkpoint.json"}
+ADDED = {"tools/linux157_ua.py", MANIFEST, "build/linux/157.0.8103.78/arm64-locale-checkpoint.json", ARM64_MANIFEST}
 
 
 def load(repo=source.ROOT, arch="x64"):
-    if arch != "x64":
-        raise ValueError("UA recovery only admits the latest fixed x64 donor")
-    raw = source.regular(repo, MANIFEST).read_bytes()
-    if source.digest(raw) != MANIFEST_SHA256:
+    if arch not in ("x64", "arm64"):
+        raise ValueError("unsupported UA donor architecture")
+    path, digest = (ARM64_MANIFEST, ARM64_MANIFEST_SHA256) if arch == "arm64" else (MANIFEST, MANIFEST_SHA256)
+    raw = source.regular(repo, path).read_bytes()
+    if source.digest(raw) != digest:
         raise ValueError("unreviewed compiled UA checkpoint manifest")
     return json.loads(raw)
 
@@ -101,13 +104,18 @@ def validate_metadata(client, arch, repo=source.ROOT):
     return want
 
 
-def recipe_delta(old, new, repo=source.ROOT):
+def recipe_delta(old, new, repo=source.ROOT, arch="x64"):
     a, b = old["inputs"], new["inputs"]
-    for name, digest in load(repo)["integration_inputs"].items():
-        if name not in ("tools/linux157_source.py", "tools/linux157_build.py") and b.get(name) != digest:
+    for name, digest in load(repo, arch)["integration_inputs"].items():
+        mutable = {"tools/linux157_source.py", "tools/linux157_build.py"}
+        if arch == "arm64":
+            mutable.add("tools/linux157_ua.py")
+        if name not in mutable and b.get(name) != digest:
             raise ValueError("unreviewed inherited tool/locale recipe identity: " + name)
-    if (set(b) - set(a) != ADDED or set(a) - set(b)
-            or {n for n in a if a[n] != b[n]} != CHANGED
+    added = {"tools/linux157_ua.py", MANIFEST, ARM64_MANIFEST} if arch == "arm64" else ADDED
+    changed = {"tools/linux157_source.py", "tools/linux157_build.py"} if arch == "arm64" else CHANGED
+    if (set(b) - set(a) != added or set(a) - set(b)
+            or {n for n in a if a[n] != b[n]} != changed
             or {k: v for k, v in old.items() if k not in ("inputs", "sha256")} !=
                {k: v for k, v in new.items() if k not in ("inputs", "sha256")}):
         raise ValueError("ua recovery recipe delta is not reviewed")
@@ -353,7 +361,7 @@ def admit(work, arch, metadata, repo=source.ROOT):
     core, tooling = work / "tooling/ungoogled-chromium", work / "tooling/ungoogled-chromium-portablelinux"
     source.get_platform(core, tooling, repo)
     new_recipe = source.recipe(repo)
-    recipe_delta(old["recipe"], new_recipe, repo)
+    recipe_delta(old["recipe"], new_recipe, repo, arch)
     selected, identity, stack = selected_stacks(repo, core, tooling, src, m)
     out_before = snapshot_outputs(src / "out")
     before, revised = private_migration(src, stack, work)
@@ -438,7 +446,7 @@ def verify(work, arch, repo=source.ROOT):
             or proof.get("new_patch_count") != NEW_COUNT or proof.get("patches") != selected["patches"][-ADDITION_COUNT:]
             or proof.get("runtime_verified") is not False):
         raise ValueError("ua migration identity mismatch")
-    recipe_delta(proof["origin_recipe"], proof["current_recipe"], repo)
+    recipe_delta(proof["origin_recipe"], proof["current_recipe"], repo, arch)
     expected_originals = {source.RECEIPT: m["files"]["src/" + source.RECEIPT],
                           ".chromix-linux157-toolchain.json": m["files"]["src/.chromix-linux157-toolchain.json"],
                           ".chromix-source-ready": m["files"]["src/.chromix-source-ready"],
