@@ -14,6 +14,7 @@ param(
   [switch]$FromSynced,
   [switch]$FreshNative,
   [switch]$CrubitRecovery,
+  [switch]$CompiledRecovery,
   [string]$MigrationReceipt = "",
   [string]$MigrationDonorRepo = "",
   [ValidateSet("stage7", "stage8", "stage8-api")] [string]$MigrationCheckpoint = "stage7",
@@ -26,6 +27,17 @@ param(
 $ErrorActionPreference = "Stop"
 if ($Arch -cnotin @("x64", "arm64")) { throw "Arch/CHROMIX_TARGET_ARCH must be x64 or arm64" }
 $Repo = (Resolve-Path "$PSScriptRoot\..\..").Path
+if ($CompiledRecovery) {
+  if (-not $FreshNative -or -not $FromSynced -or $FromArtifact -or $CrubitRecovery -or
+      $Arch -ne "x64" -or $StageIndex -lt 4 -or $StageIndex -gt 12) {
+    throw "Compiled Windows157 recovery requires preserved native x64 stage4..12"
+  }
+  $compiledReport = Join-Path $env:RUNNER_TEMP ("compiled-continuation-" + [Guid]::NewGuid().ToString('N') + ".json")
+  python (Join-Path $Repo "tools\windows157_compiled_resume.py") --phase resume --repo $Repo --workdir C:\c\chromix --report $compiledReport
+  if ($LASTEXITCODE -ne 0) { throw "Compiled source/checkpoint admission failed" }
+  $Repo = "C:\c\windows157-compiled-recipe"
+}
+
 if ($CrubitRecovery) {
   if (-not $FreshNative -or -not $FromSynced -or $FromArtifact -or $Arch -ne "x64") {
     throw "Crubit recovery requires preserved x64 source, never first-source preparation"
@@ -53,7 +65,7 @@ $FreshSource = $Fresh156 -or $Fresh157
 if ($Fresh157 -and $env:GITHUB_ACTIONS -eq "true" -and
     ($env:GITHUB_EVENT_NAME -ne "workflow_dispatch" -or
      ($env:GITHUB_WORKFLOW_REF -notmatch '/[.]github/workflows/build-win-x64-157-fresh[.]yml@refs/heads/' -and
-      -not $CrubitRecovery))) {
+      -not $CrubitRecovery -and -not $CompiledRecovery))) {
   throw "Windows157 fresh requires its explicitly authorized workflow; historical fresh entries cannot change versions"
 }
 $FreshHelper = if ($Fresh157) { "tools\windows157_fresh.py" } else { "tools\windows156_fresh.py" }
@@ -861,6 +873,10 @@ if ($MigrationReceipt -or $MigrationDonorRepo) {
   }
   [IO.File]::Copy($MigrationReceipt, (Join-Path $RecoveryDiagnostics 'migration.json'), $false)
   Write-OutVar recovery_report_dir $RecoveryDiagnostics
+} elseif ($CompiledRecovery) {
+  if (-not (Test-Path (Join-Path $WorkDir ".chromix-windows157-compiled-migration.json"))) {
+    throw "Compiled continuation receipt missing"
+  }
 } elseif ($FromSynced -and $FreshSource) {
   python (Join-Path $Repo $FreshHelper) --phase resume --repo $Repo --workdir $WorkDir --arch $Arch
   if ($LASTEXITCODE -ne 0) { throw "$FreshLabel preserved tree verification failed; refusing cold fallback" }
@@ -1110,20 +1126,22 @@ if (-not (Test-Path (Join-Path $Src ".chromix-source-ready")) -and
   Save-Handoff -Mode Unsynced
   return
 }
-$prepareDeadline = [DateTimeOffset]::new($Deadline).ToUnixTimeSeconds()
-try {
-  # Revalidate ready markers on every stage, including artifact resumes.
-  $prepareOptions = @{}
-  if ($Arch) { $prepareOptions.Arch = $Arch }
-  & "$PSScriptRoot\prepare-ungoogled.ps1" -Root $WorkDir -Repo $Repo `
-    -DeadlineEpoch $prepareDeadline -ReserveMinutes $PackReserveMin @prepareOptions
-} catch {
-  if ($_.Exception.Message -like "PREPARE_BUDGET_EXHAUSTED:*") {
-    if ($ValidateOnly) { throw }
-    Save-Handoff -Mode Unsynced
-    return
+if (-not $CompiledRecovery) {
+  $prepareDeadline = [DateTimeOffset]::new($Deadline).ToUnixTimeSeconds()
+  try {
+    # Revalidate ready markers on every stage, including artifact resumes.
+    $prepareOptions = @{}
+    if ($Arch) { $prepareOptions.Arch = $Arch }
+    & "$PSScriptRoot\prepare-ungoogled.ps1" -Root $WorkDir -Repo $Repo `
+      -DeadlineEpoch $prepareDeadline -ReserveMinutes $PackReserveMin @prepareOptions
+  } catch {
+    if ($_.Exception.Message -like "PREPARE_BUDGET_EXHAUSTED:*") {
+      if ($ValidateOnly) { throw }
+      Save-Handoff -Mode Unsynced
+      return
+    }
+    throw
   }
-  throw
 }
 if ($FromSynced) { Write-OutVar snapshot_safe true }
 $UngoogledTooling = Join-Path $WorkDir "tooling\ungoogled-chromium"
@@ -1142,29 +1160,30 @@ if ($VerifyRestoredSource) {
 }
 New-Item -ItemType Directory -Force -Path $OutDir | Out-Null
 $gnArgs = Join-Path $OutDir "args.gn"
-$mergeArgs = @((Join-Path $Repo "tools\merge_gn_args.py"), $gnArgs)
-if ($BuildProfile -in @("fast", "release")) { $mergeArgs += @("--build-profile", $BuildProfile) }
-if ($RestoredUpstream) {
-  $mergeArgs += @("--preserve-pgo-from", $gnArgs)
+if (-not $CompiledRecovery) {
+  $mergeArgs = @((Join-Path $Repo "tools\merge_gn_args.py"), $gnArgs)
+  if ($BuildProfile -in @("fast", "release")) { $mergeArgs += @("--build-profile", $BuildProfile) }
+  if ($RestoredUpstream) {
+    $mergeArgs += @("--preserve-pgo-from", $gnArgs)
+  }
+  if ($RestoredUpstream) { $mergeArgs += $gnArgs }
+  $mergeArgs += @(
+    (Join-Path $UngoogledTooling "flags.gn"),
+    (Join-Path $WindowsTooling "flags.windows.gn"),
+    (Join-Path $Repo "build\args.windows.gn")
+  )
+  if ($Arch -eq "arm64") { $mergeArgs += (Join-Path $Repo "build\args.windows.arm64.gn") }
+  if ($FreshSource) {
+    python (Join-Path $Repo $FreshHelper) --phase overlay --repo $Repo --workdir $WorkDir --arch $Arch
+    if ($LASTEXITCODE -ne 0) { throw "$FreshLabel native PGO2 overlay failed" }
+    $mergeArgs += (Join-Path $WorkDir $FreshOverlay)
+  }
+  python @mergeArgs
+  if ($LASTEXITCODE -ne 0) { throw "GN argument merge failed" }
+  if ($Arch -eq "arm64") {
+    & "$PSScriptRoot\assert-target-arch.ps1" -WorkDir $WorkDir -Arch $Arch
+  }
 }
-if ($RestoredUpstream) { $mergeArgs += $gnArgs }
-$mergeArgs += @(
-  (Join-Path $UngoogledTooling "flags.gn"),
-  (Join-Path $WindowsTooling "flags.windows.gn"),
-  (Join-Path $Repo "build\args.windows.gn")
-)
-if ($Arch -eq "arm64") { $mergeArgs += (Join-Path $Repo "build\args.windows.arm64.gn") }
-if ($FreshSource) {
-  python (Join-Path $Repo $FreshHelper) --phase overlay --repo $Repo --workdir $WorkDir --arch $Arch
-  if ($LASTEXITCODE -ne 0) { throw "$FreshLabel native PGO2 overlay failed" }
-  $mergeArgs += (Join-Path $WorkDir $FreshOverlay)
-}
-python @mergeArgs
-if ($LASTEXITCODE -ne 0) { throw "GN argument merge failed" }
-if ($Arch -eq "arm64") {
-  & "$PSScriptRoot\assert-target-arch.ps1" -WorkDir $WorkDir -Arch $Arch
-}
-
 $env:PATH = "$(Join-Path $Src 'third_party\ninja');$(Join-Path $Src 'third_party\node\win');$env:PATH"
 $Ninja = Join-Path $Src "third_party\ninja\ninja.exe"
 if ($RestoredUpstream) {
@@ -1174,6 +1193,9 @@ if ($RestoredUpstream) {
 }
 Push-Location $Src
 try {
+  if ($CompiledRecovery -and -not (Test-Path "third_party\rust-toolchain\bin\bindgen.exe")) {
+    throw "Retained compiled bindgen missing; refusing toolchain rebuild"
+  }
   if (-not (Test-Path "third_party\rust-toolchain\bin\bindgen.exe")) {
     # bindgen's build script hard-requires cargo+rustc that prepare merged
     # into third_party\rust-toolchain; failing fast here with the directory
@@ -1217,20 +1239,22 @@ for relative, keys in RESTORED.items():
       --platform windows --arch $Arch --workdir $WorkDir
     if ($LASTEXITCODE -ne 0) { throw "restored build preparation failed (exit $LASTEXITCODE)" }
   }
-  if ($Fresh157) {
+  if ($Fresh157 -and -not $CompiledRecovery) {
     python (Join-Path $Repo "tools\windows157_tools.py") --phase prepare --repo $Repo --workdir $WorkDir --arch $Arch
     if ($LASTEXITCODE -ne 0) { throw "Windows157 Crubit/MINIBRANCH preparation failed" }
   }
   $gn = Join-Path $OutDir "gn.exe"
+  if ($CompiledRecovery -and -not (Test-Path $gn)) { throw "Retained compiled GN missing" }
   if (-not (Test-Path $gn)) {
     python tools\gn\bootstrap\bootstrap.py -o $gn --skip-generate-buildfiles
     if ($LASTEXITCODE -ne 0) { throw "GN bootstrap failed" }
   }
-  if ($FreshSource) {
+  if ($FreshSource -and -not $CompiledRecovery) {
     & "$PSScriptRoot\configure-node.ps1" -NodePath (Join-Path $Src "third_party\node\win\node.exe")
     python (Join-Path $Repo $FreshHelper) --phase probe --repo $Repo --workdir $WorkDir --arch $Arch
     if ($LASTEXITCODE -ne 0) { throw "$FreshLabel dependencies/PGO verification failed" }
   }
+  if ($CompiledRecovery -and -not (Test-Path $domainMarker)) { throw "Compiled domain marker missing" }
   if (-not (Test-Path $domainMarker)) {
     # The pinned helper selects compression from the cache filename's suffix.
     $domainCache = Join-Path $WorkDir "domain_substitution_cache.tar.gz"
@@ -1259,11 +1283,13 @@ for relative, keys in RESTORED.items():
     --core $UngoogledTooling --platform-tooling $WindowsTooling --platform windows --output $FingerprintSourceReport
   if ($LASTEXITCODE -ne 0) { throw "restored source does not contain the current fingerprint patch stack" }
   $metagenBindings = Join-Path $Repo "tools\install_windows_metagen_bindings.py"
-  & python -X utf8 $metagenBindings --configure --src $Src --out $OutDir `
-    --chromium-version $Revisions.ChromiumVersion
-  if ($LASTEXITCODE -ne 0) { throw "Windows metagen source library configuration failed" }
-  & $gn gen $OutDir --fail-on-unused-args
-  if ($LASTEXITCODE -ne 0) { throw "gn gen failed" }
+  if (-not $CompiledRecovery) {
+    & python -X utf8 $metagenBindings --configure --src $Src --out $OutDir `
+      --chromium-version $Revisions.ChromiumVersion
+    if ($LASTEXITCODE -ne 0) { throw "Windows metagen source library configuration failed" }
+    & $gn gen $OutDir --fail-on-unused-args
+    if ($LASTEXITCODE -ne 0) { throw "gn gen failed" }
+  }
   # Hosted Python packages are not part of the source snapshot; check every stage.
   & python -X utf8 $metagenBindings --src $Src --out $OutDir --ninja $Ninja `
     --chromium-version $Revisions.ChromiumVersion --download
