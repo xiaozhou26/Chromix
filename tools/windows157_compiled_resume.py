@@ -17,6 +17,7 @@ import tempfile
 import apply_restored_patches as patches
 import migrate_windows_snapshot as files
 import windows157_tools as tools
+import windows157_ninja_state as ninja_state
 import windows157_crubit_resume as origin
 
 MANIFEST = "build/windows/windows157-stage3-checkpoint.json"
@@ -31,6 +32,7 @@ TARGETS = ("base/i18n/icubridge/default_icu_locale.h",
            "third_party/blink/renderer/core/timezone/timezone_controller.cc",
            "components/embedder_support/user_agent_utils.cc")
 RECOVERY_CODE = {
+    "tools/windows157_ninja_state.py": "3709b6dd13acd547637c880ad46de3a46cbb3d1b97ca5e1dfdcb02cb3c284d9f",
     "build/windows/ci-stage.ps1": "33ed7d7ee77573dc9aa5269a5599b31311cda454468a43046ed92651f6d9b438",
     "tools/gen_windows_arm64_workflow.py": "76b16bb6ce60f0014ac71a8c161534d033aefbacc90aadba146c59c13c78e899",
     ".github/workflows/build-win-x64-157-compiled-resume.yml": "b626dd46ddb75d767bbfca485dfff6ad19d0999a0c665615ea8244c8506de7ee"
@@ -230,7 +232,8 @@ def recipe_view(repo, view, git):
                     data = data.replace(b"\r\n", b"\n").replace(b"\n", b"\r\n")
                 path.write_bytes(data)
                 if os.name != "nt":
-                    path.chmod(int(tree[name][0], 8) & 0o777)
+                    mode = 0o666 if name == "build/windows/lite-tarball-files/v8/test/torque/test-torque.tq" else int(tree[name][0], 8) & 0o777
+                    path.chmod(mode)
     from verify_windows_snapshot_source import _inventory
     if _inventory(view) != set(tree):
         raise ValueError("compiled Windows recipe view inventory changed")
@@ -257,6 +260,31 @@ def output_state(root):
                 raise ValueError("compiled output changed while hashing")
             result[path.relative_to(root).as_posix()] = (info.st_size, info.st_mtime_ns, info.st_mode, value)
     return result
+
+
+def retained_gn_contract(view, work):
+    """The Windows checkpoint is never relocated; inspect its canonical paths offline too."""
+    import merge_gn_args
+    prefix = "C:/c/chromix/src"
+    if os.name == "nt" and work.resolve().as_posix().casefold() != "c:/c/chromix":
+        raise ValueError("compiled Windows checkpoint root must remain C:/c/chromix")
+    overlay = ('# Windows157 fresh native build; never disable PGO for tarball sources.\n'
+               'chrome_pgo_phase = 2\nhost_cpu = "x64"\n'
+               f'v8_metagen_libclang_so = "{prefix}/third_party/llvm-build/Release+Asserts/bin/libclang.dll"\n'
+               f'v8_metagen_libclang_bindings_dir = "{prefix}/third_party/llvm-build/Release+Asserts/bindings/python"\n')
+    if files._file(work, "windows157-native.gn").read_text() != overlay:
+        raise ValueError("retained compiled GN canonical overlay differs from donor")
+    inputs = [work / "tooling/ungoogled-chromium/flags.gn",
+              work / "tooling/ungoogled-chromium-windows/flags.windows.gn",
+              view / "build/args.windows.gn", work / "windows157-native.gn"]
+    keys, values = [], {}
+    for path in inputs:
+        order, parsed = merge_gn_args.parse(path)
+        keys.extend(key for key in order if key not in keys)
+        values.update(parsed)
+    expected = "\n".join([merge_gn_args.GENERATED_HEADER, *[values[key] for key in keys]]) + "\n"
+    if files._file(work / "src", "out/Chromix/args.gn").read_text() != expected:
+        raise ValueError("retained compiled GN arguments differ from exact recipe")
 
 
 def compiled_contract(work, m, *, migrated=False):
@@ -289,10 +317,7 @@ def compiled_contract(work, m, *, migrated=False):
     for name in ("build.ninja", "args.gn", "gn.exe", ".ninja_log", ".ninja_deps"):
         if files._file(out, name).stat().st_size == 0:
             raise ValueError("compiled checkpoint lacks retained GN/Ninja state")
-    if not files._file(out, ".ninja_log").read_bytes().startswith(b"# ninja log v5\n"):
-        raise ValueError("unsupported retained Ninja log")
-    if not files._file(out, ".ninja_deps").read_bytes().startswith(b"# ninjadeps\n"):
-        raise ValueError("unsupported retained Ninja deps")
+    ninja_state.validate(out, files._file(src, "third_party/ninja/ninja.exe"))
     if not any(p.is_file() and p.stat().st_size > 0 for p in (out / "obj").rglob("*.obj")):
         raise ValueError("compiled checkpoint has no objects")
     args = files._file(out, "args.gn").read_text()
@@ -418,9 +443,16 @@ def source_stack(repo, work, m):
     stack = [(n, bytes.fromhex(b), [tuple(e) for e in entries]) for n, b, entries in data["stack"]]
     lite = {n: (bytes.fromhex(b), mode) for n, (b, mode) in data["lite"].items()}
     old = m["source_receipt"]["identity"]
-    for key in ("lite", "regex", "list"):
-        if identity[key] != old[key]:
-            raise ValueError("compiled domain/lite inputs changed: " + key)
+    if identity["lite"] != old["lite"]:
+        raise ValueError("compiled domain/lite inputs changed: lite")
+    for key, root, filename in (("regex", core, "domain_regex.list"),
+                                ("list", tooling, "domain_substitution.list")):
+        expected_path = "C:/c/chromix/tooling/" + root.name + "/" + filename
+        if (old[key]["path"].replace("\\", "/") != expected_path
+                or identity[key]["path"] != str(root / filename)
+                or identity[key]["sha256"] != old[key]["sha256"]):
+            raise ValueError("compiled domain tooling path/hash changed: " + key)
+        identity[key] = dict(old[key])
     if identity["series"]["patches"][:232] != old["series"]["patches"]:
         raise ValueError("effective domain-substituted Windows232 prefix changed")
     for name, (raw, _) in lite.items():
@@ -429,12 +461,12 @@ def source_stack(repo, work, m):
     return identity, stack, core, tooling
 
 
-def migrate(repo, view, work, m, target_sha):
+def preflight(repo, view, work, m):
     src = work / "src"
     if (work / RECEIPT).exists():
         raise ValueError("compiled migration already applied")
     out = compiled_contract(work, m)
-    origin.gn_contract(view, work)
+    retained_gn_contract(view, work)
     state = output_state(src / "out")
     host_paths = ("out/Chromix/gn.exe", "third_party/ninja/ninja.exe", "third_party/rust-toolchain/bin/bindgen.exe",
                   tools.CRUBIT_ROOT + "/bin/cc_bindings_from_rs.exe", "third_party/llvm-build/Release+Asserts/bin/clang-cl.exe",
@@ -463,6 +495,21 @@ def migrate(repo, view, work, m, target_sha):
     if output_state(src / "out") != state:
         raise ValueError("compiled outputs changed during private replay")
     files._unchanged(src, original_state)
+    return {"before": before, "revised": revised, "identity": identity, "state": state,
+            "host_state": host_state, "host_hashes": host_hashes, "protected": protected,
+            "original_state": original_state, "observed_receipts": observed_receipts,
+            "ninja_state": ninja_state.validate(out, src / "third_party/ninja/ninja.exe")}
+
+
+def migrate(repo, view, work, m, target_sha):
+    verified = preflight(repo, view, work, m)
+    src = work / "src"
+    out = src / "out/Chromix"
+    before, revised = verified["before"], verified["revised"]
+    identity, state = verified["identity"], verified["state"]
+    host_state, host_hashes = verified["host_state"], verified["host_hashes"]
+    protected, observed_receipts = verified["protected"], verified["observed_receipts"]
+    files._unchanged(src, verified["original_state"])
     backup = work / "windows157-compiled-origin"
     backup.mkdir()
     for name in TARGETS:
@@ -486,6 +533,7 @@ def migrate(repo, view, work, m, target_sha):
                    previous_preparation_key=m["old_preparation_key"], changed_source_files=list(TARGETS),
                    source=report, output_files=len(state), outputs_preserved=True, host_hashes=host_hashes,
                    prior_source_receipts=observed_receipts,
+                   ninja_state=verified["ninja_state"],
                    consumer_run_id=os.environ.get("GITHUB_RUN_ID"), consumer_attempt=os.environ.get("GITHUB_RUN_ATTEMPT"))
     atomic_bytes(work / RECEIPT, (json.dumps(receipt, sort_keys=True, indent=2) + "\n").encode())
     diagnostic = work / "fingerprint-diagnostics/windows157-compiled-source.json"
@@ -504,7 +552,7 @@ def migrate(repo, view, work, m, target_sha):
 
 def resume(repo, view, work, m, sha):
     compiled_contract(work, m, migrated=True)
-    origin.gn_contract(view, work)
+    retained_gn_contract(view, work)
     receipt = json.loads(files._file(work, RECEIPT).read_text())
     key = preparation_key(view)
     if (receipt.get("status") != "migrated" or receipt.get("target_sha") != sha or receipt.get("donor") != expected(m)
@@ -529,6 +577,14 @@ def resume(repo, view, work, m, sha):
                         "--platform-tooling", str(work / "tooling/ungoogled-chromium-windows"),
                         "--platform", "windows", "--output", str(report)], check=True, timeout=600)
         actual = json.loads(report.read_text())
+    for key, folder, filename in (("regex", "ungoogled-chromium", "domain_regex.list"),
+                                   ("list", "ungoogled-chromium-windows", "domain_substitution.list")):
+        old = receipt["source"]["identity"][key]
+        if (actual["identity"][key]["sha256"] != old["sha256"]
+                or actual["identity"][key]["path"] != str(work / "tooling" / folder / filename)
+                or old["path"].replace("\\", "/") != "C:/c/chromix/tooling/" + folder + "/" + filename):
+            raise ValueError("continuation tooling identity path/hash changed")
+        actual["identity"][key] = dict(old)
     if actual["outputs"] != receipt["source"]["outputs"] or actual["identity"] != receipt["source"]["identity"]:
         raise ValueError("complete continuation source proof mismatch")
     return receipt
@@ -583,6 +639,20 @@ def main():
             json.dump(result, stream, sort_keys=True, indent=2)
         return 0
     except (OSError, ValueError, RuntimeError, subprocess.SubprocessError) as error:
+        failure = {"status": "rejected", "phase": args.phase, "error_type": type(error).__name__,
+                   "error": str(error)}
+        if args.workdir:
+            log = args.workdir / "src/out/Chromix/.ninja_log"
+            if log.is_file() and not log.is_symlink():
+                with log.open("rb") as stream:
+                    prefix = stream.read(64)
+                failure["ninja_log_header"] = ninja_state.header_diagnostic(prefix)
+        try:
+            args.report.parent.mkdir(parents=True, exist_ok=True)
+            with args.report.open("x", encoding="utf-8") as stream:
+                json.dump(failure, stream, sort_keys=True, indent=2)
+        except OSError:
+            pass
         print(f"Windows157 compiled checkpoint rejected: {error}", file=sys.stderr)
         return 1
 

@@ -104,7 +104,7 @@ def test_exact_root224_old232_prefix_and_three_new_files():
 def test_real_windows232_and235_full_reverse_forward_preserves_outputs(tmp_path):
     src=source_tree(tmp_path.resolve()/'src');m=recovery.load(ROOT)
     recovery.verify_hashes(src,m['source_receipt']['outputs'])
-    for n,b in [('out/Chromix/args.gn',b'chrome_pgo_phase=2'),('out/Chromix/.ninja_log',b'# ninja log v5\n'),
+    for n,b in [('out/Chromix/args.gn',b'chrome_pgo_phase=2'),('out/Chromix/.ninja_log',b'# ninja log v6\n'),
                 ('out/Chromix/obj/keep.obj',b'compiled object'),('out/Chromix/build.ninja',b'build chrome: phony')]:
         p=src/n;p.parent.mkdir(parents=True,exist_ok=True);p.write_bytes(b)
     state=recovery.output_state(src/'out')
@@ -201,8 +201,8 @@ def test_full_compiled_transaction_preserves_pgo_gn_objects_and_commits235(tmp_p
     put(core/'flags.gn',FIXTURE['core_flags']);put(tooling/'flags.windows.gn',FILES['windows/flags.windows.gn']['text'])
     put(core/'domain_regex.list',RAW['domain_regex']);put(tooling/'domain_substitution.list',RAW['domain_lists']['windows'])
     overlay=('# Windows157 fresh native build; never disable PGO for tarball sources.\nchrome_pgo_phase = 2\nhost_cpu = "x64"\n'
-             f'v8_metagen_libclang_so = {json.dumps((src/"third_party/llvm-build/Release+Asserts/bin/libclang.dll").as_posix())}\n'
-             f'v8_metagen_libclang_bindings_dir = {json.dumps((src/"third_party/llvm-build/Release+Asserts/bindings/python").as_posix())}\n')
+             f'v8_metagen_libclang_so = {json.dumps("C:/c/chromix/src/third_party/llvm-build/Release+Asserts/bin/libclang.dll")}\n'
+             f'v8_metagen_libclang_bindings_dir = {json.dumps("C:/c/chromix/src/third_party/llvm-build/Release+Asserts/bindings/python")}\n')
     put(work/'windows157-native.gn',overlay)
     order=[];values={}
     for p in [core/'flags.gn',tooling/'flags.windows.gn',view/'build/args.windows.gn',work/'windows157-native.gn']:
@@ -213,8 +213,14 @@ def test_full_compiled_transaction_preserves_pgo_gn_objects_and_commits235(tmp_p
               recovery.tools.CRUBIT_ROOT+'/bin/cc_bindings_from_rs.exe',
               'third_party/llvm-build/Release+Asserts/bin/clang-cl.exe',
               'third_party/llvm-build/Release+Asserts/bin/llvm-profdata.exe']:put(src/n,pe)
-    put(src/'out/Chromix/build.ninja','build chrome: phony\n');put(src/'out/Chromix/.ninja_log','# ninja log v5\n1\t2\t3\tobj/keep.obj\tdeadbeef\n')
-    put(src/'out/Chromix/.ninja_deps',b'# ninjadeps\n\x04\x00\x00\x00');put(src/'out/Chromix/obj/keep.obj',b'preserved object')
+    import base64, io, zipfile
+    actual = json.loads(gzip.decompress((ROOT/'tools/tests/fixtures/windows157_ninja_donor.json.gz').read_bytes()))
+    ninja = zipfile.ZipFile(io.BytesIO(base64.b64decode(actual['official_ninja_zip_base64']))).read('ninja.exe')
+    put(src/'third_party/ninja/ninja.exe',ninja)
+    put(src/'out/Chromix/build.ninja','build chrome: phony\n')
+    put(src/'out/Chromix/.ninja_log',actual['log']['text'])
+    put(src/'out/Chromix/.ninja_deps',base64.b64decode(actual['deps']['prefix_base64']))
+    put(src/'out/Chromix/obj/third_party/abseil-cpp/absl/base/base/casts.obj',b'preserved object')
     profile=recovery.tools.PGO['x64'];put(src/'chrome/build/win64.pgo.txt',profile+'\n');put(src/'chrome/build/pgo_profiles'/profile,b'profile fixture')
     put(src/'chrome/build/pgo_profiles'/(profile+'.chromix-sha256'),recovery.digest(b'profile fixture')+'\n')
     markers={'.chromix-source-unpacked':m['version'],'.chromix-ungoogled-core':m['core'],'.chromix-ungoogled-windows':m['windows'],
