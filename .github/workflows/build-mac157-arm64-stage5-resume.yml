@@ -1,0 +1,40 @@
+name: build-mac157-arm64-stage5-resume
+run-name: macOS157 ARM64 stage5 ICU/UA source migration (228 to 231)
+
+on:
+  workflow_dispatch:
+    inputs:
+      compile_jobs:
+        description: 'Ninja jobs; exact stage5 donor, three-file migration and original GN/PGO are fixed'
+        type: string
+        default: '3'
+
+permissions:
+  actions: read
+  contents: read
+
+concurrency:
+  group: mac157-arm64-stage5-resume-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  resume:
+    if: github.ref == 'refs/heads/main'
+    name: macOS157 ARM64 (exact stage5 ICU/UA migration, compile-release)
+    uses: ./.github/workflows/build-mac157-arm64-stage5-stages.yml
+    with:
+      platform: macos
+      arch: arm64
+      runner: macos-26
+      artifact: chromix-mac157-arm64-stage5-resume
+      max-stages: 8
+      build_profile: fast
+      compile_jobs: ${{ inputs.compile_jobs || '3' }}
+      resume_migration: mac157-arm64-stage5
+      resume_run_id: '44567777209'
+      resume_tree_stage: '5'
+      resume_attempt: '1'
+      resume_artifact_ids: '14626292942'
+      use_upstream_cache: true
+      macos_compile_release: true
+    secrets: inherit
