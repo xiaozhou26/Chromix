@@ -1193,6 +1193,11 @@
         "path": "patches/chromium157-additions/0238-user-agent-version-header.patch",
         "sha256": "dd22d5decfdb675477ce8d1379b7b1eaf2153f5cd0fb6dbb2de47135fc8a9561",
         "kind": "direct-header-compatibility"
+      },
+      {
+        "path": "patches/chromium157-additions/0239-linux-disabled-private-verification-token-protocol.patch",
+        "sha256": "e13445e9782b72a400ff8e4c5bd42c7162db033252c1245b1c828cbf05cbdbb4",
+        "kind": "linux-disabled-feature-protocol"
       }
     ],
     "windows": [
@@ -1304,7 +1309,7 @@
   },
   "fixture": {
     "path": "tools/tests/fixtures/chromium157_patch_sources.json.gz",
-    "sha256": "6687b61d4b1b4de11df44013e8eb70872d80f0051644bab577ce299ac826e999"
+    "sha256": "a53ab5f689310b352acbf4d32b641cfb6e1c46156de64416a83e5491c3b7e86f"
   },
   "historical_files": [
     {

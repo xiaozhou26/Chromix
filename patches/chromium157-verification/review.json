@@ -5,14 +5,15 @@
   "core_tag_object": "33eece1eb0b5286bf71e732fbbad7a46faface5a",
   "core_peeled_commit": "8c886dffc6ade39d8f7df5d64ace5a8824b455e1",
   "chromium_commit": "4b3d0dabb8250b6f152d2d85d79e7706e309d087",
-  "scope": "Append exact157 direct base/version.h include repair0238 to every platform; preserve root224,156 and all prior157 patch bytes, including0236/0237. Update fixed selector hashes and replay evidence; latest228-to229 donor migration remains separate.",
+  "scope": "Append Linux-only0239 to synchronize the already disabled downstream PVT implementation with source PDL and protocol generation configs. No stubs, no unrelated CDP removals; retain root224,156 and every prior157 patch byte and checkpoint profile.",
   "verification_limits": [
     "Full Linux downstream platform sequence is replayed, nine patches covering all36 target files. Core replay is the exact intersecting-file subset, not all827 core sections.",
     "Linux x64 complete timezone_controller.cc, default_icu_locale.cc and icu4c_tag_converter.cc compile with the restored official commands; relocatable link resolves new setter/converter symbols. No full browser link or runtime execution. Complete user_agent_utils.cc additionally verified before/after0238 with exact run44630942999 donor command.",
+    "Latest Linux ARM64 run44660206036 stage5 donor reproduces five missing pure virtual methods; exact GN protocol generation and both complete chrome_devtools_session.o/storage_handler.o compile after0239. Official AArch64 ThinLTO retained; no browser link/runtime claim.",
     "x64/arm64 share source patches; this is not six native builds.",
     "Linux uses authorized156 platform configuration baseline plus explicit157 core override and pinned downstream recipe, not an official portablelinux157 tag.",
     "No core-only diagnostic cases count toward success.",
-    "Windows/macOS preserve previous source scope and overlay intersections; ten exact157 API/initialization source files added for locale review. Two exact157 Version declaration headers added for0238 audit.",
+    "Windows/macOS previous replay cases are identical. Six exact157 protocol/session/generation source files added for0239 review; no additional predecessor intersections. Linux-only PVT schema removal does not apply to the enabled Windows/macOS implementation.",
     "No push or workflow dispatch."
   ],
   "final_overrides": {
@@ -62,7 +63,8 @@
     "all": "All previously reviewed patch bytes are unchanged. New0238 adds only the direct base/version.h include; no source behavior changes.",
     "0236": "Forward-declare and friend only blink::TimeZoneController in DefaultIcuLocaleSetterKey. Constructor remains private; existing authorized callers unchanged.",
     "0237": "Keep first-language parsing, ICU validity guards and initialization order. Convert validated ICU locale through IcuLocaleConverter and call SetDefaultIcuLocale to update both holder and ICU. No DevTools override acquisition or timezone policy changes.",
-    "0238": "user_agent_utils.cc constructs base::Version but its transitive version_info.h only forward-declares the class. Include its defining base/version.h directly; preserve all UA normalization and override behavior."
+    "0238": "user_agent_utils.cc constructs base::Version but its transitive version_info.h only forward-declares the class. Include its defining base/version.h directly; preserve all UA normalization and override behavior.",
+    "0239": "Linux156 downstream PVT removal rebased to157 deletes all five StorageHandler methods but omits PDL/config changes. Core157 and Windows/macOS do not remove PVT. Remove only these five experimental commands, two exclusive types and one event on Linux; keep all other schema and handlers unchanged."
   },
   "upstream_duplicate_checks": {
     "managed_profile": "Exact157 core still removes managed_profile_creation_controller sources;0225 remains needed. Verified exactly one final .cc entry.",
@@ -72,7 +74,7 @@
     "canvas": "Upstream157 initialization CHECK and shuffle call retained; no duplicate helper definition introduced."
   },
   "platform_patch_counts": {
-    "linux": 229,
+    "linux": 230,
     "macos": 231,
     "windows": 235
   },
@@ -104,6 +106,11 @@
         "path": "patches/chromium157-additions/0238-user-agent-version-header.patch",
         "sha256": "dd22d5decfdb675477ce8d1379b7b1eaf2153f5cd0fb6dbb2de47135fc8a9561",
         "kind": "direct-header-compatibility"
+      },
+      {
+        "path": "patches/chromium157-additions/0239-linux-disabled-private-verification-token-protocol.patch",
+        "sha256": "e13445e9782b72a400ff8e4c5bd42c7162db033252c1245b1c828cbf05cbdbb4",
+        "kind": "linux-disabled-feature-protocol"
       }
     ],
     "windows": [
@@ -254,38 +261,40 @@
     "recipe_sha256": "42d788d91c0ec2345c253044665af7f623501a73c8bdb627a94d1739790aeb11",
     "qualification": "Authorized old platform baseline plus exact157 core override and all nine downstream replacements; not an official portablelinux157 tag."
   },
-  "review_manifest_sha256": "5a2676ef54db9a90064fb45018d2c4420ed142a0ff9a694f1a45d1165cc15bf3",
+  "review_manifest_sha256": "ca3c49ce3f469b6ef85c3bd669e8d68487ce8eb5a13c7b32ed9d71da9a6db990",
   "linux_full_platform_coverage": {
-    "raw_source_files": 204,
+    "raw_source_files": 210,
     "platform_files": 36,
     "core_sections": 43,
     "platform_patches": 9,
     "platform_sections": 36,
-    "chromix_patches": 229,
-    "combined_roundtrip_patches": 238,
+    "chromix_patches": 230,
+    "combined_roundtrip_patches": 239,
     "domain_modes": [
       "raw",
       "substituted"
     ],
     "post_core_preimages": "Every36 platform source bytes must equal independently audited fixture before any replacement.",
-    "sequential_checks": "Each of9 exact pre/post SHA256 maps plus final_outputs checked; all9 platform reverse/forward and combined238 reverse/forward verified.",
+    "sequential_checks": "Each of9 exact pre/post SHA256 maps plus final_outputs checked; all9 platform reverse/forward and combined239 reverse/forward verified.",
     "policy": "Retains157 native WebBundle/IFT and Rust/Crubit assertions, Node version check and native TypeScript recipe. Full GN/link compatibility remains unverified."
   },
   "regression_tests": {
-    "passed": 723,
-    "skipped": 10,
+    "passed": 785,
+    "skipped": 26,
     "groups": {
-      "157_selector_locale_and_ua": "333 passed, 2 skipped",
-      "historical156_old_locale_and_ua_behavior": "390 passed, 8 skipped"
+      "full_157_protocol_selector_locale_ua_and_historical156": "785 passed,26 skipped",
+      "final_protocol_tests": "8 passed,2 skipped",
+      "latest_donor_native_tests": "2 passed,8 deselected"
     },
-    "skip_reason": "Optional native/source/donor inputs and historical unsupported macOS155 cases; native UA is verified separately on the actual donor.",
+    "skip_reason": "Optional native/donor environment variables and historical unsupported macOS155 cases; real latest donor native tests are run separately.",
     "negative_checks": [
-      "old228 patch prefix and bytes preserved",
-      "old226-to228 locale migration rejects229 target",
-      "platform-specific addition replacement rejected after reauthentication",
-      "UA behavior bytes unchanged after removing only new direct include"
+      "exact five abstract methods reproduced before repair",
+      "all unrelated parsed protocol declarations and JSON domains unchanged",
+      "Linux-only addition rejected for macOS/Windows",
+      "old226/228/229 recovery rejects230; historical229 UA positive validation retained",
+      "all previous patch bytes unchanged"
     ],
-    "native_separate_passed": 1
+    "native_separate_passed": 2
   },
   "locale_api_evidence": {
     "baseline_commit": "38f35ce29d6e1d02dde1d041f5a745d84cfbba9b",
@@ -454,5 +463,180 @@
     "before_diagnostics": "../../components/embedder_support/user_agent_utils.cc:166:19: error: variable has incomplete type 'base::Version'\n  166 |     base::Version parsed_version(override_version);\n      |                   ^\n../../base/version_info/version_info.h:18:7: note: forward declaration of 'base::Version'\n   18 | class Version;\n      |       ^\n../../components/embedder_support/user_agent_utils.cc:181:23: error: variable has incomplete type 'const base::Version'\n  181 |   const base::Version parsed(version);\n      |                       ^\n../../base/version_info/version_info.h:18:7: note: forward declaration of 'base::Version'\n   18 | class Version;\n      |       ^\n../../components/embedder_support/user_agent_utils.cc:197:19: error: variable has incomplete type 'base::Version'\n  197 |     base::Version version(GetEffectiveUserAgentFullVersion());\n      |                   ^\n../../base/version_info/version_info.h:18:7: note: forward declaration of 'base::Version'\n   18 | class Version;\n      |       ^\n../../components/embedder_support/user_agent_utils.cc:259:43: error: 'base::Version' is an incomplete type\n  259 |             ? full : base::NumberToString(base::Version(full).components()[0]);\n      |                                           ^\n../../base/version_info/version_info.h:18:7: note: forward declaration of 'base::Version'\n   18 | class Version;\n      |       ^\n../../components/embedder_support/user_agent_utils.cc:259:62: error: member access into incomplete type 'base::Version'\n  259 |             ? full : base::NumberToString(base::Version(full).components()[0]);\n      |                                                              ^\n../../base/version_info/version_info.h:18:7: note: forward declaration of 'base::Version'\n   18 | class Version;\n      |       ^\n5 errors generated.\n",
     "native_pytest": "1 passed, 8 deselected",
     "scope": "Complete user_agent_utils.cc compiled twice with the latest donor command, failing before and passing after0238; only output/depfile redirected. No added -I or fake headers; no full browser link/runtime claim."
+  },
+  "storage_protocol_evidence": {
+    "platforms": [
+      "linux-x64",
+      "linux-arm64"
+    ],
+    "donor_run": 44660206036,
+    "donor_attempt": 1,
+    "donor_stage": 5,
+    "donor_job": 136134564115,
+    "donor_source_commit": "289d5730627d86acf55f9a1b3770dbd4ecd0e025",
+    "donor_artifact": 14608249261,
+    "artifact_sha256": "e561a6a26a3a2682d28a9d869fb635d0dc795ec9e8fe7340986708874e9e8e7d",
+    "source_files": {
+      "third_party/blink/public/devtools_protocol/domains/Storage.pdl": {
+        "pre_sha256": "890c5f2c2cdb4d685f53244d66e201ebf47a49a1ff47b488329dc6f87bd40477",
+        "post_sha256": "f98ead822a7b34660096807d3886535b99f3de5806dc21a61c543683ab98dc7f"
+      },
+      "chrome/browser/devtools/inspector_protocol_config.json": {
+        "pre_sha256": "449d07d778c0a65bf4ba6d6324dd540ec31a47f96bd6113f19c9871f3d100ca7",
+        "post_sha256": "b5dcd72c16b4f41fd586860218b6bf8e8340b4446039bb6febcb4c423127a5b3"
+      },
+      "content/browser/devtools/protocol_config.json": {
+        "pre_sha256": "1b613ae8f136895502117c37e8ae298d8c5aa465451dc1088483df35d4e7d4ef",
+        "post_sha256": "d6583c5f4da418a214756c50fd0e7e9d8975bb53c05740983e6ad431678c0fbe"
+      }
+    },
+    "native_status": "verified",
+    "migration_policy": "Existing226/228/229 checkpoint admissions are unchanged and must reject230. No donor migration, push or dispatch authorized here.",
+    "native": {
+      "donor_run": 44660206036,
+      "donor_artifact": 14608249261,
+      "before_returncode": 1,
+      "allowed_compile_command_changes": [
+        "-o",
+        "-MF"
+      ],
+      "added_include_flags": [],
+      "compiler_sha256": "8091a95554f24a2affa32c80e884c3d36960c5d971560d3410391ffc36af19a7",
+      "source_files": {
+        "third_party/blink/public/devtools_protocol/domains/Storage.pdl": {
+          "pre_sha256": "890c5f2c2cdb4d685f53244d66e201ebf47a49a1ff47b488329dc6f87bd40477",
+          "post_sha256": "f98ead822a7b34660096807d3886535b99f3de5806dc21a61c543683ab98dc7f"
+        },
+        "chrome/browser/devtools/inspector_protocol_config.json": {
+          "pre_sha256": "449d07d778c0a65bf4ba6d6324dd540ec31a47f96bd6113f19c9871f3d100ca7",
+          "post_sha256": "b5dcd72c16b4f41fd586860218b6bf8e8340b4446039bb6febcb4c423127a5b3"
+        },
+        "content/browser/devtools/protocol_config.json": {
+          "pre_sha256": "1b613ae8f136895502117c37e8ae298d8c5aa465451dc1088483df35d4e7d4ef",
+          "post_sha256": "d6583c5f4da418a214756c50fd0e7e9d8975bb53c05740983e6ad431678c0fbe"
+        }
+      },
+      "generated_commands_removed": [
+        "clearPrivateVerificationTokens",
+        "deletePrivateVerificationToken",
+        "getPrivateVerificationTokens",
+        "getPrivateVerificationTokensIssuerConfigs",
+        "setPrivateVerificationTokensTracking"
+      ],
+      "unrelated_protocol_unchanged": true,
+      "objects": {
+        "chrome_devtools_session": {
+          "returncode": 0,
+          "bytes": 37088,
+          "sha256": "4a741a9af171ba5e10aac78933067150a760fb8c55e2024a51cbb56fc656cdac",
+          "machine": "AArch64 ThinLTO bitcode",
+          "command_sha256": "9834c9265c7afbc90ceb666763e1e77975496aefb0bdefe5520a81df965ef850"
+        },
+        "storage_handler": {
+          "returncode": 0,
+          "bytes": 19160,
+          "sha256": "905256cbc08de7ea69c2fdef950a5c2759b6e7a9acc1250b3a41097f3cc36481",
+          "machine": "AArch64 ThinLTO bitcode",
+          "command_sha256": "2f3c31fdc07be81a0a3b4971269b872fd5bab0291df08f184fe569cf49662c1d"
+        }
+      },
+      "unrelated_out_unchanged": true,
+      "preserved_out_file_count": 236475,
+      "protected_out_hashes": {
+        "args.gn": "86f17f04fabdf51870a48f54d0d04f01c85752fdb420587a6b6c29d90101a793",
+        "build.ninja": "56ea4c4547d39802d9a2478136a67e973b14ab341697cdf37f2c6cb0d135e06a",
+        "obj/build/modules/system/module.pcm": "985046e29f19faf5291f6f9fa7c5faca632b53c010a3a72ab3bb20fadbbacfa4",
+        "obj/components/embedder_support/user_agent/user_agent_utils.o": "530a21df6994f9d2e659a83730d25e3c6adcef390900c0fe88f5323985c21bfe"
+      },
+      "changed_generated_files": [
+        "gen/chrome/browser/devtools/protocol.json",
+        "gen/chrome/browser/devtools/protocol/storage.cc",
+        "gen/chrome/browser/devtools/protocol/storage.h",
+        "gen/content/browser/devtools/protocol.json",
+        "gen/content/browser/devtools/protocol/storage.cc",
+        "gen/content/browser/devtools/protocol/storage.h",
+        "gen/third_party/blink/public/devtools_protocol/protocol.json"
+      ],
+      "generated_hashes": {
+        "gen/third_party/blink/public/devtools_protocol/protocol.json": "0c158a28fab3e2071ce672d5ccb435673afbe83043ca44c7625dac14ca17ca52",
+        "gen/content/browser/devtools/protocol.json": "0c158a28fab3e2071ce672d5ccb435673afbe83043ca44c7625dac14ca17ca52",
+        "gen/content/browser/devtools/protocol/storage.cc": "fcbb66a60a5613796c10cd54494e184d2d7c248b00d7c00835fef2cdf992133a",
+        "gen/chrome/browser/devtools/protocol.json": "0c158a28fab3e2071ce672d5ccb435673afbe83043ca44c7625dac14ca17ca52",
+        "gen/chrome/browser/devtools/protocol/storage.cc": "d2fd55a04557bf814ca34ab1452945ab476085eb9347e140ea98b34d7c1dff0f",
+        "gen/chrome/browser/devtools/protocol/storage.h": "fea94c7fa8d73715c46e634c62a1fc5350f712d69b3596d29f559687c9f02f09",
+        "gen/content/browser/devtools/protocol/storage.h": "1309c6cdfea7b2af8df9b1e10214d1a2dfd9a0b0ca733c22089d8f25fb7e67e1"
+      },
+      "unchanged_generated_mtimes_preserved": 96
+    },
+    "generation_commands": [
+      "python3 ../../third_party/inspector_protocol/check_protocol_compatibility.py --stamp gen/third_party/blink/public/devtools_protocol/browser_protocol.stamp ../../third_party/blink/public/devtools_protocol/browser_protocol.pdl ../../v8/include/js_protocol.pdl",
+      "python3 ../../third_party/inspector_protocol/concatenate_protocols.py ../../third_party/blink/public/devtools_protocol/browser_protocol.pdl ../../v8/include/js_protocol.pdl gen/third_party/blink/public/devtools_protocol/protocol.json",
+      "python3 ../../third_party/inspector_protocol/concatenate_protocols.py gen/third_party/blink/public/devtools_protocol/protocol.json gen/chrome/browser/devtools/protocol.json",
+      "python3 ../../third_party/inspector_protocol/code_generator.py --jinja_dir ../../third_party --output_base gen/chrome/browser/devtools --config ../../chrome/browser/devtools/inspector_protocol_config.json --inspector_protocol_dir //third_party/inspector_protocol --depfile gen/chrome/browser/devtools/protocol_generated_sources.d --stamp gen/chrome/browser/devtools/protocol/protocol.h --config_value use_embedder_types=true --config_value protocol.path=gen/chrome/browser/devtools/protocol.json",
+      "python3 ../../third_party/inspector_protocol/concatenate_protocols.py gen/third_party/blink/public/devtools_protocol/protocol.json gen/content/browser/devtools/protocol.json",
+      "python3 ../../third_party/inspector_protocol/code_generator.py --jinja_dir ../../third_party --output_base gen/content/browser/devtools --config ../../content/browser/devtools/protocol_config.json --inspector_protocol_dir //third_party/inspector_protocol --depfile gen/content/browser/devtools/protocol_sources.d --stamp gen/content/browser/devtools/protocol/audits.cc --config_value use_embedder_types=true --config_value protocol.path=gen/content/browser/devtools/protocol.json"
+    ],
+    "generation_policy": "Use unchanged donor GN graph: compatibility check, concatenate PDL and generate Chrome/content protocol. Only seven generated files change bytes; restore mtimes for96 byte-identical generator siblings. Compile only requested session/storage objects with exact donor commands, redirect -o/-MF outside out. No GN regeneration or out deletion.",
+    "donor_roundtrip": {
+      "status": "verified",
+      "donor_run": 44660206036,
+      "old_count": 229,
+      "new_count": 230,
+      "source_count": 172,
+      "old_and_new_full_reverse_forward": true,
+      "source_and_out_untouched": true,
+      "out_file_count": 236482
+    },
+    "limits": "Actual latest Linux ARM64 donor and official AArch64 ThinLTO objects verified on Linux x64 compiler host. No full browser link, runtime CDP transport, Linux x64 object compilation or Windows/macOS build claim. Old229 checkpoint migration remains a separate unapproved operation.",
+    "evidence_files": {
+      "native/native.json": {
+        "sha256": "b32a927d9207942ae7743ad40a2897f67701b3557ea88a221f083455f2df18ea",
+        "bytes": 3820
+      },
+      "native/generation-commands.txt": {
+        "sha256": "134b9c339ff9d816db26dc472528a6536b276ece785400beb4c09d1e2b4a8c64",
+        "bytes": 1815
+      },
+      "native/chrome_devtools_session-before.log": {
+        "sha256": "d94a25a16b36264de44bbddf4dc96f76b5e148acfeb7982dbdecfae9cba30fab",
+        "bytes": 2638
+      },
+      "native/chrome_devtools_session-command.txt": {
+        "sha256": "9834c9265c7afbc90ceb666763e1e77975496aefb0bdefe5520a81df965ef850",
+        "bytes": 11066
+      },
+      "native/storage_handler-command.txt": {
+        "sha256": "2f3c31fdc07be81a0a3b4971269b872fd5bab0291df08f184fe569cf49662c1d",
+        "bytes": 11051
+      },
+      "donor-roundtrip.json": {
+        "sha256": "c71e482399ad33c81e8fc735f87821e71dd20511004152321e78814261b3737b",
+        "bytes": 23156
+      },
+      "native.py": {
+        "sha256": "75e55619f56804c31977d6a7a684591eca1ce899cdc1917356598d9c76486a6f",
+        "bytes": 7017
+      },
+      "donor-roundtrip.py": {
+        "sha256": "4c4b42daf03b0acd1bdc2b56a806acd48f99816c3d54751e5bdc6a0d4ffaf6d7",
+        "bytes": 3059
+      },
+      "native-tests.log": {
+        "sha256": "b86a72b6ac3cff86f125dc92bf51ac8dc57ac88daeb95354703e99f40c4f6aa7",
+        "bytes": 113
+      },
+      "regression-final.log": {
+        "sha256": "36c71491cb79b28ff8791be16459eac1bbca90932b1a6169855675ddf842330a",
+        "bytes": 1004
+      },
+      "protocol-final.log": {
+        "sha256": "5e1028e6f41ead5a23ebd5afdf53b44801c47f26b1fb832be1f962ea3d748067",
+        "bytes": 109
+      }
+    },
+    "regression_results": {
+      "local": "8 passed,2 skipped",
+      "native": "2 passed,8 deselected"
+    }
   }
 }

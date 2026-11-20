@@ -1432,6 +1432,48 @@
       "revision": "4b3d0dabb8250b6f152d2d85d79e7706e309d087",
       "sha256": "e4e286ddc4b778a11161381eb60be02ba6bb049566d7023852a6620816010959",
       "url": "https://chromium.googlesource.com/chromium/src/+/4b3d0dabb8250b6f152d2d85d79e7706e309d087/base/version_info/version_info.h?format=TEXT"
+    },
+    "chrome/browser/devtools/chrome_devtools_session.cc": {
+      "bytes": 6476,
+      "git_blob": "a93a5d26c146eaa90f89294a804bf74ace3439de",
+      "revision": "4b3d0dabb8250b6f152d2d85d79e7706e309d087",
+      "sha256": "aa83643fd9f7ac1b11b78e78e96c0e4c22160cbf565ff2642edfc432192fbeca",
+      "url": "https://chromium.googlesource.com/chromium/src/+/4b3d0dabb8250b6f152d2d85d79e7706e309d087/chrome/browser/devtools/chrome_devtools_session.cc?format=TEXT"
+    },
+    "chrome/browser/devtools/inspector_protocol_config.json": {
+      "bytes": 3644,
+      "git_blob": "c972f74e20b4cdab52eb3250195515e85052f026",
+      "revision": "4b3d0dabb8250b6f152d2d85d79e7706e309d087",
+      "sha256": "449d07d778c0a65bf4ba6d6324dd540ec31a47f96bd6113f19c9871f3d100ca7",
+      "url": "https://chromium.googlesource.com/chromium/src/+/4b3d0dabb8250b6f152d2d85d79e7706e309d087/chrome/browser/devtools/inspector_protocol_config.json?format=TEXT"
+    },
+    "content/browser/devtools/protocol_config.json": {
+      "bytes": 12368,
+      "git_blob": "d5ffdcfd662a795102ffe0e0f830305292a7a8ca",
+      "revision": "4b3d0dabb8250b6f152d2d85d79e7706e309d087",
+      "sha256": "1b613ae8f136895502117c37e8ae298d8c5aa465451dc1088483df35d4e7d4ef",
+      "url": "https://chromium.googlesource.com/chromium/src/+/4b3d0dabb8250b6f152d2d85d79e7706e309d087/content/browser/devtools/protocol_config.json?format=TEXT"
+    },
+    "third_party/blink/public/devtools_protocol/BUILD.gn": {
+      "bytes": 3989,
+      "git_blob": "4a061691cbc677243444491ab9d1faf85fb71b61",
+      "revision": "4b3d0dabb8250b6f152d2d85d79e7706e309d087",
+      "sha256": "a5d6cce120b94ce7ea20efeb9d56b553aa9f0e5c5cdda42c38fca065bf1c1469",
+      "url": "https://chromium.googlesource.com/chromium/src/+/4b3d0dabb8250b6f152d2d85d79e7706e309d087/third_party/blink/public/devtools_protocol/BUILD.gn?format=TEXT"
+    },
+    "third_party/blink/public/devtools_protocol/browser_protocol.pdl": {
+      "bytes": 1868,
+      "git_blob": "654548318335d4d8d9ed2709bdb451f95605e868",
+      "revision": "4b3d0dabb8250b6f152d2d85d79e7706e309d087",
+      "sha256": "f1aa425c26e6c00459f7f5880d3adfc63d3c79762ba7658fdb88b31a59161775",
+      "url": "https://chromium.googlesource.com/chromium/src/+/4b3d0dabb8250b6f152d2d85d79e7706e309d087/third_party/blink/public/devtools_protocol/browser_protocol.pdl?format=TEXT"
+    },
+    "third_party/blink/public/devtools_protocol/domains/Storage.pdl": {
+      "bytes": 10061,
+      "git_blob": "91f2641eb4805f672b4465a8423115c1c2012231",
+      "revision": "4b3d0dabb8250b6f152d2d85d79e7706e309d087",
+      "sha256": "890c5f2c2cdb4d685f53244d66e201ebf47a49a1ff47b488329dc6f87bd40477",
+      "url": "https://chromium.googlesource.com/chromium/src/+/4b3d0dabb8250b6f152d2d85d79e7706e309d087/third_party/blink/public/devtools_protocol/domains/Storage.pdl?format=TEXT"
     }
   },
   "linux_downstream": {
@@ -8594,7 +8636,13 @@
       "ui/gl/init/gl_display_initializer.cc",
       "v8/src/flags/flag-definitions.h",
       "v8/src/inspector/v8-runtime-agent-impl.cc",
-      "v8/src/inspector/v8-runtime-agent-impl.h"
+      "v8/src/inspector/v8-runtime-agent-impl.h",
+      "chrome/browser/devtools/chrome_devtools_session.cc",
+      "chrome/browser/devtools/inspector_protocol_config.json",
+      "content/browser/devtools/protocol_config.json",
+      "third_party/blink/public/devtools_protocol/BUILD.gn",
+      "third_party/blink/public/devtools_protocol/browser_protocol.pdl",
+      "third_party/blink/public/devtools_protocol/domains/Storage.pdl"
     ],
     "windows": [
       "DEPS",
@@ -8765,7 +8813,15 @@
       "ui/gl/init/gl_display_initializer.cc",
       "v8/src/flags/flag-definitions.h",
       "v8/src/inspector/v8-runtime-agent-impl.cc",
-      "v8/src/inspector/v8-runtime-agent-impl.h"
+      "v8/src/inspector/v8-runtime-agent-impl.h",
+      "chrome/browser/devtools/chrome_devtools_session.cc",
+      "chrome/browser/devtools/inspector_protocol_config.json",
+      "chrome/browser/devtools/protocol/storage_handler.cc",
+      "chrome/browser/devtools/protocol/storage_handler.h",
+      "content/browser/devtools/protocol_config.json",
+      "third_party/blink/public/devtools_protocol/BUILD.gn",
+      "third_party/blink/public/devtools_protocol/browser_protocol.pdl",
+      "third_party/blink/public/devtools_protocol/domains/Storage.pdl"
     ],
     "macos": [
       "DEPS",
@@ -8936,7 +8992,15 @@
       "ui/gl/init/gl_display_initializer.cc",
       "v8/src/flags/flag-definitions.h",
       "v8/src/inspector/v8-runtime-agent-impl.cc",
-      "v8/src/inspector/v8-runtime-agent-impl.h"
+      "v8/src/inspector/v8-runtime-agent-impl.h",
+      "chrome/browser/devtools/chrome_devtools_session.cc",
+      "chrome/browser/devtools/inspector_protocol_config.json",
+      "chrome/browser/devtools/protocol/storage_handler.cc",
+      "chrome/browser/devtools/protocol/storage_handler.h",
+      "content/browser/devtools/protocol_config.json",
+      "third_party/blink/public/devtools_protocol/BUILD.gn",
+      "third_party/blink/public/devtools_protocol/browser_protocol.pdl",
+      "third_party/blink/public/devtools_protocol/domains/Storage.pdl"
     ]
   }
 }

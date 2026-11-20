@@ -1,0 +1,106 @@
+diff --git a/third_party/blink/public/devtools_protocol/domains/Storage.pdl b/third_party/blink/public/devtools_protocol/domains/Storage.pdl
+--- a/third_party/blink/public/devtools_protocol/domains/Storage.pdl
++++ b/third_party/blink/public/devtools_protocol/domains/Storage.pdl
+@@ -40,34 +40,6 @@
+       string issuerOrigin
+       number count
+ 
+-  # Details of a stored Private Verification Token.
+-  experimental type PrivateVerificationToken extends object
+-    properties
+-      # Unique identifier of the token in the database.
+-      string id
+-      # Origin of the token issuer.
+-      string issuerOrigin
+-      # Public key ID used to issue the token.
+-      integer keyId
+-      # Expiration timestamp in seconds since the epoch.
+-      Network.TimeSinceEpoch expiration
+-      # Token creation timestamp in seconds since the epoch.
+-      Network.TimeSinceEpoch creationTime
+-      # Token protocol version.
+-      integer version
+-      # Base64-encoded serialized token.
+-      string token
+-
+-  # Configuration for a Private Verification Tokens issuer.
+-  experimental type PrivateVerificationTokensIssuerConfig extends object
+-    properties
+-      # Origin of the token issuer.
+-      string issuerOrigin
+-      # Origins authorized to redeem tokens from this issuer.
+-      array of string redeemerOrigins
+-
+-
+-
+   type StorageBucketsDurability extends string
+     enum
+       relaxed
+@@ -236,33 +208,6 @@
+       # True if any tokens were deleted, false otherwise.
+       boolean didDeleteTokens
+ 
+-  # Returns all stored Private Verification Tokens for the current browsing
+-  # context.
+-  experimental command getPrivateVerificationTokens
+-    returns
+-      array of PrivateVerificationToken tokens
+-
+-  # Returns the configured Private Verification Tokens issuers and their redeemer
+-  # origins.
+-  experimental command getPrivateVerificationTokensIssuerConfigs
+-    returns
+-      array of PrivateVerificationTokensIssuerConfig configs
+-
+-  # Removes all Private Verification Tokens issued by the provided issuerOrigin.
+-  experimental command clearPrivateVerificationTokens
+-    parameters
+-      string issuerOrigin
+-
+-  # Removes a specific Private Verification Token by its ID.
+-  experimental command deletePrivateVerificationToken
+-    parameters
+-      string tokenId
+-
+-  # Set tracking for Private Verification Tokens.
+-  experimental command setPrivateVerificationTokensTracking
+-    parameters
+-      boolean enable
+-
+   # Set tracking for a storage key's buckets.
+   experimental command setStorageBucketTracking
+     parameters
+@@ -333,5 +278,3 @@
+     parameters
+       string bucketId
+ 
+-  # Private Verification Tokens have been stored or deleted.
+-  experimental event privateVerificationTokensUpdated
+diff --git a/chrome/browser/devtools/inspector_protocol_config.json b/chrome/browser/devtools/inspector_protocol_config.json
+--- a/chrome/browser/devtools/inspector_protocol_config.json
++++ b/chrome/browser/devtools/inspector_protocol_config.json
+@@ -49,9 +49,9 @@
+             },
+             {
+                 "domain": "Storage",
+-                "include": ["runBounceTrackingMitigations", "getPrivateVerificationTokens", "getPrivateVerificationTokensIssuerConfigs", "clearPrivateVerificationTokens", "deletePrivateVerificationToken", "setPrivateVerificationTokensTracking"],
+-                "include_events": ["privateVerificationTokensUpdated"],
+-                "async": ["runBounceTrackingMitigations", "getPrivateVerificationTokens", "clearPrivateVerificationTokens", "deletePrivateVerificationToken"]
++                "include": ["runBounceTrackingMitigations"],
++                "include_events": [],
++                "async": ["runBounceTrackingMitigations"]
+             },
+             {
+                 "domain": "SystemInfo",
+diff --git a/content/browser/devtools/protocol_config.json b/content/browser/devtools/protocol_config.json
+--- a/content/browser/devtools/protocol_config.json
++++ b/content/browser/devtools/protocol_config.json
+@@ -192,7 +192,7 @@
+             },
+             {
+                 "domain": "Storage",
+-                "exclude": ["runBounceTrackingMitigations", "getPrivateVerificationTokens", "getPrivateVerificationTokensIssuerConfigs", "clearPrivateVerificationTokens", "deletePrivateVerificationToken", "setPrivateVerificationTokensTracking"],
++                "exclude": ["runBounceTrackingMitigations"],
+                 "async": ["getUsageAndQuota", "clearDataForOrigin", "clearDataForStorageKey", "getCookies", "setCookies", "clearCookies", "overrideQuotaForOrigin", "getTrustTokens", "clearTrustTokens", "getStorageBucketList"]
+             },
+             {

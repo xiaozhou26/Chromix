@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
   "status": "verified",
-  "manifest_sha256": "5a2676ef54db9a90064fb45018d2c4420ed142a0ff9a694f1a45d1165cc15bf3",
+  "manifest_sha256": "ca3c49ce3f469b6ef85c3bd669e8d68487ce8eb5a13c7b32ed9d71da9a6db990",
   "qualification": "Exact-source structural replay; all nine Linux downstream platform replacements and complete Chromix stacks. Core is intersecting-file subset only. No compilation/runtime, full GN/link or production selector/helper integration is claimed.",
   "historical_root224_and156_bytes_unchanged": true,
   "added_lines_preserved": [
@@ -47,7 +47,7 @@
     "patches/chromium157-additions/0234-macos-empty-angle-native-default.patch",
     "patches/chromium157-additions/0235-macos-hevc-recorder-mime.patch"
   ],
-  "source_file_count": 204,
+  "source_file_count": 210,
   "overlay_coverage": {
     "core": {
       "omitted": [
@@ -6957,7 +6957,7 @@
       "overlay_mode": "downstream-nine-patch-recipe",
       "build_verified": false,
       "runtime_verified": false,
-      "expected_patch_count": 229,
+      "expected_patch_count": 230,
       "patches": [
         {
           "path": "patches/0001-base-BUILD-gn.patch",
@@ -9477,6 +9477,21 @@
           "postimages": {
             "components/embedder_support/user_agent_utils.cc": "e57250a03c34a9abc8b63f74bb85cf82d5b3ec8c5c9402aa4a1145f639ca5b87"
           }
+        },
+        {
+          "path": "patches/chromium157-additions/0239-linux-disabled-private-verification-token-protocol.patch",
+          "sha256": "e13445e9782b72a400ff8e4c5bd42c7162db033252c1245b1c828cbf05cbdbb4",
+          "status": "applied",
+          "preimages": {
+            "chrome/browser/devtools/inspector_protocol_config.json": "449d07d778c0a65bf4ba6d6324dd540ec31a47f96bd6113f19c9871f3d100ca7",
+            "content/browser/devtools/protocol_config.json": "1b613ae8f136895502117c37e8ae298d8c5aa465451dc1088483df35d4e7d4ef",
+            "third_party/blink/public/devtools_protocol/domains/Storage.pdl": "890c5f2c2cdb4d685f53244d66e201ebf47a49a1ff47b488329dc6f87bd40477"
+          },
+          "postimages": {
+            "chrome/browser/devtools/inspector_protocol_config.json": "b5dcd72c16b4f41fd586860218b6bf8e8340b4446039bb6febcb4c423127a5b3",
+            "content/browser/devtools/protocol_config.json": "d6583c5f4da418a214756c50fd0e7e9d8975bb53c05740983e6ad431678c0fbe",
+            "third_party/blink/public/devtools_protocol/domains/Storage.pdl": "f98ead822a7b34660096807d3886535b99f3de5806dc21a61c543683ab98dc7f"
+          }
         }
       ],
       "predecessors": [
@@ -9991,12 +10006,12 @@
           "sha256": "d338adf0c712319a3b8efa666f57d378c6cef3bb31a027681a87e97694346417"
         }
       },
-      "patch_count": 229,
+      "patch_count": 230,
       "roundtrip": {
         "status": "verified",
         "method": "reverse-forward-exact-bytes",
-        "patch_count": 238,
-        "scope": "platform9-plus-chromix229",
+        "patch_count": 239,
+        "scope": "platform9-plus-chromix230",
         "initial": {
           "base/BUILD.gn": "2619e16bd05092597a911f7b0f9e51c3363d7a7267527d79150165fb873aa9aa",
           "base/i18n/icubridge/default_icu_locale.h": "f415c2354ec91b6a69bdda447a6fc160d744cf1cfa2ed15b82d759c30080c04b",
@@ -10006,6 +10021,7 @@
           "chrome/app/chrome_main.cc": "9bca15fa0892300b0696f4fab3d4d6559bd62abaab746be00512a674fc2a1d43",
           "chrome/browser/chrome_browser_main.cc": "039ef6326e170d43b1f333d632ee4d3929584904f7f14d0c41b33d46a24e85f9",
           "chrome/browser/component_updater/widevine_cdm_component_installer.cc": "107dbb7d930c66a5da279e948b027ebc963a5b9b435ff5fcfaff066ed7fe5a33",
+          "chrome/browser/devtools/inspector_protocol_config.json": "449d07d778c0a65bf4ba6d6324dd540ec31a47f96bd6113f19c9871f3d100ca7",
           "chrome/browser/enterprise/BUILD.gn": "af2cecf1cdf3a11a196100975ce39cb61bf55cf13959d5e655889233f6df1ace",
           "components/content_settings/core/browser/cookie_settings.cc": "a9e98b35a3279b878ae08342e7875686e02ae8e780c37f2a04342d61e661667d",
           "components/embedder_support/user_agent_utils.cc": "a1164b7fc810027885511d6935b05cfcc2f172d31f926384a8b8f59561a00540",
@@ -10017,6 +10033,7 @@
           "components/ungoogled/persona_profile.h": null,
           "content/browser/devtools/protocol/input_handler.cc": "5008fb8d8eb67bb584c99e304eb8f2456c1d8c07b6afeed8214e215df77671f7",
           "content/browser/devtools/protocol/network_handler.cc": "95a0575996da9587887c579ae1737cd41f3530decfad90e0ef5d19855f257d28",
+          "content/browser/devtools/protocol_config.json": "1b613ae8f136895502117c37e8ae298d8c5aa465451dc1088483df35d4e7d4ef",
           "content/browser/renderer_host/cross_process_frame_connector.cc": "3e682649fcc57c570a59a63ff68fbdc1e2917d91a64b5858a7f23580f8a23248",
           "content/browser/renderer_host/render_process_host_impl.cc": "45149d07a9205222d902bbb9dc1983788987e7a7310ff7a92e6ea53d20196408",
           "content/browser/renderer_host/render_widget_host_impl.cc": "44de2a23cad2fdcf81e4ca68547a4f5cbe8263736f58fe17e82f99a2812f9f81",
@@ -10042,6 +10059,7 @@
           "third_party/blink/public/common/widget/visual_properties.h": "d1d68691da95ba5909c53228a179cbfc85fb2944d2a7e90646bbc5f6fbf06a13",
           "third_party/blink/public/common/widget/visual_properties_mojom_traits.h": "afb7e544b77ec4b935378b474400ae73b352a4efd681b623865ec84cb530d6aa",
           "third_party/blink/public/devtools_protocol/domains/CSS.pdl": "c6a8ac34bdeff2c863d5e6a54d38ac1e0115d6052eba6ad33eb220230661f906",
+          "third_party/blink/public/devtools_protocol/domains/Storage.pdl": "890c5f2c2cdb4d685f53244d66e201ebf47a49a1ff47b488329dc6f87bd40477",
           "third_party/blink/public/mojom/frame/frame_visual_properties.mojom": "6120519609d609a829efffd3229ec555807376dfb03ec71e94f6f89261fdbc4f",
           "third_party/blink/public/mojom/widget/visual_properties.mojom": "b8c5478c2c24d4647d2496ed44237b40ad928fec108c81fba1fe3a15d3a243a9",
           "third_party/blink/renderer/core/animation/animation_clock.cc": "f3290008c81dab4f17c7ae8439de25c1c95d0204be6dbb16dada0fd1a8e584eb",
@@ -10222,6 +10240,7 @@
           "chrome/browser/component_updater/private_verification_tokens_installer.cc": "1a95754e34097242f76fe0153cbbed1342fd787482af4398543842836e367b88",
           "chrome/browser/component_updater/widevine_cdm_component_installer.cc": "62869c5366c8b3384a827bb3c9f81b12a79f69c77dccf22ffd47813bfcd71da6",
           "chrome/browser/devtools/BUILD.gn": "fefd077b37dd34383ed3ecada1c10c25b59408e29c12518841ca9ce49a8b14c1",
+          "chrome/browser/devtools/inspector_protocol_config.json": "b5dcd72c16b4f41fd586860218b6bf8e8340b4446039bb6febcb4c423127a5b3",
           "chrome/browser/devtools/protocol/storage_handler.cc": "642371405cf3bc550d92e9ecc2b5832d04cce07a514add5c314b0412a8a564b2",
           "chrome/browser/devtools/protocol/storage_handler.h": "f1dbb4eb30dd1685b965f84a621add3943b1d77c38d9c4bb2f98c41a542830ca",
           "chrome/browser/enterprise/BUILD.gn": "e29618e07d6f85a6c5676a2c8456b1a05c1d59ee6d2634474bcfc77a1711ddef",
@@ -10242,6 +10261,7 @@
           "components/web_package/BUILD.gn": "7bf8eae684b669031d1d2b819b998820dcb5b57303e344ec3b658766791a7ee0",
           "content/browser/devtools/protocol/input_handler.cc": "51d64a02218686f8e4da60bcff49f6c546f1822c4fc447df293e2d156e7c6e2a",
           "content/browser/devtools/protocol/network_handler.cc": "1202daa997e96407f67addaa759145e2711a02fe60fd6bb85397fd14663bd0cd",
+          "content/browser/devtools/protocol_config.json": "d6583c5f4da418a214756c50fd0e7e9d8975bb53c05740983e6ad431678c0fbe",
           "content/browser/renderer_host/cross_process_frame_connector.cc": "b20f7f796faea16b1fc6960013b43cb166c2479091d3e01af436e3b22cfd9884",
           "content/browser/renderer_host/render_process_host_impl.cc": "4c343762deeb85fec4c6d4b134d652adaa15a6bd5b1fa7592ce7177adcf8908f",
           "content/browser/renderer_host/render_widget_host_impl.cc": "28f4535c4394c53579f4269a767c6f2d976a06a3e070f4d7922a6cea6817e72f",
@@ -10268,6 +10288,7 @@
           "third_party/blink/public/common/widget/visual_properties.h": "a3139e2ed18aca3206c7016462a77737dd8d6957bf4586b82b9e12f2e34103f6",
           "third_party/blink/public/common/widget/visual_properties_mojom_traits.h": "d17b9c8abf6a4fcbd458b9b8185f03e43f84c2d6b3ca2783c3f185960e9b6c69",
           "third_party/blink/public/devtools_protocol/domains/CSS.pdl": "c1314da9f4f7a01892970dbc43208a4ef9f864c0c7cba3287743092d32d774a4",
+          "third_party/blink/public/devtools_protocol/domains/Storage.pdl": "f98ead822a7b34660096807d3886535b99f3de5806dc21a61c543683ab98dc7f",
           "third_party/blink/public/mojom/frame/frame_visual_properties.mojom": "d245aec1a45211ba6158280375bfed7854fd3a9b8c76a5ec9d4259564df2ad90",
           "third_party/blink/public/mojom/widget/visual_properties.mojom": "d534e88556d08be627c8bb47d571c6d0303a1825876e233283b996581cc34579",
           "third_party/blink/renderer/core/animation/animation_clock.cc": "55528182d806831687efe0e3a982ba8cd736421f1dce01391bde7277ddba84b4",
@@ -10422,7 +10443,7 @@
       "overlay_mode": "downstream-nine-patch-recipe",
       "build_verified": false,
       "runtime_verified": false,
-      "expected_patch_count": 229,
+      "expected_patch_count": 230,
       "patches": [
         {
           "path": "patches/0001-base-BUILD-gn.patch",
@@ -12942,6 +12963,21 @@
           "postimages": {
             "components/embedder_support/user_agent_utils.cc": "e57250a03c34a9abc8b63f74bb85cf82d5b3ec8c5c9402aa4a1145f639ca5b87"
           }
+        },
+        {
+          "path": "patches/chromium157-additions/0239-linux-disabled-private-verification-token-protocol.patch",
+          "sha256": "e13445e9782b72a400ff8e4c5bd42c7162db033252c1245b1c828cbf05cbdbb4",
+          "status": "applied",
+          "preimages": {
+            "chrome/browser/devtools/inspector_protocol_config.json": "449d07d778c0a65bf4ba6d6324dd540ec31a47f96bd6113f19c9871f3d100ca7",
+            "content/browser/devtools/protocol_config.json": "1b613ae8f136895502117c37e8ae298d8c5aa465451dc1088483df35d4e7d4ef",
+            "third_party/blink/public/devtools_protocol/domains/Storage.pdl": "890c5f2c2cdb4d685f53244d66e201ebf47a49a1ff47b488329dc6f87bd40477"
+          },
+          "postimages": {
+            "chrome/browser/devtools/inspector_protocol_config.json": "b5dcd72c16b4f41fd586860218b6bf8e8340b4446039bb6febcb4c423127a5b3",
+            "content/browser/devtools/protocol_config.json": "d6583c5f4da418a214756c50fd0e7e9d8975bb53c05740983e6ad431678c0fbe",
+            "third_party/blink/public/devtools_protocol/domains/Storage.pdl": "f98ead822a7b34660096807d3886535b99f3de5806dc21a61c543683ab98dc7f"
+          }
         }
       ],
       "predecessors": [
@@ -13456,12 +13492,12 @@
           "sha256": "d338adf0c712319a3b8efa666f57d378c6cef3bb31a027681a87e97694346417"
         }
       },
-      "patch_count": 229,
+      "patch_count": 230,
       "roundtrip": {
         "status": "verified",
         "method": "reverse-forward-exact-bytes",
-        "patch_count": 238,
-        "scope": "platform9-plus-chromix229",
+        "patch_count": 239,
+        "scope": "platform9-plus-chromix230",
         "initial": {
           "base/BUILD.gn": "a4a7c9b2663f2fe6fe529329fb60b523e73ace09363b7b4c4e27b196eb2a5b0d",
           "base/i18n/icubridge/default_icu_locale.h": "f415c2354ec91b6a69bdda447a6fc160d744cf1cfa2ed15b82d759c30080c04b",
@@ -13471,6 +13507,7 @@
           "chrome/app/chrome_main.cc": "9bca15fa0892300b0696f4fab3d4d6559bd62abaab746be00512a674fc2a1d43",
           "chrome/browser/chrome_browser_main.cc": "039ef6326e170d43b1f333d632ee4d3929584904f7f14d0c41b33d46a24e85f9",
           "chrome/browser/component_updater/widevine_cdm_component_installer.cc": "107dbb7d930c66a5da279e948b027ebc963a5b9b435ff5fcfaff066ed7fe5a33",
+          "chrome/browser/devtools/inspector_protocol_config.json": "449d07d778c0a65bf4ba6d6324dd540ec31a47f96bd6113f19c9871f3d100ca7",
           "chrome/browser/enterprise/BUILD.gn": "af2cecf1cdf3a11a196100975ce39cb61bf55cf13959d5e655889233f6df1ace",
           "components/content_settings/core/browser/cookie_settings.cc": "a9e98b35a3279b878ae08342e7875686e02ae8e780c37f2a04342d61e661667d",
           "components/embedder_support/user_agent_utils.cc": "a1164b7fc810027885511d6935b05cfcc2f172d31f926384a8b8f59561a00540",
@@ -13482,6 +13519,7 @@
           "components/ungoogled/persona_profile.h": null,
           "content/browser/devtools/protocol/input_handler.cc": "5008fb8d8eb67bb584c99e304eb8f2456c1d8c07b6afeed8214e215df77671f7",
           "content/browser/devtools/protocol/network_handler.cc": "95a0575996da9587887c579ae1737cd41f3530decfad90e0ef5d19855f257d28",
+          "content/browser/devtools/protocol_config.json": "1b613ae8f136895502117c37e8ae298d8c5aa465451dc1088483df35d4e7d4ef",
           "content/browser/renderer_host/cross_process_frame_connector.cc": "3e682649fcc57c570a59a63ff68fbdc1e2917d91a64b5858a7f23580f8a23248",
           "content/browser/renderer_host/render_process_host_impl.cc": "b615651dc20486e91ba49d80ea524e096fd33efc6cca49a8ab947d1d79a1b29a",
           "content/browser/renderer_host/render_widget_host_impl.cc": "44de2a23cad2fdcf81e4ca68547a4f5cbe8263736f58fe17e82f99a2812f9f81",
@@ -13507,6 +13545,7 @@
           "third_party/blink/public/common/widget/visual_properties.h": "82f7c8a7f136ca40cd91aaf1c26cbf89ce1ba50a57f27c777e13ceff900d4a30",
           "third_party/blink/public/common/widget/visual_properties_mojom_traits.h": "afb7e544b77ec4b935378b474400ae73b352a4efd681b623865ec84cb530d6aa",
           "third_party/blink/public/devtools_protocol/domains/CSS.pdl": "c6a8ac34bdeff2c863d5e6a54d38ac1e0115d6052eba6ad33eb220230661f906",
+          "third_party/blink/public/devtools_protocol/domains/Storage.pdl": "890c5f2c2cdb4d685f53244d66e201ebf47a49a1ff47b488329dc6f87bd40477",
           "third_party/blink/public/mojom/frame/frame_visual_properties.mojom": "6120519609d609a829efffd3229ec555807376dfb03ec71e94f6f89261fdbc4f",
           "third_party/blink/public/mojom/widget/visual_properties.mojom": "b8c5478c2c24d4647d2496ed44237b40ad928fec108c81fba1fe3a15d3a243a9",
           "third_party/blink/renderer/core/animation/animation_clock.cc": "f3290008c81dab4f17c7ae8439de25c1c95d0204be6dbb16dada0fd1a8e584eb",
@@ -13687,6 +13726,7 @@
           "chrome/browser/component_updater/private_verification_tokens_installer.cc": "1a95754e34097242f76fe0153cbbed1342fd787482af4398543842836e367b88",
           "chrome/browser/component_updater/widevine_cdm_component_installer.cc": "62869c5366c8b3384a827bb3c9f81b12a79f69c77dccf22ffd47813bfcd71da6",
           "chrome/browser/devtools/BUILD.gn": "fefd077b37dd34383ed3ecada1c10c25b59408e29c12518841ca9ce49a8b14c1",
+          "chrome/browser/devtools/inspector_protocol_config.json": "b5dcd72c16b4f41fd586860218b6bf8e8340b4446039bb6febcb4c423127a5b3",
           "chrome/browser/devtools/protocol/storage_handler.cc": "642371405cf3bc550d92e9ecc2b5832d04cce07a514add5c314b0412a8a564b2",
           "chrome/browser/devtools/protocol/storage_handler.h": "f1dbb4eb30dd1685b965f84a621add3943b1d77c38d9c4bb2f98c41a542830ca",
           "chrome/browser/enterprise/BUILD.gn": "e29618e07d6f85a6c5676a2c8456b1a05c1d59ee6d2634474bcfc77a1711ddef",
@@ -13707,6 +13747,7 @@
           "components/web_package/BUILD.gn": "7bf8eae684b669031d1d2b819b998820dcb5b57303e344ec3b658766791a7ee0",
           "content/browser/devtools/protocol/input_handler.cc": "51d64a02218686f8e4da60bcff49f6c546f1822c4fc447df293e2d156e7c6e2a",
           "content/browser/devtools/protocol/network_handler.cc": "1202daa997e96407f67addaa759145e2711a02fe60fd6bb85397fd14663bd0cd",
+          "content/browser/devtools/protocol_config.json": "d6583c5f4da418a214756c50fd0e7e9d8975bb53c05740983e6ad431678c0fbe",
           "content/browser/renderer_host/cross_process_frame_connector.cc": "b20f7f796faea16b1fc6960013b43cb166c2479091d3e01af436e3b22cfd9884",
           "content/browser/renderer_host/render_process_host_impl.cc": "9931ef99f82b2341acc52a9bfa26d2adabb36dccd2a55eebeb5ab6c1399079fa",
           "content/browser/renderer_host/render_widget_host_impl.cc": "28f4535c4394c53579f4269a767c6f2d976a06a3e070f4d7922a6cea6817e72f",
@@ -13733,6 +13774,7 @@
           "third_party/blink/public/common/widget/visual_properties.h": "4d22c31cdb12177756ee933073260c4f7b34c87672ba2b8cde1f27d28f657364",
           "third_party/blink/public/common/widget/visual_properties_mojom_traits.h": "d17b9c8abf6a4fcbd458b9b8185f03e43f84c2d6b3ca2783c3f185960e9b6c69",
           "third_party/blink/public/devtools_protocol/domains/CSS.pdl": "c1314da9f4f7a01892970dbc43208a4ef9f864c0c7cba3287743092d32d774a4",
+          "third_party/blink/public/devtools_protocol/domains/Storage.pdl": "f98ead822a7b34660096807d3886535b99f3de5806dc21a61c543683ab98dc7f",
           "third_party/blink/public/mojom/frame/frame_visual_properties.mojom": "d245aec1a45211ba6158280375bfed7854fd3a9b8c76a5ec9d4259564df2ad90",
           "third_party/blink/public/mojom/widget/visual_properties.mojom": "d534e88556d08be627c8bb47d571c6d0303a1825876e233283b996581cc34579",
           "third_party/blink/renderer/core/animation/animation_clock.cc": "55528182d806831687efe0e3a982ba8cd736421f1dce01391bde7277ddba84b4",

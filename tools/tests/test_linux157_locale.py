@@ -377,9 +377,10 @@ def test_real_integrated_selector_requires_separate_ua_migration():
     assert selected['selection']['base_series_sha256'] == old['selection']['base_series_sha256']
     with pytest.raises(ValueError, match='require unchanged old226 plus exact two additions'):
         locale.validate_additions(selected, raw, manifest, ROOT)
-    assert selected['patches'][:-3] == old['patches']
-    assert [name for name, _ in raw[-3:-1]] == [p['patch'] for p in manifest['migration']['additions']]
-    assert raw[-1][0] == 'patches/chromium157-additions/0238-user-agent-version-header.patch'
+    assert selected['patches'][:226] == old['patches']
+    assert [name for name, _ in raw[226:228]] == [p['patch'] for p in manifest['migration']['additions']]
+    assert raw[228][0] == 'patches/chromium157-additions/0238-user-agent-version-header.patch'
+    assert raw[229][0] == 'patches/chromium157-additions/0239-linux-disabled-private-verification-token-protocol.patch'
 
 
 def test_real_selector_onephase_private_donor_migration():

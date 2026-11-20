@@ -90,9 +90,9 @@ def test_old228_patch_bytes_and_only_added_version_translation_unit():
         replacements = {"patches/" + Path(patch["path"]).name: patch for patch in old["overrides"]}
         previous = [{key: replacements.get(patch["path"], patch)[key] for key in ("path", "sha256")}
                     for patch in old["base_patches"]] + entry["additions"]
-        assert identity["patches"][:-1] == previous
-        assert patches[-1][0] == PATCH
-        assert len(patches) == {"linux": 229, "macos": 231, "windows": 235}[platform]
+        assert identity["patches"][:len(previous)] == previous
+        assert patches[len(previous)][0] == PATCH
+        assert len(patches) == {"linux": 230, "macos": 231, "windows": 235}[platform]
         introduced = set()
         for _, raw in patches:
             if any(line.startswith(b"+") and not line.startswith(b"+++") and b"base::Version" in line

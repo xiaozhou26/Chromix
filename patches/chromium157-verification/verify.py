@@ -115,7 +115,25 @@ def invariants(src, platform):
     assert ua.count('#include "base/version.h"') == 1
     assert ua.count("std::string GetUserAgentInternal() {") == 1
     assert ua.count("std::string BuildUserAgentFromProduct(const std::string& product) {") == 1
+    storage = text("third_party/blink/public/devtools_protocol/domains/Storage.pdl")
+    handler = text("chrome/browser/devtools/protocol/storage_handler.h")
+    for command in ("getPrivateVerificationTokens", "getPrivateVerificationTokensIssuerConfigs",
+                    "clearPrivateVerificationTokens", "deletePrivateVerificationToken",
+                    "setPrivateVerificationTokensTracking"):
+        assert ("command " + command in storage) == (platform != "linux")
+        assert (command[0].upper() + command[1:] in handler) == (platform != "linux")
+    for command in ("runBounceTrackingMitigations", "getTrustTokens", "clearTrustTokens",
+                    "setStorageBucketTracking", "deleteStorageBucket", "getCookies", "getUsageAndQuota"):
+        assert "command " + command in storage
     if platform == "linux":
+        assert "PrivateVerificationToken" not in storage
+        assert "privateVerificationTokensUpdated" not in storage
+        for name in ("chrome/browser/devtools/inspector_protocol_config.json",
+                     "content/browser/devtools/protocol_config.json"):
+            config = json.loads(text(name))
+            entry = next(entry for entry in config["protocol"]["options"] if entry["domain"] == "Storage")
+            assert "PrivateVerification" not in json.dumps(entry)
+            assert "privateVerification" not in json.dumps(entry)
         blink = text("third_party/blink/renderer/platform/BUILD.gn")
         web_bundle = text("components/web_package/BUILD.gn")
         for content in (blink, web_bundle):
@@ -175,7 +193,18 @@ def verify():
     preservation = []
     for entry in list(overrides.values()) + list(additions.values()):
         raw = checked(entry)
-        assert len(arp.transform_patch(raw, set(), [])[1]) == 1, entry["path"]
+        targets = [target for target, _, _ in arp.transform_patch(raw, set(), [])[1]]
+        if entry.get("kind") == "linux-disabled-feature-protocol":
+            assert entry["path"] == "patches/chromium157-additions/0239-linux-disabled-private-verification-token-protocol.patch"
+            assert targets == [
+                "third_party/blink/public/devtools_protocol/domains/Storage.pdl",
+                "chrome/browser/devtools/inspector_protocol_config.json",
+                "content/browser/devtools/protocol_config.json",
+            ]
+            assert entry in manifest["additions"]["linux"]
+            assert all(entry not in manifest["additions"][platform] for platform in ("macos", "windows"))
+            continue
+        assert len(targets) == 1, entry["path"]
         if entry.get("kind") == "locale-api-compatibility":
             assert entry["path"] in {
                 "patches/chromium157-additions/0236-timezone-default-locale-setter-key.patch",
@@ -222,7 +251,7 @@ def verify():
                           "domain_substituted": substituted, "status": "failed",
                           "overlay_mode": "downstream-nine-patch-recipe" if platform == "linux" else "actual-platform",
                           "build_verified": False, "runtime_verified": False,
-                          "expected_patch_count": {"linux": 229, "windows": 235, "macos": 231}[platform],
+                          "expected_patch_count": {"linux": 230, "windows": 235, "macos": 231}[platform],
                           "patches": [], "predecessors": []}
                 results.append(result)
                 try:
@@ -323,7 +352,7 @@ def verify():
                     result.update(status="verified", patch_count=len(prepared),
                                   roundtrip={"status": "verified", "method": "reverse-forward-exact-bytes",
                                              "patch_count": len(roundtrip_patches),
-                                             "scope": "platform9-plus-chromix229" if platform == "linux" else "chromix-stack",
+                                             "scope": "platform9-plus-chromix230" if platform == "linux" else "chromix-stack",
                                              "initial": roundtrip_initial, "final": final})
                     for key in ("stage", "current_patch", "current_file"):
                         del result[key]

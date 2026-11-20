@@ -70,7 +70,7 @@ def test_integrated_linux_selection_matches_real_recipe_and_parser():
     identity, patches = selection.select(ROOT, "linux")
     assert pins["ChromiumVersion"] == selection.VERSION157
     assert pins["UngoogledLinuxVersion"] == selection.VERSION156 + "-1"
-    assert len(patches) == 229
+    assert len(patches) == 230
     assert identity["selection"]["downstream"]["recipe"] == linux157_source.recipe(ROOT)
     assert identity["selection"]["core_gitlink"] == selection.CORE156
     assert identity["selection"]["effective_core_commit"] == selection.CORE157
@@ -135,7 +135,7 @@ def test_gn_recovery_binds_exact_new_inputs_and_preserves_donor_patch_identity(l
         with pytest.raises(ValueError, match="delta"):
             checkpoint.validate_recipe_delta(donor["source_receipt"]["recipe"], DOWNSTREAM["recipe"])
         original = donor["source_receipt"]["chromix_selection"]
-        assert original["patches"] == selected["patches"][:-3]
+        assert original["patches"] == selected["patches"][:226]
         with pytest.raises(ValueError, match="cannot change the 226 patches"):
             checkpoint.compatible_selection(original, selected)
         assert delta["gn_args"]["identities"][arch]["original_sha256"] == donor["files"]["src/out/Chromix/args.gn"]
@@ -195,7 +195,7 @@ def test_libclang_scope_and_latest_postgn_donors_are_exact(linux_repo):
         with pytest.raises(ValueError, match="only"):
             postgn.delta(donor["source_receipt"]["recipe"], DOWNSTREAM["recipe"])
         original = donor["source_receipt"]["chromix_selection"]
-        assert original["patches"] == selected["patches"][:-3]
+        assert original["patches"] == selected["patches"][:226]
         with pytest.raises(ValueError, match="cannot change the 226 patches"):
             prior.compatible_selection(original, selected)
         assert delta["donors"][arch]["artifact"] == donor["artifact"]
@@ -246,10 +246,10 @@ def test_locale_review_preserves_old_prefix_and_rejects_generic_restore(linux_re
     locale.recipe_delta(donor["source_receipt"]["recipe"], historical)
     with pytest.raises(ValueError, match="not reviewed"):
         locale.recipe_delta(donor["source_receipt"]["recipe"], DOWNSTREAM["recipe"])
-    assert selected["patches"][:-3] == old["patches"]
+    assert selected["patches"][:226] == old["patches"]
     assert selected["series_sha256"] != delta["series_sha256"]["linux"]
     assert selected["series_sha256"] != old["series_sha256"]
-    assert selected["patches"][-3:-1] == [
+    assert selected["patches"][226:228] == [
         {"path": pin["patch"], "sha256": pin["sha256"]}
         for pin in donor["migration"]["additions"]]
     assert delta["source_migration"] == donor["migration"]
@@ -257,7 +257,7 @@ def test_locale_review_preserves_old_prefix_and_rejects_generic_restore(linux_re
         prior.compatible_selection(old, selected)
     with pytest.raises(ValueError, match="only"):
         postgn.delta(donor["source_receipt"]["recipe"], DOWNSTREAM["recipe"])
-    assert len(raw) == 229
+    assert len(raw) == 230
 
 
 def test_old_locale_preflight_rejects_unmigrated_ua_addition():
@@ -305,7 +305,7 @@ def test_real_selector_authenticates_only_exact_locale_profiles(arch, run, stage
     assert locale.load(ROOT) == locale.load(ROOT, "x64")
     if arch == "arm64":
         assert donor["continuation_stage"] == 3
-        assert selected["patches"][:-3] == donor["source_receipt"]["chromix_selection"]["patches"]
+        assert selected["patches"][:226] == donor["source_receipt"]["chromix_selection"]["patches"]
 
 
 @pytest.mark.parametrize("arch", ["aarch64", "ARM64", "x86", "linux", "", None])
@@ -341,17 +341,33 @@ def test_unknown_arm_profile_identity_rejected(mutation):
         selection.validate_manifest157(manifest)
 
 
+def historical_ua_selection(donor):
+    from tools import linux157_ua as ua
+
+    selected = copy.deepcopy(donor["source_receipt"]["chromix_selection"])
+    additions = [{"path": entry["patch"], "sha256": entry["sha256"]}
+                 for entry in donor["migration"]["additions"]]
+    selected["patches"].extend(additions)
+    selected["selection"]["additions"]["patches"].extend(additions)
+    selected["series_sha256"] = ua.canonical_series(ROOT, selected, (ROOT / "patches/series").read_bytes())
+    raw = [(entry["path"], (ROOT / entry["path"]).read_bytes()) for entry in selected["patches"]]
+    return selected, raw
+
+
 def test_current_ua_preflight_binds_latest228_and_preserves_locale():
     from tools import linux157_ua as ua
     from tools import linux157_locale as locale
     from tools import linux157_checkpoint as prior
     selected, raw = selection.select(ROOT, "linux")
     donor = ua.load(ROOT)
-    assert ua.validate_additions(selected, raw, donor, ROOT) == donor["migration"]["additions"]
+    with pytest.raises(ValueError, match="require unchanged old228 plus exact one addition"):
+        ua.validate_additions(selected, raw, donor, ROOT)
+    historical, historical_raw = historical_ua_selection(donor)
+    assert ua.validate_additions(historical, historical_raw, donor, ROOT) == donor["migration"]["additions"]
     ua.recipe_delta(donor["source_receipt"]["recipe"], DOWNSTREAM["recipe"], ROOT)
-    assert selected["patches"][:-1] == donor["source_receipt"]["chromix_selection"]["patches"]
-    assert selected["patches"][-1]["sha256"] == "dd22d5decfdb675477ce8d1379b7b1eaf2153f5cd0fb6dbb2de47135fc8a9561"
-    assert [Path(p["path"]).name[:5] for p in selected["patches"][-3:-1]] == ["0236-", "0237-"]
+    assert selected["patches"][:228] == donor["source_receipt"]["chromix_selection"]["patches"]
+    assert selected["patches"][228]["sha256"] == "dd22d5decfdb675477ce8d1379b7b1eaf2153f5cd0fb6dbb2de47135fc8a9561"
+    assert [Path(p["path"]).name[:5] for p in selected["patches"][226:228]] == ["0236-", "0237-"]
     assert (donor["run_id"], donor["artifact"]["id"]) == (44630942999, 14584551831)
     with pytest.raises(ValueError, match="cannot change"):
         prior.compatible_selection(donor["source_receipt"]["chromix_selection"], selected)
@@ -391,7 +407,10 @@ def test_current_ua_profiles_have_exact_distinct_donor_contracts(arch, run, stag
     from tools import linux157_ua as ua
     selected, raw = selection.select(ROOT, "linux")
     donor = ua.load(ROOT, arch)
-    assert ua.validate_additions(selected, raw, donor, ROOT) == donor["migration"]["additions"]
+    with pytest.raises(ValueError, match="require unchanged old228 plus exact one addition"):
+        ua.validate_additions(selected, raw, donor, ROOT)
+    historical, historical_raw = historical_ua_selection(donor)
+    assert ua.validate_additions(historical, historical_raw, donor, ROOT) == donor["migration"]["additions"]
     ua.recipe_delta(donor["source_receipt"]["recipe"], DOWNSTREAM["recipe"], ROOT, arch)
     expected = ua.expected(arch, ROOT)
     assert (expected["run_id"], expected["stage"], expected["artifacts"][0]["id"]) == (run, stage, artifact)
@@ -416,7 +435,14 @@ def test_x64_ua_profile_and_workflows_are_unchanged():
     delta = DOWNSTREAM["validation"]["recipe_integration"]["arm64_ua_profile"]
     for name, digest in delta["preserved_x64_inputs"].items():
         assert selection.digest(blob(name, delta["baseline_commit"])) == digest
-        assert selection.digest((ROOT / name).read_bytes()) == digest
+        baseline = blob(name, "3da74546373f3351029064d79fe85e3d3cb4497f")
+        if name == ".github/workflows/build-linux157-x64-ua-stages.yml":
+            assert selection.digest(baseline) == "10a80991a9bc9a8d92c616c6e51ab0ada7bffc9f84532bb63182b1e25a7e1b65"
+        elif name == "tools/gen_linux157_ua_workflow.py":
+            assert selection.digest(baseline) == "2479d697e8c204608f3a33c180d6e69f4ff7bddd0be74af795b3cef90cecc74a"
+        else:
+            assert selection.digest(baseline) == digest
+        assert (ROOT / name).read_bytes() == baseline
 
 
 @pytest.mark.parametrize("mutation", ["stage", "artifact", "arch", "profile-hash"])
@@ -439,7 +465,7 @@ def test_reviewed_activation_preserves_real_origin_and_effective_core(linux_repo
     activate(linux_repo, monkeypatch)
     identity, patches = selection.select(linux_repo, "linux")
     chosen = identity["selection"]
-    assert len(patches) == 229
+    assert len(patches) == 230
     assert chosen["core_commit"] == chosen["effective_core_commit"] == selection.CORE157
     assert chosen["core_gitlink"] == selection.CORE156 != selection.CORE157
     assert chosen["platform_version"] == "156.0.8078.79-1"
