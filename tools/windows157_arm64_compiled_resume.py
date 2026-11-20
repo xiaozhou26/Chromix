@@ -89,7 +89,14 @@ def checkout(repo):
         raise ValueError("ARM recovery workflow bytes changed")
     base = recovery.origin.git_tree(git, repo, recovery.RECIPE_BASE)
     current = recovery.origin.git_tree(git, repo, head)
-    names = {"build/args.windows.arm64.gn", "build/upstream-cache.json",
+    cache = json.loads(files._file(repo, "build/upstream-cache.json").read_bytes())
+    prior = json.loads(recovery.origin.blob(git, repo, recovery.RECIPE_BASE, "build/upstream-cache.json"))
+    def windows_cache(value):
+        return {**{k: v for k, v in value.items() if k != "sources"},
+                "sources": {"windows": value["sources"]["windows"]}}
+    if windows_cache(cache) != windows_cache(prior):
+        raise ValueError("ARM Windows upstream recipe changed")
+    names = {"build/args.windows.arm64.gn",
              "tools/restore_upstream_cache.py", "tools/import_upstream_cache.py",
              "tools/fetch_upstream_cache.py", "tools/restored_reuse_evidence.py",
              "tools/upstream_object_cache.py"}
