@@ -515,6 +515,72 @@ def test_storage_review_scope_mutations_rejected(mutation):
         selection.validate_manifest157(manifest)
 
 
+@pytest.fixture
+def x64_storage_repo(linux_repo):
+    binding = DOWNSTREAM["validation"]["recipe_integration"]["x64_storage_profile"]
+    paths = [binding[key]["path"] for key in ("helper", "manifest")]
+    paths += list(binding["route_inputs"])
+    for name in paths:
+        store(linux_repo, name, (ROOT / name).read_bytes())
+    return linux_repo
+
+
+def test_real_x64_storage_binding_keeps_shared_recipe_and_arm_default():
+    from tools import linux157_x64_storage as x64
+    from tools import linux157_storage as arm
+    from tools import linux157_source as source
+    baseline = json.loads(blob(selection.MANIFEST157, "461fe905610d3266171336d3b0a87657703991b7"))
+    assert DOWNSTREAM["recipe"] == baseline["platforms"]["linux"]["downstream"]["recipe"] == source.recipe(ROOT)
+    assert x64.HELPER not in DOWNSTREAM["recipe"]["inputs"]
+    assert x64.MANIFEST not in DOWNSTREAM["recipe"]["inputs"]
+    assert x64.authenticate(ROOT) == selection.select(ROOT, "linux")[0]
+    defaults = arm.load, arm.verify_current, arm.verify_current_ninja
+    with x64.profile(ROOT) as active:
+        donor = active.load(ROOT, "x64")
+        selected, raw = selection.select(ROOT, "linux")
+        active.validate_additions(selected, raw, donor, ROOT)
+        active.recipe_delta(donor["source_receipt"]["recipe"], source.recipe(ROOT), ROOT, "x64")
+        assert (donor["run_id"], donor["stage"], donor["continuation_stage"]) == (44687163614, 1, 2)
+        with pytest.raises(ValueError):
+            active.load(ROOT, "arm64")
+    assert (arm.load, arm.verify_current, arm.verify_current_ninja) == defaults
+    assert arm.load(ROOT)["run_id"] == 44660206036
+
+
+@pytest.mark.parametrize("name", [
+    "tools/linux157_x64_storage.py", "build/linux/157.0.8103.78/x64-storage-checkpoint.json",
+    *DOWNSTREAM["validation"]["recipe_integration"]["x64_storage_profile"]["route_inputs"],
+])
+@pytest.mark.parametrize("mutation", ["tamper", "missing", "symlink"])
+def test_x64_profile_rejects_actual_input_drift_without_changing_arm(x64_storage_repo, name, mutation):
+    from tools import linux157_x64_storage as x64
+    from tools import linux157_storage as arm
+    repo = x64_storage_repo
+    assert x64.authenticate(repo)
+    before = selection.select(repo, "linux")
+    path = repo / name
+    if mutation == "tamper":
+        path.write_bytes(path.read_bytes() + b"\n")
+    elif mutation == "missing":
+        path.unlink()
+    else:
+        path.unlink()
+        path.symlink_to(ROOT / name)
+    with pytest.raises(ValueError):
+        x64.authenticate(repo)
+    assert selection.select(repo, "linux") == before
+    assert arm.load(repo)["arch"] == "arm64"
+
+
+@pytest.mark.parametrize("field", ["manifest", "helper", "engine", "route_inputs", "recipe_sha256", "run_id", "arch", "stage"])
+def test_x64_profile_unknown_binding_rejected(field):
+    manifest = copy.deepcopy(MANIFEST)
+    profile = manifest["platforms"]["linux"]["downstream"]["validation"]["recipe_integration"]["x64_storage_profile"]
+    profile[field] = None
+    with pytest.raises(selection.SelectionError, match="downstream recipe"):
+        selection.validate_manifest157(manifest)
+
+
 def test_reviewed_activation_preserves_real_origin_and_effective_core(linux_repo, monkeypatch):
     activate(linux_repo, monkeypatch)
     identity, patches = selection.select(linux_repo, "linux")

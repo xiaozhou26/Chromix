@@ -2163,6 +2163,130 @@
                 "source-full232-roundtrip.json": "502ad08c95f6da10e70fe9f1e5ed83207bcc75f2347ec1ecfd270957a51af1b5"
               },
               "qualification": "Linux-only source alignment with the previously disabled PVT backend: append exact0239/0240/0241, each modifying one assigned source. Fixed ARM stage5 donor continues at stage6 through Storage admission, not generic UA/locale restoration. Full old229/new232 private reverse-forward, root224/effective series, every patch byte, source pre/post and GN target/profile are authenticated. Three-source publication remains blocked until source and receipts verify. Per-output content/mode/mtime/inode checks preserve generated files, Ninja/PGO and compiled objects. Prior helper audit used isolated strict review bindings; current production binding requires its own verification. Windows235/mac231 and all prior patch bytes remain unchanged."
+            },
+            "x64_storage_profile": {
+              "manifest": {
+                "path": "build/linux/157.0.8103.78/x64-storage-checkpoint.json",
+                "sha256": "08fd8b16405f966006b7b1d684f0e55d7427266cdbb7cc8bc63775db94979200"
+              },
+              "helper": {
+                "path": "tools/linux157_x64_storage.py",
+                "sha256": "e6546882d3a9519fd585da488aa8661e9e923e1eafdb214c1611ee7bed8110e4"
+              },
+              "engine": {
+                "path": "tools/linux157_storage.py",
+                "sha256": "7d41e5e9f6e0d2a029db3a1d7954e9189bb7ace2cc4b3c682829bb259bec9818"
+              },
+              "route_inputs": {
+                "build/posix/ci-stage.sh": "7ddaf82e7e4e0a43731ad0e0be5805b3cf1a2b2a6a328077855fbbd018e37613",
+                "tools/gen_linux157_x64_storage_workflow.py": "41cf7fbaf292b37c3b52c846c3316a8596d507e1bc16d619da4185cb7b0f1e99",
+                ".github/workflows/build-linux157-x64-storage-resume.yml": "59054295f50a9bea386842a7c9159497898a9391379cbde058dc18e989f33d14",
+                ".github/workflows/build-linux157-x64-storage-stages.yml": "583e69e3ea46e0b10b3321787772a8d0bcbe000d096a5c3b35701571da2246ae"
+              },
+              "recipe_sha256": "f72b67654204d0447a1f3732463382a6f0a7a16877ee35b2c51d00c22ca8adc2",
+              "run_id": 44687163614,
+              "job_id": 136124135111,
+              "head_sha": "3da74546373f3351029064d79fe85e3d3cb4497f",
+              "arch": "x64",
+              "stage": 1,
+              "attempt": 1,
+              "continuation_stage": 2,
+              "old_patch_count": 229,
+              "new_patch_count": 232
+            },
+            "x64_storage_profile_review": {
+              "baseline_commit": "461fe905610d3266171336d3b0a87657703991b7",
+              "implementation_commit": "6971c8ddb0bf46fdf418e615909eed620b15f1e9",
+              "shared_recipe_sha256": "f72b67654204d0447a1f3732463382a6f0a7a16877ee35b2c51d00c22ca8adc2",
+              "global_recipe_delta": {
+                "added": {},
+                "changed": {},
+                "removed": []
+              },
+              "donor_to_shared_recipe_delta": {
+                "build/linux/157.0.8103.78/arm64-storage-checkpoint.json": {
+                  "after": "e8fa58c996ceb30f357a273408f01a6f3d80cb314e7ce5f01410471a861f89b6",
+                  "before": null
+                },
+                "tools/linux157_build.py": {
+                  "after": "c84adaa69f782b85a74112295572d3fea454bd3d7f7ea636fd9854e3123bf9dc",
+                  "before": "ccac0e3a4926a755734f22dfa4bd1109d7a0553232b5741fc5dfb8a959821640"
+                },
+                "tools/linux157_source.py": {
+                  "after": "f8675d110ffc9b4b73a2049d23659075a7de055b9b3bf3fd75808350a213a244",
+                  "before": "401b7d4abc70bc3adf93f30793553f52f87427d958adbbee04b3a47f38b09750"
+                },
+                "tools/linux157_storage.py": {
+                  "after": "7d41e5e9f6e0d2a029db3a1d7954e9189bb7ace2cc4b3c682829bb259bec9818",
+                  "before": null
+                }
+              },
+              "profile_binding_sha256": "5db431495f9b865340f7c5c88fd321ff9ec7f89fdc3eb485fd1766a01e435d91",
+              "preserved_shared_inputs": {
+                ".github/workflows/build-linux157-arm64-storage-resume.yml": "609498facb4db51da76a3e4a60a4c155249e4931da4e7643c18fb88d8e6db276",
+                ".github/workflows/build-linux157-arm64-storage-stages.yml": "6884ff52e05866af0ac820953f30129a06869d53ea8eba4934d45b915201db95",
+                "build/linux/157.0.8103.78/arm64-storage-checkpoint.json": "e8fa58c996ceb30f357a273408f01a6f3d80cb314e7ce5f01410471a861f89b6",
+                "patches/series": "71613faf45339ae3debd3dcf8afb95101989c4e6537d14dc7b0cebd1766f5863",
+                "tools/gen_linux157_arm64_storage_workflow.py": "f9a4abcd774f1bcb1da55e21ee9dd4d3b0f4925ff6c7baa7340891687bef2a9e",
+                "tools/gen_linux157_ua_workflow.py": "2479d697e8c204608f3a33c180d6e69f4ff7bddd0be74af795b3cef90cecc74a",
+                "tools/linux157_build.py": "c84adaa69f782b85a74112295572d3fea454bd3d7f7ea636fd9854e3123bf9dc",
+                "tools/linux157_source.py": "f8675d110ffc9b4b73a2049d23659075a7de055b9b3bf3fd75808350a213a244",
+                "tools/linux157_storage.py": "7d41e5e9f6e0d2a029db3a1d7954e9189bb7ace2cc4b3c682829bb259bec9818",
+                "tools/linux157_toolchain.py": "539a28814632a79333adefe55d2f8bd6b8e37455aaf43f2b506175d3b733954a",
+                "tools/verify_linux157_upload.py": "58b85c9148557a0fde692d7cd950f9be9486c3b1366a86cc8692d600c654288e"
+              },
+              "source_migration": {
+                "additions": [
+                  {
+                    "patch": "patches/chromium157-additions/0239-linux-disabled-private-verification-token-protocol.patch",
+                    "sha256": "bdc9b0a2dacc62f31d2a34c2b634b25783f8ad2f48f6af144463e93b048acfe9",
+                    "targets": [
+                      "third_party/blink/public/devtools_protocol/domains/Storage.pdl"
+                    ]
+                  },
+                  {
+                    "patch": "patches/chromium157-additions/0240-linux-disabled-private-verification-token-chrome-config.patch",
+                    "sha256": "cf0c7e35e891104f495f6c72492082279ca942b2a98c7e079e6e36f2a2abf1c9",
+                    "targets": [
+                      "chrome/browser/devtools/inspector_protocol_config.json"
+                    ]
+                  },
+                  {
+                    "patch": "patches/chromium157-additions/0241-linux-disabled-private-verification-token-content-config.patch",
+                    "sha256": "f2ab0307d06cf25765141fd96c0d83850f307fceb1fc1dc308b4faa34d8de9af",
+                    "targets": [
+                      "content/browser/devtools/protocol_config.json"
+                    ]
+                  }
+                ],
+                "new_patch_count": 232,
+                "old_patch_count": 229,
+                "sources": {
+                  "chrome/browser/devtools/inspector_protocol_config.json": {
+                    "after": "b5dcd72c16b4f41fd586860218b6bf8e8340b4446039bb6febcb4c423127a5b3",
+                    "before": "449d07d778c0a65bf4ba6d6324dd540ec31a47f96bd6113f19c9871f3d100ca7"
+                  },
+                  "content/browser/devtools/protocol_config.json": {
+                    "after": "d6583c5f4da418a214756c50fd0e7e9d8975bb53c05740983e6ad431678c0fbe",
+                    "before": "1b613ae8f136895502117c37e8ae298d8c5aa465451dc1088483df35d4e7d4ef"
+                  },
+                  "third_party/blink/public/devtools_protocol/domains/Storage.pdl": {
+                    "after": "f98ead822a7b34660096807d3886535b99f3de5806dc21a61c543683ab98dc7f",
+                    "before": "890c5f2c2cdb4d685f53244d66e201ebf47a49a1ff47b488329dc6f87bd40477"
+                  }
+                },
+                "status": "verified"
+              },
+              "output_tree": {
+                "entries": 191604,
+                "sha256": "a4319e27c0fbf053ef48a440810c703a6bac8b27c0fce2d4062df41e3994ab5b"
+              },
+              "audit_sha256": {
+                "review-delta-final.json": "637257717b329514d5e3a74574ee8fcb7e5dec5d12cdddfcfd5b26405741aa71",
+                "handoff-final.json": "17f51a2e65dd25ca2482c9d95b0a555a788f57a598778481a2680287a86903ee",
+                "actual-onephase-final.json": "4cec3befe68abfd9e1ef6289e8039b219283627ae2953f4cde421d0cebd1ccfc"
+              },
+              "qualification": "Independent exact x64 stage1 donor continues at stage2 through the authenticated wrapper for restore/source/build/upload. Binding fixes helper/profile/engine plus all four route inputs. No shared recipe inputs are added, changed or removed; ARM engine/profile/callers remain frozen. The explicit process context restores ARM defaults on exit and authenticates again after success. Prior isolated data binding evidence is not production activation; current shared-repo admission must be verified independently. Full old229/new232 private replay and original output/source protections remain mandatory."
             }
           },
           "patch_count": 232,
