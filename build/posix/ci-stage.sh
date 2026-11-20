@@ -155,6 +155,20 @@ fi
 
 LINUX157_FRESH=0
 LINUX157_RECOVERY=0
+case "${CHROMIX_LINUX157_X64_PVT_LINK_RECOVERY:-0}" in
+  0) ;;
+  1)
+    [ "$PLATFORM:$ARCH:${CHROMIX_LINUX157_X64_PVT_LINK_STAGE2_RECOVERY:-0}" = linux:x64:1 ] ||
+      die "PVT link recovery requires exact x64 stage2 donor"
+    [ "$STAGE_INDEX" -ge 3 ] && [ "$STAGE_INDEX" -le 8 ] ||
+      die "PVT link continuation requires logical stages3 through8"
+    [ "${CHROMIX_LINUX157_X64_STORAGE_RECOVERY:-0}:${CHROMIX_LINUX157_STORAGE_RECOVERY:-0}:${CHROMIX_LINUX157_UA_RECOVERY:-0}:${CHROMIX_LINUX157_PRE_GN_RECOVERY:-0}:${CHROMIX_LINUX157_POST_GN_RECOVERY:-0}:${CHROMIX_LINUX157_LOCALE_RECOVERY:-0}" = 0:0:0:0:0:0 ] ||
+      die "PVT link recovery cannot combine historical or ARM routes"
+    LINUX157_SOURCE=(python3 "$REPO/tools/linux157_x64_pvt_link.py" --command source)
+    LINUX157_BUILD=(python3 "$REPO/tools/linux157_x64_pvt_link.py" --command build)
+    LINUX157_RECOVERY=1 ;;
+  *) die "invalid PVT link recovery opt-in" ;;
+esac
 case "${CHROMIX_LINUX157_X64_STORAGE_RECOVERY:-0}" in
   0) ;;
   1)
