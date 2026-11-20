@@ -29,12 +29,25 @@ def render_stage():
     text = replace_once(text, 'elif [ -e "$WORK/fingerprint-diagnostics/mac156-x64-stage3-resume.json" ] ||',
                         'elif [ -e "$WORK/fingerprint-diagnostics/mac157-arm64-stage5-resume.json" ] ||\n'
                         '     [ -e "$WORK/fingerprint-diagnostics/mac156-x64-stage3-resume.json" ] ||')
-    text = replace_once(text, 'if [ "$RC" -ne 0 ]; then\n  die "build script failed',
+    text = replace_once(text, 'if [ "$RC" -ne 0 ]; then\n  if [ "$MAC157_CHECKPOINT" -eq 1 ]; then',
                         'if [ "$RC" -ne 0 ]; then\n'
                         '  if [ "${CHROMIX_UNCHANGED_RESUME:-}" = mac157-arm64-stage5 ]; then\n'
-                        '    bash "$REPO/build/posix/ci-parts.sh" "$WORK" "$SNAPSHOT_DIR"\n'
-                        '    emit upload_snapshot true\n'
-                        '  fi\n  die "build script failed')
+                        '    emit status failed\n'
+                        '    emit last_error "native build failed at stage $STAGE_INDEX (exit $RC)"\n'
+                        '    if python3 "$UNCHANGED_HELPER" --mode verify --repo "$REPO" --workdir "$WORK" \\\n'
+                        '        --stage "$STAGE_INDEX" > "$WORK/fingerprint-diagnostics/mac157-stage5-failed-checkpoint.json"; then\n'
+                        '      if bash "$REPO/build/posix/ci-parts.sh" "$WORK" "$SNAPSHOT_DIR"; then\n'
+                        '        emit mac157_stage5_failed_checkpoint true\n'
+                        '        emit upload_snapshot true\n'
+                        '      else\n'
+                        '        log "mac157 stage5 failed-build snapshot could not be saved"\n'
+                        '      fi\n'
+                        '    else\n'
+                        '      log "mac157 stage5 failed-build source is not eligible for a checkpoint"\n'
+                        '    fi\n'
+                        '    exit "$RC"\n'
+                        '  fi\n'
+                        '  if [ "$MAC157_CHECKPOINT" -eq 1 ]; then')
     text = replace_once(text, '  if [ -z "$UNCHANGED_HELPER" ] && { [[ "$CHROMIUM_VERSION_PIN" = 157.* ]] ||',
                         '  if { [ -z "$UNCHANGED_HELPER" ] ||\n'
                         '       [ "${CHROMIX_UNCHANGED_RESUME:-}" = mac157-arm64-stage5 ]; } &&\n'
@@ -72,6 +85,19 @@ def render():
             ('exact mac156 ARM64 HEVC migration inputs', 'exact mac157 ARM64 ICU/UA migration inputs'),
         ):
             text = text.replace(old, new)
+        failed = "(always() && inputs.platform == 'macos' && steps.stage.outcome == 'failure' && steps.stage.outputs.mac157_failed_checkpoint == 'true')"
+        resumed = "(always() && inputs.resume_migration == 'mac157-arm64-stage5' && steps.stage.outcome == 'failure' && steps.stage.outputs.mac157_stage5_failed_checkpoint == 'true')"
+        if text.count(failed) != 5:
+            raise ValueError('shared failed-checkpoint upload conditions changed')
+        text = text.replace(failed, failed + ' || ' + resumed)
+        upload_check = '''          if [ '${{ inputs.resume_migration }}' = mac157-arm64-stage5 ] &&
+             [ '${{ steps.stage.outputs.mac157_stage5_failed_checkpoint }}' = true ]; then
+            test '${{ steps.stage.outputs.status }}' = failed
+            python3 tools/migrate_macos157_arm64_stage5.py --mode verify \\
+              --workdir "${RUNNER_TEMP}/chromix-build" --stage __STAGE__ > "$UPLOAD_IDENTITY"
+          fi
+'''.replace('__STAGE__', str(stage))
+        text = replace_once(text, '          test -d "$SNAP/p1"\n', upload_check + '          test -d "$SNAP/p1"\n')
         text = replace_once(text, '      - uses: actions/checkout@v4\n\n',
                             '      - uses: actions/checkout@v4\n\n' + guard)
         jobs.append(text)

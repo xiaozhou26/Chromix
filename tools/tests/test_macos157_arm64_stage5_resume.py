@@ -34,9 +34,37 @@ def test_fixed_profile_and_exact_228_to_231_recipes():
         assert len(migration.arp.patch_selection.select(ROOT, platform)[1]) == count
 
 
+def test_target_recipe_rejects_arbitrary_build_and_tool_hashes():
+    original = migration.engine.read
+    for name in ('build/macos/build.sh', 'tools/verify_macos_checkpoint.py'):
+        def changed(root, path):
+            raw = original(root, path)
+            return raw + b'\n' if path == name else raw
+        with mock.patch.object(migration.engine, 'read', side_effect=changed), pytest.raises(ValueError, match='unreviewed'):
+            migration.recipes()
+
+
+def test_failed_checkpoint_requires_same_attempt_current_after_gate(tmp_path):
+    state = migration.load()['build_state']
+    with mock.patch.dict(os.environ, GITHUB_RUN_ID='123', GITHUB_RUN_ATTEMPT='1'), \
+            mock.patch.object(migration, 'source_state', return_value=state):
+        expected = dict(migration.identity(), continuation_run='123', continuation_attempt='1',
+                        continuation_stage=1, logical_stage=6, phase='after', state=state)
+        path = tmp_path / f'fingerprint-diagnostics/{migration.CONTINUATION}-s1-after-attempt-1.json'
+        path.parent.mkdir()
+        path.write_text(json.dumps(expected))
+        assert migration.verify_checkpoint(tmp_path, 1)['status'] == 'verified'
+        for key, value in (('continuation_run', '9'), ('phase', 'before'), ('state', {})):
+            path.write_text(json.dumps(dict(expected, **{key: value})))
+            with pytest.raises(ValueError, match='same-attempt'):
+                migration.verify_checkpoint(tmp_path, 1)
+
+
 def test_actual_archived_old228_to_new231_private_full_replay(tmp_path):
     fixture = json.loads(gzip.decompress((ROOT / 'tools/tests/fixtures/macos157_arm64_stage5_source.json.gz').read_bytes()))
     evidence = fixture['actual_migration']
+    assert evidence['profile_sha256'] == migration.PROFILE_SHA256
+    assert evidence['recipes'] == migration.recipes()
     assert evidence['source_unchanged_outputs'] is True
     assert evidence['out_stream_before'] == evidence['out_stream_after'] == migration.load()['out_stream']
     assert evidence['state'] == migration.load()['build_state']
@@ -165,6 +193,17 @@ def test_generated_workflow_and_isolated_stage_are_current():
         step = next(s for s in job['steps'] if s.get('id') == 'stage')
         assert workflow.STAGE in step['run']
         assert any('compile-release' in s.get('name', '') for s in job['steps'])
+        checkpoints = [s for s in job['steps'] if s.get('id') == 'checkpoint' or
+                       s.get('name', '').startswith('Upload tree part ')]
+        assert len(checkpoints) == 5
+        for checkpoint in checkpoints:
+            assert 'always()' in checkpoint['if']
+            assert "steps.stage.outcome == 'failure'" in checkpoint['if']
+            assert 'mac157_stage5_failed_checkpoint' in checkpoint['if']
+            assert 'mac157_failed_checkpoint' in checkpoint['if']
+        verification = next(s for s in checkpoints if s.get('id') == 'checkpoint')['run']
+        assert 'tools/migrate_macos157_arm64_stage5.py --mode verify' in verification
+        assert 'tools/verify_macos_checkpoint.py' in verification
     script = workflow.render_stage()
     subprocess.run(['/bin/bash', '-n'], input=script, text=True, check=True)
     assert 'engine.frozen_ninja(' in (ROOT / 'tools/migrate_macos157_arm64_stage5.py').read_text()
@@ -176,6 +215,7 @@ def test_generated_workflow_and_isolated_stage_are_current():
     ('smoke', None, True), ('fingerprint', None, True), ('dependencies', None, True),
     ('none', 'source', False), ('none', 'architecture', False), ('none', 'sha', False),
     ('source_after', None, False), ('archive_after', None, False), ('none', 'compile', False),
+    ('checkpoint', 'compile', False), ('snapshot', 'compile', False),
 ])
 def test_dedicated_route_runtime_nonblocking_integrity_hard(failure, damage, success):
     harness = completion.MacOSCompileReleaseTest()
@@ -187,13 +227,16 @@ def test_dedicated_route_runtime_nonblocking_integrity_hard(failure, damage, suc
             stage.write_text(workflow.render_stage())
             repo = stage.parents[2]
             parts = repo / 'build/posix/ci-parts.sh'
-            parts.write_text('#!/bin/sh\nmkdir -p "$2/p1"\nprintf snapshot > "$2/p1/tree.tar.zst.001"\n')
+            parts.write_text('#!/bin/sh\nexit 23\n' if failure == 'snapshot' else
+                             '#!/bin/sh\nmkdir -p "$2/p1"\nprintf snapshot > "$2/p1/tree.tar.zst.001"\n')
             env = kwargs['env']
             env.update(CHROMIX_UNCHANGED_RESUME='mac157-arm64-stage5')
             shim = Path(env['PATH'].split(os.pathsep)[0]) / 'python3'
             text = shim.read_text()
             needle = 'if name.startswith("validate_macos156_"):'
             replacement = ('if name == "migrate_macos157_arm64_stage5.py":\n'
+                           '    if args[args.index("--mode") + 1] == "verify" and failure == "checkpoint":\n'
+                           '        sys.exit(31)\n'
                            '    sys.exit(9 if "--mode" in args and args[args.index("--mode") + 1] == "compile" '
                            'and os.environ["FIXTURE_DAMAGE"] == "compile" else 0)\n'
                            'if name.startswith("validate_macos156_"):')
@@ -214,7 +257,16 @@ def test_dedicated_route_runtime_nonblocking_integrity_hard(failure, damage, suc
         else:
             assert outputs['finished'] == 'false'
         if damage == 'compile':
-            assert outputs['upload_snapshot'] == 'true'
-            assert (root / 'work/.snapshot-stage-1/p1/tree.tar.zst.001').exists()
+            assert result.returncode == 9
+            assert outputs['status'] == 'failed'
+            assert 'mac157_failed_checkpoint' not in outputs
+            if failure in ('checkpoint', 'snapshot'):
+                assert 'mac157_stage5_failed_checkpoint' not in outputs
+                assert 'upload_snapshot' not in outputs
+                assert not (root / 'work/.snapshot-stage-1/p1/tree.tar.zst.001').exists()
+            else:
+                assert outputs['mac157_stage5_failed_checkpoint'] == 'true'
+                assert outputs['upload_snapshot'] == 'true'
+                assert (root / 'work/.snapshot-stage-1/p1/tree.tar.zst.001').exists()
     finally:
         harness.doCleanups()

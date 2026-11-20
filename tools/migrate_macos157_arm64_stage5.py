@@ -27,7 +27,7 @@ shared = engine.migration
 require = engine.require
 ROOT = Path(__file__).resolve().parents[1]
 PROFILE = 'build/macos/mac157-arm64-stage5-checkpoint.json'
-PROFILE_SHA256 = '45235db9f8ddb943f2206c6a34d715c0a95b20520a44a493b821e3c0d000629d'
+PROFILE_SHA256 = '7310edbbba329a7f99df45128014f0b353dadfd7540de58df4ad69d1d053a2e8'
 RECEIPT = 'fingerprint-diagnostics/mac157-arm64-stage5-resume.json'
 ARCHIVED_SOURCE = 'fingerprint-diagnostics/mac157-arm64-stage5-donor-source.json'
 MARKER = '.chromix-macos157-arm64-stage5-migration.json'
@@ -132,10 +132,13 @@ def recipes(repo=ROOT, previous=None):
         require(digest(engine.read(repo, name)) == values['new'], 'unreviewed current recipe: ' + name)
         if previous is not None:
             require(digest(engine.read(previous, name)) == values['old'], 'unreviewed producer recipe: ' + name)
+    target_only = p['target_recipe_audit']['target_only_inputs']
+    for name, expected in target_only.items():
+        require(digest(engine.read(repo, name)) == expected, 'unreviewed target-only tooling: ' + name)
     if previous is not None:
         with historical_selection(previous, repo):
             require(shared.source_ready_key(previous, 'macos', 'arm64') == p['old_key'], 'wrong old preparation key')
-    return {name: values['new'] for name, values in p['recipes'].items()}
+    return {**{name: values['new'] for name, values in p['recipes'].items()}, **target_only}
 
 
 def canonical(report, original):
@@ -359,6 +362,20 @@ def continuation(work, stage, phase, repo=ROOT):
     return result
 
 
+def verify_checkpoint(work, stage, repo=ROOT):
+    """Recheck current source/state against this attempt's completed stage gate."""
+    require(1 <= stage <= 8, 'invalid checkpoint stage')
+    attempt = os.environ.get('GITHUB_RUN_ATTEMPT', '')
+    require(re.fullmatch(r'[1-9][0-9]*', attempt), 'checkpoint attempt required')
+    state = source_state(work, repo)
+    expected = dict(identity(repo), continuation_run=os.environ.get('GITHUB_RUN_ID'),
+                    continuation_attempt=attempt, continuation_stage=stage,
+                    logical_stage=5 + stage, phase='after', state=state)
+    name = f'fingerprint-diagnostics/{CONTINUATION}-s{stage}-after-attempt-{attempt}.json'
+    require(json.loads(engine.read(work, name)) == expected, 'same-attempt completed source gate required')
+    return dict(expected, qualification='Verified resumable tree; not compiled or runtime verified.')
+
+
 def compile_tree(work, stage, repo=ROOT):
     state = source_state(work, repo)
     name = f'fingerprint-diagnostics/{CONTINUATION}-s{stage}-before-attempt-{os.environ.get("GITHUB_RUN_ATTEMPT")}.json'
@@ -378,7 +395,7 @@ def compile_tree(work, stage, repo=ROOT):
 
 def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('--mode', choices=('metadata', 'admit', 'check', 'compile'), required=True)
+    parser.add_argument('--mode', choices=('metadata', 'admit', 'check', 'verify', 'compile'), required=True)
     for name in ('repo', 'workdir', 'previous-repo', 'origin', 'download-report', 'report'):
         parser.add_argument('--' + name, type=Path)
     parser.add_argument('--stage', type=int)
@@ -403,6 +420,9 @@ def main(argv=None):
             elif args.mode == 'check':
                 require(args.stage is not None and args.phase is not None, 'stage/phase required')
                 result = continuation(work, args.stage, args.phase, repo)
+            elif args.mode == 'verify':
+                require(args.stage is not None, 'checkpoint stage required')
+                result = verify_checkpoint(work, args.stage, repo)
             else:
                 require(args.stage is not None and 1 <= args.stage <= 8, 'compile stage required')
                 return compile_tree(work, args.stage, repo)

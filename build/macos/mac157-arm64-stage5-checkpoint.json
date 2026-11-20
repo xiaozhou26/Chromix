@@ -3633,7 +3633,7 @@
     },
     "build/macos/build.sh": {
       "old": "1018612629f8cc0ae2d5ccd648739d0ab125884b578d9c90f7e16da7537ada7a",
-      "new": "78d55964a5952e1d85e4d1ecde642cd232d61e2c8bd35eeb0b0392226365567b"
+      "new": "abfda669a005e9d1dc548dcfd9cd14530115fcbefb81770b7e12edf7ceb5061d"
     },
     "tools/prepare_restored_build.py": {
       "old": "8243ee45a115a7f8ad4c6bdcb2af72019b5819858f5799c2cf0b0cab51c09443",
@@ -3793,5 +3793,22 @@
     "bytes": 9356462259,
     "entries": 209731,
     "sha256": "8f2df9ca0980a8f12e00b8023a20299532a1906a3230121518bccba316ff7440"
+  },
+  "target_recipe_audit": {
+    "base_commit": "cba44dca82e70d9f8c09d78c1ff92e435a117b6a",
+    "integration_commit": "fd63aaa7d3fa18eb9995efa1e15289110e9d62f7",
+    "previous_target_build_sha256": "78d55964a5952e1d85e4d1ecde642cd232d61e2c8bd35eeb0b0392226365567b",
+    "current_target_build_sha256": "abfda669a005e9d1dc548dcfd9cd14530115fcbefb81770b7e12edf7ceb5061d",
+    "donor_to_base_diff_sha256": "bd19599eb3251cdfd8135743767e50aff337a40fd31c3b5956bb06a1ea2aa16b",
+    "base_to_current_diff_sha256": "e783ec257dae1d0eb76a0e4beb075b68f70a3a92ec6e4417564c9f2e999e1949",
+    "review": [
+      "Donor-to-cba44dc retains the failed Ninja/Crubit plan log and exits with PLAN_RC before compilation.",
+      "cba44dc-to-fd63aaa records the mac157 current-stage native-ready identity only after successful GN and plan validation.",
+      "The fixed stage5 route invokes its strict compile helper, not build/macos/build.sh; preparation, GN regeneration and broad invalidation remain forbidden.",
+      "Target-only tooling admission does not permit changes to source pre/postimages, GN, PGO, Ninja dependencies or existing compiled outputs."
+    ],
+    "target_only_inputs": {
+      "tools/verify_macos_checkpoint.py": "6134fdf4a4b40598a33e776296bb5431cb063820cff754034cb1ea4f337b5b9a"
+    }
   }
 }
