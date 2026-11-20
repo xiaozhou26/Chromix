@@ -242,10 +242,13 @@ jobs:
       # Match Chromium's install-build-deps; Go is pinned by setup-go below.
       - name: Install Linux build dependencies
         if: runner.os == 'Linux'
+        timeout-minutes: 20
         run: |
           set -euo pipefail
-          sudo apt-get update
-          sudo apt-get install -y \
+          APT_OPTIONS=(-o Acquire::http::Timeout=30 -o Acquire::https::Timeout=30
+                       -o Acquire::Retries=3 -o DPkg::Lock::Timeout=60)
+          sudo timeout -k 30s 300s apt-get "${APT_OPTIONS[@]}" update -o APT::Update::Error-Mode=any
+          sudo timeout -k 30s 600s apt-get "${APT_OPTIONS[@]}" install -y \
             apparmor-utils bison clang clang-format cmake curl flex g++ git gperf \
             libasound2-dev libatk1.0-dev libcups2-dev libdrm-dev libegl1-mesa-dev \
             libevent-dev libflac-dev libgbm-dev libglib2.0-dev libgtk-3-dev \
@@ -1007,10 +1010,13 @@ jobs:
       # Match Chromium's install-build-deps; Go is pinned by setup-go below.
       - name: Install Linux build dependencies
         if: runner.os == 'Linux'
+        timeout-minutes: 20
         run: |
           set -euo pipefail
-          sudo apt-get update
-          sudo apt-get install -y \
+          APT_OPTIONS=(-o Acquire::http::Timeout=30 -o Acquire::https::Timeout=30
+                       -o Acquire::Retries=3 -o DPkg::Lock::Timeout=60)
+          sudo timeout -k 30s 300s apt-get "${APT_OPTIONS[@]}" update -o APT::Update::Error-Mode=any
+          sudo timeout -k 30s 600s apt-get "${APT_OPTIONS[@]}" install -y \
             apparmor-utils bison clang clang-format cmake curl flex g++ git gperf \
             libasound2-dev libatk1.0-dev libcups2-dev libdrm-dev libegl1-mesa-dev \
             libevent-dev libflac-dev libgbm-dev libglib2.0-dev libgtk-3-dev \
@@ -1578,10 +1584,13 @@ jobs:
       # Match Chromium's install-build-deps; Go is pinned by setup-go below.
       - name: Install Linux build dependencies
         if: runner.os == 'Linux'
+        timeout-minutes: 20
         run: |
           set -euo pipefail
-          sudo apt-get update
-          sudo apt-get install -y \
+          APT_OPTIONS=(-o Acquire::http::Timeout=30 -o Acquire::https::Timeout=30
+                       -o Acquire::Retries=3 -o DPkg::Lock::Timeout=60)
+          sudo timeout -k 30s 300s apt-get "${APT_OPTIONS[@]}" update -o APT::Update::Error-Mode=any
+          sudo timeout -k 30s 600s apt-get "${APT_OPTIONS[@]}" install -y \
             apparmor-utils bison clang clang-format cmake curl flex g++ git gperf \
             libasound2-dev libatk1.0-dev libcups2-dev libdrm-dev libegl1-mesa-dev \
             libevent-dev libflac-dev libgbm-dev libglib2.0-dev libgtk-3-dev \
@@ -2149,10 +2158,13 @@ jobs:
       # Match Chromium's install-build-deps; Go is pinned by setup-go below.
       - name: Install Linux build dependencies
         if: runner.os == 'Linux'
+        timeout-minutes: 20
         run: |
           set -euo pipefail
-          sudo apt-get update
-          sudo apt-get install -y \
+          APT_OPTIONS=(-o Acquire::http::Timeout=30 -o Acquire::https::Timeout=30
+                       -o Acquire::Retries=3 -o DPkg::Lock::Timeout=60)
+          sudo timeout -k 30s 300s apt-get "${APT_OPTIONS[@]}" update -o APT::Update::Error-Mode=any
+          sudo timeout -k 30s 600s apt-get "${APT_OPTIONS[@]}" install -y \
             apparmor-utils bison clang clang-format cmake curl flex g++ git gperf \
             libasound2-dev libatk1.0-dev libcups2-dev libdrm-dev libegl1-mesa-dev \
             libevent-dev libflac-dev libgbm-dev libglib2.0-dev libgtk-3-dev \
@@ -2720,10 +2732,13 @@ jobs:
       # Match Chromium's install-build-deps; Go is pinned by setup-go below.
       - name: Install Linux build dependencies
         if: runner.os == 'Linux'
+        timeout-minutes: 20
         run: |
           set -euo pipefail
-          sudo apt-get update
-          sudo apt-get install -y \
+          APT_OPTIONS=(-o Acquire::http::Timeout=30 -o Acquire::https::Timeout=30
+                       -o Acquire::Retries=3 -o DPkg::Lock::Timeout=60)
+          sudo timeout -k 30s 300s apt-get "${APT_OPTIONS[@]}" update -o APT::Update::Error-Mode=any
+          sudo timeout -k 30s 600s apt-get "${APT_OPTIONS[@]}" install -y \
             apparmor-utils bison clang clang-format cmake curl flex g++ git gperf \
             libasound2-dev libatk1.0-dev libcups2-dev libdrm-dev libegl1-mesa-dev \
             libevent-dev libflac-dev libgbm-dev libglib2.0-dev libgtk-3-dev \
@@ -3291,10 +3306,13 @@ jobs:
       # Match Chromium's install-build-deps; Go is pinned by setup-go below.
       - name: Install Linux build dependencies
         if: runner.os == 'Linux'
+        timeout-minutes: 20
         run: |
           set -euo pipefail
-          sudo apt-get update
-          sudo apt-get install -y \
+          APT_OPTIONS=(-o Acquire::http::Timeout=30 -o Acquire::https::Timeout=30
+                       -o Acquire::Retries=3 -o DPkg::Lock::Timeout=60)
+          sudo timeout -k 30s 300s apt-get "${APT_OPTIONS[@]}" update -o APT::Update::Error-Mode=any
+          sudo timeout -k 30s 600s apt-get "${APT_OPTIONS[@]}" install -y \
             apparmor-utils bison clang clang-format cmake curl flex g++ git gperf \
             libasound2-dev libatk1.0-dev libcups2-dev libdrm-dev libegl1-mesa-dev \
             libevent-dev libflac-dev libgbm-dev libglib2.0-dev libgtk-3-dev \
@@ -3862,10 +3880,13 @@ jobs:
       # Match Chromium's install-build-deps; Go is pinned by setup-go below.
       - name: Install Linux build dependencies
         if: runner.os == 'Linux'
+        timeout-minutes: 20
         run: |
           set -euo pipefail
-          sudo apt-get update
-          sudo apt-get install -y \
+          APT_OPTIONS=(-o Acquire::http::Timeout=30 -o Acquire::https::Timeout=30
+                       -o Acquire::Retries=3 -o DPkg::Lock::Timeout=60)
+          sudo timeout -k 30s 300s apt-get "${APT_OPTIONS[@]}" update -o APT::Update::Error-Mode=any
+          sudo timeout -k 30s 600s apt-get "${APT_OPTIONS[@]}" install -y \
             apparmor-utils bison clang clang-format cmake curl flex g++ git gperf \
             libasound2-dev libatk1.0-dev libcups2-dev libdrm-dev libegl1-mesa-dev \
             libevent-dev libflac-dev libgbm-dev libglib2.0-dev libgtk-3-dev \
@@ -4433,10 +4454,13 @@ jobs:
       # Match Chromium's install-build-deps; Go is pinned by setup-go below.
       - name: Install Linux build dependencies
         if: runner.os == 'Linux'
+        timeout-minutes: 20
         run: |
           set -euo pipefail
-          sudo apt-get update
-          sudo apt-get install -y \
+          APT_OPTIONS=(-o Acquire::http::Timeout=30 -o Acquire::https::Timeout=30
+                       -o Acquire::Retries=3 -o DPkg::Lock::Timeout=60)
+          sudo timeout -k 30s 300s apt-get "${APT_OPTIONS[@]}" update -o APT::Update::Error-Mode=any
+          sudo timeout -k 30s 600s apt-get "${APT_OPTIONS[@]}" install -y \
             apparmor-utils bison clang clang-format cmake curl flex g++ git gperf \
             libasound2-dev libatk1.0-dev libcups2-dev libdrm-dev libegl1-mesa-dev \
             libevent-dev libflac-dev libgbm-dev libglib2.0-dev libgtk-3-dev \

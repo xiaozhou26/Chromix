@@ -6,7 +6,10 @@ import difflib
 import json
 import os
 from pathlib import Path
+import shlex
+import shutil
 import subprocess
+import sys
 from unittest import mock
 
 import pytest
@@ -118,6 +121,80 @@ def test_dedicated_workflow_is_exact_and_keeps_failure_preservation():
     caller=yaml.safe_load((ROOT/'.github/workflows/build-linux157-x64-ua-resume.yml').read_text())
     assert caller['concurrency']['cancel-in-progress'] is False
     event=caller.get('on',caller.get(True));assert set(event['workflow_dispatch']['inputs'])=={'compile_jobs'}
+
+
+@pytest.mark.parametrize('failure,code,commands', [
+    ('none', 0, ['update', 'install']),
+    ('update-error', 100, ['update']),
+    ('install-error', 100, ['update', 'install']),
+    ('update-timeout', 124, ['update']),
+    ('install-timeout', 124, ['update', 'install']),
+])
+def test_generated_apt_commands_fail_closed(tmp_path, failure, code, commands):
+    data = yaml.safe_load(workflow.render())
+    steps = data['jobs']['posix-1']['steps']
+    dependencies = next(s for s in steps if s.get('name') == 'Install Linux build dependencies')
+    stage = next(s for s in steps if s.get('id') == 'stage')
+    assert dependencies['timeout-minutes'] == 20
+    assert 'continue-on-error' not in dependencies
+    assert 'if' not in stage  # The build retains GitHub Actions' default success() gate.
+    assert steps.index(dependencies) < steps.index(stage)
+    for number in range(2, 9):
+        job = data['jobs'][f'posix-{number}']
+        assert f"needs.posix-{number - 1}.result == 'success'" in job['if']
+        assert next(s for s in job['steps'] if s.get('name') == dependencies['name']) == dependencies
+
+    real_timeout = shutil.which('timeout') or shutil.which('gtimeout')
+    assert real_timeout, 'GNU timeout is required for executable timeout coverage'
+    put(tmp_path / 'bin/sudo', '#!/bin/sh\nexec "$@"\n')
+    # Keep the generated timeout arguments checked; only shorten the test clock.
+    put(tmp_path / 'bin/timeout', f'''#!/bin/bash
+set -euo pipefail
+test "$1:$2" = '-k:30s'
+case "$3" in 300s|600s) ;; *) exit 91 ;; esac
+printf '%s\\n' "$3" >> "$TIMEOUT_LOG"
+shift 3
+exec {shlex.quote(real_timeout)} -k 1s 1s "$@"
+''')
+    put(tmp_path / 'bin/apt-get', f'''#!{sys.executable}
+import json, os, sys, time
+args = sys.argv[1:]
+with open(os.environ['CALL_LOG'], 'a') as log:
+    log.write(json.dumps(args) + '\\n')
+command = 'update' if 'update' in args else 'install'
+if os.environ['FAILURE'] == command + '-timeout':
+    time.sleep(60)
+if os.environ['FAILURE'] == command + '-error':
+    raise SystemExit(100)
+''')
+    put(tmp_path / 'build/posix/ci-stage.sh', '#!/bin/sh\nprintf "build\\n" >> "$BUILD_LOG"\n')
+    (tmp_path / 'chromix-logs').mkdir()
+    env = dict(os.environ, PATH=str(tmp_path / 'bin') + os.pathsep + os.environ['PATH'],
+               CALL_LOG=str(tmp_path / 'calls'), BUILD_LOG=str(tmp_path / 'build-calls'),
+               TIMEOUT_LOG=str(tmp_path / 'timeouts'), FAILURE=failure,
+               RUNNER_TEMP=str(tmp_path), CHROMIX_JOB_START_EPOCH='0')
+    build_run = stage['run']
+    for key, value in [('inputs.platform', 'linux'), ('inputs.arch', 'x64'), ("inputs['max-stages']", '8')]:
+        build_run = build_run.replace('${{ ' + key + ' }}', value)
+    assert '${{' not in build_run
+    result = subprocess.run(['bash', '-c', dependencies['run'] + '\n' + build_run],
+                            cwd=tmp_path, env=env, capture_output=True, text=True, timeout=10)
+    assert result.returncode == code, result.stderr
+    assert (tmp_path / 'build-calls').exists() == (code == 0)
+    calls = [json.loads(line) for line in (tmp_path / 'calls').read_text().splitlines()]
+    assert len(calls) == len(commands)
+    options = ['-o', 'Acquire::http::Timeout=30', '-o', 'Acquire::https::Timeout=30',
+               '-o', 'Acquire::Retries=3', '-o', 'DPkg::Lock::Timeout=60']
+    for args, command in zip(calls, commands):
+        assert args[:len(options)] == options
+        assert args[len(options)] == command
+        if command == 'update':
+            assert args[len(options) + 1:] == ['-o', 'APT::Update::Error-Mode=any']
+        else:
+            assert args[len(options) + 1] == '-y'
+            assert not any(arg.startswith('-') for arg in args[len(options) + 2:])
+    assert (tmp_path / 'timeouts').read_text().splitlines() == [
+        '300s' if command == 'update' else '600s' for command in commands]
 
 
 @pytest.mark.parametrize('arch,locale_optin,expected',[('x64','0',True),('x64','1',False),('arm64','0',False)])

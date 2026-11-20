@@ -12,6 +12,20 @@ OUT = Path('.github/workflows/build-linux157-x64-ua-stages.yml')
 
 def render():
     body = base.HEADER + '\n'.join(base.job(s) for s in range(1, base.STAGES + 1)) + '\n' + base.NATIVE_LINUX_ARM64
+    # Bound only this recovery route; frozen sibling workflows keep their dependency step.
+    dependencies = base.LINUX_CLEAN.replace(
+        "      - name: Install Linux build dependencies\n        if: runner.os == 'Linux'\n",
+        "      - name: Install Linux build dependencies\n        if: runner.os == 'Linux'\n        timeout-minutes: 20\n",
+    ).replace(
+        '          sudo apt-get update\n',
+        '          APT_OPTIONS=(-o Acquire::http::Timeout=30 -o Acquire::https::Timeout=30\n'
+        '                       -o Acquire::Retries=3 -o DPkg::Lock::Timeout=60)\n'
+        '          sudo timeout -k 30s 300s apt-get "${APT_OPTIONS[@]}" update -o APT::Update::Error-Mode=any\n',
+    ).replace(
+        '          sudo apt-get install -y ',
+        '          sudo timeout -k 30s 600s apt-get "${APT_OPTIONS[@]}" install -y ',
+    )
+    body = body.replace(base.LINUX_CLEAN, dependencies)
     body = body.replace('name: build-posix-github', 'name: build-linux157-x64-ua-stages')
     body = body.replace('linux157_locale_recovery', 'linux157_ua_recovery')
     body = body.replace('CHROMIX_LINUX157_LOCALE_RECOVERY', 'CHROMIX_LINUX157_UA_RECOVERY')
