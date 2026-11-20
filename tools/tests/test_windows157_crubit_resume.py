@@ -3,6 +3,7 @@ from copy import deepcopy
 from datetime import datetime, timezone
 import gzip
 import hashlib
+import io
 import json
 import os
 from pathlib import Path
@@ -11,6 +12,7 @@ import subprocess
 import sys
 from types import SimpleNamespace
 from unittest import mock
+import zipfile
 
 import pytest
 
@@ -18,13 +20,13 @@ ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / "tools"))
 import windows157_tools as tools
 import windows157_crubit_resume as resume
-import gen_windows_arm64_workflow as generator
 from test_windows157 import pe_dll, put, host_tree, FILES
 
 HISTORICAL_AUDIT = json.loads(gzip.decompress((ROOT / 'tools/tests/fixtures/windows157_crubit_checkpoint.json.gz').read_bytes()))
 AUDIT = json.loads(gzip.decompress((ROOT / 'tools/tests/fixtures/windows157_handle_native.json.gz').read_bytes()))['latest_checkpoint']
 SOURCE = json.loads(gzip.decompress((ROOT / 'tools/tests/fixtures/windows157_crubit_source.json.gz').read_bytes()))
 NOW = datetime(2026, 11, 19, 16, tzinfo=timezone.utc)
+HISTORICAL_TARGET = "9449625271c13a351ceab1a271f00699c54ac2b2"
 
 
 class Client:
@@ -185,32 +187,74 @@ def test_authenticated_download_requires_both_contiguous_volumes():
 
 
 @pytest.fixture(scope='module')
-def recipe(tmp_path_factory):
+def historical_target(tmp_path_factory):
+    target = tmp_path_factory.mktemp('windows157-old232').resolve()
+    archive = subprocess.check_output(['git', '-C', str(ROOT), 'archive', '--format=zip', HISTORICAL_TARGET])
+    tree = resume.git_tree('git', ROOT, HISTORICAL_TARGET)
+    with zipfile.ZipFile(io.BytesIO(archive)) as source:
+        for item in source.infolist():
+            if item.is_dir():
+                continue
+            mode, kind, oid = tree[item.filename]
+            assert kind == 'blob' and mode in ('100644', '100755')
+            raw = source.read(item)
+            assert oid in {hashlib.sha1(f'blob {len(data)}\0'.encode() + data).hexdigest()
+                           for data in (raw, raw.replace(b'\r\n', b'\n'))}, item.filename
+            path = target / item.filename
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_bytes(raw)
+            path.chmod(int(mode, 8) & 0o777)
+    # Preserve real Git refs/blobs for recipe_view without checking out current main files.
+    subprocess.run(['git', 'init', '--quiet', str(target)], check=True)
+    common = subprocess.check_output(['git', '-C', str(ROOT), 'rev-parse', '--path-format=absolute',
+                                      '--git-common-dir'], text=True).strip()
+    (target / '.git/objects/info/alternates').write_text(str(Path(common) / 'objects') + '\n')
+    subprocess.run(['git', '-C', str(target), 'update-ref', 'refs/heads/historical', HISTORICAL_TARGET], check=True)
+    subprocess.run(['git', '-C', str(target), 'symbolic-ref', 'HEAD', 'refs/heads/historical'], check=True)
+    selected = json.loads(historical_python(target,
+        "import json,sys; from pathlib import Path; import patch_selection; "
+        "print(json.dumps(patch_selection.select(Path(sys.argv[1]), 'windows')[0]))", target))
+    assert len(selected['patches']) == 232
+    return target
+
+
+def historical_python(target, script, *arguments):
+    env = {key: value for key, value in os.environ.items() if not key.startswith(('PYTHON', 'GIT_'))}
+    env.update(PYTHONDONTWRITEBYTECODE='1', PYTHONPATH=str(target / 'tools'),
+               GIT_CONFIG_NOSYSTEM='1', GIT_CONFIG_GLOBAL=os.devnull)
+    return subprocess.check_output([sys.executable, '-c', script, *map(str, arguments)],
+                                   cwd=target / 'tools', env=env, text=True)
+
+
+@pytest.fixture(scope='module')
+def recipe(tmp_path_factory, historical_target):
     directory = tmp_path_factory.mktemp('crubit-recipe').resolve()
     view = directory / resume.VIEW
-    resume.recipe_view(ROOT, view, 'git')
-    resume.view_identity(ROOT, view, 'git')
+    historical_python(historical_target,
+        "import sys; from pathlib import Path; import windows157_crubit_resume as r; "
+        "r.recipe_view(Path(sys.argv[1]), Path(sys.argv[2]), 'git'); "
+        "r.view_identity(Path(sys.argv[1]), Path(sys.argv[2]), 'git')", historical_target, view)
     return view
 
 
-def test_linux_only_main_change_preserves_exact_windows_donor_recipe(recipe):
+def test_linux_only_main_change_preserves_exact_windows_donor_recipe(recipe, historical_target):
     donor = json.loads(subprocess.check_output(['git', '-C', str(ROOT), 'show', resume.RECIPE_SHA + ':build/patch-selection-157.json']))
-    current = json.loads((ROOT / 'build/patch-selection-157.json').read_text())
+    current = json.loads((historical_target / 'build/patch-selection-157.json').read_text())
     assert donor != current
     assert resume.windows_recipe(donor) == resume.windows_recipe(current)
     actual = subprocess.check_output([sys.executable, str(recipe / 'tools/patch_selection.py'), '--repo', str(recipe),
                                       '--platform', 'windows', '--key', 'windows'], text=True).strip()
     assert actual == resume.PREPARE_KEY
-    assert (recipe / resume.HELPER).read_bytes() == (ROOT / resume.HELPER).read_bytes()
+    assert (recipe / resume.HELPER).read_bytes() == (historical_target / resume.HELPER).read_bytes()
     assert (recipe / 'build/windows/ci-stage.ps1').read_bytes().replace(b'\r\n', b'\n') == subprocess.check_output(
         ['git', '-C', str(ROOT), 'show', resume.RECIPE_SHA + ':build/windows/ci-stage.ps1'])
     assert b'\r\n' in (recipe / 'build/windows/lite-tarball-files/v8/test/torque/test-torque.tq').read_bytes()
 
 
-def test_complete_real_affected_sources_and_all_232_patches(recipe, tmp_path):
+def test_complete_real_affected_sources_and_all_232_patches(recipe, tmp_path, historical_target):
     src = tmp_path.resolve() / 'src'
     for name, text in SOURCE['files'].items(): put(src / name, text)
-    assert len(resume.full_source(ROOT, src)) == 176
+    assert len(resume.full_source(historical_target, src)) == 176
     report = tmp_path.resolve() / 'source.json'
     subprocess.run([sys.executable, str(recipe / 'tools/verify_patch_stack.py'), '--repo', str(recipe), '--src', str(src),
                     '--platform', 'windows', '--output', str(report)], check=True, capture_output=True)
@@ -218,21 +262,22 @@ def test_complete_real_affected_sources_and_all_232_patches(recipe, tmp_path):
     # A change outside a patch hunk must fail complete-file proof too.
     path = src / 'content/renderer/render_thread_impl.cc'
     path.write_bytes(path.read_bytes() + b'\n// unrelated injected source\n')
-    with pytest.raises(ValueError, match='complete affected-source'): resume.full_source(ROOT, src)
+    with pytest.raises(ValueError, match='complete affected-source'): resume.full_source(historical_target, src)
 
 
-def test_recipe_tamper_is_not_admitted(recipe):
+def test_recipe_tamper_is_not_admitted(recipe, historical_target):
     helper = recipe / resume.HELPER
     before = helper.read_bytes()
     try:
         helper.write_bytes(before + b'# changed\n')
-        with pytest.raises(ValueError, match='helper changed'): resume.view_identity(ROOT, recipe, 'git')
+        with pytest.raises(ValueError, match='helper changed'): resume.view_identity(historical_target, recipe, 'git')
     finally:
         helper.write_bytes(before)
 
 
-def test_dedicated_workflow_cannot_start_fresh_or_choose_other_donor():
-    workflow = generator.crubit_resume_workflow()
+def test_dedicated_workflow_cannot_start_fresh_or_choose_other_donor(historical_target):
+    workflow = json.loads(historical_python(historical_target,
+        "import json; import gen_windows_arm64_workflow as g; print(json.dumps(g.crubit_resume_workflow()))"))
     assert set(workflow['on']['workflow_dispatch']['inputs']) == {'compile_jobs'}
     assert set(workflow['on']) == {'workflow_dispatch'}
     for i in range(1, 13):
@@ -245,8 +290,9 @@ def test_dedicated_workflow_cannot_start_fresh_or_choose_other_donor():
     assert 'if' not in restore
     assert restore['run'].index('--phase metadata') < restore['run'].index('download_windows_snapshot.py') < restore['run'].index('--phase admit')
     assert '--phase initialize' not in restore['run']
-    assert (ROOT / f'.github/workflows/{resume.WORKFLOW}.yml').read_text() == generator.render_crubit_resume()
-    ci = (ROOT / 'build/windows/ci-stage.ps1').read_text()
+    assert (historical_target / f'.github/workflows/{resume.WORKFLOW}.yml').read_text() == historical_python(
+        historical_target, "import gen_windows_arm64_workflow as g; print(g.render_crubit_resume(), end='')")
+    ci = (historical_target / 'build/windows/ci-stage.ps1').read_text()
     assert ci.index('--phase view') < ci.index('$Repo = "C:\\c\\windows157-crubit-recipe"')
     assert 'historical fresh entries cannot change versions' in ci
     assert '--phase view' in ci and '$FromSynced' in ci
@@ -307,20 +353,20 @@ def test_consumer_cannot_be_generic_fresh_wrong_sha_or_other_attempt():
         with mock.patch.dict(os.environ, dict(env, **{key: value})), pytest.raises(ValueError): resume.consumer()
 
 
-def test_reviewed_code_tuple_and_pinned_source_proof_are_exact():
+def test_reviewed_code_tuple_and_pinned_source_proof_are_exact(historical_target):
     old = subprocess.check_output(['git', '-C', str(ROOT), 'show', resume.DONOR_SHA + ':' + resume.HELPER])
-    assert (hashlib.sha256(old).hexdigest(), hashlib.sha256((ROOT / resume.HELPER).read_bytes()).hexdigest()) == resume.HELPER_TUPLE
-    assert hashlib.sha256((ROOT / resume.PROOF).read_bytes()).hexdigest() == resume.PROOF_SHA256
+    assert (hashlib.sha256(old).hexdigest(), hashlib.sha256((historical_target / resume.HELPER).read_bytes()).hexdigest()) == resume.HELPER_TUPLE
+    assert hashlib.sha256((historical_target / resume.PROOF).read_bytes()).hexdigest() == resume.PROOF_SHA256
     for name, expected in resume.RECOVERY_CODE.items():
-        assert hashlib.sha256((ROOT / name).read_bytes().replace(b'\r\n', b'\n')).hexdigest() == expected
+        assert hashlib.sha256((historical_target / name).read_bytes().replace(b'\r\n', b'\n')).hexdigest() == expected
 
 
-def test_cargo_install_does_not_touch_arm64_cache_path():
-    stage = (ROOT / 'build/windows/ci-stage.ps1').read_text()
+def test_cargo_install_does_not_touch_arm64_cache_path(historical_target):
+    stage = (historical_target / 'build/windows/ci-stage.ps1').read_text()
     start = stage.index('if ($Fresh157) {', stage.index('if ($RestoredUpstream) {\n    python'))
     assert '--phase prepare' in stage[start:stage.index('  $gn = ', start)]
     assert '$Fresh157 = $FreshNative' in stage and '-and $Arch -eq "x64"' in stage
-    source = (ROOT / 'tools/windows157_tools.py').read_text()
+    source = (historical_target / 'tools/windows157_tools.py').read_text()
     assert 'if restored or args.arch != "x64":' in source
     assert 'if not executable.exists():' in source
 
@@ -345,3 +391,20 @@ def test_current_main_base_includes_reviewed_platform_inputs_without_wildcards()
         changed = dict(base, **{name: ('100644', 'blob', 'f' * 40)})
         with pytest.raises(ValueError, match='outside reviewed'):
             resume.reviewed_changes('git', ROOT, resume.MAIN_BASE, base, changed)
+
+
+def test_current235_is_rejected_by_unmodified_historical232_gate(historical_target, tmp_path):
+    selected, _ = resume.patch_selection.select(ROOT, 'windows')
+    assert len(selected['patches']) == 235
+    destination = tmp_path.resolve() / 'must-not-exist'
+    with pytest.raises(ValueError, match='Windows platform recipe changed'):
+        resume.recipe_view(ROOT, destination, 'git')
+    assert not destination.exists()
+    output = historical_python(historical_target,
+        "import sys; from pathlib import Path; import windows157_crubit_resume as r; "
+        "repo=Path(sys.argv[1]); dest=Path(sys.argv[2]); "
+        "\ntry: r.recipe_view(repo, dest, 'git')"
+        "\nexcept ValueError as error: assert str(error)=='Windows platform recipe changed'; print('rejected235')"
+        "\nelse: raise AssertionError('historical232 gate admitted235')", ROOT, destination)
+    assert output.strip() == 'rejected235'
+    assert not destination.exists()
