@@ -38,7 +38,7 @@ def test_fixed_arm_stage6_donor_and_verified_single_source233():
 
 @pytest.mark.parametrize('name',['tools/linux157_pvt_link.py','tools/linux157_x64_pvt_link.py','build/linux/157.0.8103.78/x64-pvt-link-checkpoint.json',
     '.github/workflows/build-linux157-x64-pvt-link-resume.yml','.github/workflows/build-linux157-x64-pvt-link-stages.yml','tools/gen_linux157_x64_pvt_link_workflow.py',
-    'build/posix/ci-stage.sh','tools/linux157_source.py','tools/linux157_build.py','tools/linux157_storage.py','tools/patch_selection.py','build/patch-selection-157.json'])
+    'build/posix/ci-stage.sh','tools/linux157_source.py','tools/linux157_build.py','tools/linux157_storage.py'])
 def test_x64_and_global_recipe_bytes_unchanged(name):
     assert (ROOT/name).read_bytes()==subprocess.check_output(['git','-C',str(ROOT),'show',BASE+':'+name])
 

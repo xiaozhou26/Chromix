@@ -2403,6 +2403,126 @@
                 "runtime_verified": false
               },
               "qualification": "Independent exact x64 stage2 link-tree profile continues at stage3. Only0242 removes the disabled PVT service factory include and dependency; full old232 prefix/raw bytes and canonical series remain mandatory. Old x64 Storage profile stays an immutable232 contract and cannot admit233. Shared recipe and ARM inputs have zero delta. Source-only clone evidence retains blockers and never calls full admit or writes completion marker. Two read-only archive scans preserve233149 output records including62541 ThinLTO entries; they do not verify local output inodes or full compiled-tree admission. Cloud restore/full-output admission and continued build remain required."
+            },
+            "arm64_pvt_link_profile": {
+              "manifest": {
+                "path": "build/linux/157.0.8103.78/arm64-pvt-link-checkpoint.json",
+                "sha256": "d165dc25f7a777cbcae6e723b5121404efd82c78983b696ac11e0270e36df71a"
+              },
+              "helper": {
+                "path": "tools/linux157_arm64_pvt_link.py",
+                "sha256": "560e2fc816f607b9f0bd6b04e5869e085b0baaf5517b35b93fcc43d9c61bda13"
+              },
+              "engine": {
+                "path": "tools/linux157_pvt_link.py",
+                "sha256": "51c9a9c6468cee226184235f22fd6468e178feee0d1b71809acf3c33d2bab903"
+              },
+              "route_inputs": {
+                "build/posix/ci-stage-arm64-pvt-link.sh": "25d250f894cd792c4e237fa1291dac52e2d84c59b9f39eb92a5faa8ca9e66882",
+                "tools/gen_linux157_arm64_pvt_link_workflow.py": "36efeeaf329e8f2c8cb14c22286c4175c6743989c47cf00599164f1a1abd4344",
+                ".github/workflows/build-linux157-arm64-pvt-link-resume.yml": "9e691a02309e39c89b555722f1d1daa461c2e55418d523a8490cc5224b6cec7d",
+                ".github/workflows/build-linux157-arm64-pvt-link-stages.yml": "656d4ae6ad4d288f7172d0ef74d24bdb940644b21325b0b2d045e9ef0e9172b1"
+              },
+              "recipe_sha256": "f72b67654204d0447a1f3732463382a6f0a7a16877ee35b2c51d00c22ca8adc2",
+              "run_id": 44701383685,
+              "job_id": 136170356964,
+              "head_sha": "8147b39e782ed933ee2e9cb8b8e3fa734c53399b",
+              "arch": "arm64",
+              "stage": 6,
+              "attempt": 1,
+              "continuation_stage": 7,
+              "old_patch_count": 232,
+              "new_patch_count": 233
+            },
+            "arm64_pvt_link_profile_review": {
+              "baseline_commit": "bebc7d38b6abab3ca8ed10c0dc06984ce0db0084",
+              "implementation_commit": "b4ba6acc716a2fbd1baae4cfe728c24c8b5fb7b1",
+              "shared_recipe_sha256": "f72b67654204d0447a1f3732463382a6f0a7a16877ee35b2c51d00c22ca8adc2",
+              "global_recipe_delta": {
+                "added": {},
+                "changed": {},
+                "removed": []
+              },
+              "profile_binding_sha256": "738cf6e9877359bca2668622be729d5be8c2d92b1a7d54b49762cd37d9def5da",
+              "donor": {
+                "arch": "arm64",
+                "run_id": 44701383685,
+                "job_id": 136170356964,
+                "stage": 6,
+                "attempt": 1,
+                "continuation_stage": 7,
+                "head_sha": "8147b39e782ed933ee2e9cb8b8e3fa734c53399b",
+                "workflow_path": ".github/workflows/build-linux157-arm64-storage-resume.yml",
+                "artifact": {
+                  "digest": "sha256:fe2bd6ef09355c30becdc17b2e42afee51aaeab56842e3285585b7e6d29add33",
+                  "expires_at": "2026-11-23T11:48:26Z",
+                  "id": 14625498615,
+                  "name": "chromix-linux-arm64-tree-s6-attempt-1-part1",
+                  "size_in_bytes": 5488969487
+                }
+              },
+              "source_migration": {
+                "additions": [
+                  {
+                    "patch": "patches/chromium157-additions/0242-linux-disabled-private-verification-token-factory-dependency.patch",
+                    "sha256": "8f737d17fc5689e7fdb5893b0c72ad6e0fbae2dbecd9549284f5f1b9b938a137",
+                    "targets": [
+                      "chrome/browser/browsing_data/chrome_browsing_data_remover_delegate_factory.cc"
+                    ]
+                  }
+                ],
+                "new_patch_count": 233,
+                "old_patch_count": 232,
+                "sources": {
+                  "chrome/browser/browsing_data/chrome_browsing_data_remover_delegate_factory.cc": {
+                    "after": "9a15070321a1a959262f9f857d195e782512f1dda6208b3ca07443a262845ae1",
+                    "before": "6d30fc730f5b9bc379742e9c377dc4fd663e233ea8fe43d303e93d6dd8c0a573"
+                  }
+                },
+                "status": "verified"
+              },
+              "output_tree": {
+                "entries": 331933,
+                "sha256": "d7d9ee4af3b9fb73824a5669c39dd3e2cdcf07ba335ea5cf42ef1258e285f57a"
+              },
+              "link_cache": {
+                "bytes": 1119231640,
+                "entries": 44706,
+                "files": 44706,
+                "identity": {
+                  "entries": 44706,
+                  "sha256": "639113ad60a0e45de66693b53ee45a9c77339e15ef30be10eb516dc3d8892262"
+                },
+                "path": "src/out/Chromix/thinlto-cache"
+              },
+              "preserved_x64_inputs": {
+                ".github/workflows/build-linux157-x64-pvt-link-resume.yml": "b5a3594ccfe0f49ebe72f9377b9a7d48d1114abf19f551b0ec1c2daa42d5b772",
+                ".github/workflows/build-linux157-x64-pvt-link-stages.yml": "44622675669113d534525d29239391addf2aee598749b65c7c05af0f9532763f",
+                "build/linux/157.0.8103.78/x64-pvt-link-checkpoint.json": "bcc6f630679fbcea57d5e2803b034d5208d03289d2776b7c0b4d5ffd6ac101ba",
+                "build/posix/ci-stage.sh": "27b4a0b3883cf5948932594589b7477ccc8d1969bee29f81e703b0f561e0c80c",
+                "patches/series": "71613faf45339ae3debd3dcf8afb95101989c4e6537d14dc7b0cebd1766f5863",
+                "tools/gen_linux157_x64_pvt_link_workflow.py": "c58e3ab8cb99e7858b53af1c614952baecd393c74e5acabfdfddc66e1f6b8a94",
+                "tools/linux157_build.py": "c84adaa69f782b85a74112295572d3fea454bd3d7f7ea636fd9854e3123bf9dc",
+                "tools/linux157_pvt_link.py": "51c9a9c6468cee226184235f22fd6468e178feee0d1b71809acf3c33d2bab903",
+                "tools/linux157_source.py": "f8675d110ffc9b4b73a2049d23659075a7de055b9b3bf3fd75808350a213a244",
+                "tools/linux157_storage.py": "7d41e5e9f6e0d2a029db3a1d7954e9189bb7ace2cc4b3c682829bb259bec9818",
+                "tools/linux157_x64_pvt_link.py": "0641c2ffe8f90475714497566f04d4bc8ce61669c68276ce2a40f1c68a7e5053"
+              },
+              "evidence_sha256": {
+                "review-delta.json": "fc766622a343b0bf1b6256c96f34c4ec79ebc232309422256620340232ae7d4f",
+                "handoff-final.json": "ca9e58ba4398150230861c42386dd9d4fc570a77eec4e416815ce3246c0c443e",
+                "source233-report.json": "eb58b6cf9f85e7b885814905257e2e972a93257144855a2daf5a87f5fe77f67e",
+                "archive-audit.json": "c2b3e53514e85d3aa6e924c1cec72a43065146a115ace899536bb0641f55f059"
+              },
+              "verification_limits": {
+                "source_only_replay_and_guarded_publication": true,
+                "archive_integrity_verified": true,
+                "local_output_inode_verified": false,
+                "full_output_admission_verified": false,
+                "full_checkpoint_verified": false,
+                "runtime_verified": false
+              },
+              "qualification": "Independent fixed ARM stage6 donor continues at stage7 through its own wrapper, stage script and workflow. Exact0242 migrates old232 to233; it does not relabel old source. Shared recipe inputs and x64 engine/profile/routes stay byte-identical. Source-only evidence validates full old/new private replay and guarded single-source publication while retaining both blockers and no completion marker. Archive stream integrity is not local output/inode or full compiled-tree admission. Cloud full-output restore/admission and native runtime gates remain required."
             }
           },
           "patch_count": 233,

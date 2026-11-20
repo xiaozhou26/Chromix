@@ -674,6 +674,70 @@ def test_real_pvt233_contract_never_accepts_unknown_sources(mutation):
         link.validate_additions(selected, raw, donor, ROOT)
 
 
+def test_arm_pvt_binding_preserves_x64_and_shared_recipe_history():
+    from tools import linux157_arm64_pvt_link as arm
+    from tools import linux157_x64_pvt_link as x64
+    from tools import linux157_storage as shared
+    historical = json.loads(blob(selection.MANIFEST157, "bebc7d38b6abab3ca8ed10c0dc06984ce0db0084"))
+    old = historical["platforms"]["linux"]["downstream"]
+    assert old["recipe"] == DOWNSTREAM["recipe"] == arm.source.recipe(ROOT)
+    previous = old["validation"]["recipe_integration"]
+    current = DOWNSTREAM["validation"]["recipe_integration"]
+    for name, value in previous.items():
+        assert current[name] == value
+    assert set(current) - set(previous) == {"arm64_pvt_link_profile", "arm64_pvt_link_profile_review"}
+    selected, raw = selection.select(ROOT, "linux")
+    assert arm.authenticate(ROOT) == x64.authenticate(ROOT) == selected
+    defaults = arm.engine.load, shared.verify_current, shared.verify_current_ninja
+    with arm.profile(ROOT) as active:
+        donor = active.load(ROOT, "arm64")
+        assert (donor["run_id"], donor["stage"], donor["continuation_stage"]) == (44701383685, 6, 7)
+        assert selected["patches"][:232] == donor["source_receipt"]["chromix_selection"]["patches"]
+        active.validate_additions(selected, raw, donor, ROOT)
+        active.recipe_delta(donor["source_receipt"]["recipe"], DOWNSTREAM["recipe"], ROOT, "arm64")
+        with pytest.raises(ValueError):
+            active.load(ROOT, "x64")
+    assert (arm.engine.load, shared.verify_current, shared.verify_current_ninja) == defaults
+    assert x64.authenticate(ROOT) == selected
+
+
+@pytest.fixture
+def arm_pvt_repo(linux_repo):
+    binding = DOWNSTREAM["validation"]["recipe_integration"]["arm64_pvt_link_profile"]
+    for name in [binding[key]["path"] for key in ("helper", "engine", "manifest")] + list(binding["route_inputs"]):
+        store(linux_repo, name, (ROOT / name).read_bytes())
+    return linux_repo
+
+
+@pytest.mark.parametrize("name", [
+    *[DOWNSTREAM["validation"]["recipe_integration"]["arm64_pvt_link_profile"][key]["path"]
+      for key in ("helper", "engine", "manifest")],
+    *DOWNSTREAM["validation"]["recipe_integration"]["arm64_pvt_link_profile"]["route_inputs"],
+])
+@pytest.mark.parametrize("mutation", ["tamper", "missing", "symlink"])
+def test_arm_pvt_profile_rejects_actual_input_drift(arm_pvt_repo, name, mutation):
+    from tools import linux157_arm64_pvt_link as arm
+    repo = arm_pvt_repo
+    assert arm.authenticate(repo)
+    path = repo / name
+    if mutation == "tamper":
+        path.write_bytes(path.read_bytes() + b"\n")
+    elif mutation == "missing":
+        path.unlink()
+    else:
+        path.unlink()
+        path.symlink_to(ROOT / name)
+    with pytest.raises(ValueError):
+        arm.authenticate(repo)
+
+
+@pytest.mark.parametrize("arch", ["x64", "aarch64", "ARM64", "", None])
+def test_arm_pvt_unknown_architecture_rejected(arch):
+    from tools import linux157_arm64_pvt_link as arm
+    with pytest.raises(ValueError):
+        arm.load(ROOT, arch)
+
+
 def test_reviewed_activation_preserves_real_origin_and_effective_core(linux_repo, monkeypatch):
     activate(linux_repo, monkeypatch)
     identity, patches = selection.select(linux_repo, "linux")
