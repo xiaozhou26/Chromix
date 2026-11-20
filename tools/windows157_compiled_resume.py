@@ -38,10 +38,20 @@ TARGETS = ("base/i18n/icubridge/default_icu_locale.h",
            "components/embedder_support/user_agent_utils.cc")
 RECOVERY_CODE = {
     "tools/windows157_ninja_state.py": "3709b6dd13acd547637c880ad46de3a46cbb3d1b97ca5e1dfdcb02cb3c284d9f",
-    "build/windows/ci-stage.ps1": "41b3687231d946faed780f2257e1ffec6772864cb67659e74f88690d62620d56",
-    "tools/gen_windows_arm64_workflow.py": "bcfa855361b524480ed317575a29aa4d588f40e0e1c1e12f2411062b87280554",
+    "build/windows/ci-stage.ps1": "26e4eae152eb7f7e99b7e21e9213627c6e661c0a79fc0708c33a5d0b5de326c8",
+    "tools/gen_windows_arm64_workflow.py": "d5a03724b5d28ce322bf04c7db9f52365c1a1ffc48ea3dfee2ae648e48c103a9",
     ".github/workflows/build-win-x64-157-compiled-resume.yml": "b626dd46ddb75d767bbfca485dfff6ad19d0999a0c665615ea8244c8506de7ee"
 }
+# Reviewed diagnostics/packing transitions; source and ABI inputs stay frozen.
+RECIPE_TRANSITIONS = {
+    "build/windows/ensure-windows-sdk.ps1": (
+        "d29e85307bc4fd41066cb381b6a5c0284b9a8ef209622534252fa06450df9f87",
+        "908e27b2f20127235a0e2f0d900d262b0dc43794b88739fcf29b58cbee63ce63"),
+    "build/windows/ci-parts.ps1": (
+        "0706dbccd6a3f5f2c219b0f3e8e7b47a882618c164b296f8b056f308a9d09b60",
+        "edeec3250bfaf537e85af631b7665c4c1bc570a81779978b3bb7d16002626c03"),
+}
+
 RECIPE_FILES = ("build/args.windows.gn", "build/windows/lite-tarball-files/v8/test/torque/test-torque.tq",
                 "CHROMIUM_WINDOWS_VERSION",
                 "UNGOOGLED_WINDOWS_VERSION", "tools/windows157_fresh.py", "tools/windows157_tools.py",
@@ -212,11 +222,23 @@ def scoped_recipe(repo, git):
     return digest(json.dumps(windows_recipe_projection(current), sort_keys=True, separators=(",", ":")).encode())
 
 
+def approved_recipe_updates(repo, git):
+    updates = {}
+    for name, (before, after) in RECIPE_TRANSITIONS.items():
+        old = origin.blob(git, repo, RECIPE_BASE, name).replace(b"\r\n", b"\n")
+        new = files._file(repo, name).read_bytes().replace(b"\r\n", b"\n")
+        if digest(old) != before or digest(new) != after:
+            raise ValueError("unreviewed compiled recipe transition: " + name)
+        updates[name] = new
+    return updates
+
+
 def checkout(repo):
     git = files._host_git((repo,))
     head, tree = files._tree(git, repo, os.environ.get("GITHUB_SHA") or None)
     files._tracked(repo, tree)
     scoped_recipe(repo, git)
+    approved_recipe_updates(repo, git)
     # Only the frozen Windows recipe executes; other platform orchestration is not an input.
     base = origin.git_tree(git, repo, RECIPE_BASE)
     scope = {name for name in set(base) | set(tree) if name.startswith("build/windows/")}
@@ -224,6 +246,10 @@ def checkout(repo):
               "build/windows/windows157-arm64-stage6-checkpoint.json"}
     scoped = set(RECIPE_FILES) | scope
     for name in scoped:
+        if name in RECIPE_TRANSITIONS:
+            if tree.get(name, ())[:2] != base.get(name, ())[:2]:
+                raise ValueError("compiled recipe input mode changed: " + name)
+            continue
         if tree.get(name) != base.get(name):
             raise ValueError("unreviewed Windows preparation tool input: " + name)
     from platform_pins import load_pins
@@ -247,6 +273,7 @@ def recipe_view(repo, view, git):
     import io
     import zipfile
     tree = origin.git_tree(git, repo, RECIPE_BASE)
+    updates = approved_recipe_updates(repo, git)
     if not view.exists():
         view.mkdir(parents=True)
         with zipfile.ZipFile(io.BytesIO(files._git(git, repo, "archive", "--format=zip", RECIPE_BASE))) as archive:
@@ -256,7 +283,7 @@ def recipe_view(repo, view, git):
                 name = patches._relative(item.filename)
                 path = view / name
                 path.parent.mkdir(parents=True, exist_ok=True)
-                data = archive.read(item)
+                data = updates.get(name, archive.read(item))
                 if name == "build/windows/lite-tarball-files/v8/test/torque/test-torque.tq":
                     data = data.replace(b"\r\n", b"\n").replace(b"\n", b"\r\n")
                 path.write_bytes(data)
@@ -268,9 +295,18 @@ def recipe_view(repo, view, git):
         raise ValueError("compiled Windows recipe view inventory changed")
     for name, (_, kind, oid) in tree.items():
         raw = files._file(view, name).read_bytes()
+        if name in updates:
+            if digest(raw.replace(b"\r\n", b"\n")) not in RECIPE_TRANSITIONS[name]:
+                raise ValueError("compiled recipe transition view changed: " + name)
+            continue
         if kind != "blob" or oid not in {hashlib.sha1(f"blob {len(b)}\0".encode() + b).hexdigest()
                                          for b in (raw, raw.replace(b"\r\n", b"\n"))}:
             raise ValueError("compiled Windows recipe view content changed: " + name)
+    # Upgrade only a fully authenticated historical view; no source/output writes.
+    for name, raw in updates.items():
+        path = files._file(view, name)
+        if path.read_bytes().replace(b"\r\n", b"\n") != raw:
+            atomic_bytes(path, raw, stat.S_IMODE(path.stat().st_mode))
     return preparation_key(view)
 
 

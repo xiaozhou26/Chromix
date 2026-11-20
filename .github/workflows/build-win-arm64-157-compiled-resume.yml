@@ -104,8 +104,10 @@ jobs:
       env:
         UPLOAD_PARTS: ${{ steps.stage.outputs.upload_parts }}
         STAGE_OUTCOME: ${{ steps.stage.outcome }}
+      id: compiled_snapshot
     - name: Upload tree part 1
-      if: ${{ always() && steps.stage.outputs.snapshot_safe == 'true' && steps.stage.outputs.finished != 'true' }}
+      if: ${{ always() && steps.stage.outputs.snapshot_safe == 'true' && steps.stage.outputs.finished != 'true' && steps.compiled_snapshot.outcome
+        == 'success' }}
       uses: actions/upload-artifact@v4
       with:
         name: win-arm64-157-compiled-tree-s7-attempt-${{ github.run_attempt }}-part1
@@ -114,7 +116,8 @@ jobs:
         retention-days: 14
         compression-level: 0
     - name: Upload tree part 2
-      if: ${{ always() && steps.stage.outputs.snapshot_safe == 'true' && steps.stage.outputs.finished != 'true' }}
+      if: ${{ always() && steps.stage.outputs.snapshot_safe == 'true' && steps.stage.outputs.finished != 'true' && steps.compiled_snapshot.outcome
+        == 'success' }}
       uses: actions/upload-artifact@v4
       with:
         name: win-arm64-157-compiled-tree-s7-attempt-${{ github.run_attempt }}-part2
@@ -123,7 +126,8 @@ jobs:
         retention-days: 14
         compression-level: 0
     - name: Upload tree part 3
-      if: ${{ always() && steps.stage.outputs.snapshot_safe == 'true' && steps.stage.outputs.finished != 'true' }}
+      if: ${{ always() && steps.stage.outputs.snapshot_safe == 'true' && steps.stage.outputs.finished != 'true' && steps.compiled_snapshot.outcome
+        == 'success' }}
       uses: actions/upload-artifact@v4
       with:
         name: win-arm64-157-compiled-tree-s7-attempt-${{ github.run_attempt }}-part3
@@ -132,7 +136,8 @@ jobs:
         retention-days: 14
         compression-level: 0
     - name: Upload tree part 4
-      if: ${{ always() && steps.stage.outputs.snapshot_safe == 'true' && steps.stage.outputs.finished != 'true' }}
+      if: ${{ always() && steps.stage.outputs.snapshot_safe == 'true' && steps.stage.outputs.finished != 'true' && steps.compiled_snapshot.outcome
+        == 'success' }}
       uses: actions/upload-artifact@v4
       with:
         name: win-arm64-157-compiled-tree-s7-attempt-${{ github.run_attempt }}-part4
@@ -230,8 +235,10 @@ jobs:
       env:
         UPLOAD_PARTS: ${{ steps.stage.outputs.upload_parts }}
         STAGE_OUTCOME: ${{ steps.stage.outcome }}
+      id: compiled_snapshot
     - name: Upload tree part 1
-      if: ${{ always() && steps.stage.outputs.snapshot_safe == 'true' && steps.stage.outputs.finished != 'true' }}
+      if: ${{ always() && steps.stage.outputs.snapshot_safe == 'true' && steps.stage.outputs.finished != 'true' && steps.compiled_snapshot.outcome
+        == 'success' }}
       uses: actions/upload-artifact@v4
       with:
         name: win-arm64-157-compiled-tree-s8-attempt-${{ github.run_attempt }}-part1
@@ -240,7 +247,8 @@ jobs:
         retention-days: 14
         compression-level: 0
     - name: Upload tree part 2
-      if: ${{ always() && steps.stage.outputs.snapshot_safe == 'true' && steps.stage.outputs.finished != 'true' }}
+      if: ${{ always() && steps.stage.outputs.snapshot_safe == 'true' && steps.stage.outputs.finished != 'true' && steps.compiled_snapshot.outcome
+        == 'success' }}
       uses: actions/upload-artifact@v4
       with:
         name: win-arm64-157-compiled-tree-s8-attempt-${{ github.run_attempt }}-part2
@@ -249,7 +257,8 @@ jobs:
         retention-days: 14
         compression-level: 0
     - name: Upload tree part 3
-      if: ${{ always() && steps.stage.outputs.snapshot_safe == 'true' && steps.stage.outputs.finished != 'true' }}
+      if: ${{ always() && steps.stage.outputs.snapshot_safe == 'true' && steps.stage.outputs.finished != 'true' && steps.compiled_snapshot.outcome
+        == 'success' }}
       uses: actions/upload-artifact@v4
       with:
         name: win-arm64-157-compiled-tree-s8-attempt-${{ github.run_attempt }}-part3
@@ -258,7 +267,8 @@ jobs:
         retention-days: 14
         compression-level: 0
     - name: Upload tree part 4
-      if: ${{ always() && steps.stage.outputs.snapshot_safe == 'true' && steps.stage.outputs.finished != 'true' }}
+      if: ${{ always() && steps.stage.outputs.snapshot_safe == 'true' && steps.stage.outputs.finished != 'true' && steps.compiled_snapshot.outcome
+        == 'success' }}
       uses: actions/upload-artifact@v4
       with:
         name: win-arm64-157-compiled-tree-s8-attempt-${{ github.run_attempt }}-part4
@@ -355,8 +365,10 @@ jobs:
       env:
         UPLOAD_PARTS: ${{ steps.stage.outputs.upload_parts }}
         STAGE_OUTCOME: ${{ steps.stage.outcome }}
+      id: compiled_snapshot
     - name: Upload tree part 1
-      if: ${{ always() && steps.stage.outputs.snapshot_safe == 'true' && steps.stage.outputs.finished != 'true' }}
+      if: ${{ always() && steps.stage.outputs.snapshot_safe == 'true' && steps.stage.outputs.finished != 'true' && steps.compiled_snapshot.outcome
+        == 'success' }}
       uses: actions/upload-artifact@v4
       with:
         name: win-arm64-157-compiled-tree-s9-attempt-${{ github.run_attempt }}-part1
@@ -365,7 +377,8 @@ jobs:
         retention-days: 14
         compression-level: 0
     - name: Upload tree part 2
-      if: ${{ always() && steps.stage.outputs.snapshot_safe == 'true' && steps.stage.outputs.finished != 'true' }}
+      if: ${{ always() && steps.stage.outputs.snapshot_safe == 'true' && steps.stage.outputs.finished != 'true' && steps.compiled_snapshot.outcome
+        == 'success' }}
       uses: actions/upload-artifact@v4
       with:
         name: win-arm64-157-compiled-tree-s9-attempt-${{ github.run_attempt }}-part2
@@ -374,7 +387,8 @@ jobs:
         retention-days: 14
         compression-level: 0
     - name: Upload tree part 3
-      if: ${{ always() && steps.stage.outputs.snapshot_safe == 'true' && steps.stage.outputs.finished != 'true' }}
+      if: ${{ always() && steps.stage.outputs.snapshot_safe == 'true' && steps.stage.outputs.finished != 'true' && steps.compiled_snapshot.outcome
+        == 'success' }}
       uses: actions/upload-artifact@v4
       with:
         name: win-arm64-157-compiled-tree-s9-attempt-${{ github.run_attempt }}-part3
@@ -383,7 +397,8 @@ jobs:
         retention-days: 14
         compression-level: 0
     - name: Upload tree part 4
-      if: ${{ always() && steps.stage.outputs.snapshot_safe == 'true' && steps.stage.outputs.finished != 'true' }}
+      if: ${{ always() && steps.stage.outputs.snapshot_safe == 'true' && steps.stage.outputs.finished != 'true' && steps.compiled_snapshot.outcome
+        == 'success' }}
       uses: actions/upload-artifact@v4
       with:
         name: win-arm64-157-compiled-tree-s9-attempt-${{ github.run_attempt }}-part4
@@ -480,8 +495,10 @@ jobs:
       env:
         UPLOAD_PARTS: ${{ steps.stage.outputs.upload_parts }}
         STAGE_OUTCOME: ${{ steps.stage.outcome }}
+      id: compiled_snapshot
     - name: Upload tree part 1
-      if: ${{ always() && steps.stage.outputs.snapshot_safe == 'true' && steps.stage.outputs.finished != 'true' }}
+      if: ${{ always() && steps.stage.outputs.snapshot_safe == 'true' && steps.stage.outputs.finished != 'true' && steps.compiled_snapshot.outcome
+        == 'success' }}
       uses: actions/upload-artifact@v4
       with:
         name: win-arm64-157-compiled-tree-s10-attempt-${{ github.run_attempt }}-part1
@@ -490,7 +507,8 @@ jobs:
         retention-days: 14
         compression-level: 0
     - name: Upload tree part 2
-      if: ${{ always() && steps.stage.outputs.snapshot_safe == 'true' && steps.stage.outputs.finished != 'true' }}
+      if: ${{ always() && steps.stage.outputs.snapshot_safe == 'true' && steps.stage.outputs.finished != 'true' && steps.compiled_snapshot.outcome
+        == 'success' }}
       uses: actions/upload-artifact@v4
       with:
         name: win-arm64-157-compiled-tree-s10-attempt-${{ github.run_attempt }}-part2
@@ -499,7 +517,8 @@ jobs:
         retention-days: 14
         compression-level: 0
     - name: Upload tree part 3
-      if: ${{ always() && steps.stage.outputs.snapshot_safe == 'true' && steps.stage.outputs.finished != 'true' }}
+      if: ${{ always() && steps.stage.outputs.snapshot_safe == 'true' && steps.stage.outputs.finished != 'true' && steps.compiled_snapshot.outcome
+        == 'success' }}
       uses: actions/upload-artifact@v4
       with:
         name: win-arm64-157-compiled-tree-s10-attempt-${{ github.run_attempt }}-part3
@@ -508,7 +527,8 @@ jobs:
         retention-days: 14
         compression-level: 0
     - name: Upload tree part 4
-      if: ${{ always() && steps.stage.outputs.snapshot_safe == 'true' && steps.stage.outputs.finished != 'true' }}
+      if: ${{ always() && steps.stage.outputs.snapshot_safe == 'true' && steps.stage.outputs.finished != 'true' && steps.compiled_snapshot.outcome
+        == 'success' }}
       uses: actions/upload-artifact@v4
       with:
         name: win-arm64-157-compiled-tree-s10-attempt-${{ github.run_attempt }}-part4
@@ -605,8 +625,10 @@ jobs:
       env:
         UPLOAD_PARTS: ${{ steps.stage.outputs.upload_parts }}
         STAGE_OUTCOME: ${{ steps.stage.outcome }}
+      id: compiled_snapshot
     - name: Upload tree part 1
-      if: ${{ always() && steps.stage.outputs.snapshot_safe == 'true' && steps.stage.outputs.finished != 'true' }}
+      if: ${{ always() && steps.stage.outputs.snapshot_safe == 'true' && steps.stage.outputs.finished != 'true' && steps.compiled_snapshot.outcome
+        == 'success' }}
       uses: actions/upload-artifact@v4
       with:
         name: win-arm64-157-compiled-tree-s11-attempt-${{ github.run_attempt }}-part1
@@ -615,7 +637,8 @@ jobs:
         retention-days: 14
         compression-level: 0
     - name: Upload tree part 2
-      if: ${{ always() && steps.stage.outputs.snapshot_safe == 'true' && steps.stage.outputs.finished != 'true' }}
+      if: ${{ always() && steps.stage.outputs.snapshot_safe == 'true' && steps.stage.outputs.finished != 'true' && steps.compiled_snapshot.outcome
+        == 'success' }}
       uses: actions/upload-artifact@v4
       with:
         name: win-arm64-157-compiled-tree-s11-attempt-${{ github.run_attempt }}-part2
@@ -624,7 +647,8 @@ jobs:
         retention-days: 14
         compression-level: 0
     - name: Upload tree part 3
-      if: ${{ always() && steps.stage.outputs.snapshot_safe == 'true' && steps.stage.outputs.finished != 'true' }}
+      if: ${{ always() && steps.stage.outputs.snapshot_safe == 'true' && steps.stage.outputs.finished != 'true' && steps.compiled_snapshot.outcome
+        == 'success' }}
       uses: actions/upload-artifact@v4
       with:
         name: win-arm64-157-compiled-tree-s11-attempt-${{ github.run_attempt }}-part3
@@ -633,7 +657,8 @@ jobs:
         retention-days: 14
         compression-level: 0
     - name: Upload tree part 4
-      if: ${{ always() && steps.stage.outputs.snapshot_safe == 'true' && steps.stage.outputs.finished != 'true' }}
+      if: ${{ always() && steps.stage.outputs.snapshot_safe == 'true' && steps.stage.outputs.finished != 'true' && steps.compiled_snapshot.outcome
+        == 'success' }}
       uses: actions/upload-artifact@v4
       with:
         name: win-arm64-157-compiled-tree-s11-attempt-${{ github.run_attempt }}-part4
@@ -730,8 +755,10 @@ jobs:
       env:
         UPLOAD_PARTS: ${{ steps.stage.outputs.upload_parts }}
         STAGE_OUTCOME: ${{ steps.stage.outcome }}
+      id: compiled_snapshot
     - name: Upload tree part 1
-      if: ${{ always() && steps.stage.outputs.snapshot_safe == 'true' && steps.stage.outputs.finished != 'true' }}
+      if: ${{ always() && steps.stage.outputs.snapshot_safe == 'true' && steps.stage.outputs.finished != 'true' && steps.compiled_snapshot.outcome
+        == 'success' }}
       uses: actions/upload-artifact@v4
       with:
         name: win-arm64-157-compiled-tree-s12-attempt-${{ github.run_attempt }}-part1
@@ -740,7 +767,8 @@ jobs:
         retention-days: 14
         compression-level: 0
     - name: Upload tree part 2
-      if: ${{ always() && steps.stage.outputs.snapshot_safe == 'true' && steps.stage.outputs.finished != 'true' }}
+      if: ${{ always() && steps.stage.outputs.snapshot_safe == 'true' && steps.stage.outputs.finished != 'true' && steps.compiled_snapshot.outcome
+        == 'success' }}
       uses: actions/upload-artifact@v4
       with:
         name: win-arm64-157-compiled-tree-s12-attempt-${{ github.run_attempt }}-part2
@@ -749,7 +777,8 @@ jobs:
         retention-days: 14
         compression-level: 0
     - name: Upload tree part 3
-      if: ${{ always() && steps.stage.outputs.snapshot_safe == 'true' && steps.stage.outputs.finished != 'true' }}
+      if: ${{ always() && steps.stage.outputs.snapshot_safe == 'true' && steps.stage.outputs.finished != 'true' && steps.compiled_snapshot.outcome
+        == 'success' }}
       uses: actions/upload-artifact@v4
       with:
         name: win-arm64-157-compiled-tree-s12-attempt-${{ github.run_attempt }}-part3
@@ -758,7 +787,8 @@ jobs:
         retention-days: 14
         compression-level: 0
     - name: Upload tree part 4
-      if: ${{ always() && steps.stage.outputs.snapshot_safe == 'true' && steps.stage.outputs.finished != 'true' }}
+      if: ${{ always() && steps.stage.outputs.snapshot_safe == 'true' && steps.stage.outputs.finished != 'true' && steps.compiled_snapshot.outcome
+        == 'success' }}
       uses: actions/upload-artifact@v4
       with:
         name: win-arm64-157-compiled-tree-s12-attempt-${{ github.run_attempt }}-part4

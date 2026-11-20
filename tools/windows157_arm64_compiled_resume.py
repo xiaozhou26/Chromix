@@ -18,7 +18,7 @@ tools = recovery.tools
 MANIFEST = "build/windows/windows157-arm64-stage6-checkpoint.json"
 MANIFEST_SHA256 = "b19cd67c45bc584aaa21210b058ce527a7be52e054d930201909a4b0c9905572"
 WORKFLOW = "build-win-arm64-157-compiled-resume"
-WORKFLOW_SHA256 = "283b8f458e8594407569e242347641a806d97f35111626c53f5ccda0688941d9"
+WORKFLOW_SHA256 = "92660bf1429f8d52681a9b6cff17cf2e2593b58a05963f49e4a9bb8982f812da"
 BASE_CHECKOUT = recovery.checkout
 
 
@@ -184,6 +184,7 @@ def receipt_binding(work, m):
             "shared_helper_sha256": recovery.digest(Path(recovery.__file__).read_bytes().replace(b"\r\n", b"\n")),
             "workflow_sha256": WORKFLOW_SHA256,
             "recipe_base": recovery.RECIPE_BASE,
+            "approved_runtime_recipe_sha256": {name: hashes[1] for name, hashes in recovery.RECIPE_TRANSITIONS.items()},
             "original_source_receipt_sha256": recovery.digest(json.dumps(m["source_receipt"], sort_keys=True, separators=(",", ":")).encode()),
             "windows_recipe_sha256": recovery.scoped_recipe(Path(__file__).resolve().parents[1], "git"),
             "original_producer_job_id": m["job_id"], "original_producer_stage": 6,

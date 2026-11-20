@@ -266,3 +266,36 @@ def test_recovery_orchestration_pins_and_historical_workflows_are_exact():
         assert subprocess.check_output(['git','-C',str(ROOT),'show',recovery.RECIPE_BASE+':'+name])==(ROOT/name).read_bytes()
     assert recovery.TARGETS==tuple(pin['target'] for pin in recovery.load(ROOT)['additions'])
     assert recovery.load(ROOT)['stage']==3
+
+
+def test_exact_sdk_and_packing_transitions_preserve_source_recipe(tmp_path):
+    view = tmp_path.resolve() / recovery.VIEW
+    key = recovery.recipe_view(ROOT, view, "git")
+    assert key == "5aeed0d6dfb4f3fabe34dd9b9dd75f10ac9645b9c15c0a16f5b29c9a3bc4b1cc"
+    assert set(recovery.RECIPE_TRANSITIONS) == {"build/windows/ensure-windows-sdk.ps1", "build/windows/ci-parts.ps1"}
+    for name, (before, after) in recovery.RECIPE_TRANSITIONS.items():
+        old = subprocess.check_output(["git", "-C", str(ROOT), "show", recovery.RECIPE_BASE + ":" + name])
+        assert recovery.digest(old.replace(b"\r\n", b"\n")) == before
+        assert recovery.digest((ROOT / name).read_bytes().replace(b"\r\n", b"\n")) == after
+        assert recovery.digest((view / name).read_bytes().replace(b"\r\n", b"\n")) == after
+        (view / name).write_bytes(old)
+    # Historical extracted recipe views can be upgraded only after full authentication.
+    assert recovery.recipe_view(ROOT, view, "git") == key
+    for name, (_, after) in recovery.RECIPE_TRANSITIONS.items():
+        assert recovery.digest((view / name).read_bytes().replace(b"\r\n", b"\n")) == after
+    target = view / "build/windows/ci-parts.ps1"
+    target.write_bytes(target.read_bytes() + b"\n# unreviewed\n")
+    with pytest.raises(ValueError, match="transition view"):
+        recovery.recipe_view(ROOT, view, "git")
+
+
+def test_approved_runtime_input_rejects_unreviewed_sdk_bytes(tmp_path):
+    repo = tmp_path.resolve()
+    name = "build/windows/ensure-windows-sdk.ps1"
+    target = repo / name
+    target.parent.mkdir(parents=True)
+    target.write_bytes((ROOT / name).read_bytes() + b"\n# unreviewed\n")
+    original = recovery.origin.blob
+    with mock.patch.object(recovery.origin, "blob", side_effect=lambda git, path, sha, name: original(git, ROOT, sha, name)):
+        with pytest.raises(ValueError, match="unreviewed compiled recipe transition"):
+            recovery.approved_recipe_updates(repo, "git")

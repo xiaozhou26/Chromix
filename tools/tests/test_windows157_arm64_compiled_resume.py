@@ -107,6 +107,7 @@ def test_arm_workflow_stage7_to12_and_original_native_acceptance():
         for step in j["steps"]:
             if step.get("name", "").startswith("Upload tree part"):
                 assert "snapshot_safe" in step["if"] and f"arm64-157-compiled-tree-s{i}" in step["with"]["name"]
+                assert "steps.compiled_snapshot.outcome == 'success'" in step["if"]
     assert (ROOT / f".github/workflows/{arm.WORKFLOW}.yml").read_text() == generator.render_arm64_compiled_resume()
 
 
@@ -134,10 +135,10 @@ def test_arm_gn_exact_no_cold_output_and_no_x64_profile(tmp_path):
     with pytest.raises(ValueError, match="cold"): arm.retained_gn_contract(ROOT, work)
 
 
-def test_no_sdk_installer_changes_or_cold_reprepare():
+def test_exact_approved_sdk_transition_without_cold_reprepare():
     path = "build/windows/ensure-windows-sdk.ps1"
     assert (ROOT / path).read_bytes().replace(b"\r\n", b"\n") == subprocess.check_output(
-        ["git", "-C", str(ROOT), "show", "f679ecc:" + path]).replace(b"\r\n", b"\n")
+        ["git", "-C", str(ROOT), "show", "63ba8d9:" + path]).replace(b"\r\n", b"\n")
     ci = (ROOT / "build/windows/ci-stage.ps1").read_text()
     assert 'if ($RestoredUpstream -and -not $CompiledRecovery)' in ci
     assert 'if (-not $CompiledRecovery)' in ci
@@ -280,3 +281,21 @@ def test_legacy_x64_receipt_has_no_new_arm_binding_requirement(tmp_path):
             x64.resume(ROOT, ROOT, work, m, "a" * 40)
         assert "continuation identity mismatch" not in str(error.value)
         assert ".chromix-patches" in str(error.value)
+
+
+def test_arm_snapshot_phase_preserves_real_compile_not_failed_restore():
+    ci = (ROOT / "build/windows/ci-stage.ps1").read_text()
+    start = ci.index('Write-Host "==> Chromix CI stage')
+    initial = ci.index('Write-OutVar snapshot_safe false', start)
+    sdk = ci.index('Install-WindowsSdk', initial)
+    ready = ci.index('if ($FromSynced) { Write-OutVar snapshot_safe true }', sdk)
+    ninja = ci.index('Write-Host "==> Ninja compile jobs:', ready)
+    assert initial < sdk < ready < ninja
+    handoff = ci[ci.index('function Save-Handoff'):ci.index('function Assert-CiScripts')]
+    assert handoff.index('snapshot_safe false') < handoff.index('ci-parts.ps1') < handoff.index('upload_parts true') < handoff.index('snapshot_safe true')
+    for i in range(7, 13):
+        steps = generator.arm64_compiled_resume_workflow()["jobs"][f"build-{i}"]["steps"]
+        snapshot = next(s for s in steps if s.get("id") == "compiled_snapshot")
+        assert "steps.stage.outputs.snapshot_safe == 'true'" in snapshot["if"]
+        assert "STAGE_OUTCOME -ne 'success'" in snapshot["run"]
+        assert "-Arch arm64" in snapshot["run"]

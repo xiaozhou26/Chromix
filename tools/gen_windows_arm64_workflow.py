@@ -372,9 +372,11 @@ def arm64_compiled_resume_workflow():
                 step['with']['pattern'] = (f'win-arm64-157-compiled-tree-s{index-1}-attempt-'
                     '${{ needs.build-' + str(index - 1) + '.outputs.snapshot_attempt }}-part*')
             if label.startswith('Upload tree part'):
+                step['if'] = step['if'].replace(' }}', " && steps.compiled_snapshot.outcome == 'success' }}")
                 part = label.rsplit(' ', 1)[1]
                 step['with']['name'] = f'win-arm64-157-compiled-tree-s{index}-attempt-${{{{ github.run_attempt }}}}-part{part}'
             if label == 'Ensure build tree snapshot':
+                step['id'] = 'compiled_snapshot'
                 step['run'] = step['run'].replace('-Arch x64', '-Arch arm64')
             if label in ('Upload fingerprint diagnostics', 'Upload final bundle'):
                 step['with'] = {k: v.replace('win-x64', 'win-arm64') if isinstance(v, str) else v
