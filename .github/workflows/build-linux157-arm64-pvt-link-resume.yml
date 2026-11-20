@@ -1,0 +1,34 @@
+name: build-linux157-arm64-pvt-link-resume
+run-name: Linux157 arm64 compiled stage6 44701383685 to logical stage7 PVT link repair
+
+on:
+  workflow_dispatch:
+    inputs:
+      compile_jobs:
+        description: 'Ninja jobs; exact stage6 donor and reviewed single-source233 link repair are fixed'
+        type: string
+        default: auto
+
+permissions:
+  actions: read
+  contents: read
+
+concurrency:
+  group: linux157-arm64-pvt-link-resume-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  resume:
+    name: Linux157 arm64 (latest stage6 compiled tree, continue stage7)
+    uses: ./.github/workflows/build-linux157-arm64-pvt-link-stages.yml
+    with:
+      platform: linux
+      arch: arm64
+      runner: ubuntu-24.04
+      artifact: chromix-linux-arm64
+      max-stages: 8
+      build_profile: fast
+      compile_jobs: ${{ inputs.compile_jobs || 'auto' }}
+      use_upstream_cache: false
+      linux157_pvt_link_recovery: true
+    secrets: inherit
