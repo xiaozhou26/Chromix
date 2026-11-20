@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
   "status": "verified",
-  "manifest_sha256": "637e507bbd3b48ec5fe1bd89e9b2177097bdf9214cb70569ddfdb2fb96ca8dd0",
+  "manifest_sha256": "dc5c555e6c1ab35c5368f274c3e2276179ddf54efa6ec0f0e4e2fdbb18c88537",
   "qualification": "Exact-source structural replay; all nine Linux downstream platform replacements and complete Chromix stacks. Core is intersecting-file subset only. No compilation/runtime, full GN/link or production selector/helper integration is claimed.",
   "historical_root224_and156_bytes_unchanged": true,
   "added_lines_preserved": [
@@ -47,7 +47,7 @@
     "patches/chromium157-additions/0234-macos-empty-angle-native-default.patch",
     "patches/chromium157-additions/0235-macos-hevc-recorder-mime.patch"
   ],
-  "source_file_count": 210,
+  "source_file_count": 211,
   "overlay_coverage": {
     "core": {
       "omitted": [
@@ -6957,7 +6957,7 @@
       "overlay_mode": "downstream-nine-patch-recipe",
       "build_verified": false,
       "runtime_verified": false,
-      "expected_patch_count": 232,
+      "expected_patch_count": 233,
       "patches": [
         {
           "path": "patches/0001-base-BUILD-gn.patch",
@@ -9510,6 +9510,17 @@
           "postimages": {
             "content/browser/devtools/protocol_config.json": "d6583c5f4da418a214756c50fd0e7e9d8975bb53c05740983e6ad431678c0fbe"
           }
+        },
+        {
+          "path": "patches/chromium157-additions/0242-linux-disabled-private-verification-token-factory-dependency.patch",
+          "sha256": "8f737d17fc5689e7fdb5893b0c72ad6e0fbae2dbecd9549284f5f1b9b938a137",
+          "status": "applied",
+          "preimages": {
+            "chrome/browser/browsing_data/chrome_browsing_data_remover_delegate_factory.cc": "6d30fc730f5b9bc379742e9c377dc4fd663e233ea8fe43d303e93d6dd8c0a573"
+          },
+          "postimages": {
+            "chrome/browser/browsing_data/chrome_browsing_data_remover_delegate_factory.cc": "9a15070321a1a959262f9f857d195e782512f1dda6208b3ca07443a262845ae1"
+          }
         }
       ],
       "predecessors": [
@@ -10024,12 +10035,12 @@
           "sha256": "d338adf0c712319a3b8efa666f57d378c6cef3bb31a027681a87e97694346417"
         }
       },
-      "patch_count": 232,
+      "patch_count": 233,
       "roundtrip": {
         "status": "verified",
         "method": "reverse-forward-exact-bytes",
-        "patch_count": 241,
-        "scope": "platform9-plus-chromix232",
+        "patch_count": 242,
+        "scope": "platform9-plus-chromix233",
         "initial": {
           "base/BUILD.gn": "2619e16bd05092597a911f7b0f9e51c3363d7a7267527d79150165fb873aa9aa",
           "base/i18n/icubridge/default_icu_locale.h": "f415c2354ec91b6a69bdda447a6fc160d744cf1cfa2ed15b82d759c30080c04b",
@@ -10037,6 +10048,7 @@
           "base/uxr_config.h": null,
           "base/uxr_pixel_noise.h": null,
           "chrome/app/chrome_main.cc": "9bca15fa0892300b0696f4fab3d4d6559bd62abaab746be00512a674fc2a1d43",
+          "chrome/browser/browsing_data/chrome_browsing_data_remover_delegate_factory.cc": "6d30fc730f5b9bc379742e9c377dc4fd663e233ea8fe43d303e93d6dd8c0a573",
           "chrome/browser/chrome_browser_main.cc": "039ef6326e170d43b1f333d632ee4d3929584904f7f14d0c41b33d46a24e85f9",
           "chrome/browser/component_updater/widevine_cdm_component_installer.cc": "107dbb7d930c66a5da279e948b027ebc963a5b9b435ff5fcfaff066ed7fe5a33",
           "chrome/browser/devtools/inspector_protocol_config.json": "449d07d778c0a65bf4ba6d6324dd540ec31a47f96bd6113f19c9871f3d100ca7",
@@ -10252,6 +10264,7 @@
           "chrome/browser/browsing_data/BUILD.gn": "78ae0c5905eb80dc2d43229e1f8049f51eda25dc56e4ca1d815c01cae660c2db",
           "chrome/browser/browsing_data/chrome_browsing_data_model_delegate.cc": "5a35a28c466b65dc017b895d690a397fe77a1729093e90b8bbb12fc83ae0ff61",
           "chrome/browser/browsing_data/chrome_browsing_data_remover_delegate.cc": "f22ee7eb9a454ac0736a527df1b4a7f45099f0e5558aed2714a6fe91f1281b92",
+          "chrome/browser/browsing_data/chrome_browsing_data_remover_delegate_factory.cc": "9a15070321a1a959262f9f857d195e782512f1dda6208b3ca07443a262845ae1",
           "chrome/browser/chrome_browser_main.cc": "f320f3137250ea5878ee82e06c972f2a71523c22a44ab16fd6332d78a55666c3",
           "chrome/browser/chrome_content_browser_client.cc": "7a8a5951c8a915cfe08ed4ed693520048ebab62c926eb22d7f0bee341d7b6f9b",
           "chrome/browser/component_updater/BUILD.gn": "26c08156d778c7a2dd77b11697b5b4dd756840ce55267de58d6b16b78137f246",
@@ -10461,7 +10474,7 @@
       "overlay_mode": "downstream-nine-patch-recipe",
       "build_verified": false,
       "runtime_verified": false,
-      "expected_patch_count": 232,
+      "expected_patch_count": 233,
       "patches": [
         {
           "path": "patches/0001-base-BUILD-gn.patch",
@@ -13014,6 +13027,17 @@
           "postimages": {
             "content/browser/devtools/protocol_config.json": "d6583c5f4da418a214756c50fd0e7e9d8975bb53c05740983e6ad431678c0fbe"
           }
+        },
+        {
+          "path": "patches/chromium157-additions/0242-linux-disabled-private-verification-token-factory-dependency.patch",
+          "sha256": "8f737d17fc5689e7fdb5893b0c72ad6e0fbae2dbecd9549284f5f1b9b938a137",
+          "status": "applied",
+          "preimages": {
+            "chrome/browser/browsing_data/chrome_browsing_data_remover_delegate_factory.cc": "6d30fc730f5b9bc379742e9c377dc4fd663e233ea8fe43d303e93d6dd8c0a573"
+          },
+          "postimages": {
+            "chrome/browser/browsing_data/chrome_browsing_data_remover_delegate_factory.cc": "9a15070321a1a959262f9f857d195e782512f1dda6208b3ca07443a262845ae1"
+          }
         }
       ],
       "predecessors": [
@@ -13528,12 +13552,12 @@
           "sha256": "d338adf0c712319a3b8efa666f57d378c6cef3bb31a027681a87e97694346417"
         }
       },
-      "patch_count": 232,
+      "patch_count": 233,
       "roundtrip": {
         "status": "verified",
         "method": "reverse-forward-exact-bytes",
-        "patch_count": 241,
-        "scope": "platform9-plus-chromix232",
+        "patch_count": 242,
+        "scope": "platform9-plus-chromix233",
         "initial": {
           "base/BUILD.gn": "a4a7c9b2663f2fe6fe529329fb60b523e73ace09363b7b4c4e27b196eb2a5b0d",
           "base/i18n/icubridge/default_icu_locale.h": "f415c2354ec91b6a69bdda447a6fc160d744cf1cfa2ed15b82d759c30080c04b",
@@ -13541,6 +13565,7 @@
           "base/uxr_config.h": null,
           "base/uxr_pixel_noise.h": null,
           "chrome/app/chrome_main.cc": "9bca15fa0892300b0696f4fab3d4d6559bd62abaab746be00512a674fc2a1d43",
+          "chrome/browser/browsing_data/chrome_browsing_data_remover_delegate_factory.cc": "6d30fc730f5b9bc379742e9c377dc4fd663e233ea8fe43d303e93d6dd8c0a573",
           "chrome/browser/chrome_browser_main.cc": "039ef6326e170d43b1f333d632ee4d3929584904f7f14d0c41b33d46a24e85f9",
           "chrome/browser/component_updater/widevine_cdm_component_installer.cc": "107dbb7d930c66a5da279e948b027ebc963a5b9b435ff5fcfaff066ed7fe5a33",
           "chrome/browser/devtools/inspector_protocol_config.json": "449d07d778c0a65bf4ba6d6324dd540ec31a47f96bd6113f19c9871f3d100ca7",
@@ -13756,6 +13781,7 @@
           "chrome/browser/browsing_data/BUILD.gn": "78ae0c5905eb80dc2d43229e1f8049f51eda25dc56e4ca1d815c01cae660c2db",
           "chrome/browser/browsing_data/chrome_browsing_data_model_delegate.cc": "5a35a28c466b65dc017b895d690a397fe77a1729093e90b8bbb12fc83ae0ff61",
           "chrome/browser/browsing_data/chrome_browsing_data_remover_delegate.cc": "f22ee7eb9a454ac0736a527df1b4a7f45099f0e5558aed2714a6fe91f1281b92",
+          "chrome/browser/browsing_data/chrome_browsing_data_remover_delegate_factory.cc": "9a15070321a1a959262f9f857d195e782512f1dda6208b3ca07443a262845ae1",
           "chrome/browser/chrome_browser_main.cc": "f320f3137250ea5878ee82e06c972f2a71523c22a44ab16fd6332d78a55666c3",
           "chrome/browser/chrome_content_browser_client.cc": "2a89f4d3a313b5f53fccee03f138b70186baaa9e88f5044af662a9502226c13e",
           "chrome/browser/component_updater/BUILD.gn": "26c08156d778c7a2dd77b11697b5b4dd756840ce55267de58d6b16b78137f246",

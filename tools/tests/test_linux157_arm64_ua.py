@@ -248,6 +248,6 @@ def test_unreviewed_recipe_does_not_get_selector_exception():
             patch_selection.select(ROOT,'linux')
     else:
         selected,raw=patch_selection.select(ROOT,'linux')
-        assert len(raw)==232 and selected['selection']['downstream']['recipe']==source.recipe()
+        assert len(raw)==233 and selected['selection']['downstream']['recipe']==source.recipe()
         with pytest.raises(ValueError, match='require unchanged old228 plus exact one addition'):
             ua.validate_additions(selected,raw,ua.load(ROOT,'arm64'),ROOT)

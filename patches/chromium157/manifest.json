@@ -1208,6 +1208,11 @@
         "path": "patches/chromium157-additions/0241-linux-disabled-private-verification-token-content-config.patch",
         "sha256": "f2ab0307d06cf25765141fd96c0d83850f307fceb1fc1dc308b4faa34d8de9af",
         "kind": "linux-disabled-feature-protocol"
+      },
+      {
+        "path": "patches/chromium157-additions/0242-linux-disabled-private-verification-token-factory-dependency.patch",
+        "sha256": "8f737d17fc5689e7fdb5893b0c72ad6e0fbae2dbecd9549284f5f1b9b938a137",
+        "kind": "linux-disabled-feature-factory"
       }
     ],
     "windows": [
@@ -1319,7 +1324,7 @@
   },
   "fixture": {
     "path": "tools/tests/fixtures/chromium157_patch_sources.json.gz",
-    "sha256": "a53ab5f689310b352acbf4d32b641cfb6e1c46156de64416a83e5491c3b7e86f"
+    "sha256": "a22e533c9de2191e1bded9758a278fe6f3ce90cc3dc584cf441dcc6b13bd0b24"
   },
   "historical_files": [
     {

@@ -60,8 +60,8 @@ def test_exact_append_preserves_all_old_bytes_and_platform_scope():
                     for entry in old["base_patches"]] + old_platform["additions"]
         selected, raw = selection.select(ROOT, platform)
         assert selected["patches"][:len(previous)] == previous
-        assert len(raw) == {"linux": 232, "macos": 231, "windows": 235}[platform]
-        assert [name for name, _ in raw[len(previous):]] == (list(PATCHES) if platform == "linux" else [])
+        assert len(raw) == {"linux": 233, "macos": 231, "windows": 235}[platform]
+        assert [name for name, _ in raw[len(previous):]] == (list(PATCHES) + ["patches/chromium157-additions/0242-linux-disabled-private-verification-token-factory-dependency.patch"] if platform == "linux" else [])
     for patch in PATCHES:
         assert patch not in (ROOT / "patches/series").read_text()
         assert patch not in (ROOT / selection.MANIFEST156).read_text()
@@ -165,8 +165,8 @@ def test_full_replay_and_fixed_source_identities_cover_protocol():
         assert case["status"] == case["roundtrip"]["status"] == "verified"
         assert case["patch_count"] == selection.PATCH_COUNTS157[case["platform"]]
         if case["platform"] == "linux":
-            assert case["roundtrip"]["patch_count"] == 241
-            for entry, patch, name in zip(case["patches"][-3:], PATCHES, (PDL, *CONFIGS), strict=True):
+            assert case["roundtrip"]["patch_count"] == 242
+            for entry, patch, name in zip(case["patches"][229:232], PATCHES, (PDL, *CONFIGS), strict=True):
                 assert entry["path"] == patch
                 hashes = evidence["source_files"][name]
                 assert entry["preimages"] == {name: hashes["pre_sha256"]}
@@ -176,7 +176,7 @@ def test_full_replay_and_fixed_source_identities_cover_protocol():
 @pytest.mark.parametrize("platform", ["macos", "windows"])
 def test_protocol_patch_cannot_be_selected_for_enabled_platform(platform):
     manifest = json.loads((ROOT / selection.MANIFEST157).read_bytes())
-    manifest["platforms"][platform]["additions"].append(copy.deepcopy(manifest["platforms"]["linux"]["additions"][-1]))
+    manifest["platforms"][platform]["additions"].append(copy.deepcopy(manifest["platforms"]["linux"]["additions"][-2]))
     with pytest.raises(selection.SelectionError, match="incomplete Chromium 157 additions"):
         selection.validate_manifest157(manifest)
 

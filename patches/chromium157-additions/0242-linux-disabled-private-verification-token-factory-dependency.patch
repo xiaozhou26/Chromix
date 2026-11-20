@@ -1,0 +1,19 @@
+diff --git a/chrome/browser/browsing_data/chrome_browsing_data_remover_delegate_factory.cc b/chrome/browser/browsing_data/chrome_browsing_data_remover_delegate_factory.cc
+--- a/chrome/browser/browsing_data/chrome_browsing_data_remover_delegate_factory.cc
++++ b/chrome/browser/browsing_data/chrome_browsing_data_remover_delegate_factory.cc
+@@ -30,7 +30,6 @@
+ #include "chrome/browser/permissions/permission_decision_auto_blocker_factory.h"
+ #include "chrome/browser/preloading/prefetch/no_state_prefetch/no_state_prefetch_manager_factory.h"
+ #include "chrome/browser/preloading/prefetch/search_prefetch/search_prefetch_service_factory.h"
+-#include "chrome/browser/private_verification_tokens/private_verification_tokens_service_factory.h"
+ #include "chrome/browser/profiles/profile.h"
+ #include "chrome/browser/reading_list/reading_list_model_factory.h"
+ #include "chrome/browser/safe_browsing/verdict_cache_manager_factory.h"
+@@ -107,7 +106,6 @@
+   DependsOn(PermissionActionsHistoryFactory::GetInstance());
+   DependsOn(PermissionDecisionAutoBlockerFactory::GetInstance());
+   DependsOn(prerender::NoStatePrefetchManagerFactory::GetInstance());
+-  DependsOn(PrivateVerificationTokensServiceFactory::GetInstance());
+   DependsOn(ProtocolHandlerRegistryFactory::GetInstance());
+   DependsOn(ReadingListModelFactory::GetInstance());
+   DependsOn(safe_browsing::VerdictCacheManagerFactory::GetInstance());

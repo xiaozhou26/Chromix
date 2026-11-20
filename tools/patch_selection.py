@@ -141,15 +141,15 @@ PLATFORM157_STATUS = {
     platform: "reviewed-downstream-patches" if platform == "linux" else "reviewed-patches"
     for platform in PLATFORM157_COMMITS
 }
-PATCH_COUNTS157 = {"windows": 235, "macos": 231, "linux": 232}
+PATCH_COUNTS157 = {"windows": 235, "macos": 231, "linux": 233}
 OVERRIDE157_ROOT = "patches/chromium157"
 ADDITIONS157_ROOT = "patches/chromium157-additions"
 MANIFEST157 = "build/patch-selection-157.json"
-MANIFEST157_SHA256 = "c53037baf822e504f1ec5d04b369233eeef6a44caf07cac1c57e8abb809d3484"
+MANIFEST157_SHA256 = "5be149089b7cdb5656a2b4f6b2ed9e2ce90285be8976c7171502dc1e24ee4d8b"
 REVIEW157 = "patches/chromium157/manifest.json"
-REVIEW157_SHA256 = "637e507bbd3b48ec5fe1bd89e9b2177097bdf9214cb70569ddfdb2fb96ca8dd0"
+REVIEW157_SHA256 = "dc5c555e6c1ab35c5368f274c3e2276179ddf54efa6ec0f0e4e2fdbb18c88537"
 
-LINUX157_DOWNSTREAM_SHA256 = "37cc57d8f7252000671bcea6a33d094d438088dc8559cc622e0a1caefe5516c0"
+LINUX157_DOWNSTREAM_SHA256 = "6e1aaae1d4d80f8a795ec88c38411d453c95010ab0cda33f802400e609dc79c5"
 # Activation requires the final patch review, not just successful platform preparation.
 LINUX157_VALIDATED_REVIEW_SHA256: str | None = REVIEW157_SHA256
 
@@ -503,7 +503,7 @@ def authenticate_linux157_downstream(repo: Path, downstream: dict, review: dict)
                 or case["patch_count"] != PATCH_COUNTS157["linux"] or replay["patch_count"] != 9
                 or replay["status"] != "verified" or replay["source_manifest"] != downstream["source_manifest"]
                 or roundtrip["status"] != "verified" or roundtrip["patch_count"] != 9 + PATCH_COUNTS157["linux"]
-                or roundtrip["scope"] != "platform9-plus-chromix232"
+                or roundtrip["scope"] != "platform9-plus-chromix233"
                 or case["build_verified"] is not False or case["runtime_verified"] is not False
                 or [{key: entry[key] for key in ("path", "sha256")} for entry in case["patches"]] != expected
                 or [{key: entry[key] for key in ("path", "sha256")} for entry in case["predecessors"]

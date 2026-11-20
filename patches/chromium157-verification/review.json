@@ -5,7 +5,7 @@
   "core_tag_object": "33eece1eb0b5286bf71e732fbbad7a46faface5a",
   "core_peeled_commit": "8c886dffc6ade39d8f7df5d64ace5a8824b455e1",
   "chromium_commit": "4b3d0dabb8250b6f152d2d85d79e7706e309d087",
-  "scope": "Append Linux-only0239/0240/0241 to synchronize the already disabled downstream PVT implementation with source PDL and protocol generation configs. No stubs, no unrelated CDP removals; retain root224,156 and every prior157 patch byte and checkpoint profile. Split6302b91 into three single-source patches without changing any source pre/postimage.",
+  "scope": "Append Linux-only0242 removing the disabled PVT factory include and DependsOn registration from the browsing-data remover factory. Preserve all previous232 patch bytes, protocol repairs, platform recipe and checkpoint/workflow/helper inputs.",
   "verification_limits": [
     "Full Linux downstream platform sequence is replayed, nine patches covering all36 target files. Core replay is the exact intersecting-file subset, not all827 core sections.",
     "Linux x64 complete timezone_controller.cc, default_icu_locale.cc and icu4c_tag_converter.cc compile with the restored official commands; relocatable link resolves new setter/converter symbols. No full browser link or runtime execution. Complete user_agent_utils.cc additionally verified before/after0238 with exact run44630942999 donor command.",
@@ -14,7 +14,8 @@
     "Linux uses authorized156 platform configuration baseline plus explicit157 core override and pinned downstream recipe, not an official portablelinux157 tag.",
     "No core-only diagnostic cases count toward success.",
     "Windows/macOS previous replay cases are identical. Six exact157 protocol/session/generation source files added for0239 review; no additional predecessor intersections. Linux-only PVT schema removal does not apply to the enabled Windows/macOS implementation.",
-    "No push or workflow dispatch."
+    "No push or workflow dispatch.",
+    "0242: latest Linux x64 run44712280809 stage2 factory object compiles; all23608 final link inputs inspected, no PVT service/factory symbols remain. Actual full chrome ThinLTO link attempted with jobs=1 and OOM-killed (exit250); final link and runtime remain unverified."
   ],
   "final_overrides": {
     "count": 31,
@@ -64,7 +65,8 @@
     "0236": "Forward-declare and friend only blink::TimeZoneController in DefaultIcuLocaleSetterKey. Constructor remains private; existing authorized callers unchanged.",
     "0237": "Keep first-language parsing, ICU validity guards and initialization order. Convert validated ICU locale through IcuLocaleConverter and call SetDefaultIcuLocale to update both holder and ICU. No DevTools override acquisition or timezone policy changes.",
     "0238": "user_agent_utils.cc constructs base::Version but its transitive version_info.h only forward-declares the class. Include its defining base/version.h directly; preserve all UA normalization and override behavior.",
-    "0239/0240/0241": "Linux156 downstream PVT removal rebased to157 deletes all five StorageHandler methods but omits PDL/config changes. Core157 and Windows/macOS do not remove PVT. Remove only these five experimental commands, two exclusive types and one event on Linux; keep all other schema and handlers unchanged. One source file per patch; concatenated diffs exactly equal the original0239 bytes."
+    "0239/0240/0241": "Linux156 downstream PVT removal rebased to157 deletes all five StorageHandler methods but omits PDL/config changes. Core157 and Windows/macOS do not remove PVT. Remove only these five experimental commands, two exclusive types and one event on Linux; keep all other schema and handlers unchanged. One source file per patch; concatenated diffs exactly equal the original0239 bytes.",
+    "0242": "The Linux platform already removes the PVT target and its consumers but leaves a direct factory lifecycle dependency. Remove exactly the matching include and DependsOn call, not the disabled backend policy or unrelated dependencies. Windows/macOS retain their real implementation and dependency."
   },
   "upstream_duplicate_checks": {
     "managed_profile": "Exact157 core still removes managed_profile_creation_controller sources;0225 remains needed. Verified exactly one final .cc entry.",
@@ -74,7 +76,7 @@
     "canvas": "Upstream157 initialization CHECK and shuffle call retained; no duplicate helper definition introduced."
   },
   "platform_patch_counts": {
-    "linux": 232,
+    "linux": 233,
     "macos": 231,
     "windows": 235
   },
@@ -121,6 +123,11 @@
         "path": "patches/chromium157-additions/0241-linux-disabled-private-verification-token-content-config.patch",
         "sha256": "f2ab0307d06cf25765141fd96c0d83850f307fceb1fc1dc308b4faa34d8de9af",
         "kind": "linux-disabled-feature-protocol"
+      },
+      {
+        "path": "patches/chromium157-additions/0242-linux-disabled-private-verification-token-factory-dependency.patch",
+        "sha256": "8f737d17fc5689e7fdb5893b0c72ad6e0fbae2dbecd9549284f5f1b9b938a137",
+        "kind": "linux-disabled-feature-factory"
       }
     ],
     "windows": [
@@ -271,21 +278,21 @@
     "recipe_sha256": "42d788d91c0ec2345c253044665af7f623501a73c8bdb627a94d1739790aeb11",
     "qualification": "Authorized old platform baseline plus exact157 core override and all nine downstream replacements; not an official portablelinux157 tag."
   },
-  "review_manifest_sha256": "637e507bbd3b48ec5fe1bd89e9b2177097bdf9214cb70569ddfdb2fb96ca8dd0",
+  "review_manifest_sha256": "dc5c555e6c1ab35c5368f274c3e2276179ddf54efa6ec0f0e4e2fdbb18c88537",
   "linux_full_platform_coverage": {
-    "raw_source_files": 210,
+    "raw_source_files": 211,
     "platform_files": 36,
     "core_sections": 43,
     "platform_patches": 9,
     "platform_sections": 36,
-    "chromix_patches": 232,
-    "combined_roundtrip_patches": 241,
+    "chromix_patches": 233,
+    "combined_roundtrip_patches": 242,
     "domain_modes": [
       "raw",
       "substituted"
     ],
     "post_core_preimages": "Every36 platform source bytes must equal independently audited fixture before any replacement.",
-    "sequential_checks": "Each of9 exact pre/post SHA256 maps plus final_outputs checked; all9 platform reverse/forward and combined241 reverse/forward verified.",
+    "sequential_checks": "Each of9 exact pre/post SHA256 maps plus final_outputs checked; all9 platform reverse/forward and combined242 reverse/forward verified.",
     "policy": "Retains157 native WebBundle/IFT and Rust/Crubit assertions, Node version check and native TypeScript recipe. Full GN/link compatibility remains unverified."
   },
   "regression_tests": {
@@ -722,5 +729,434 @@
       "protocol_tests": "10 passed,2 skipped",
       "regression_tests": "805 passed, 27 skipped in 281.90s (0:04:41)"
     }
+  },
+  "pvt_factory_evidence": {
+    "baseline_commit": "e411ccf25cae004b9e6f5f7815e003b3efc3a9b8",
+    "source_files": {
+      "chrome/browser/browsing_data/chrome_browsing_data_remover_delegate_factory.cc": {
+        "pre_sha256": "6d30fc730f5b9bc379742e9c377dc4fd663e233ea8fe43d303e93d6dd8c0a573",
+        "post_sha256": "9a15070321a1a959262f9f857d195e782512f1dda6208b3ca07443a262845ae1"
+      }
+    },
+    "donor_run": 44712280809,
+    "donor_stage": 2,
+    "donor_artifact": 14624172635,
+    "artifact_sha256": "318b1c7b4f79d38e20629a5d533612b6c6586f4476c054b9e470f25a096c64b3",
+    "native_status": "object-verified",
+    "final_link_status": "resource-blocked",
+    "scope": [
+      "linux-x64",
+      "linux-arm64"
+    ],
+    "migration_policy": "Old232 Storage recovery remains unchanged and rejects233; no workflow or migration helper edits.",
+    "initial_source_audit": {
+      "source_tree": "previous exact157 ARM donor; repeat on latest x64 before final conclusion",
+      "roots": [
+        "chrome",
+        "components",
+        "content",
+        "services",
+        "net"
+      ],
+      "matching_lines": 1432,
+      "matching_nonfeature_nontest_lines": 80,
+      "unique_external_production_factory_call": "chrome/browser/browsing_data/chrome_browsing_data_remover_delegate_factory.cc: DependsOn(PrivateVerificationTokensServiceFactory::GetInstance())",
+      "settings_references": 0,
+      "classification": "Retained includes/enums/metrics are not service links. InstallerPolicy::LoadFromFile reference requires archive-member/link reachability audit. Test and excluded feature target source references are reported, not silently deleted. net feature remains disabled by default."
+    },
+    "donor_source_commit": "fa32bca2d2c67e04c5ababa434e03941ed8ac1d0",
+    "regression_tests": "939 passed, 53 skipped in 369.03s (0:06:09)",
+    "native": {
+      "donor_run": 44712280809,
+      "donor_artifact": 14624172635,
+      "object_returncode": 0,
+      "before_undefined_pvt": [
+        "                 U PrivateVerificationTokensServiceFactory::GetInstance()"
+      ],
+      "after_undefined_pvt": [],
+      "object_pre_sha256": "adbeadd919547e99b38ccb0d1a6bd921a2389a3ede133c107823ac7af5c5fe93",
+      "object_post_sha256": "45eaa17d72342d5bcee7fca47cc56cf8b181c0c468137b2c21346147ad270b3a",
+      "object_bytes": 52692,
+      "object_command_sha256": "7763fa41f6dc30095d1be76afefd7630e8269fc66d4bf5584a03278f0a0a7422",
+      "source_files": {
+        "chrome/browser/browsing_data/chrome_browsing_data_remover_delegate_factory.cc": {
+          "pre_sha256": "6d30fc730f5b9bc379742e9c377dc4fd663e233ea8fe43d303e93d6dd8c0a573",
+          "post_sha256": "9a15070321a1a959262f9f857d195e782512f1dda6208b3ca07443a262845ae1"
+        }
+      },
+      "compiler_sha256": "8091a95554f24a2affa32c80e884c3d36960c5d971560d3410391ffc36af19a7",
+      "protected_outputs": {
+        "args.gn": "2368fb9594bcebf1f5f74ffcd49bb0684d6e479d4e5f010a46f47f555b588027",
+        "build.ninja": "33c17bf17684286919900be9416aceda0b222e803e70cc70ac9e1b7d2d6f3761",
+        "chrome.rsp": "03c7badde64546b164d467e2b9fa8e2940694df190f578dc5469c82f9e5e626c"
+      },
+      "link_attempted": true,
+      "link_status": "resource-blocked",
+      "link_command_changes": {
+        "-Wl,--thinlto-jobs": "all -> 1 (resource limit only)"
+      },
+      "link_command_sha256": "adbca9c6992c7bb77c3a585aeb113cc8e1c7b091ef39a34014328fbf22992f61",
+      "link_returncode": 250,
+      "link_elapsed_seconds": 56.325733734003734,
+      "link_log_sha256": "c6cff31ba83c17fe82039d9104edf2afd3eee316698c20bc0202fc710e88ee5e"
+    },
+    "restored_official_headers": {
+      "chrome/browser/autofill/autofill_entity_data_manager_factory.h": {
+        "revision": "4b3d0dabb8250b6f152d2d85d79e7706e309d087",
+        "url": "https://chromium.googlesource.com/chromium/src/+/4b3d0dabb8250b6f152d2d85d79e7706e309d087/chrome/browser/autofill/autofill_entity_data_manager_factory.h?format=TEXT",
+        "sha256": "f435f9c2d18c4e5508d04474d53e30616ef35d15c3d0edb2ec3378383ecace97",
+        "bytes": 1300
+      },
+      "chrome/browser/autofill/entity_suppression_manager_factory.h": {
+        "revision": "4b3d0dabb8250b6f152d2d85d79e7706e309d087",
+        "url": "https://chromium.googlesource.com/chromium/src/+/4b3d0dabb8250b6f152d2d85d79e7706e309d087/chrome/browser/autofill/entity_suppression_manager_factory.h?format=TEXT",
+        "sha256": "47855567f9ed8c001eeea3f9c9ca3482813956d589241baa80f613be2ac45376",
+        "bytes": 1447
+      },
+      "chrome/browser/autofill/personal_data_manager_factory.h": {
+        "revision": "4b3d0dabb8250b6f152d2d85d79e7706e309d087",
+        "url": "https://chromium.googlesource.com/chromium/src/+/4b3d0dabb8250b6f152d2d85d79e7706e309d087/chrome/browser/autofill/personal_data_manager_factory.h?format=TEXT",
+        "sha256": "79ca3dd519e169b3b3b80877cdee2854b61bf61d4cb79731ade2d531199fd0e6",
+        "bytes": 1414
+      },
+      "chrome/browser/custom_handlers/protocol_handler_registry_factory.h": {
+        "revision": "4b3d0dabb8250b6f152d2d85d79e7706e309d087",
+        "url": "https://chromium.googlesource.com/chromium/src/+/4b3d0dabb8250b6f152d2d85d79e7706e309d087/chrome/browser/custom_handlers/protocol_handler_registry_factory.h?format=TEXT",
+        "sha256": "ce7b21b4b7ce8f5e186a7f63a44a29920cf69a2c55bb978ac7326154381861a5",
+        "bytes": 2004
+      },
+      "chrome/browser/file_system_access/file_system_access_permission_context_factory.h": {
+        "revision": "4b3d0dabb8250b6f152d2d85d79e7706e309d087",
+        "url": "https://chromium.googlesource.com/chromium/src/+/4b3d0dabb8250b6f152d2d85d79e7706e309d087/chrome/browser/file_system_access/file_system_access_permission_context_factory.h?format=TEXT",
+        "sha256": "071652ade8952b9d45ba0556cfe0c93dbf650433932b52eb4d41f396e3a6eff3",
+        "bytes": 1648
+      },
+      "chrome/browser/media/media_engagement_service_factory.h": {
+        "revision": "4b3d0dabb8250b6f152d2d85d79e7706e309d087",
+        "url": "https://chromium.googlesource.com/chromium/src/+/4b3d0dabb8250b6f152d2d85d79e7706e309d087/chrome/browser/media/media_engagement_service_factory.h?format=TEXT",
+        "sha256": "993dbbffac28a01ccbe61c80908ad4468605cdb1569b6dd52d5d05436337164c",
+        "bytes": 1204
+      },
+      "chrome/browser/media/webrtc/media_device_salt_service_factory.h": {
+        "revision": "4b3d0dabb8250b6f152d2d85d79e7706e309d087",
+        "url": "https://chromium.googlesource.com/chromium/src/+/4b3d0dabb8250b6f152d2d85d79e7706e309d087/chrome/browser/media/webrtc/media_device_salt_service_factory.h?format=TEXT",
+        "sha256": "b2632c2141fce698d9b5e4d680a6c4623a8b1a87fb477e1562492cfa3baf384f",
+        "bytes": 1491
+      },
+      "chrome/browser/payments/browser_binding/browser_bound_key_deleter_service_factory.h": {
+        "revision": "4b3d0dabb8250b6f152d2d85d79e7706e309d087",
+        "url": "https://chromium.googlesource.com/chromium/src/+/4b3d0dabb8250b6f152d2d85d79e7706e309d087/chrome/browser/payments/browser_binding/browser_bound_key_deleter_service_factory.h?format=TEXT",
+        "sha256": "12ffd8cc8dc46601261a3859b0d1cf51029760169e10f85f4c8690a1936f4bd7",
+        "bytes": 1930
+      },
+      "chrome/browser/safe_browsing/verdict_cache_manager_factory.h": {
+        "revision": "4b3d0dabb8250b6f152d2d85d79e7706e309d087",
+        "url": "https://chromium.googlesource.com/chromium/src/+/4b3d0dabb8250b6f152d2d85d79e7706e309d087/chrome/browser/safe_browsing/verdict_cache_manager_factory.h?format=TEXT",
+        "sha256": "f3a7054c971e87b4dbd788693286b6a97cd8547c6d2babc3b70996f43ee7fcc8",
+        "bytes": 1713
+      },
+      "chrome/browser/sessions/tab_restore_service_factory.h": {
+        "revision": "4b3d0dabb8250b6f152d2d85d79e7706e309d087",
+        "url": "https://chromium.googlesource.com/chromium/src/+/4b3d0dabb8250b6f152d2d85d79e7706e309d087/chrome/browser/sessions/tab_restore_service_factory.h?format=TEXT",
+        "sha256": "f893f433f74a353cb5cd93b23e1a54aa859541eb931ffe779e56ad821f0a9467",
+        "bytes": 1604
+      },
+      "chrome/browser/spellchecker/spellcheck_factory.h": {
+        "revision": "4b3d0dabb8250b6f152d2d85d79e7706e309d087",
+        "url": "https://chromium.googlesource.com/chromium/src/+/4b3d0dabb8250b6f152d2d85d79e7706e309d087/chrome/browser/spellchecker/spellcheck_factory.h?format=TEXT",
+        "sha256": "56dcd600244de3abcc8b4ede72d04ac3afb715037b286257ae297c0ef379179d",
+        "bytes": 1944
+      },
+      "chrome/browser/extensions/activity_log/activity_log.h": {
+        "revision": "4b3d0dabb8250b6f152d2d85d79e7706e309d087",
+        "url": "https://chromium.googlesource.com/chromium/src/+/4b3d0dabb8250b6f152d2d85d79e7706e309d087/chrome/browser/extensions/activity_log/activity_log.h?format=TEXT",
+        "sha256": "a50abb6c11d4bdd551c059ea31754d2587197ec4c4ccccb547baca7060a7cd00",
+        "bytes": 11424
+      },
+      "chrome/browser/sessions/session_service_factory.h": {
+        "revision": "4b3d0dabb8250b6f152d2d85d79e7706e309d087",
+        "url": "https://chromium.googlesource.com/chromium/src/+/4b3d0dabb8250b6f152d2d85d79e7706e309d087/chrome/browser/sessions/session_service_factory.h?format=TEXT",
+        "sha256": "1c9eb82e373ac79d42f3d9add8432e832de161f2bb09a82ca470594de100b004",
+        "bytes": 3238
+      },
+      "chrome/browser/extensions/activity_log/activity_actions.h": {
+        "revision": "4b3d0dabb8250b6f152d2d85d79e7706e309d087",
+        "url": "https://chromium.googlesource.com/chromium/src/+/4b3d0dabb8250b6f152d2d85d79e7706e309d087/chrome/browser/extensions/activity_log/activity_actions.h?format=TEXT",
+        "sha256": "7d2000bd324c08cd515df9660bb11fd70a62f6fe7d248035b96b072d1b317ac4",
+        "bytes": 6573
+      },
+      "chrome/browser/extensions/activity_log/activity_log_policy.h": {
+        "revision": "4b3d0dabb8250b6f152d2d85d79e7706e309d087",
+        "url": "https://chromium.googlesource.com/chromium/src/+/4b3d0dabb8250b6f152d2d85d79e7706e309d087/chrome/browser/extensions/activity_log/activity_log_policy.h?format=TEXT",
+        "sha256": "96e0f81f40617eedef70ae1c0d93ee8a571e9e58a2909b3c004b869094240138",
+        "bytes": 9369
+      },
+      "chrome/browser/private_verification_tokens/private_verification_tokens_service_factory.h": {
+        "revision": "4b3d0dabb8250b6f152d2d85d79e7706e309d087",
+        "url": "https://chromium.googlesource.com/chromium/src/+/4b3d0dabb8250b6f152d2d85d79e7706e309d087/chrome/browser/private_verification_tokens/private_verification_tokens_service_factory.h?format=TEXT",
+        "sha256": "6a197a92ccda8f684b4c430861c903e08975ff6d288523aacc92852e9c84f29f",
+        "bytes": 2059
+      },
+      "chrome/browser/sessions/session_service.h": {
+        "revision": "4b3d0dabb8250b6f152d2d85d79e7706e309d087",
+        "url": "https://chromium.googlesource.com/chromium/src/+/4b3d0dabb8250b6f152d2d85d79e7706e309d087/chrome/browser/sessions/session_service.h?format=TEXT",
+        "sha256": "bf1929dfc2969eadb34cc3d9b0a227342e47fe3adfa570cec0bb33fb448fcbac",
+        "bytes": 13574
+      },
+      "chrome/browser/extensions/activity_log/activity_database.h": {
+        "revision": "4b3d0dabb8250b6f152d2d85d79e7706e309d087",
+        "url": "https://chromium.googlesource.com/chromium/src/+/4b3d0dabb8250b6f152d2d85d79e7706e309d087/chrome/browser/extensions/activity_log/activity_database.h?format=TEXT",
+        "sha256": "0f926727fa3b7af647ea52ed0ccc44831349b862b71179d7bfccccfac9148ce1",
+        "bytes": 8661
+      },
+      "chrome/browser/extensions/activity_log/activity_log_task_runner.h": {
+        "revision": "4b3d0dabb8250b6f152d2d85d79e7706e309d087",
+        "url": "https://chromium.googlesource.com/chromium/src/+/4b3d0dabb8250b6f152d2d85d79e7706e309d087/chrome/browser/extensions/activity_log/activity_log_task_runner.h?format=TEXT",
+        "sha256": "f267fcbe4af3f755c529c9031c4fdc77b12b2b2b5104577956f7492fddb94293",
+        "bytes": 1180
+      },
+      "chrome/browser/sessions/session_service_base.h": {
+        "revision": "4b3d0dabb8250b6f152d2d85d79e7706e309d087",
+        "url": "https://chromium.googlesource.com/chromium/src/+/4b3d0dabb8250b6f152d2d85d79e7706e309d087/chrome/browser/sessions/session_service_base.h?format=TEXT",
+        "sha256": "9401c2869afd535006d9eab68e666e92c10d566c29714b6cd89187db2aad607c",
+        "bytes": 15717
+      }
+    },
+    "header_restore_qualification": "Latest compiledtree contains20 NUL-only direct/transitive headers. Restored exact Chromium4b3d0dabb8250b6f152d2d85d79e7706e309d087 originals; no core/platform patch intersections. Recompiled pre-repair and post-repair factory with unchanged GN command. No fake declarations or suppression.",
+    "resource_limits": {
+      "docker_memtotal_kib": 8123740,
+      "swap_kib": 1048572,
+      "oom_kill_after": 1,
+      "link_returncode": 250,
+      "qualification": "Actual final chrome link executed using complete donor response file and original semantic flags; only --thinlto-jobs=all changed to1. Linker killed by OOM after56 seconds. Not a successful link or runtime verification."
+    },
+    "native_regression": "6 passed",
+    "evidence_files": {
+      "replay.json": {
+        "sha256": "cdae254e7166bbf67b55da13fdd16a13eb27ac1a182c4c1d2290d5e00f19602a",
+        "bytes": 1523886
+      },
+      "lint.log": {
+        "sha256": "c6c67af8a3e2508f3fc072bef95518be9bc4c067d388c1b6a02d03edf231db93",
+        "bytes": 2201
+      },
+      "regression.log": {
+        "sha256": "fbce103185bdf4bd2194fdce59010f8753fac1f40ffb3782895f0389ee9fa9b7",
+        "bytes": 1164
+      },
+      "native-test.log": {
+        "sha256": "32474846ae4372c596eb55783e16b294e33c945a8fe0076ae5634338fd1acc37",
+        "bytes": 98
+      },
+      "native/native.json": {
+        "sha256": "052169a1d33c3d101c39bd12f533be577f76256942d7259bda70c24c23aa7ecb",
+        "bytes": 1612
+      },
+      "native/link.log": {
+        "sha256": "c6cff31ba83c17fe82039d9104edf2afd3eee316698c20bc0202fc710e88ee5e",
+        "bytes": 133
+      },
+      "native/object.log": {
+        "sha256": "c4fc9e14491521c72efbe136e8ac0cfaedb46ad1645db53e145074b99709af5c",
+        "bytes": 29381468
+      },
+      "native/object-command.txt": {
+        "sha256": "7763fa41f6dc30095d1be76afefd7630e8269fc66d4bf5584a03278f0a0a7422",
+        "bytes": 11590
+      },
+      "native/link-command.txt": {
+        "sha256": "adbca9c6992c7bb77c3a585aeb113cc8e1c7b091ef39a34014328fbf22992f61",
+        "bytes": 16291
+      },
+      "native/object-before-symbols.txt": {
+        "sha256": "ac5efd2a21cfced4026180be94cbf5652da8de0426271b2e16aaf29f47c598ca",
+        "bytes": 8037
+      },
+      "native/object-after-symbols.txt": {
+        "sha256": "3f1a75b546fcd860a8df1d6fff7c8d1bb3c94649cf23744acb5d9663f87dd582",
+        "bytes": 7963
+      },
+      "native/memory-events.txt": {
+        "sha256": "b0fda63be6c9abe96567fbe5650cc2b02b45afa9a4456c7e5e398a8012e2e1df",
+        "bytes": 70
+      },
+      "restored-headers.json": {
+        "sha256": "0586df9cd45f55304077eeaa364529c26da963f3127e2c7c3af6adb1a0d2aa03",
+        "bytes": 8212
+      },
+      "native.py": {
+        "sha256": "54aa2a0043edc2bfea0bb4887490875781ca1c7b1a9cbdaffe16fac48847e967",
+        "bytes": 4358
+      },
+      "audit.json": {
+        "sha256": "99a3539c265e850256aadef58ba76761959d3128012ef3244c08021027f3464f",
+        "bytes": 8122
+      },
+      "source-grep.txt": {
+        "sha256": "c83d6122f3ceae26fd449836ede09e719ae179e2fd149934407e5a4030fde52e",
+        "bytes": 159229
+      },
+      "link-pvt-symbols.txt": {
+        "sha256": "5240e527360f5a22f0c82026cecff1e00176a6a8e637c8392e2d4d3d76c3ef54",
+        "bytes": 23377
+      },
+      "nm-warnings.txt": {
+        "sha256": "71875d206903baa5a98f82dbdfb5ce19bb8ba13d4522143fb7a091b3407c17f9",
+        "bytes": 147518
+      },
+      "link-inputs.json": {
+        "sha256": "91dfba9c8654b56026856b8294b4b6ea01a3d4996e4d41d8059b8fa2d68ba2c0",
+        "bytes": 1751183
+      },
+      "symbol-classification.json": {
+        "sha256": "9d248aabe9d1ec64b9d5347cb30c5b2b112ffed330f2abcafc849d585bd254e9",
+        "bytes": 2941
+      },
+      "audit.py": {
+        "sha256": "08d30a60df1793f56e3ca83d4b85f5de248762ff5fe2db0359b1cd521d2171cb",
+        "bytes": 3288
+      },
+      "classify.py": {
+        "sha256": "0fa8243b9a0433d2df5f173232a2c08a1be29f3fb74562ccf5ecd53b7b295570",
+        "bytes": 2198
+      },
+      "native-test-final.log": {
+        "sha256": "c986c8de796570847f8fc6d2653feb6d09b6e6f66c207ce95d407bc4df762ab9",
+        "bytes": 98
+      },
+      "all-source-grep-initial.log": {
+        "sha256": "a00aa5585e36c4a08b91b26935bab278c5b4a820f2b74a06b4c06ce6799be939",
+        "bytes": 254608
+      },
+      "lint-final.log": {
+        "sha256": "c6c67af8a3e2508f3fc072bef95518be9bc4c067d388c1b6a02d03edf231db93",
+        "bytes": 2201
+      }
+    },
+    "latest_source_and_symbol_audit": {
+      "source_roots": [
+        "chrome",
+        "components",
+        "content",
+        "services",
+        "net"
+      ],
+      "grep_line_count": 923,
+      "source_file_count": 54,
+      "production_external_factory_calls": [],
+      "settings_references": [],
+      "compiled_sources_with_pvt_references": [
+        {
+          "source": "net/base/features.cc",
+          "object": "obj/net/net/features.o",
+          "sha256": "af5f1ba691ef2369c3a1728119b39ff22c4e9d8e1bb3cf728723f55b1cee7eff"
+        },
+        {
+          "source": "chrome/browser/browsing_data/chrome_browsing_data_model_delegate.cc",
+          "object": "obj/chrome/browser/browsing_data/impl/chrome_browsing_data_model_delegate.o",
+          "sha256": "5a35a28c466b65dc017b895d690a397fe77a1729093e90b8bbb12fc83ae0ff61"
+        },
+        {
+          "source": "chrome/browser/browsing_data/chrome_browsing_data_remover_delegate.cc",
+          "object": "obj/chrome/browser/browsing_data/impl/chrome_browsing_data_remover_delegate.o",
+          "sha256": "f22ee7eb9a454ac0736a527df1b4a7f45099f0e5558aed2714a6fe91f1281b92"
+        },
+        {
+          "source": "chrome/browser/component_updater/private_verification_tokens_installer.cc",
+          "object": "obj/chrome/browser/component_updater/impl/private_verification_tokens_installer.o",
+          "sha256": "1a95754e34097242f76fe0153cbbed1342fd787482af4398543842836e367b88"
+        },
+        {
+          "source": "chrome/browser/component_updater/registration.cc",
+          "object": "obj/chrome/browser/component_updater/impl/registration.o",
+          "sha256": "2e6571c507afd724a4906682e0756c9b2139931b21a9487789d8f9a33ea2486c"
+        },
+        {
+          "source": "chrome/browser/profiles/chrome_browser_main_extra_parts_profiles.cc",
+          "object": "obj/chrome/browser/profiles/profiles_extra_parts_impl/chrome_browser_main_extra_parts_profiles.o",
+          "sha256": "8cee6759a8c40f3811930e0c7919aace48857478ed323fa6be338623befb16ad"
+        },
+        {
+          "source": "services/network/url_loader.cc",
+          "object": "obj/services/network/network_service/url_loader.o",
+          "sha256": "957433cbaf47ce2b11632e570e3eed97d86cef3ca8db335552cf8147e577bdb5"
+        },
+        {
+          "source": "chrome/browser/devtools/devtools_ui_bindings.cc",
+          "object": "obj/chrome/browser/devtools/devtools/devtools_ui_bindings.o",
+          "sha256": "87413ae52a58e44dd37447b78b417c513974ba62a5dd3e82b9922dd9ef1304b4"
+        },
+        {
+          "source": "components/component_updater/installer_policies/private_verification_tokens_installer_policy.cc",
+          "object": "obj/components/component_updater/installer_policies/installer_policies_no_content_deps/private_verification_tokens_installer_policy.o",
+          "sha256": "25078466fc09db5da7d0a9c395797645bd10f400b6d62eae73f8faba244f7cd2"
+        }
+      ],
+      "link_input_count": 23608,
+      "link_input_manifest_sha256": "91dfba9c8654b56026856b8294b4b6ea01a3d4996e4d41d8059b8fa2d68ba2c0",
+      "symbol_match_count": 54,
+      "undefined_pvt_symbols": [
+        "obj/chrome/browser/component_updater/impl/registration.o:                  U component_updater::RegisterPrivateVerificationTokensComponentIfEnabled(component_updater::ComponentUpdateService*)",
+        "obj/services/network/libnetwork_service.a:network_service/url_loader.o:                  U kEnablePrivateVerificationTokens",
+        "obj/chrome/browser/devtools/libdevtools.a:devtools/devtools_ui_bindings.o:                  U kEnablePrivateVerificationTokens",
+        "obj/components/component_updater/installer_policies/libinstaller_policies_no_content_deps.a:installer_policies_no_content_deps/private_verification_tokens_installer_policy.o:                  U component_updater::PrivateVerificationTokensInstallerPolicy::ComponentReady(base::Version const&, base::FilePath const&, base::DictValue)",
+        "obj/components/component_updater/installer_policies/libinstaller_policies_no_content_deps.a:installer_policies_no_content_deps/private_verification_tokens_installer_policy.o:                  U component_updater::PrivateVerificationTokensInstallerPolicy::OnCustomInstall(base::DictValue const&, base::FilePath const&)",
+        "obj/components/component_updater/installer_policies/libinstaller_policies_no_content_deps.a:installer_policies_no_content_deps/private_verification_tokens_installer_policy.o:                  U component_updater::PrivateVerificationTokensInstallerPolicy::OnCustomUninstall()",
+        "obj/components/component_updater/installer_policies/libinstaller_policies_no_content_deps.a:installer_policies_no_content_deps/private_verification_tokens_installer_policy.o:                  U component_updater::PrivateVerificationTokensInstallerPolicy::~PrivateVerificationTokensInstallerPolicy()",
+        "obj/components/component_updater/installer_policies/libinstaller_policies_no_content_deps.a:installer_policies_no_content_deps/private_verification_tokens_installer_policy.o:                  U component_updater::PrivateVerificationTokensInstallerPolicy::~PrivateVerificationTokensInstallerPolicy()",
+        "obj/components/component_updater/installer_policies/libinstaller_policies_no_content_deps.a:installer_policies_no_content_deps/private_verification_tokens_installer_policy.o:                  U private_verification_tokens::PrivateVerificationTokensIssuerConfig::LoadFromFile(base::FilePath const&)",
+        "obj/components/component_updater/installer_policies/libinstaller_policies_no_content_deps.a:installer_policies_no_content_deps/private_verification_tokens_installer_policy.o:                  U private_verification_tokens::PrivateVerificationTokensIssuerConfig::~PrivateVerificationTokensIssuerConfig()",
+        "obj/components/component_updater/installer_policies/libinstaller_policies_no_content_deps.a:installer_policies_no_content_deps/private_verification_tokens_installer_policy.o:                  U component_updater::PrivateVerificationTokensInstallerPolicy::VerifyInstallation(base::DictValue const&, base::FilePath const&) const",
+        "obj/components/component_updater/installer_policies/libinstaller_policies_no_content_deps.a:installer_policies_no_content_deps/private_verification_tokens_installer_policy.o:                  U component_updater::PrivateVerificationTokensInstallerPolicy::GetRelativeInstallDir() const",
+        "obj/components/component_updater/installer_policies/libinstaller_policies_no_content_deps.a:installer_policies_no_content_deps/private_verification_tokens_installer_policy.o:                  U component_updater::PrivateVerificationTokensInstallerPolicy::GetInstallerAttributes() const",
+        "obj/components/component_updater/installer_policies/libinstaller_policies_no_content_deps.a:installer_policies_no_content_deps/private_verification_tokens_installer_policy.o:                  U component_updater::PrivateVerificationTokensInstallerPolicy::RequiresNetworkEncryption() const",
+        "obj/components/component_updater/installer_policies/libinstaller_policies_no_content_deps.a:installer_policies_no_content_deps/private_verification_tokens_installer_policy.o:                  U component_updater::PrivateVerificationTokensInstallerPolicy::SupportsGroupPolicyEnabledComponentUpdates() const",
+        "obj/components/component_updater/installer_policies/libinstaller_policies_no_content_deps.a:installer_policies_no_content_deps/private_verification_tokens_installer_policy.o:                  U component_updater::PrivateVerificationTokensInstallerPolicy::GetHash(std::__Cr::vector<unsigned char, std::__Cr::allocator<unsigned char>>*) const",
+        "obj/components/component_updater/installer_policies/libinstaller_policies_no_content_deps.a:installer_policies_no_content_deps/private_verification_tokens_installer_policy.o:                  U component_updater::PrivateVerificationTokensInstallerPolicy::GetName() const",
+        "obj/components/component_updater/installer_policies/libinstaller_policies_no_content_deps.a:installer_policies_no_content_deps/private_verification_tokens_installer_policy.o:                  U vtable for component_updater::PrivateVerificationTokensInstallerPolicy"
+      ],
+      "pvt_target_inputs": [],
+      "source_grep_sha256": "c83d6122f3ceae26fd449836ede09e719ae179e2fd149934407e5a4030fde52e",
+      "symbols_sha256": "5240e527360f5a22f0c82026cecff1e00176a6a8e637c8392e2d4d3d76c3ef54"
+    },
+    "symbol_classification": {
+      "status": "symbol-audit-verified-not-final-link",
+      "total_link_inputs": 23608,
+      "settings_input_count": 47,
+      "settings_pvt_symbols": [],
+      "service_factory_symbols": [],
+      "pvt_undefined_with_definitions": [
+        "component_updater::PrivateVerificationTokensInstallerPolicy::ComponentReady(base::Version const&, base::FilePath const&, base::DictValue)",
+        "component_updater::PrivateVerificationTokensInstallerPolicy::GetHash(std::__Cr::vector<unsigned char, std::__Cr::allocator<unsigned char>>*) const",
+        "component_updater::PrivateVerificationTokensInstallerPolicy::GetInstallerAttributes() const",
+        "component_updater::PrivateVerificationTokensInstallerPolicy::GetName() const",
+        "component_updater::PrivateVerificationTokensInstallerPolicy::GetRelativeInstallDir() const",
+        "component_updater::PrivateVerificationTokensInstallerPolicy::OnCustomInstall(base::DictValue const&, base::FilePath const&)",
+        "component_updater::PrivateVerificationTokensInstallerPolicy::OnCustomUninstall()",
+        "component_updater::PrivateVerificationTokensInstallerPolicy::RequiresNetworkEncryption() const",
+        "component_updater::PrivateVerificationTokensInstallerPolicy::SupportsGroupPolicyEnabledComponentUpdates() const",
+        "component_updater::PrivateVerificationTokensInstallerPolicy::VerifyInstallation(base::DictValue const&, base::FilePath const&) const",
+        "component_updater::PrivateVerificationTokensInstallerPolicy::~PrivateVerificationTokensInstallerPolicy()",
+        "component_updater::RegisterPrivateVerificationTokensComponentIfEnabled(component_updater::ComponentUpdateService*)",
+        "kEnablePrivateVerificationTokens",
+        "vtable for component_updater::PrivateVerificationTokensInstallerPolicy"
+      ],
+      "unresolved_archive_member_only": [
+        {
+          "input": "obj/components/component_updater/installer_policies/libinstaller_policies_no_content_deps.a:installer_policies_no_content_deps/private_verification_tokens_installer_policy.o",
+          "kind": "U",
+          "symbol": "private_verification_tokens::PrivateVerificationTokensIssuerConfig::LoadFromFile(base::FilePath const&)"
+        },
+        {
+          "input": "obj/components/component_updater/installer_policies/libinstaller_policies_no_content_deps.a:installer_policies_no_content_deps/private_verification_tokens_installer_policy.o",
+          "kind": "U",
+          "symbol": "private_verification_tokens::PrivateVerificationTokensIssuerConfig::~PrivateVerificationTokensIssuerConfig()"
+        }
+      ],
+      "external_references_to_policy_member": [],
+      "whole_archive_used": false,
+      "qualification": "Only two unresolved PVT symbols are inside the unused installer-policy lazy archive member. No external PVT policy reference and no whole-archive flag. Existing disabled registration function and disabled feature flag have definitions; not reenabled or stubbed by0242. Actual final ThinLTO link was attempted and OOM-killed, so this is symbol analysis, not link success."
+    },
+    "latest_source_audit_limit": "Snapshot has pruned NUL source files, so latest grep alone is not a complete source audit. Combined previous full exact157 source grep plus latest all23608 link-input llvm-nm covers live binary references. No final-link success claim."
   }
 }

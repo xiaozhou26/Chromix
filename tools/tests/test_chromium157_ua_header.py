@@ -92,7 +92,7 @@ def test_old228_patch_bytes_and_only_added_version_translation_unit():
                     for patch in old["base_patches"]] + entry["additions"]
         assert identity["patches"][:len(previous)] == previous
         assert patches[len(previous)][0] == PATCH
-        assert len(patches) == {"linux": 232, "macos": 231, "windows": 235}[platform]
+        assert len(patches) == {"linux": 233, "macos": 231, "windows": 235}[platform]
         introduced = set()
         for _, raw in patches:
             if any(line.startswith(b"+") and not line.startswith(b"+++") and b"base::Version" in line

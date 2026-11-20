@@ -115,6 +115,10 @@ def invariants(src, platform):
     assert ua.count('#include "base/version.h"') == 1
     assert ua.count("std::string GetUserAgentInternal() {") == 1
     assert ua.count("std::string BuildUserAgentFromProduct(const std::string& product) {") == 1
+    factory = text("chrome/browser/browsing_data/chrome_browsing_data_remover_delegate_factory.cc")
+    assert ("PrivateVerificationTokensServiceFactory" in factory) == (platform != "linux")
+    assert "DependsOn(ProtocolHandlerRegistryFactory::GetInstance());" in factory
+    assert "DependsOn(ReadingListModelFactory::GetInstance());" in factory
     storage = text("third_party/blink/public/devtools_protocol/domains/Storage.pdl")
     handler = text("chrome/browser/devtools/protocol/storage_handler.h")
     for command in ("getPrivateVerificationTokens", "getPrivateVerificationTokensIssuerConfigs",
@@ -195,6 +199,13 @@ def verify():
         raw = checked(entry)
         targets = [target for target, _, _ in arp.transform_patch(raw, set(), [])[1]]
         assert len(targets) == 1, entry["path"]
+        if entry.get("kind") == "linux-disabled-feature-factory":
+            assert entry["path"] == "patches/chromium157-additions/0242-linux-disabled-private-verification-token-factory-dependency.patch"
+            assert targets == ["chrome/browser/browsing_data/chrome_browsing_data_remover_delegate_factory.cc"]
+            assert not added(raw)
+            assert entry in manifest["additions"]["linux"]
+            assert all(entry not in manifest["additions"][platform] for platform in ("macos", "windows"))
+            continue
         if entry.get("kind") == "linux-disabled-feature-protocol":
             protocol_targets = {
                 "0239-linux-disabled-private-verification-token-protocol.patch":
@@ -254,7 +265,7 @@ def verify():
                           "domain_substituted": substituted, "status": "failed",
                           "overlay_mode": "downstream-nine-patch-recipe" if platform == "linux" else "actual-platform",
                           "build_verified": False, "runtime_verified": False,
-                          "expected_patch_count": {"linux": 232, "windows": 235, "macos": 231}[platform],
+                          "expected_patch_count": {"linux": 233, "windows": 235, "macos": 231}[platform],
                           "patches": [], "predecessors": []}
                 results.append(result)
                 try:
@@ -355,7 +366,7 @@ def verify():
                     result.update(status="verified", patch_count=len(prepared),
                                   roundtrip={"status": "verified", "method": "reverse-forward-exact-bytes",
                                              "patch_count": len(roundtrip_patches),
-                                             "scope": "platform9-plus-chromix232" if platform == "linux" else "chromix-stack",
+                                             "scope": "platform9-plus-chromix233" if platform == "linux" else "chromix-stack",
                                              "initial": roundtrip_initial, "final": final})
                     for key in ("stage", "current_patch", "current_file"):
                         del result[key]

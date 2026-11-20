@@ -1185,6 +1185,10 @@
         {
           "path": "patches/chromium157-additions/0241-linux-disabled-private-verification-token-content-config.patch",
           "sha256": "f2ab0307d06cf25765141fd96c0d83850f307fceb1fc1dc308b4faa34d8de9af"
+        },
+        {
+          "path": "patches/chromium157-additions/0242-linux-disabled-private-verification-token-factory-dependency.patch",
+          "sha256": "8f737d17fc5689e7fdb5893b0c72ad6e0fbae2dbecd9549284f5f1b9b938a137"
         }
       ],
       "downstream": {
@@ -1301,11 +1305,11 @@
           "scope": "source-replay",
           "review_manifest": {
             "path": "patches/chromium157/manifest.json",
-            "sha256": "637e507bbd3b48ec5fe1bd89e9b2177097bdf9214cb70569ddfdb2fb96ca8dd0"
+            "sha256": "dc5c555e6c1ab35c5368f274c3e2276179ddf54efa6ec0f0e4e2fdbb18c88537"
           },
           "report": {
             "path": "patches/chromium157-verification/verified.json",
-            "sha256": "2bca5a29a04e78b7071f074a1ea1e8fdbb1b06fcc0b691c18eb7dd46d29917cf"
+            "sha256": "cdae254e7166bbf67b55da13fdd16a13eb27ac1a182c4c1d2290d5e00f19602a"
           },
           "replayed_recipe_sha256": "42d788d91c0ec2345c253044665af7f623501a73c8bdb627a94d1739790aeb11",
           "recipe_integration": {

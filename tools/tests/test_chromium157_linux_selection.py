@@ -71,7 +71,7 @@ def test_integrated_linux_selection_matches_real_recipe_and_parser():
     identity, patches = selection.select(ROOT, "linux")
     assert pins["ChromiumVersion"] == selection.VERSION157
     assert pins["UngoogledLinuxVersion"] == selection.VERSION156 + "-1"
-    assert len(patches) == 232
+    assert len(patches) == 233
     assert identity["selection"]["downstream"]["recipe"] == linux157_source.recipe(ROOT)
     assert identity["selection"]["core_gitlink"] == selection.CORE156
     assert identity["selection"]["effective_core_commit"] == selection.CORE157
@@ -258,7 +258,7 @@ def test_locale_review_preserves_old_prefix_and_rejects_generic_restore(linux_re
         prior.compatible_selection(old, selected)
     with pytest.raises(ValueError, match="only"):
         postgn.delta(donor["source_receipt"]["recipe"], DOWNSTREAM["recipe"])
-    assert len(raw) == 232
+    assert len(raw) == 233
 
 
 def test_old_locale_preflight_rejects_unmigrated_ua_addition():
@@ -466,17 +466,32 @@ def test_unknown_arm_ua_profile_identity_rejected(mutation):
         selection.validate_manifest157(manifest)
 
 
+def historical_storage_selection(donor):
+    from tools import linux157_storage as storage
+
+    selected = copy.deepcopy(donor["source_receipt"]["chromix_selection"])
+    additions = [{"path": entry["patch"], "sha256": entry["sha256"]}
+                 for entry in donor["migration"]["additions"]]
+    selected["patches"].extend(additions)
+    selected["selection"]["additions"]["patches"].extend(additions)
+    selected["series_sha256"] = storage.canonical_series(ROOT, selected, (ROOT / "patches/series").read_bytes())
+    return selected, [(entry["path"], (ROOT / entry["path"]).read_bytes()) for entry in selected["patches"]]
+
+
 def test_current_storage_preflight_binds_exact_stage5_and_three_sources():
     from tools import linux157_storage as storage
     from tools import linux157_ua as ua
     from tools import linux157_checkpoint as prior
     selected, raw = selection.select(ROOT, "linux")
     donor = storage.load(ROOT)
-    assert storage.validate_additions(selected, raw, donor, ROOT) == donor["migration"]["additions"]
+    with pytest.raises(ValueError, match="unchanged full old229"):
+        storage.validate_additions(selected, raw, donor, ROOT)
+    historical, historical_raw = historical_storage_selection(donor)
+    assert storage.validate_additions(historical, historical_raw, donor, ROOT) == donor["migration"]["additions"]
     storage.recipe_delta(donor["source_receipt"]["recipe"], DOWNSTREAM["recipe"], ROOT)
     assert selected["patches"][:229] == donor["source_receipt"]["chromix_selection"]["patches"]
-    assert len(raw) == 232
-    assert [Path(p["path"]).name[:4] for p in selected["patches"][-3:]] == ["0239", "0240", "0241"]
+    assert len(raw) == 233
+    assert [Path(p["path"]).name[:4] for p in selected["patches"][229:232]] == ["0239", "0240", "0241"]
     assert (donor["run_id"], donor["stage"], donor["artifact"]["id"], donor["continuation_stage"]) == (
         44660206036, 5, 14608249261, 6)
     assert DOWNSTREAM["validation"]["recipe_integration"]["storage_recovery"]["source_migration"] == donor["migration"]
@@ -538,7 +553,10 @@ def test_real_x64_storage_binding_keeps_shared_recipe_and_arm_default():
     with x64.profile(ROOT) as active:
         donor = active.load(ROOT, "x64")
         selected, raw = selection.select(ROOT, "linux")
-        active.validate_additions(selected, raw, donor, ROOT)
+        with pytest.raises(ValueError, match="unchanged full old229"):
+            active.validate_additions(selected, raw, donor, ROOT)
+        historical, historical_raw = historical_storage_selection(donor)
+        active.validate_additions(historical, historical_raw, donor, ROOT)
         active.recipe_delta(donor["source_receipt"]["recipe"], source.recipe(ROOT), ROOT, "x64")
         assert (donor["run_id"], donor["stage"], donor["continuation_stage"]) == (44687163614, 1, 2)
         with pytest.raises(ValueError):
@@ -585,7 +603,7 @@ def test_reviewed_activation_preserves_real_origin_and_effective_core(linux_repo
     activate(linux_repo, monkeypatch)
     identity, patches = selection.select(linux_repo, "linux")
     chosen = identity["selection"]
-    assert len(patches) == 232
+    assert len(patches) == 233
     assert chosen["core_commit"] == chosen["effective_core_commit"] == selection.CORE157
     assert chosen["core_gitlink"] == selection.CORE156 != selection.CORE157
     assert chosen["platform_version"] == "156.0.8078.79-1"

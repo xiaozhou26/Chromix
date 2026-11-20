@@ -75,7 +75,7 @@ def test_locale_patch_chain_preserves_source_behavior(tmp_path, platform, substi
     selected = [replacements.get(entry["path"], entry) for entry in review["base_patches"]]
     selected += review["additions"][platform]
     assert [entry["path"] for entry in selected if entry["path"] in PATCHES] == list(PATCHES)
-    assert len(selected) == {"linux": 232, "macos": 231, "windows": 235}[platform]
+    assert len(selected) == {"linux": 233, "macos": 231, "windows": 235}[platform]
     listed = set(data["domain_lists"][platform].splitlines()) if substituted else set()
     rules = verify.arp._rules(data["domain_regex"].encode()) if substituted else []
     for name in (HEADER, SOURCE):
