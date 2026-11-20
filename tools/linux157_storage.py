@@ -33,8 +33,10 @@ except ImportError:
     import patch_selection
 
 MANIFEST = "build/linux/157.0.8103.78/arm64-storage-checkpoint.json"
-MANIFEST_SHA256 = "6c1b078565ff82751c3f2ad833cf740b5f239ad9b85f5cc24fb43dae25d13765"
+MANIFEST_SHA256 = "e8fa58c996ceb30f357a273408f01a6f3d80cb314e7ce5f01410471a861f89b6"
 OLD_COUNT = 229
+NEW_COUNT = 232
+ADDITION_COUNT = 3
 MARKER = ".chromix-linux157-storage-migration.json"
 PENDING = ".chromix-linux157-storage-migration-in-progress"
 BACKUP = "linux157-storage-origin"
@@ -53,11 +55,11 @@ def load(repo=source.ROOT, arch="arm64"):
 
 def review(manifest):
     migration = manifest["migration"]
-    if migration.get("status") != "reviewed":
+    if migration.get("status") != "verified":
         raise ValueError("Storage patch scope awaits strict parent review")
     additions, targets = migration["additions"], migration["sources"]
-    if (migration["old_patch_count"] != OLD_COUNT or not additions or not targets
-            or migration["new_patch_count"] != OLD_COUNT + len(additions)):
+    if (migration["old_patch_count"] != OLD_COUNT or len(additions) != ADDITION_COUNT
+            or len(targets) != ADDITION_COUNT or migration["new_patch_count"] != NEW_COUNT):
         raise ValueError("invalid reviewed Storage patch count/surface")
     for name, pin in targets.items():
         arp._relative(name)
@@ -75,7 +77,7 @@ def review(manifest):
         if (not entry["patch"].startswith("patches/chromium157-additions/")
                 or ".." in Path(entry["patch"]).parts
                 or not re.fullmatch(r"[0-9a-f]{64}", entry["sha256"])
-                or not entry["targets"] or len(set(entry["targets"])) != len(entry["targets"])
+                or len(entry["targets"]) != 1
                 or set(entry["targets"]) - targets.keys()):
             raise ValueError("invalid reviewed Storage patch")
     if set().union(*(set(p["targets"]) for p in additions)) != set(targets):
@@ -206,7 +208,8 @@ def validate_additions(selected, raw, manifest, repo=source.ROOT):
 
 
 def validate_surface(entries, pin):
-    if ([e[0] for e in entries] != pin["targets"] or any(e[1] != "modify" for e in entries)):
+    if (len(entries) != 1 or [e[0] for e in entries] != pin["targets"]
+            or entries[0][1] != "modify"):
         raise ValueError("Storage addition differs from reviewed source surface")
 
 

@@ -145,11 +145,11 @@ PATCH_COUNTS157 = {"windows": 235, "macos": 231, "linux": 232}
 OVERRIDE157_ROOT = "patches/chromium157"
 ADDITIONS157_ROOT = "patches/chromium157-additions"
 MANIFEST157 = "build/patch-selection-157.json"
-MANIFEST157_SHA256 = "f3af9658e4c61c9e052e425ec28bd52f17fecf2224b45eedfbc4e454b87af3c0"
+MANIFEST157_SHA256 = "970b72c9273489e22d7840abf4fdf701ae19467b8d2e42d69da3db63e26931c6"
 REVIEW157 = "patches/chromium157/manifest.json"
 REVIEW157_SHA256 = "637e507bbd3b48ec5fe1bd89e9b2177097bdf9214cb70569ddfdb2fb96ca8dd0"
 
-LINUX157_DOWNSTREAM_SHA256 = "1a3f72254bfa365291ef8dce4ff4c2084d9e61734f4e016cb70e40fc02a32bf0"
+LINUX157_DOWNSTREAM_SHA256 = "3f49a64d2e83c6c86abe9858494c8c35b1eb6709ec40d253a3c113ff3e4ca599"
 # Activation requires the final patch review, not just successful platform preparation.
 LINUX157_VALIDATED_REVIEW_SHA256: str | None = REVIEW157_SHA256
 

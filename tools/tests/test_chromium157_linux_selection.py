@@ -14,7 +14,7 @@ from tools import patch_selection as selection
 from tools.tests.test_patch_selection import clone_repo, set_platform_pins
 
 ROOT = Path(__file__).resolve().parents[2]
-LINUX_IMPLEMENTATION = "fba691946d77a138977d25605ff3b771ea95faca"
+LINUX_IMPLEMENTATION = "c839eafeff4997d508f0e21e364d2c7bfd877127"
 MANIFEST = json.loads((ROOT / selection.MANIFEST157).read_bytes())
 DOWNSTREAM = MANIFEST["platforms"]["linux"]["downstream"]
 
@@ -34,7 +34,8 @@ def linux_repo(tmp_path, monkeypatch):
     repo = clone_repo(tmp_path)
     shutil.copy2(ROOT / selection.MANIFEST157, repo / selection.MANIFEST157)
     for name, expected in DOWNSTREAM["recipe"]["inputs"].items():
-        raw = blob(name)
+        raw = ((ROOT / name).read_bytes() if name in ("tools/linux157_storage.py",
+               "build/linux/157.0.8103.78/arm64-storage-checkpoint.json") else blob(name))
         assert selection.digest(raw) == expected
         store(repo, name, raw)
     set_platform_pins(repo, "linux", selection.VERSION157, selection.CORE157,
@@ -84,12 +85,12 @@ def test_exact_recipe_source_and_nine_override_group_match_actual_implementation
         for entry in source["patches"]]
     assert len(DOWNSTREAM["platform_overrides"]) == 9
     assert DOWNSTREAM["platform_override_group_sha256"] == selection.canonical_digest(DOWNSTREAM["platform_overrides"])
-    assert DOWNSTREAM["recipe"]["sha256"] == "89daf4e70a64fc7641e4d70ce61759cfd1eb289d7697d0c7c3b4870cbc3b2f41"
+    assert DOWNSTREAM["recipe"]["sha256"] == "f72b67654204d0447a1f3732463382a6f0a7a16877ee35b2c51d00c22ca8adc2"
 
 
 def test_precise_host_go_helper_and_previous_unbound_helper_rejected(linux_repo):
     helper = "tools/linux157_build.py"
-    assert DOWNSTREAM["recipe"]["inputs"][helper] == "ccac0e3a4926a755734f22dfa4bd1109d7a0553232b5741fc5dfb8a959821640"
+    assert DOWNSTREAM["recipe"]["inputs"][helper] == "c84adaa69f782b85a74112295572d3fea454bd3d7f7ea636fd9854e3123bf9dc"
     delta = DOWNSTREAM["validation"]["recipe_integration"]["changed_inputs"][helper]
     assert delta == {
         "before_sha256": "048e644354c26812c5b0db71e272c53066eb6f1b7d19d68821bb4329cfdb6503",
@@ -342,14 +343,10 @@ def test_unknown_arm_profile_identity_rejected(mutation):
 
 
 def historical_ua_selection(donor):
-    from tools import linux157_ua as ua
+    from tools import linux157_storage as storage
 
-    selected = copy.deepcopy(donor["source_receipt"]["chromix_selection"])
-    additions = [{"path": entry["patch"], "sha256": entry["sha256"]}
-                 for entry in donor["migration"]["additions"]]
-    selected["patches"].extend(additions)
-    selected["selection"]["additions"]["patches"].extend(additions)
-    selected["series_sha256"] = ua.canonical_series(ROOT, selected, (ROOT / "patches/series").read_bytes())
+    selected = copy.deepcopy(storage.load(ROOT)["source_receipt"]["chromix_selection"])
+    assert selected["patches"][:228] == donor["source_receipt"]["chromix_selection"]["patches"]
     raw = [(entry["path"], (ROOT / entry["path"]).read_bytes()) for entry in selected["patches"]]
     return selected, raw
 
@@ -364,7 +361,11 @@ def test_current_ua_preflight_binds_latest228_and_preserves_locale():
         ua.validate_additions(selected, raw, donor, ROOT)
     historical, historical_raw = historical_ua_selection(donor)
     assert ua.validate_additions(historical, historical_raw, donor, ROOT) == donor["migration"]["additions"]
-    ua.recipe_delta(donor["source_receipt"]["recipe"], DOWNSTREAM["recipe"], ROOT)
+    from tools import linux157_storage as storage
+    historical_recipe = storage.load(ROOT)["source_receipt"]["recipe"]
+    ua.recipe_delta(donor["source_receipt"]["recipe"], historical_recipe, ROOT)
+    with pytest.raises(ValueError, match="not reviewed"):
+        ua.recipe_delta(donor["source_receipt"]["recipe"], DOWNSTREAM["recipe"], ROOT)
     assert selected["patches"][:228] == donor["source_receipt"]["chromix_selection"]["patches"]
     assert selected["patches"][228]["sha256"] == "dd22d5decfdb675477ce8d1379b7b1eaf2153f5cd0fb6dbb2de47135fc8a9561"
     assert [Path(p["path"]).name[:5] for p in selected["patches"][226:228]] == ["0236-", "0237-"]
@@ -411,7 +412,11 @@ def test_current_ua_profiles_have_exact_distinct_donor_contracts(arch, run, stag
         ua.validate_additions(selected, raw, donor, ROOT)
     historical, historical_raw = historical_ua_selection(donor)
     assert ua.validate_additions(historical, historical_raw, donor, ROOT) == donor["migration"]["additions"]
-    ua.recipe_delta(donor["source_receipt"]["recipe"], DOWNSTREAM["recipe"], ROOT, arch)
+    from tools import linux157_storage as storage
+    historical_recipe = storage.load(ROOT)["source_receipt"]["recipe"]
+    ua.recipe_delta(donor["source_receipt"]["recipe"], historical_recipe, ROOT, arch)
+    with pytest.raises(ValueError, match="not reviewed"):
+        ua.recipe_delta(donor["source_receipt"]["recipe"], DOWNSTREAM["recipe"], ROOT, arch)
     expected = ua.expected(arch, ROOT)
     assert (expected["run_id"], expected["stage"], expected["artifacts"][0]["id"]) == (run, stage, artifact)
     assert ua.load(ROOT) == ua.load(ROOT, "x64")
@@ -457,6 +462,55 @@ def test_unknown_arm_ua_profile_identity_rejected(mutation):
         delta["donor"]["arch"] = "x64"
     else:
         delta["profile"]["sha256"] = "0" * 64
+    with pytest.raises(selection.SelectionError, match="downstream recipe"):
+        selection.validate_manifest157(manifest)
+
+
+def test_current_storage_preflight_binds_exact_stage5_and_three_sources():
+    from tools import linux157_storage as storage
+    from tools import linux157_ua as ua
+    from tools import linux157_checkpoint as prior
+    selected, raw = selection.select(ROOT, "linux")
+    donor = storage.load(ROOT)
+    assert storage.validate_additions(selected, raw, donor, ROOT) == donor["migration"]["additions"]
+    storage.recipe_delta(donor["source_receipt"]["recipe"], DOWNSTREAM["recipe"], ROOT)
+    assert selected["patches"][:229] == donor["source_receipt"]["chromix_selection"]["patches"]
+    assert len(raw) == 232
+    assert [Path(p["path"]).name[:4] for p in selected["patches"][-3:]] == ["0239", "0240", "0241"]
+    assert (donor["run_id"], donor["stage"], donor["artifact"]["id"], donor["continuation_stage"]) == (
+        44660206036, 5, 14608249261, 6)
+    assert DOWNSTREAM["validation"]["recipe_integration"]["storage_recovery"]["source_migration"] == donor["migration"]
+    with pytest.raises(ValueError, match="cannot change"):
+        prior.compatible_selection(donor["source_receipt"]["chromix_selection"], selected)
+    for arch in ("x64", "arm64"):
+        with pytest.raises(ValueError, match="unavailable"):
+            ua.validate_additions(selected, raw, ua.load(ROOT, arch), ROOT)
+
+
+@pytest.mark.parametrize("arch", ["x64", "aarch64", "ARM64", "x86", "linux", "", None])
+def test_storage_profile_does_not_accept_other_architectures(arch):
+    from tools import linux157_storage as storage
+    with pytest.raises(ValueError, match="ARM64 only"):
+        storage.load(ROOT, arch)
+
+
+@pytest.mark.parametrize("mutation", ["count", "source", "patch-order", "stage", "recipe", "manifest"])
+def test_storage_review_scope_mutations_rejected(mutation):
+    manifest = copy.deepcopy(MANIFEST)
+    downstream = manifest["platforms"]["linux"]["downstream"]
+    delta = downstream["validation"]["recipe_integration"]["storage_recovery"]
+    if mutation == "count":
+        delta["source_migration"]["new_patch_count"] = 230
+    elif mutation == "source":
+        delta["source_migration"]["additions"][0]["targets"] = ["out/Chromix/gen/storage.h"]
+    elif mutation == "patch-order":
+        delta["source_migration"]["additions"].reverse()
+    elif mutation == "stage":
+        delta["donor"]["stage"] = 3
+    elif mutation == "recipe":
+        downstream["recipe"]["inputs"]["tools/linux157_storage.py"] = "0" * 64
+    else:
+        delta["checkpoint_manifest"]["sha256"] = "0" * 64
     with pytest.raises(selection.SelectionError, match="downstream recipe"):
         selection.validate_manifest157(manifest)
 

@@ -624,11 +624,46 @@
   "job_name": "Linux157 ARM64 (latest stage3 ICU-compiled tree, continue stage4) / linux-arm64 stage 5 (resume compile)",
   "kind": "linux157-arm64-stage5-compiled-Storage-recovery",
   "migration": {
-    "additions": [],
-    "new_patch_count": null,
+    "additions": [
+      {
+        "patch": "patches/chromium157-additions/0239-linux-disabled-private-verification-token-protocol.patch",
+        "sha256": "bdc9b0a2dacc62f31d2a34c2b634b25783f8ad2f48f6af144463e93b048acfe9",
+        "targets": [
+          "third_party/blink/public/devtools_protocol/domains/Storage.pdl"
+        ]
+      },
+      {
+        "patch": "patches/chromium157-additions/0240-linux-disabled-private-verification-token-chrome-config.patch",
+        "sha256": "cf0c7e35e891104f495f6c72492082279ca942b2a98c7e079e6e36f2a2abf1c9",
+        "targets": [
+          "chrome/browser/devtools/inspector_protocol_config.json"
+        ]
+      },
+      {
+        "patch": "patches/chromium157-additions/0241-linux-disabled-private-verification-token-content-config.patch",
+        "sha256": "f2ab0307d06cf25765141fd96c0d83850f307fceb1fc1dc308b4faa34d8de9af",
+        "targets": [
+          "content/browser/devtools/protocol_config.json"
+        ]
+      }
+    ],
+    "new_patch_count": 232,
     "old_patch_count": 229,
-    "sources": {},
-    "status": "pending-parent-review"
+    "sources": {
+      "chrome/browser/devtools/inspector_protocol_config.json": {
+        "after": "b5dcd72c16b4f41fd586860218b6bf8e8340b4446039bb6febcb4c423127a5b3",
+        "before": "449d07d778c0a65bf4ba6d6324dd540ec31a47f96bd6113f19c9871f3d100ca7"
+      },
+      "content/browser/devtools/protocol_config.json": {
+        "after": "d6583c5f4da418a214756c50fd0e7e9d8975bb53c05740983e6ad431678c0fbe",
+        "before": "1b613ae8f136895502117c37e8ae298d8c5aa465451dc1088483df35d4e7d4ef"
+      },
+      "third_party/blink/public/devtools_protocol/domains/Storage.pdl": {
+        "after": "f98ead822a7b34660096807d3886535b99f3de5806dc21a61c543683ab98dc7f",
+        "before": "890c5f2c2cdb4d685f53244d66e201ebf47a49a1ff47b488329dc6f87bd40477"
+      }
+    },
+    "status": "verified"
   },
   "ninja": {
     "host": [

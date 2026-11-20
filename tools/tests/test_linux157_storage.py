@@ -20,7 +20,7 @@ from tools.tests.test_linux157_pre_gn_workflow import put
 ROOT = source.ROOT
 
 
-def test_exact_stage5_identity_and_pending_review():
+def test_exact_stage5_identity_and_verified_three_single_file_review():
     m = storage.load()
     want = storage.expected('arm64')
     assert (want['run_id'], want['stage'], want['attempt'], want['job_id']) == (44660206036, 5, 1, 136134564115)
@@ -33,9 +33,10 @@ def test_exact_stage5_identity_and_pending_review():
     assert len(m['source_receipt']['chromix_selection']['patches']) == 229
     assert m['output_tree']['entries'] > 10000
     assert m['files']['src/.chromix-linux157-ua-migration.json']
-    if m['migration']['status'] != 'reviewed':
-        with pytest.raises(ValueError, match='strict parent review'):
-            storage.review(m)
+    migration = storage.review(m)
+    assert migration['status'] == 'verified' and migration['new_patch_count'] == 232
+    assert [Path(p['patch']).name[:4] for p in migration['additions']] == ['0239', '0240', '0241']
+    assert all(len(p['targets']) == 1 for p in migration['additions'])
 
 
 @pytest.mark.parametrize('field', ['run_id', 'stage', 'attempt', 'job_id', 'head_sha', 'arch'])
@@ -47,10 +48,10 @@ def test_wrong_tuple_rejects_before_tree_access(tmp_path, field):
     assert not list(tmp_path.iterdir())
 
 
-def test_pending_slot_cannot_download_or_publish(tmp_path):
-    m = storage.load()
-    if m['migration']['status'] == 'reviewed':
-        pytest.skip('parent has sealed the reviewed scope')
+def test_pending_slot_cannot_download_or_publish(tmp_path, monkeypatch):
+    m = copy.deepcopy(storage.load())
+    m['migration']['status'] = 'pending-parent-review'
+    monkeypatch.setattr(storage, 'load', lambda *args: m)
     with pytest.raises(ValueError, match='strict parent review'):
         storage.restore(tmp_path / 'absent', 'arm64')
     with pytest.raises(ValueError, match='strict parent review'):
@@ -111,8 +112,8 @@ def fixture(root):
         put(src / name, f'patched{i}\n')
         raw, transformed, entries = patch(name, f'original{i}\n', f'patched{i}\n')
         stack.append((f'old/{i}.patch', transformed, entries))
-    migration = {'status': 'reviewed', 'old_patch_count': 229, 'new_patch_count': 231, 'additions': [], 'sources': {}}
-    for i, names in enumerate((('protocol/Storage.pdl', 'handlers/storage.cc'), ('handlers/storage.h',))):
+    migration = {'status': 'verified', 'old_patch_count': 229, 'new_patch_count': 232, 'additions': [], 'sources': {}}
+    for i, names in enumerate((('protocol/Storage.pdl',), ('handlers/storage.cc',), ('handlers/storage.h',))):
         data, targets = b'', []
         for name in names:
             before, after = 'disabled old\n', 'disabled current\n'
@@ -130,7 +131,7 @@ def fixture(root):
     return src, stack, {'migration': migration}
 
 
-def test_fixture_full229_plus_multifile_multistack_private_roundtrip(tmp_path):
+def test_fixture_full229_plus_three_single_file_patches_private_roundtrip(tmp_path):
     src, stack, manifest = fixture(tmp_path)
     output = storage.snapshot_outputs(src / 'out')
     before, after = storage.private_migration(src, stack, tmp_path, manifest)
@@ -335,3 +336,57 @@ def test_review_cannot_authorize_generated_output_or_gn(tmp_path, name):
     manifest['migration']['additions'][0]['targets'][0] = name
     with pytest.raises((ValueError, storage.arp.ApplyError)):
         storage.review(manifest)
+
+
+def actual_selected_identity():
+    manifest = storage.load()
+    selected = copy.deepcopy(manifest['source_receipt']['chromix_selection'])
+    extra = [{'path': p['patch'], 'sha256': p['sha256']} for p in manifest['migration']['additions']]
+    selected['patches'] += extra
+    selected['selection']['additions']['patches'] += extra
+    selected['series_sha256'] = storage.canonical_series(ROOT, selected, (ROOT / 'patches/series').read_bytes())
+    raw = [(p['path'], (ROOT / p['path']).read_bytes()) for p in selected['patches']]
+    return manifest, selected, raw
+
+
+def test_actual_old229_prefix_and_new232_canonical_series_are_distinct():
+    manifest, selected, raw = actual_selected_identity()
+    old = manifest['source_receipt']['chromix_selection']
+    assert selected['series_sha256'] != old['series_sha256']
+    assert selected['patches'][:229] == old['patches']
+    assert storage.validate_additions(selected, raw, manifest) == manifest['migration']['additions']
+
+
+@pytest.mark.parametrize('attack', ['old-prefix', 'old-series', 'new-series', 'addition-order', 'raw-bytes', 'multi-source', 'count'])
+def test_storage232_contract_mutations_fail_closed(attack):
+    manifest, selected, raw = actual_selected_identity()
+    if attack == 'old-prefix': selected['patches'][10]['sha256'] = '0' * 64
+    elif attack == 'old-series': manifest['source_receipt']['chromix_selection']['series_sha256'] = selected['series_sha256']
+    elif attack == 'new-series': selected['series_sha256'] = manifest['source_receipt']['chromix_selection']['series_sha256']
+    elif attack == 'addition-order': raw[-1], raw[-2] = raw[-2], raw[-1]
+    elif attack == 'raw-bytes': raw[-1] = (raw[-1][0], raw[-1][1] + b'\n')
+    elif attack == 'multi-source': manifest['migration']['additions'][0]['targets'].append(manifest['migration']['additions'][1]['targets'][0])
+    elif attack == 'count': manifest['migration']['new_patch_count'] = 230
+    with pytest.raises(ValueError):
+        storage.validate_additions(selected, raw, manifest)
+
+
+def test_actual_migrated232_checkpoint_with_strict_test_review():
+    donor = os.environ.get('CHROMIX_STORAGE_MIGRATED')
+    reviewed = os.environ.get('CHROMIX_STORAGE_REVIEW_REPO')
+    if not donor or not reviewed:
+        pytest.skip('requires actual latest donor transaction and isolated strict recipe review')
+    repo = Path(reviewed)
+    assert (repo / 'tools/linux157_storage.py').read_bytes() == (ROOT / 'tools/linux157_storage.py').read_bytes()
+    assert (repo / storage.MANIFEST).read_bytes() == (ROOT / storage.MANIFEST).read_bytes()
+    result = subprocess.run([os.sys.executable, str(repo / 'tools/linux157_storage.py'), '--phase', 'verify',
+                             '--arch', 'arm64', '--workdir', donor, '--repo', str(repo)],
+                            cwd=repo, capture_output=True, text=True, check=True)
+    proof = json.loads(result.stdout)
+    assert proof['old_patch_count'] == 229 and proof['new_patch_count'] == 232
+    assert proof['runtime_verified'] is False
+    result = subprocess.run([os.sys.executable, str(repo / 'tools/linux157_source.py'), '--phase', 'checkpoint',
+                             '--arch', 'arm64', '--workdir', donor, '--repo', str(repo)],
+                            cwd=repo, capture_output=True, text=True, check=True)
+    assert json.loads(result.stdout)['source_verified'] is True
+    assert storage.output_identity(storage.snapshot_outputs(Path(donor) / 'src/out')) == storage.load()['output_tree']
