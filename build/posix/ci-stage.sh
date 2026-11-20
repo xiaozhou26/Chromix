@@ -357,6 +357,18 @@ else
   die "neither timeout nor gtimeout is available"
 fi
 
+MAC157_CHECKPOINT=0
+if [ "$PLATFORM" = macos ] && [ -z "$UNCHANGED_HELPER" ] &&
+    [ -f "$REPO/CHROMIUM_MACOS_VERSION" ]; then
+  read -r MACOS_VERSION < "$REPO/CHROMIUM_MACOS_VERSION"
+  if [[ "$MACOS_VERSION" = 157.* ]]; then
+    MAC157_CHECKPOINT=1
+    # A restored receipt cannot qualify a failed preparation in this invocation.
+    rm -f "$WORK/fingerprint-diagnostics/mac157-native-ready.json"
+    export CHROMIX_MAC157_CHECKPOINT_STAGE="$STAGE_INDEX"
+  fi
+fi
+
 # Guard the external process, not a sourced function: child errexit stays enabled.
 RC=0
 BUILD_COMMAND=(env CHROMIX_SKIP_DEPS=1 CHROMIX_WORKDIR="$WORK" "$BUILD_SCRIPT" "$WORK" "$ARCH")
@@ -377,6 +389,24 @@ if [ "$RC" -eq 124 ]; then
 fi
 unchanged_check after
 if [ "$RC" -ne 0 ]; then
+  if [ "$MAC157_CHECKPOINT" -eq 1 ]; then
+    emit status failed
+    emit last_error "native build failed at stage $STAGE_INDEX (exit $RC)"
+    mkdir -p "$WORK/fingerprint-diagnostics"
+    if python3 "$REPO/tools/verify_macos_checkpoint.py" --workdir "$WORK" --arch "$ARCH" \
+        --stage "$STAGE_INDEX" > "$WORK/fingerprint-diagnostics/mac157-failed-checkpoint.json"; then
+      if bash "$REPO/build/posix/ci-parts.sh" "$WORK" "$SNAPSHOT_DIR"; then
+        emit mac157_failed_checkpoint true
+        emit upload_snapshot true
+      else
+        log "mac157 failed-build snapshot could not be saved"
+      fi
+    else
+      log "mac157 failed-build tree is not eligible for a checkpoint"
+    fi
+    log "ERROR: build script failed at stage $STAGE_INDEX (exit $RC)"
+    exit "$RC"
+  fi
   die "build script failed at stage $STAGE_INDEX (exit $RC)"
 fi
 

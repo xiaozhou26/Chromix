@@ -498,7 +498,7 @@ RUNTIME_FAILURE = """      - name: Upload failed macOS runtime bundle
 
 SNAPSHOT_ENSURE = """      - name: Verify handoff snapshot
         id: checkpoint
-        if: ${{ !cancelled() && (steps.stage.outputs.upload_snapshot == 'true' || steps.runtime_checkpoint.outputs.upload_snapshot == 'true' || (inputs.platform == 'linux' && steps.linux_runtime_checkpoint.outputs.upload_snapshot == 'true')) }}
+        if: ${{ !cancelled() && ((always() && inputs.platform == 'macos' && steps.stage.outcome == 'failure' && steps.stage.outputs.mac157_failed_checkpoint == 'true') || steps.stage.outputs.upload_snapshot == 'true' || steps.runtime_checkpoint.outputs.upload_snapshot == 'true' || (inputs.platform == 'linux' && steps.linux_runtime_checkpoint.outputs.upload_snapshot == 'true')) }}
         run: |
           set -euo pipefail
           SNAP="${RUNNER_TEMP}/chromix-build/.snapshot-stage-%(stage)d"
@@ -517,6 +517,12 @@ SNAPSHOT_ENSURE = """      - name: Verify handoff snapshot
                 > "$UPLOAD_IDENTITY"
             fi
           fi
+          if [ '${{ inputs.platform }}' = macos ] &&
+             [ '${{ steps.stage.outputs.mac157_failed_checkpoint }}' = true ]; then
+            test '${{ steps.stage.outputs.status }}' = failed
+            python3 tools/verify_macos_checkpoint.py --workdir "${RUNNER_TEMP}/chromix-build" \\
+              --arch '${{ inputs.arch }}' --stage %(stage)d > "$UPLOAD_IDENTITY"
+          fi
           test -d "$SNAP/p1"
           if [ "$LINUX157_UPLOAD" = 1 ]; then
             python3 tools/snapshot_volumes.py "$SNAP" |
@@ -528,7 +534,7 @@ SNAPSHOT_ENSURE = """      - name: Verify handoff snapshot
 """
 
 UPLOAD_PARTS = """      - name: Upload tree part 1
-        if: ${{ !cancelled() && (steps.stage.outputs.upload_snapshot == 'true' || steps.runtime_checkpoint.outputs.upload_snapshot == 'true' || (inputs.platform == 'linux' && steps.linux_runtime_checkpoint.outputs.upload_snapshot == 'true')) && steps.checkpoint.outcome == 'success' }}
+        if: ${{ !cancelled() && ((always() && inputs.platform == 'macos' && steps.stage.outcome == 'failure' && steps.stage.outputs.mac157_failed_checkpoint == 'true') || steps.stage.outputs.upload_snapshot == 'true' || steps.runtime_checkpoint.outputs.upload_snapshot == 'true' || (inputs.platform == 'linux' && steps.linux_runtime_checkpoint.outputs.upload_snapshot == 'true')) && steps.checkpoint.outcome == 'success' }}
         uses: actions/upload-artifact@v4
         with:
           name: ${{ inputs.artifact }}-tree-s%(stage)d-attempt-${{ github.run_attempt }}-part1
@@ -537,7 +543,7 @@ UPLOAD_PARTS = """      - name: Upload tree part 1
           retention-days: ${{ inputs.platform == 'macos' && 14 || 3 }}
           compression-level: 0
       - name: Upload tree part 2
-        if: ${{ !cancelled() && (steps.stage.outputs.upload_snapshot == 'true' || steps.runtime_checkpoint.outputs.upload_snapshot == 'true' || (inputs.platform == 'linux' && steps.linux_runtime_checkpoint.outputs.upload_snapshot == 'true')) && steps.checkpoint.outcome == 'success' }}
+        if: ${{ !cancelled() && ((always() && inputs.platform == 'macos' && steps.stage.outcome == 'failure' && steps.stage.outputs.mac157_failed_checkpoint == 'true') || steps.stage.outputs.upload_snapshot == 'true' || steps.runtime_checkpoint.outputs.upload_snapshot == 'true' || (inputs.platform == 'linux' && steps.linux_runtime_checkpoint.outputs.upload_snapshot == 'true')) && steps.checkpoint.outcome == 'success' }}
         uses: actions/upload-artifact@v4
         with:
           name: ${{ inputs.artifact }}-tree-s%(stage)d-attempt-${{ github.run_attempt }}-part2
@@ -546,7 +552,7 @@ UPLOAD_PARTS = """      - name: Upload tree part 1
           retention-days: ${{ inputs.platform == 'macos' && 14 || 3 }}
           compression-level: 0
       - name: Upload tree part 3
-        if: ${{ !cancelled() && (steps.stage.outputs.upload_snapshot == 'true' || steps.runtime_checkpoint.outputs.upload_snapshot == 'true' || (inputs.platform == 'linux' && steps.linux_runtime_checkpoint.outputs.upload_snapshot == 'true')) && steps.checkpoint.outcome == 'success' }}
+        if: ${{ !cancelled() && ((always() && inputs.platform == 'macos' && steps.stage.outcome == 'failure' && steps.stage.outputs.mac157_failed_checkpoint == 'true') || steps.stage.outputs.upload_snapshot == 'true' || steps.runtime_checkpoint.outputs.upload_snapshot == 'true' || (inputs.platform == 'linux' && steps.linux_runtime_checkpoint.outputs.upload_snapshot == 'true')) && steps.checkpoint.outcome == 'success' }}
         uses: actions/upload-artifact@v4
         with:
           name: ${{ inputs.artifact }}-tree-s%(stage)d-attempt-${{ github.run_attempt }}-part3
@@ -555,7 +561,7 @@ UPLOAD_PARTS = """      - name: Upload tree part 1
           retention-days: ${{ inputs.platform == 'macos' && 14 || 3 }}
           compression-level: 0
       - name: Upload tree part 4
-        if: ${{ !cancelled() && (steps.stage.outputs.upload_snapshot == 'true' || steps.runtime_checkpoint.outputs.upload_snapshot == 'true' || (inputs.platform == 'linux' && steps.linux_runtime_checkpoint.outputs.upload_snapshot == 'true')) && steps.checkpoint.outcome == 'success' }}
+        if: ${{ !cancelled() && ((always() && inputs.platform == 'macos' && steps.stage.outcome == 'failure' && steps.stage.outputs.mac157_failed_checkpoint == 'true') || steps.stage.outputs.upload_snapshot == 'true' || steps.runtime_checkpoint.outputs.upload_snapshot == 'true' || (inputs.platform == 'linux' && steps.linux_runtime_checkpoint.outputs.upload_snapshot == 'true')) && steps.checkpoint.outcome == 'success' }}
         uses: actions/upload-artifact@v4
         with:
           name: ${{ inputs.artifact }}-tree-s%(stage)d-attempt-${{ github.run_attempt }}-part4

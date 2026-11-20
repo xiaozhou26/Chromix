@@ -1086,7 +1086,9 @@ class GenPosixWorkflowTest(unittest.TestCase):
             snapshot_steps.append(next(s for s in steps if s.get("name") == "Verify handoff snapshot"))
             self.assertEqual(len(snapshot_steps), 5)
             for step in snapshot_steps:
-                expected = ("!cancelled() && (steps.stage.outputs.upload_snapshot == 'true' || "
+                expected = ("!cancelled() && ((always() && inputs.platform == 'macos' && "
+                            "steps.stage.outcome == 'failure' && steps.stage.outputs.mac157_failed_checkpoint == 'true') || "
+                            "steps.stage.outputs.upload_snapshot == 'true' || "
                             "steps.runtime_checkpoint.outputs.upload_snapshot == 'true' || "
                             "(inputs.platform == 'linux' && "
                             "steps.linux_runtime_checkpoint.outputs.upload_snapshot == 'true'))")
@@ -1095,7 +1097,9 @@ class GenPosixWorkflowTest(unittest.TestCase):
                 self.assertEqual(step["if"], "${{ " + expected + " }}")
                 self.assertNotIn("ci-parts.sh", step.get("run", ""))
             logs = next(s for s in steps if s.get("name") == "Upload build diagnostics")
-            self.assertEqual(logs["if"], "always()")
+            self.assertEqual(logs["if"], "always() && !(inputs.platform == 'macos' && "
+                             "steps.stage.outputs.finished == 'true' && "
+                             "steps.stage.outputs.release_policy == 'macos-compile-release')")
 
     def test_platform_workflows_reference_posix_reusable_jobs(self):
         import yaml

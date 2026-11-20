@@ -89,5 +89,10 @@ else
   echo "macOS Ninja plan failed (exit $PLAN_RC); refusing compilation" >&2
   exit "$PLAN_RC"
 fi
+if [[ "$(cat "$REPO/CHROMIUM_MACOS_VERSION")" = 157.* ]] &&
+    [ -n "${CHROMIX_MAC157_CHECKPOINT_STAGE:-}" ]; then
+  python3 "$REPO/tools/verify_macos_checkpoint.py" --record-ready \
+    --workdir "$WORK" --arch "$ARCH" --stage "$CHROMIX_MAC157_CHECKPOINT_STAGE"
+fi
 chromix_build_restored_target macos "${CHROMIX_JOBS:-$(sysctl -n hw.ncpu)}" chrome
 printf '==> Done: %s\n' "$OUT/Chromium.app"
