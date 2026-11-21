@@ -1,0 +1,40 @@
+name: build-mac157-x64-stage6-resume
+run-name: macOS157 Intel stage6 UA source migration (230 to 231)
+
+on:
+  workflow_dispatch:
+    inputs:
+      compile_jobs:
+        description: 'Ninja jobs; exact stage6 donor, one-file migration and original GN/PGO are fixed'
+        type: string
+        default: '3'
+
+permissions:
+  actions: read
+  contents: read
+
+concurrency:
+  group: mac157-x64-stage6-resume-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  resume:
+    if: github.ref == 'refs/heads/main'
+    name: macOS157 Intel (exact stage6 UA migration, compile-release)
+    uses: ./.github/workflows/build-mac157-x64-stage6-stages.yml
+    with:
+      platform: macos
+      arch: x64
+      runner: macos-26-intel
+      artifact: chromix-mac157-x64-stage6-resume
+      max-stages: 8
+      build_profile: fast
+      compile_jobs: ${{ inputs.compile_jobs || '3' }}
+      resume_migration: mac157-x64-stage6
+      resume_run_id: '44639554770'
+      resume_tree_stage: '6'
+      resume_attempt: '1'
+      resume_artifact_ids: '14678246702'
+      use_upstream_cache: true
+      macos_compile_release: true
+    secrets: inherit

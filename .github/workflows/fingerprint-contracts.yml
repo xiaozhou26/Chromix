@@ -136,6 +136,12 @@ jobs:
         run: >-
           python -X utf8 -m pytest -q tools/tests/test_macos_runtime.py
           --junitxml=contracts-macos-runtime.xml
+      - name: macOS157 Intel stage6 isolated resume contracts
+        if: ${{ !cancelled() && runner.os != 'Windows' }}
+        run: |
+          python -m pip install PyYAML
+          git fetch --no-tags origin 35e2db1b0687a4525017f5ec8fd3820823aef8ff
+          python -X utf8 -m pytest -q tools/tests/test_macos157_x64_stage6_resume.py
       - name: Linux 155 generator restoration contracts
         if: ${{ !cancelled() && runner.os == 'Linux' }}
         run: >-

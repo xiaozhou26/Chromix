@@ -1,0 +1,729 @@
+#!/usr/bin/env bash
+# One stage of the GitHub-hosted POSIX (Linux/macOS) build, modeled on
+# ungoogled-chromium-portablelinux's prep/build_part_NN CI and
+# ungoogled-chromium-macos' retrieve-resources/build_job_NN chain: each job
+# restores the previous stage's tar|zstd tree snapshot when one exists,
+# prepares the pinned source or resumes ninja under `timeout -k`, snapshots
+# the work tree again (mtimes/modes/symlinks preserved for ninja state), and
+# reports status=running|compiled|completed through GITHUB_OUTPUT. Cross-built
+# bundles require a separate native runtime check. A failed compile fails the
+# job; only the deadline path hands off to the next stage.
+#
+# Usage:
+#   ci-stage.sh --platform linux|macos --arch x64|arm64 \
+#     [--workdir DIR] [--stage-index N] [--max-stages N]
+#     [--from-snapshot DIR] [--deadline-epoch EPOCH] [--reserve-minutes N]
+set -euo pipefail
+
+# Resolve to the repository root: this script lives at <repo>/build/posix/,
+# so two parent hops are needed, not one.
+REPO="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+PLATFORM=""
+ARCH=""
+WORK="${CHROMIX_WORKDIR:-$REPO/.chromix-build-posix}"
+STAGE_INDEX=1
+MAX_STAGES=8
+FROM_SNAPSHOT=""
+DEADLINE_EPOCH=0
+RESERVE_MINUTES="${CHROMIX_RESERVE_MINUTES:-45}"
+LINUX157_SOURCE=(python3 "$REPO/tools/linux157_source.py")
+LINUX157_BUILD=(python3 "$REPO/tools/linux157_build.py")
+
+while [ $# -gt 0 ]; do
+  case "$1" in
+    --platform) PLATFORM="${2:?--platform needs a value}"; shift 2 ;;
+    --arch) ARCH="${2:?--arch needs a value}"; shift 2 ;;
+    --workdir) WORK="${2:?--workdir needs a value}"; shift 2 ;;
+    --stage-index) STAGE_INDEX="${2:?--stage-index needs a value}"; shift 2 ;;
+    --max-stages) MAX_STAGES="${2:?--max-stages needs a value}"; shift 2 ;;
+    --from-snapshot) FROM_SNAPSHOT="${2:?--from-snapshot needs a value}"; shift 2 ;;
+    --deadline-epoch) DEADLINE_EPOCH="${2:?--deadline-epoch needs a value}"; shift 2 ;;
+    --reserve-minutes) RESERVE_MINUTES="${2:?--reserve-minutes needs a value}"; shift 2 ;;
+    *) echo "unknown argument: $1" >&2; exit 2 ;;
+  esac
+done
+
+case "$PLATFORM" in linux|macos) ;; *) echo "--platform linux|macos is required" >&2; exit 2 ;; esac
+case "$ARCH" in x64|arm64) ;; *) echo "--arch x64|arm64 is required" >&2; exit 2 ;; esac
+case "${CHROMIX_BUILD_PROFILE:-release}" in
+  fast|release) ;;
+  *) echo "CHROMIX_BUILD_PROFILE must be fast or release" >&2; exit 2 ;;
+esac
+case "$MAX_STAGES" in [1-8]) ;; *) echo "--max-stages must be between 1 and 8" >&2; exit 2 ;; esac
+case "$STAGE_INDEX" in [1-8]) ;; *) echo "--stage-index must be between 1 and 8" >&2; exit 2 ;; esac
+[ "$STAGE_INDEX" -le "$MAX_STAGES" ] || { echo "stage index exceeds max-stages" >&2; exit 2; }
+
+[ "$PLATFORM:$ARCH:$MAX_STAGES:${CHROMIX_UNCHANGED_RESUME:-}" = macos:x64:8:mac157-x64-stage6 ] ||
+  { echo "fixed mac157 Intel stage6 route required" >&2; exit 2; }
+
+mkdir -p "$WORK"
+WORK="$(cd "$WORK" && pwd)"
+SRC="$WORK/src"
+OUT="$SRC/out/Chromix"
+SNAPSHOT_DIR="$WORK/.snapshot-stage-$STAGE_INDEX"
+
+emit() {
+  # A bare `[ ... ] && printf` under `set -e` returns nonzero and aborts
+  # when GITHUB_OUTPUT is unset (local runs); branch explicitly instead.
+  if [ -n "${GITHUB_OUTPUT:-}" ]; then
+    printf '%s=%s\n' "$1" "$2" >>"$GITHUB_OUTPUT"
+  fi
+}
+log() { printf '==> %s\n' "$*" >&2; }
+die() { log "ERROR: $*"; exit 1; }
+now_epoch() { date +%s; }
+
+remaining_min() {
+  if [ "${DEADLINE_EPOCH:-0}" -le 0 ]; then echo 300; return; fi
+  # macOS runners execute workflow steps with the system /bin/bash 3.2,
+  # whose $(( )) cannot nest a quoted command substitution; expand to a
+  # variable first (verified against a locally built 3.2.0).
+  local now left
+  now="$(now_epoch)"
+  left=$(( (DEADLINE_EPOCH - now) / 60 ))
+  [ "$left" -lt 0 ] && left=0
+  echo "$left"
+}
+
+UNCHANGED_HELPER=""
+case "${CHROMIX_UNCHANGED_RESUME:-}" in
+  "") ;;
+  mac157-x64-stage6) UNCHANGED_HELPER="$REPO/tools/migrate_macos157_x64_stage6.py" ;;
+  mac156-arm64-hevc) UNCHANGED_HELPER="$REPO/tools/migrate_macos156_hevc_snapshot.py" ;;
+  mac156-arm64-stage3) UNCHANGED_HELPER="$REPO/tools/validate_macos156_arm64_stage3_checkpoint.py" ;;
+  mac156-arm64-stage1) UNCHANGED_HELPER="$REPO/tools/validate_macos156_arm64_stage1_checkpoint.py" ;;
+  mac156-arm64-stage8) UNCHANGED_HELPER="$REPO/tools/validate_macos156_arm64_stage8_checkpoint.py" ;;
+  mac156-x64-stage3) UNCHANGED_HELPER="$REPO/tools/validate_macos156_x64_stage3_checkpoint.py" ;;
+  mac156-x64-stage2) UNCHANGED_HELPER="$REPO/tools/validate_macos156_x64_stage2_checkpoint.py" ;;
+  mac156-x64-stage8) UNCHANGED_HELPER="$REPO/tools/validate_macos156_x64_stage8_checkpoint.py" ;;
+  *) die "unknown unchanged continuation mode" ;;
+esac
+
+unchanged_check() {
+  if [ -n "$UNCHANGED_HELPER" ]; then
+    python3 "$UNCHANGED_HELPER" --mode check \
+      --repo "$REPO" --workdir "$WORK" --stage "$STAGE_INDEX" --phase "$1" ||
+      die "unchanged mac156 continuation identity failed"
+  fi
+}
+
+handoff() {
+  unchanged_check after
+  log "stage $STAGE_INDEX: $*; snapshotting unfinished work"
+  if [ "${LINUX157_FRESH:-0}" -eq 1 ]; then
+    "${LINUX157_SOURCE[@]}" --phase checkpoint --repo "$REPO" \
+      --workdir "$WORK" --arch "$ARCH" || die "Linux157 checkpoint is incomplete; retain failed source diagnostics"
+  fi
+  mkdir -p "$SNAPSHOT_DIR"
+  bash "$REPO/build/posix/ci-parts.sh" "$WORK" "$SNAPSHOT_DIR"
+  emit upload_snapshot true
+  # Preserve the final checkpoint without reporting an unfinished build as success.
+  if [ "$STAGE_INDEX" -ge "$MAX_STAGES" ]; then
+    die "stage $STAGE_INDEX reached max-stages $MAX_STAGES without finishing"
+  fi
+  exit 0
+}
+
+emit status running
+emit finished false
+
+# ---- restore previous stage snapshot ------------------------------------
+if [ -n "$FROM_SNAPSHOT" ] && [ ! -d "$FROM_SNAPSHOT" ] && [ "$STAGE_INDEX" -gt 1 ]; then
+  die "resume snapshot directory does not exist: $FROM_SNAPSHOT"
+fi
+if [ -n "$FROM_SNAPSHOT" ] && [ -d "$FROM_SNAPSHOT" ]; then
+  bash "$REPO/build/posix/restore-snapshot.sh" "$FROM_SNAPSHOT" "$WORK" ||
+    die "POSIX build snapshot restore failed"
+fi
+
+if [ "${CHROMIX_UNCHANGED_RESUME:-}" = mac156-arm64-stage8 ] ||
+   [ "${CHROMIX_UNCHANGED_RESUME:-}" = mac156-arm64-stage1 ] ||
+   [ "${CHROMIX_UNCHANGED_RESUME:-}" = mac156-arm64-stage3 ] ||
+   [ "${CHROMIX_UNCHANGED_RESUME:-}" = mac156-arm64-hevc ]; then
+  [ "$PLATFORM:$ARCH:$MAX_STAGES" = macos:arm64:8 ] || die "invalid unchanged continuation target"
+  unchanged_check before
+elif [ "${CHROMIX_UNCHANGED_RESUME:-}" = mac157-x64-stage6 ] ||
+     [ "${CHROMIX_UNCHANGED_RESUME:-}" = mac156-x64-stage8 ] ||
+     [ "${CHROMIX_UNCHANGED_RESUME:-}" = mac156-x64-stage2 ] ||
+     [ "${CHROMIX_UNCHANGED_RESUME:-}" = mac156-x64-stage3 ]; then
+  [ "$PLATFORM:$ARCH:$MAX_STAGES" = macos:x64:8 ] || die "invalid unchanged continuation target"
+  unchanged_check before
+elif [ -e "$WORK/fingerprint-diagnostics/mac157-x64-stage6-resume.json" ] ||
+     [ -e "$WORK/fingerprint-diagnostics/mac156-x64-stage3-resume.json" ] ||
+     [ -e "$WORK/fingerprint-diagnostics/mac156-arm64-hevc-resume.json" ] ||
+     [ -e "$WORK/fingerprint-diagnostics/mac156-arm64-stage3-resume.json" ] ||
+     [ -e "$WORK/fingerprint-diagnostics/mac156-x64-stage2-resume.json" ] ||
+     [ -e "$WORK/fingerprint-diagnostics/mac156-arm64-stage1-resume.json" ] ||
+     [ -e "$WORK/fingerprint-diagnostics/mac156-arm64-stage8-resume.json" ] ||
+     [ -e "$WORK/fingerprint-diagnostics/mac156-x64-stage8-resume.json" ]; then
+  die "unchanged mac156 receipt requires the dedicated continuation mode"
+fi
+
+LINUX157_FRESH=0
+LINUX157_RECOVERY=0
+case "${CHROMIX_LINUX157_X64_PVT_LINK_RECOVERY:-0}" in
+  0) ;;
+  1)
+    [ "$PLATFORM:$ARCH:${CHROMIX_LINUX157_X64_PVT_LINK_STAGE2_RECOVERY:-0}" = linux:x64:1 ] ||
+      die "PVT link recovery requires exact x64 stage2 donor"
+    [ "$STAGE_INDEX" -ge 3 ] && [ "$STAGE_INDEX" -le 8 ] ||
+      die "PVT link continuation requires logical stages3 through8"
+    [ "${CHROMIX_LINUX157_X64_STORAGE_RECOVERY:-0}:${CHROMIX_LINUX157_STORAGE_RECOVERY:-0}:${CHROMIX_LINUX157_UA_RECOVERY:-0}:${CHROMIX_LINUX157_PRE_GN_RECOVERY:-0}:${CHROMIX_LINUX157_POST_GN_RECOVERY:-0}:${CHROMIX_LINUX157_LOCALE_RECOVERY:-0}" = 0:0:0:0:0:0 ] ||
+      die "PVT link recovery cannot combine historical or ARM routes"
+    LINUX157_SOURCE=(python3 "$REPO/tools/linux157_x64_pvt_link.py" --command source)
+    LINUX157_BUILD=(python3 "$REPO/tools/linux157_x64_pvt_link.py" --command build)
+    LINUX157_RECOVERY=1 ;;
+  *) die "invalid PVT link recovery opt-in" ;;
+esac
+case "${CHROMIX_LINUX157_X64_STORAGE_RECOVERY:-0}" in
+  0) ;;
+  1)
+    [ "$PLATFORM:$ARCH:${CHROMIX_LINUX157_X64_STORAGE_STAGE1_RECOVERY:-0}" = linux:x64:1 ] ||
+      die "x64 Storage recovery requires exact stage1 donor"
+    [ "$STAGE_INDEX" -ge 2 ] && [ "$STAGE_INDEX" -le 8 ] ||
+      die "x64 Storage continuation requires logical stages2 through8"
+    [ "${CHROMIX_LINUX157_STORAGE_RECOVERY:-0}:${CHROMIX_LINUX157_UA_RECOVERY:-0}:${CHROMIX_LINUX157_PRE_GN_RECOVERY:-0}:${CHROMIX_LINUX157_POST_GN_RECOVERY:-0}:${CHROMIX_LINUX157_LOCALE_RECOVERY:-0}" = 0:0:0:0:0 ] ||
+      die "x64 Storage cannot combine historical or ARM routes"
+    LINUX157_SOURCE=(python3 "$REPO/tools/linux157_x64_storage.py" --command source)
+    LINUX157_BUILD=(python3 "$REPO/tools/linux157_x64_storage.py" --command build)
+    LINUX157_RECOVERY=1 ;;
+  *) die "invalid x64 Storage recovery opt-in" ;;
+esac
+case "${CHROMIX_LINUX157_STORAGE_RECOVERY:-0}" in
+  0) ;;
+  1)
+    [ "$PLATFORM:$ARCH:${CHROMIX_LINUX157_ARM64_STORAGE_STAGE5_RECOVERY:-0}" = linux:arm64:1 ] ||
+      die "Storage recovery requires exact ARM stage5 donor"
+    [ "$STAGE_INDEX" -ge 6 ] && [ "$STAGE_INDEX" -le 8 ] ||
+      die "Storage continuation requires logical stages6 through8"
+    [ "${CHROMIX_LINUX157_UA_RECOVERY:-0}:${CHROMIX_LINUX157_PRE_GN_RECOVERY:-0}:${CHROMIX_LINUX157_POST_GN_RECOVERY:-0}:${CHROMIX_LINUX157_LOCALE_RECOVERY:-0}" = 0:0:0:0 ] ||
+      die "Storage recovery cannot be combined with historical donor routes"
+    LINUX157_RECOVERY=1 ;;
+  *) die "invalid Storage recovery opt-in" ;;
+esac
+case "${CHROMIX_LINUX157_UA_RECOVERY:-0}" in
+  0) ;;
+  1)
+    case "$PLATFORM:$ARCH:${CHROMIX_LINUX157_ARM64_UA_STAGE3_RECOVERY:-0}" in
+      linux:x64:0) ;;
+      linux:arm64:1)
+        [ "$STAGE_INDEX" -ge 4 ] || die "ARM UA continuation must start at logical stage4" ;;
+      *) die "UA recovery requires an exact architecture donor route" ;;
+    esac
+    [ "${CHROMIX_LINUX157_PRE_GN_RECOVERY:-0}:${CHROMIX_LINUX157_POST_GN_RECOVERY:-0}:${CHROMIX_LINUX157_LOCALE_RECOVERY:-0}" = 0:0:0 ] ||
+      die "UA recovery cannot be combined with historical donor routes"
+    LINUX157_RECOVERY=1 ;;
+  *) die "invalid UA recovery opt-in" ;;
+esac
+case "${CHROMIX_LINUX157_PRE_GN_RECOVERY:-0}:${CHROMIX_LINUX157_POST_GN_RECOVERY:-0}:${CHROMIX_LINUX157_LOCALE_RECOVERY:-0}" in
+  0:0:0) ;;
+  1:0:0|0:1:0) LINUX157_RECOVERY=1 ;;
+  0:0:1)
+    case "$PLATFORM:$ARCH:${CHROMIX_LINUX157_ARM64_STAGE2_RECOVERY:-0}" in
+      linux:x64:0) ;;
+      linux:arm64:1)
+        [ "$STAGE_INDEX" -ge 3 ] || die "ARM locale continuation must start at logical stage3" ;;
+      *) die "locale recovery requires exact architecture donor route" ;;
+    esac
+    LINUX157_RECOVERY=1 ;;
+  *) die "select exactly one Linux157 recovery route" ;;
+esac
+if [ "$LINUX157_RECOVERY" = 1 ] && [ "$PLATFORM" != linux ]; then
+  die "Linux157 recovery is Linux-only"
+fi
+if [ "$PLATFORM" = linux ] && [ -f "$REPO/CHROMIUM_LINUX_VERSION" ]; then
+  read -r LINUX_VERSION < "$REPO/CHROMIUM_LINUX_VERSION"
+  if [ "$LINUX_VERSION" = 157.0.8103.78 ]; then
+    "${LINUX157_SOURCE[@]}" --phase route --repo "$REPO" --arch "$ARCH" ||
+      die "Linux157 fresh route identity/cache policy failed"
+    [ "$LINUX157_RECOVERY" = 1 ] ||
+      die "Linux157 requires a dedicated exact checkpoint recovery workflow"
+    [ "${CHROMIX_BUILD_PROFILE:-release}" = fast ] || die "Linux157 recovery preserves the fast donor profile"
+    [ -d "$SRC" ] || die "Linux157 prepared donor must be restored before the stage; fresh fallback forbidden"
+    "${LINUX157_SOURCE[@]}" --phase checkpoint --repo "$REPO" \
+      --workdir "$WORK" --arch "$ARCH" || die "Linux157 migration/source checkpoint proof failed"
+    LINUX157_FRESH=1
+  fi
+fi
+if [ "$LINUX157_RECOVERY" = 1 ] && [ "$LINUX157_FRESH" -ne 1 ]; then
+  die "checkpoint recovery requires exact Linux157 pins"
+fi
+
+# Historical donor mode remains mandatory when explicitly selected.
+if [ "${CHROMIX_USE_UPSTREAM_CACHE:-0}" = 1 ]; then
+  # Own snapshots take precedence, but cold snapshots cannot satisfy this mode.
+  if [ "$STAGE_INDEX" -eq 1 ] && [ -z "$FROM_SNAPSHOT" ] && [ ! -e "$SRC" ]; then
+    CACHE_TIMEOUT_SECONDS="${CHROMIX_CACHE_TIMEOUT_SECONDS-3600}"
+    [[ "$CACHE_TIMEOUT_SECONDS" =~ ^[1-9][0-9]*$ ]] ||
+      die "CHROMIX_CACHE_TIMEOUT_SECONDS must be a positive integer"
+    # Python integers avoid wrapping a large configured timeout in shell arithmetic.
+    CACHE_REQUIRED_MINUTES="$(python3 -c \
+      'import sys; print((int(sys.argv[1]) + 59) // 60 + int(sys.argv[2]) + 30)' \
+      "$CACHE_TIMEOUT_SECONDS" "$RESERVE_MINUTES")"
+    [ "$(remaining_min)" -ge "$CACHE_REQUIRED_MINUTES" ] ||
+      die "required upstream cache: insufficient stage budget for restore (need ${CACHE_REQUIRED_MINUTES}m)"
+    UPSTREAM_CACHE_DIR="${RUNNER_TEMP:-$(dirname "$WORK")}/chromix-upstream"
+    CHROMIX_CACHE_TIMEOUT_SECONDS="$CACHE_TIMEOUT_SECONDS" bash "$REPO/build/posix/fetch-upstream-cache.sh" \
+      --platform "$PLATFORM" --arch "$ARCH" --destination "$UPSTREAM_CACHE_DIR" ||
+      die "required upstream cache fetch failed"
+    python3 - "$UPSTREAM_CACHE_DIR" "$PLATFORM" "$ARCH" <<'PY' || die "required upstream cache fetch did not produce a verified hit"
+import json
+import math
+import os
+from pathlib import Path
+import stat
+import sys
+
+cache = Path(os.path.abspath(Path(sys.argv[1]).expanduser()))
+try:
+    descriptor = os.open(cache / "result.json", os.O_RDONLY | os.O_NONBLOCK | os.O_NOFOLLOW)
+    with os.fdopen(descriptor, "rb") as stream:
+        if not stat.S_ISREG(os.fstat(stream.fileno()).st_mode):
+            raise ValueError
+        raw = stream.read(1024 * 1024 + 1)
+    if len(raw) > 1024 * 1024:
+        raise ValueError
+    result = json.loads(raw)
+    if (not isinstance(result, dict) or result.get("owner") != "chromix-upstream-cache-v1"
+            or result.get("destination") != str(cache)
+            or result.get("platform") != sys.argv[2] or result.get("arch") != sys.argv[3]):
+        raise ValueError
+except (OSError, ValueError, UnicodeError, RecursionError):
+    print("upstream cache: missing or invalid fetch receipt", file=sys.stderr)
+    sys.exit(1)
+if result.get("status") != "hit":
+    reason = result.get("reason")
+    safe_reasons = {"unavailable", "network_unavailable", "cache_timeout", "download_timeout",
+                    "insufficient_disk_space", "checksum_mismatch", "download_size_mismatch",
+                    "invalid_content_range", "download_write_failed", "unexpected_http_status",
+                    "cache_unusable_OSError", "network_error", "artifact_expired", "artifact_mismatch"}
+    safe_reasons.update(f"github_http_{code}" for code in (401, 403, 404, 408, 410, 429, 500, 502, 503, 504))
+    reason = reason if isinstance(reason, str) and reason in safe_reasons else "cache_miss"
+    fields = []
+    for name in ("download_partial_bytes", "download_expected_bytes", "download_timeout_seconds",
+                 "duration_seconds"):
+        value = result.get(name)
+        if type(value) in (int, float) and 0 <= value <= 10**15 and math.isfinite(value):
+            fields.append(f"{name}={value}")
+    print(f"upstream cache: required fetch failed: {reason}" +
+          ("; " + ", ".join(fields) if fields else ""), file=sys.stderr)
+    sys.exit(1)
+PY
+    python3 "$REPO/tools/restore_upstream_cache.py" --phase restore \
+      --platform "$PLATFORM" --arch "$ARCH" --workdir "$WORK" \
+      --cache-dir "$UPSTREAM_CACHE_DIR" || die "required upstream cache restore helper failed"
+  fi
+  [ -f "$SRC/.chromix-upstream-restored.json" ] ||
+    die "required upstream cache: restore receipt missing; refusing cold preparation or compilation"
+fi
+if [ -f "$SRC/.chromix-upstream-restored.json" ]; then
+  python3 "$REPO/tools/restore_upstream_cache.py" --phase verify \
+    --platform "$PLATFORM" --arch "$ARCH" --workdir "$WORK" ||
+    die "restored upstream source verification failed"
+  OUT="$SRC/out/Default"
+fi
+
+if [ -f "$SRC/.chromix-domain-substitution-in-progress" ]; then
+  die "domain substitution was interrupted; use a clean work directory"
+fi
+if [ "$LINUX157_FRESH" -eq 1 ]; then
+  # The bounded fresh helper owns both preparation and official tool provisioning.
+  :
+elif [ -f "$SRC/.chromix-source-ready" ]; then
+  # prepare-ungoogled.sh revalidates version pins, commits, and patch hash on rerun.
+  :
+else
+  PREPARE_BUDGET=$(( $(remaining_min) - RESERVE_MINUTES ))
+  if [ "$PREPARE_BUDGET" -lt 25 ]; then
+    handoff "preparation budget ${PREPARE_BUDGET}m below minimum"
+  fi
+  "$REPO/build/prepare-ungoogled.sh" "$WORK" "$PLATFORM" "$ARCH"
+fi
+
+# ---- bounded compile ------------------------------------------------------
+NINJA_BUDGET=$(( $(remaining_min) - RESERVE_MINUTES ))
+if [ "$NINJA_BUDGET" -le 20 ]; then
+  handoff "ninja budget ${NINJA_BUDGET}m below minimum"
+fi
+
+if [ "$PLATFORM" = linux ]; then
+  BUILD_SCRIPT="$REPO/build/build.sh"
+else
+  BUILD_SCRIPT="$REPO/build/macos/build.sh"
+fi
+
+# GNU timeout is not shipped by macOS; Homebrew's coreutils provides it as
+# gtimeout with identical semantics (-k/-s), mirroring the gsplit fallback
+# in ci-parts.sh.
+if command -v timeout >/dev/null 2>&1; then
+  TIMEOUT=timeout
+elif command -v gtimeout >/dev/null 2>&1; then
+  TIMEOUT=gtimeout
+else
+  die "neither timeout nor gtimeout is available"
+fi
+
+MAC157_CHECKPOINT=0
+if [ "$PLATFORM" = macos ] && [ -z "$UNCHANGED_HELPER" ] &&
+    [ -f "$REPO/CHROMIUM_MACOS_VERSION" ]; then
+  read -r MACOS_VERSION < "$REPO/CHROMIUM_MACOS_VERSION"
+  if [[ "$MACOS_VERSION" = 157.* ]]; then
+    MAC157_CHECKPOINT=1
+    # A restored receipt cannot qualify a failed preparation in this invocation.
+    rm -f "$WORK/fingerprint-diagnostics/mac157-native-ready.json"
+    export CHROMIX_MAC157_CHECKPOINT_STAGE="$STAGE_INDEX"
+  fi
+fi
+
+# Guard the external process, not a sourced function: child errexit stays enabled.
+RC=0
+BUILD_COMMAND=(env CHROMIX_SKIP_DEPS=1 CHROMIX_WORKDIR="$WORK" "$BUILD_SCRIPT" "$WORK" "$ARCH")
+if [ "$LINUX157_FRESH" -eq 1 ]; then
+  BUILD_COMMAND=("${LINUX157_BUILD[@]}" --repo "$REPO" --workdir "$WORK" --arch "$ARCH")
+fi
+if [ -n "$UNCHANGED_HELPER" ]; then
+  BUILD_COMMAND=(python3 "$UNCHANGED_HELPER"
+    --mode compile --repo "$REPO" --workdir "$WORK" --stage "$STAGE_INDEX")
+fi
+if "$TIMEOUT" -k 7m -s SIGTERM "${NINJA_BUDGET}m" "${BUILD_COMMAND[@]}"; then
+  :
+else
+  RC=$?
+fi
+if [ "$RC" -eq 124 ]; then
+  handoff "deadline reached after ${NINJA_BUDGET}m"
+fi
+unchanged_check after
+if [ "$RC" -ne 0 ]; then
+  if [ "${CHROMIX_UNCHANGED_RESUME:-}" = mac157-x64-stage6 ]; then
+    emit status failed
+    emit last_error "native build failed at stage $STAGE_INDEX (exit $RC)"
+    if python3 "$UNCHANGED_HELPER" --mode verify --repo "$REPO" --workdir "$WORK" \
+        --stage "$STAGE_INDEX" > "$WORK/fingerprint-diagnostics/mac157-stage6-failed-checkpoint.json"; then
+      if bash "$REPO/build/posix/ci-parts.sh" "$WORK" "$SNAPSHOT_DIR"; then
+        emit mac157_stage6_failed_checkpoint true
+        emit upload_snapshot true
+      else
+        log "mac157 stage6 failed-build snapshot could not be saved"
+      fi
+    else
+      log "mac157 stage6 failed-build source is not eligible for a checkpoint"
+    fi
+    exit "$RC"
+  fi
+  if [ "$MAC157_CHECKPOINT" -eq 1 ]; then
+    emit status failed
+    emit last_error "native build failed at stage $STAGE_INDEX (exit $RC)"
+    mkdir -p "$WORK/fingerprint-diagnostics"
+    if python3 "$REPO/tools/verify_macos_checkpoint.py" --workdir "$WORK" --arch "$ARCH" \
+        --stage "$STAGE_INDEX" > "$WORK/fingerprint-diagnostics/mac157-failed-checkpoint.json"; then
+      if bash "$REPO/build/posix/ci-parts.sh" "$WORK" "$SNAPSHOT_DIR"; then
+        emit mac157_failed_checkpoint true
+        emit upload_snapshot true
+      else
+        log "mac157 failed-build snapshot could not be saved"
+      fi
+    else
+      log "mac157 failed-build tree is not eligible for a checkpoint"
+    fi
+    log "ERROR: build script failed at stage $STAGE_INDEX (exit $RC)"
+    exit "$RC"
+  fi
+  die "build script failed at stage $STAGE_INDEX (exit $RC)"
+fi
+
+# macOS compile-release keeps diagnostics separate from mandatory integrity checks.
+finish_macos_compile_release() {
+  local evidence="$WORK/fingerprint-diagnostics/compile-release-s$STAGE_INDEX-$(date +%s)-$$"
+  local smoke_rc=0 dependencies_rc=0 fingerprint_rc=0 diagnostic_status
+  mkdir -p "$evidence"
+
+  macos_release_integrity() {
+    python3 - "$REPO" "$SRC" "$WORK/fingerprint-diagnostics/source-final.json" \
+      "$SMOKE_DIR/chromix/Chromium.app" "$DEST_DIST/$ASSET" "$ARCH" "$CHROMIUM_VERSION_PIN" <<'PYINTEGRITY'
+import hashlib
+import json
+from pathlib import Path
+import plistlib
+import sys
+
+repo, src, receipt, app, archive = map(Path, sys.argv[1:6])
+arch, version = sys.argv[6:]
+sys.path.insert(0, str(repo / "tools"))
+from fingerprint_acceptance import check_source
+from verify_patch_stack import load_stack
+from verify_macos_bundle import verify_bundle
+from patch_selection import source_version
+
+if source_version(src) != version:
+    raise ValueError("compiled source version does not match the platform pin")
+inputs, patches = load_stack(repo, platform="macos")
+targets = {entry[0] for _, _, entries in patches for entry in entries}
+source = check_source(receipt, src, inputs, targets)
+verify_bundle(app, arch)
+metadata = plistlib.loads((app / "Contents/Info.plist").read_bytes())
+framework = app / "Contents/Frameworks/Chromium Framework.framework/Versions/Current"
+if metadata.get("CFBundleShortVersionString") != version or framework.resolve(strict=True).name != version:
+    raise ValueError("packaged macOS version does not match the platform pin")
+def sha256(path):
+    with path.open("rb") as stream:
+        return hashlib.file_digest(stream, "sha256").hexdigest()
+archive_hash = sha256(archive)
+if archive.with_name("SHA256SUMS").read_text().splitlines() != [f"{archive_hash}  {archive.name}"]:
+    raise ValueError("macOS bundle checksum manifest must contain exactly the verified asset")
+print(json.dumps({"source": source, "patch_inputs": inputs, "version": version, "arch": arch,
+                  "archive_sha256": archive_hash,
+                  "browser_sha256": sha256(app / "Contents/MacOS/Chromium")}, sort_keys=True))
+PYINTEGRITY
+  }
+
+  # ZIP verification reads every payload (CRC), checks paths, modes and Mach-O slices.
+  python3 "$REPO/tools/verify_macos_bundle.py" --zip "$DEST_DIST/$ASSET" --arch "$ARCH" ||
+    die "macOS compile-release archive integrity failed"
+  macos_release_integrity > "$evidence/integrity-before.json" ||
+    die "macOS compile-release source/bundle integrity failed"
+  if python3 "$REPO/tools/macos_browser_smoke.py" --launcher "$LAUNCHER" \
+      --output "$WORK/runtime-smoke-stage-$STAGE_INDEX" --profile "$SMOKE_DIR/profile" \
+      --chromium-version "$CHROMIUM_VERSION_PIN"; then
+    :
+  else
+    smoke_rc=$?
+    log "macOS runtime smoke diagnostic failed (exit $smoke_rc); retaining report"
+  fi
+  if "$TIMEOUT" -k 15s 300s python3 -m pip install --disable-pip-version-check --timeout 30 --retries 1 \
+      -r "$REPO/tools/fingerprint-requirements.txt"; then
+    BROWSER_HASH="$(python3 -c 'import hashlib,sys; print(hashlib.file_digest(open(sys.argv[1],"rb"),"sha256").hexdigest())' \
+      "$SMOKE_DIR/chromix/Chromium.app/Contents/MacOS/Chromium")" || die "fingerprint browser hash failed"
+    if "$TIMEOUT" -k 30s 2100s python3 "$REPO/tools/fingerprint_acceptance.py" \
+        --browser "$SMOKE_DIR/chromix/Chromium.app/Contents/MacOS/Chromium" \
+        --expected-sha256 "$BROWSER_HASH" --expected-version "$CHROMIUM_VERSION_PIN" \
+        --source-report "$WORK/fingerprint-diagnostics/source-final.json" --source-root "$SRC" \
+        --output-dir "$evidence/fingerprint"; then
+      :
+    else
+      fingerprint_rc=$?
+      log "macOS fingerprint diagnostic failed (exit $fingerprint_rc); retaining report"
+    fi
+  else
+    dependencies_rc=$?
+    log "macOS fingerprint dependencies unavailable (exit $dependencies_rc)"
+  fi
+
+  # Never rewrite acceptance.json, including partial output left by a timeout.
+  diagnostic_status="$(python3 - "$evidence" "$WORK/runtime-smoke-stage-$STAGE_INDEX/report.json" \
+      "$smoke_rc" "$dependencies_rc" "$fingerprint_rc" <<'PYREPORT'
+import json
+from pathlib import Path
+import sys
+
+root, smoke_path = map(Path, sys.argv[1:3])
+smoke_rc, dependencies_rc, fingerprint_rc = map(int, sys.argv[3:])
+errors, gaps = [], []
+def read_report(path):
+    try:
+        value = json.loads(path.read_text())
+        if not isinstance(value, dict):
+            raise ValueError("report must be an object")
+        return value
+    except (OSError, ValueError) as error:
+        gaps.append(str(path) + ": " + str(error))
+        return {}
+smoke = read_report(smoke_path)
+acceptance = read_report(root / "fingerprint/acceptance.json")
+for name, code in (("smoke", smoke_rc), ("dependencies", dependencies_rc), ("fingerprint", fingerprint_rc)):
+    if code:
+        errors.append(f"{name} exited {code}")
+raw_errors = acceptance.get("errors", [])
+if raw_errors:
+    errors.append("fingerprint report contains errors; see unchanged acceptance.json")
+if smoke.get("passed") is not True:
+    gaps.append("native smoke did not pass")
+if acceptance.get("status") != "passed" or acceptance.get("ci_gate_passed") is not True:
+    gaps.append("fingerprint acceptance did not pass completely")
+# Startup failures may have no version/hash; only observed identities can mismatch.
+identity_mismatches = []
+expected = json.loads((root / "integrity-before.json").read_text())
+for path in sorted((root / "fingerprint").glob("*.json")):
+    observation = read_report(path)
+    browser = observation.get("browser")
+    browser = browser if isinstance(browser, dict) else {}
+    identities = [(observation.get("browser_sha256"), expected["browser_sha256"]),
+                  (observation.get("browser_version"), expected["version"]),
+                  (browser.get("sha256"), expected["browser_sha256"]),
+                  (browser.get("version"), expected["version"])]
+    if path.name == "browser.json":
+        identities += [(observation.get("sha256"), expected["browser_sha256"]),
+                       (observation.get("version"), expected["version"])]
+    if any(observed not in (None, "") and observed != pinned for observed, pinned in identities):
+        identity_mismatches.append("observed browser identity mismatch in " + str(path))
+errors.extend(identity_mismatches)
+status = "failed" if errors or acceptance.get("status") == "failed" else "incomplete" if gaps else "passed"
+report = {"schema_version": 1, "policy": "macos-compile-release", "status": status,
+          "runtime_verified": status == "passed", "errors": errors, "gaps": gaps,
+          "smoke_exit_code": smoke_rc, "dependencies_exit_code": dependencies_rc,
+          "fingerprint_exit_code": None if dependencies_rc else fingerprint_rc,
+          "fingerprint_status": acceptance.get("status", "incomplete")}
+(root / "diagnostics.json").write_text(json.dumps(report, indent=2) + "\n")
+# Integrity errors observed by acceptance remain fatal even if later restored.
+integrity_errors = (
+    "a successful source patch-stack verification report is required",
+    "malformed source", "source receipt", "invalid source output hash", "source-final.json",
+    "source changed since its freshness check", "executable SHA-256",
+    "browser executable changed during acceptance", "runner or patch inputs changed during acceptance",
+)
+if identity_mismatches:
+    raise SystemExit("; ".join(identity_mismatches))
+if any(message in str(raw_errors) for message in integrity_errors):
+    raise SystemExit("fingerprint reported source/binary integrity failure")
+if isinstance(smoke.get("version"), dict) and smoke["version"].get("status") == "version_mismatch":
+    raise SystemExit("native smoke reported a different browser version")
+print(status)
+PYREPORT
+  )" || die "macOS diagnostic integrity failure; reports retained"
+  macos_release_integrity > "$evidence/integrity-after.json" ||
+    die "macOS compile-release final source/bundle integrity failed"
+  cmp -s "$evidence/integrity-before.json" "$evidence/integrity-after.json" ||
+    die "macOS source, patch inputs or bundle changed during diagnostics"
+  emit runtime_diagnostic_status "$diagnostic_status"
+  if [ "$diagnostic_status" = passed ]; then
+    emit runtime_verified true
+  elif [ "$diagnostic_status" = failed ]; then
+    emit runtime_failed true
+  fi
+  rm -rf "$SMOKE_DIR"
+  log "macOS compile-release: integrity verified; runtime diagnostics $diagnostic_status"
+  emit release_policy macos-compile-release
+  emit finished true
+  emit status compiled
+  exit 0
+}
+
+# ---- completion checks -----------------------------------------------------
+if [ "$PLATFORM" = linux ]; then
+  [ -x "$OUT/chrome" ] || die "build exited 0 but $OUT/chrome is missing"
+  emit compiled_ready true
+  emit runtime_verified false
+else
+  [ -d "$OUT/Chromium.app" ] || die "build exited 0 but $OUT/Chromium.app is missing"
+  emit compiled_ready true
+  emit runtime_verified false
+fi
+
+DEST_DIST="$WORK/dist"
+rm -rf "$DEST_DIST"
+mkdir -p "$DEST_DIST"
+if [ "$PLATFORM" = linux ]; then
+  bash "$REPO/build/linux/package-linux.sh" "$OUT" "$DEST_DIST" "$ARCH"
+else
+  bash "$REPO/build/macos/package-macos.sh" "$OUT/Chromium.app" "$DEST_DIST" "$ARCH"
+fi
+
+cd "$DEST_DIST"
+ASSET="chromix-linux-$ARCH.zip"
+[ "$PLATFORM" = macos ] && ASSET="chromix-mac-$ARCH.zip"
+[ -s "$ASSET" ] || die "packaging did not produce $ASSET in $DEST_DIST"
+# Compare the basename literally; a checksum for another file cannot qualify this bundle.
+awk -v asset="$ASSET" '
+  NR == 1 && length($0) == 66 + length(asset) &&
+    substr($0, 1, 64) !~ /[^0-9a-fA-F]/ && substr($0, 65, 2) == "  " &&
+    substr($0, 67) == asset { valid = 1 }
+  END { exit !(NR == 1 && valid) }
+' SHA256SUMS || die "SHA256SUMS must contain exactly one entry for $ASSET"
+if [ "$PLATFORM" = linux ]; then
+  sha256sum --check --strict SHA256SUMS || die "bundle checksum verification failed"
+else
+  shasum -a 256 -c SHA256SUMS || die "bundle checksum verification failed"
+fi
+
+SMOKE_DIR="$WORK/smoke"
+fail_runtime_check() {
+  local code="$1"
+  shift
+  emit runtime_failed true
+  rm -rf "$SMOKE_DIR"
+  die "$* (exit $code)"
+}
+emit package_ready true
+if [ "$PLATFORM" = macos ]; then
+  emit runtime_verified false
+fi
+rm -rf "$SMOKE_DIR"
+mkdir -p "$SMOKE_DIR"
+python3 - "$REPO" "$DEST_DIST/$ASSET" "$SMOKE_DIR" <<'PY' || fail_runtime_check "$?" "bundle extraction failed"
+import importlib.util
+from pathlib import Path
+import sys
+spec = importlib.util.spec_from_file_location("chromix_bundle_extract", Path(sys.argv[1]) / "sdk/python/chromix/_binary.py")
+module = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(module)
+module._extract_zip(Path(sys.argv[2]), Path(sys.argv[3]))
+PY
+LAUNCHER="$SMOKE_DIR/chromix/chromix"
+[ -x "$LAUNCHER" ] || fail_runtime_check 1 "extracted bundle launcher is missing: $LAUNCHER"
+
+HOST_ARCH="$(uname -m)"
+case "$HOST_ARCH" in x86_64) HOST_ARCH=x64 ;; aarch64) HOST_ARCH=arm64 ;; esac
+if [ "$PLATFORM" = linux ] && [ "$HOST_ARCH" != "$ARCH" ]; then
+  [ "$HOST_ARCH:$ARCH" = x64:arm64 ] || die "unsupported Linux cross-build completion"
+  python3 "$REPO/tools/verify_linux_bundle.py" --bundle-dir "$SMOKE_DIR/chromix" --arch "$ARCH" ||
+    die "cross-built bundle architecture verification failed"
+  rm -rf "$SMOKE_DIR"
+  log "ARM64 bundle compiled and checksum/ELF verified; native runtime verification is still required"
+  emit runtime_verified false
+  emit finished true
+  emit status compiled
+  exit 0
+fi
+
+CHROMIUM_VERSION_PIN="$(python3 "$REPO/tools/platform_pins.py" --repo "$REPO" \
+  --platform "$PLATFORM" --field ChromiumVersion)"
+if [ "$PLATFORM" = macos ]; then
+  # Frozen mac156 continuations retain their original blocking runtime contract.
+  if { [ -z "$UNCHANGED_HELPER" ] ||
+       [ "${CHROMIX_UNCHANGED_RESUME:-}" = mac157-x64-stage6 ]; } &&
+     { [[ "$CHROMIUM_VERSION_PIN" = 157.* ]] ||
+      [ "${CHROMIX_MACOS_COMPILE_RELEASE:-0}" = 1 ]; }; then
+    finish_macos_compile_release
+  fi
+  if python3 "$REPO/tools/macos_browser_smoke.py" --launcher "$LAUNCHER" \
+      --output "$WORK/runtime-smoke-stage-$STAGE_INDEX" --profile "$SMOKE_DIR/profile" \
+      --chromium-version "$CHROMIUM_VERSION_PIN"; then
+    :
+  else
+    fail_runtime_check "$?" "extracted macOS runtime smoke test failed; see runtime-smoke-stage-$STAGE_INDEX"
+  fi
+else
+  bash "$REPO/build/linux/prepare-ci-sandbox.sh" "$SMOKE_DIR/chromix/chrome" ||
+    fail_runtime_check "$?" "Linux sandbox preparation failed"
+  VERSION_OUTPUT="$("$TIMEOUT" 30s "$LAUNCHER" --version)" ||
+    fail_runtime_check "$?" "extracted launcher --version check failed"
+  echo "$VERSION_OUTPUT"
+  grep -qF "$CHROMIUM_VERSION_PIN" <<<"$VERSION_OUTPUT" ||
+    fail_runtime_check 1 "extracted browser version does not match the pinned Chromium version"
+
+  DOM_OUTPUT="$("$TIMEOUT" 60s "$LAUNCHER" --headless --disable-gpu --no-first-run \
+    --no-default-browser-check "--user-data-dir=$SMOKE_DIR/profile" \
+    --dump-dom 'data:text/html,<p>chromix-smoke-ok</p>')" ||
+    fail_runtime_check "$?" "extracted headless smoke test failed"
+  echo "$DOM_OUTPUT"
+  grep -qF '<p>chromix-smoke-ok</p>' <<<"$DOM_OUTPUT" ||
+    fail_runtime_check 1 "smoke page marker missing from dumped DOM"
+fi
+
+NATIVE_BROWSER="$SMOKE_DIR/chromix/chrome"
+[ "$PLATFORM" = macos ] && NATIVE_BROWSER="$SMOKE_DIR/chromix/Chromium.app/Contents/MacOS/Chromium"
+"$TIMEOUT" -k 15s 300s python3 -m pip install --disable-pip-version-check --timeout 30 --retries 1 \
+  -r "$REPO/tools/fingerprint-requirements.txt" || fail_runtime_check "$?" "fingerprint audit dependencies unavailable"
+BROWSER_HASH="$(python3 -c 'import hashlib,sys; print(hashlib.file_digest(open(sys.argv[1],"rb"),"sha256").hexdigest())' "$NATIVE_BROWSER")" ||
+  fail_runtime_check "$?" "fingerprint browser hash failed"
+"$TIMEOUT" -k 30s 2100s python3 "$REPO/tools/fingerprint_acceptance.py" \
+  --browser "$NATIVE_BROWSER" --expected-sha256 "$BROWSER_HASH" --expected-version "$CHROMIUM_VERSION_PIN" \
+  --source-report "$WORK/fingerprint-diagnostics/source-final.json" --source-root "$SRC" \
+  --output-dir "$WORK/fingerprint-diagnostics/runtime-s$STAGE_INDEX-$(date +%s)-$$" ||
+  fail_runtime_check "$?" "fingerprint regression gate failed; see the separate diagnostic artifact"
+
+rm -rf "$SMOKE_DIR"
+emit runtime_verified true
+emit finished true
+emit status completed
+exit 0
