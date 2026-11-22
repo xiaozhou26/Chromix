@@ -1,0 +1,74 @@
+name: reverify-win157-arm64
+run-name: Reverify run 44816651803 Windows157 ARM64 (no build or release)
+
+'on':
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+  actions: read
+
+concurrency:
+  group: reverify-win157-arm64-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  reverify:
+    name: Native Windows157 ARM64 fixed-artifact verification only
+    runs-on: windows-11-arm
+    timeout-minutes: 120
+    env:
+      PYTHONUTF8: '1'
+      REVERIFY_INPUTS: ${{ toJSON(inputs) }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Checkout the actual immutable compiled source recipe
+        uses: actions/checkout@v4
+        with:
+          repository: xiaozhou26/Chromix
+          ref: 8147b39e782ed933ee2e9cb8b8e3fa734c53399b
+          path: source-recipe
+          fetch-depth: 1
+          persist-credentials: false
+          submodules: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+          architecture: x64
+      - name: Validate provenance and download digest-pinned artifact ZIPs
+        shell: pwsh
+        timeout-minutes: 25
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          python -X utf8 tools/reverify_windows157_arm64.py prepare --directory "$env:RUNNER_TEMP/arm64-157-reverify" --recipe "$env:GITHUB_WORKSPACE/source-recipe"
+          if ($LASTEXITCODE -ne 0) { throw 'pinned artifact preparation failed' }
+      - name: Verify bundle checksum, ARM64 PE, version and native headless exit
+        shell: pwsh
+        timeout-minutes: 5
+        run: |
+          $root = "$env:RUNNER_TEMP/arm64-157-reverify"
+          python -X utf8 tools/verify_windows_bundle.py --archive "$root/downloads/bundle/chromix-win-arm64.zip" --sha256-file "$root/downloads/bundle/SHA256SUMS" --dest "$root/smoke" --arch arm64 --native --version 157.0.8103.78 --report "$root/diagnostics/native-smoke.json"
+          if ($LASTEXITCODE -ne 0) { throw 'native ARM64 bundle verification failed' }
+      - name: Install fingerprint verification dependencies (no browser download)
+        shell: pwsh
+        timeout-minutes: 10
+        run: |
+          python -m pip install --disable-pip-version-check --timeout 30 --retries 1 -r tools/fingerprint-requirements.txt
+          if ($LASTEXITCODE -ne 0) { throw 'fingerprint dependency installation failed' }
+      - name: Run all native fingerprint acceptance suites on the pinned executable
+        shell: pwsh
+        timeout-minutes: 65
+        run: |
+          python -X utf8 tools/reverify_windows157_arm64.py acceptance --directory "$env:RUNNER_TEMP/arm64-157-reverify" --recipe "$env:GITHUB_WORKSPACE/source-recipe"
+          if ($LASTEXITCODE -ne 0) { throw 'native ARM64 fingerprint acceptance failed' }
+      - name: Upload new diagnostics only (original failed run remains unchanged)
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: reverify-win157-arm64-${{ github.run_id }}-attempt-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/arm64-157-reverify/diagnostics/
+          if-no-files-found: warn
+          retention-days: 7

@@ -1,0 +1,692 @@
+{
+  "schema_version": 1,
+  "repository": "xiaozhou26/Chromix",
+  "repository_id": 1342691290,
+  "run": {
+    "id": 44816651803,
+    "name": "build-win-arm64-157-compiled-resume",
+    "path": ".github/workflows/build-win-arm64-157-compiled-resume.yml",
+    "workflow_id": 425404145,
+    "head_sha": "5d93c8bfe6b85f17112d138f8e25eabbab589266",
+    "head_branch": "main",
+    "event": "workflow_dispatch",
+    "run_attempt": 1,
+    "status": "completed",
+    "conclusion": "failure"
+  },
+  "jobs": [
+    {
+      "id": 137038008909,
+      "run_id": 44816651803,
+      "workflow_name": "build-win-arm64-157-compiled-resume",
+      "head_branch": "main",
+      "run_url": "https://api.github.com/repos/xiaozhou26/Chromix/actions/runs/44816651803",
+      "run_attempt": 1,
+      "node_id": "CR_kwDOUAfX2s8AAAAf6BoSTQ",
+      "head_sha": "5d93c8bfe6b85f17112d138f8e25eabbab589266",
+      "url": "https://api.github.com/repos/xiaozhou26/Chromix/actions/jobs/137038008909",
+      "html_url": "https://github.com/xiaozhou26/Chromix/actions/runs/44816651803/job/137038008909",
+      "status": "completed",
+      "conclusion": "success",
+      "created_at": "2026-11-22T00:30:28Z",
+      "started_at": "2026-11-22T00:30:31Z",
+      "completed_at": "2026-11-22T02:01:53Z",
+      "name": "Windows157 ARM64 compiled stage 12",
+      "steps": [
+        {
+          "name": "Set up job",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 1,
+          "started_at": "2026-11-22T00:30:32Z",
+          "completed_at": "2026-11-22T00:30:33Z"
+        },
+        {
+          "name": "Record snapshot producer attempt",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 2,
+          "started_at": "2026-11-22T00:30:33Z",
+          "completed_at": "2026-11-22T00:30:37Z"
+        },
+        {
+          "name": "Run actions/checkout@v4",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 3,
+          "started_at": "2026-11-22T00:30:37Z",
+          "completed_at": "2026-11-22T00:30:45Z"
+        },
+        {
+          "name": "Download tree from previous stage",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 4,
+          "started_at": "2026-11-22T00:30:45Z",
+          "completed_at": "2026-11-22T00:34:33Z"
+        },
+        {
+          "name": "Restore preserved source and output",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 5,
+          "started_at": "2026-11-22T00:34:33Z",
+          "completed_at": "2026-11-22T01:12:14Z"
+        },
+        {
+          "name": "Select compile parallelism",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 6,
+          "started_at": "2026-11-22T01:12:14Z",
+          "completed_at": "2026-11-22T01:12:18Z"
+        },
+        {
+          "name": "Run stage 12",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 7,
+          "started_at": "2026-11-22T01:12:18Z",
+          "completed_at": "2026-11-22T02:01:35Z"
+        },
+        {
+          "name": "Ensure build tree snapshot",
+          "status": "completed",
+          "conclusion": "skipped",
+          "number": 8,
+          "started_at": "2026-11-22T02:01:35Z",
+          "completed_at": "2026-11-22T02:01:35Z"
+        },
+        {
+          "name": "Upload tree part 1",
+          "status": "completed",
+          "conclusion": "skipped",
+          "number": 9,
+          "started_at": "2026-11-22T02:01:35Z",
+          "completed_at": "2026-11-22T02:01:35Z"
+        },
+        {
+          "name": "Upload tree part 2",
+          "status": "completed",
+          "conclusion": "skipped",
+          "number": 10,
+          "started_at": "2026-11-22T02:01:35Z",
+          "completed_at": "2026-11-22T02:01:35Z"
+        },
+        {
+          "name": "Upload tree part 3",
+          "status": "completed",
+          "conclusion": "skipped",
+          "number": 11,
+          "started_at": "2026-11-22T02:01:35Z",
+          "completed_at": "2026-11-22T02:01:35Z"
+        },
+        {
+          "name": "Upload tree part 4",
+          "status": "completed",
+          "conclusion": "skipped",
+          "number": 12,
+          "started_at": "2026-11-22T02:01:35Z",
+          "completed_at": "2026-11-22T02:01:35Z"
+        },
+        {
+          "name": "Upload fingerprint diagnostics",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 13,
+          "started_at": "2026-11-22T02:01:35Z",
+          "completed_at": "2026-11-22T02:01:42Z"
+        },
+        {
+          "name": "Upload final bundle",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 14,
+          "started_at": "2026-11-22T02:01:42Z",
+          "completed_at": "2026-11-22T02:01:46Z"
+        },
+        {
+          "name": "Upload compiled migration evidence",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 15,
+          "started_at": "2026-11-22T02:01:46Z",
+          "completed_at": "2026-11-22T02:01:47Z"
+        },
+        {
+          "name": "Upload final source receipt",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 16,
+          "started_at": "2026-11-22T02:01:47Z",
+          "completed_at": "2026-11-22T02:01:49Z"
+        },
+        {
+          "name": "Post Run actions/checkout@v4",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 32,
+          "started_at": "2026-11-22T02:01:49Z",
+          "completed_at": "2026-11-22T02:01:51Z"
+        },
+        {
+          "name": "Complete job",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 33,
+          "started_at": "2026-11-22T02:01:51Z",
+          "completed_at": "2026-11-22T02:01:51Z"
+        }
+      ],
+      "check_run_url": "https://api.github.com/repos/xiaozhou26/Chromix/check-runs/137038008909",
+      "labels": [
+        "windows-2022"
+      ],
+      "runner_id": 1000008488,
+      "runner_name": "GitHub Actions 1000008488",
+      "runner_group_id": 0,
+      "runner_group_name": "GitHub Actions"
+    },
+    {
+      "id": 137060205519,
+      "run_id": 44816651803,
+      "workflow_name": "build-win-arm64-157-compiled-resume",
+      "head_branch": "main",
+      "run_url": "https://api.github.com/repos/xiaozhou26/Chromix/actions/runs/44816651803",
+      "run_attempt": 1,
+      "node_id": "CR_kwDOUAfX2s8AAAAf6WzDzw",
+      "head_sha": "5d93c8bfe6b85f17112d138f8e25eabbab589266",
+      "url": "https://api.github.com/repos/xiaozhou26/Chromix/actions/jobs/137060205519",
+      "html_url": "https://github.com/xiaozhou26/Chromix/actions/runs/44816651803/job/137060205519",
+      "status": "completed",
+      "conclusion": "failure",
+      "created_at": "2026-11-22T02:01:58Z",
+      "started_at": "2026-11-22T02:02:00Z",
+      "completed_at": "2026-11-22T02:04:49Z",
+      "name": "native Windows ARM64 bundle and fingerprint verification",
+      "steps": [
+        {
+          "name": "Set up job",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 1,
+          "started_at": "2026-11-22T02:02:01Z",
+          "completed_at": "2026-11-22T02:02:04Z"
+        },
+        {
+          "name": "Run actions/checkout@v4",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 2,
+          "started_at": "2026-11-22T02:02:04Z",
+          "completed_at": "2026-11-22T02:02:16Z"
+        },
+        {
+          "name": "Run actions/setup-python@v5",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 3,
+          "started_at": "2026-11-22T02:02:16Z",
+          "completed_at": "2026-11-22T02:04:10Z"
+        },
+        {
+          "name": "Download this run's compiled ARM64 bundle",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 4,
+          "started_at": "2026-11-22T02:04:10Z",
+          "completed_at": "2026-11-22T02:04:14Z"
+        },
+        {
+          "name": "Download this run's source receipt",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 5,
+          "started_at": "2026-11-22T02:04:14Z",
+          "completed_at": "2026-11-22T02:04:15Z"
+        },
+        {
+          "name": "Verify checksum, PE architecture, version and native headless exit",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 6,
+          "started_at": "2026-11-22T02:04:15Z",
+          "completed_at": "2026-11-22T02:04:29Z"
+        },
+        {
+          "name": "Install fingerprint verification dependencies",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 7,
+          "started_at": "2026-11-22T02:04:29Z",
+          "completed_at": "2026-11-22T02:04:40Z"
+        },
+        {
+          "name": "Verify native ARM64 fingerprint behavior",
+          "status": "completed",
+          "conclusion": "failure",
+          "number": 8,
+          "started_at": "2026-11-22T02:04:40Z",
+          "completed_at": "2026-11-22T02:04:42Z"
+        },
+        {
+          "name": "Upload native verification diagnostics",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 9,
+          "started_at": "2026-11-22T02:04:42Z",
+          "completed_at": "2026-11-22T02:04:43Z"
+        },
+        {
+          "name": "Post Run actions/setup-python@v5",
+          "status": "completed",
+          "conclusion": "skipped",
+          "number": 17,
+          "started_at": "2026-11-22T02:04:43Z",
+          "completed_at": "2026-11-22T02:04:43Z"
+        },
+        {
+          "name": "Post Run actions/checkout@v4",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 18,
+          "started_at": "2026-11-22T02:04:43Z",
+          "completed_at": "2026-11-22T02:04:47Z"
+        },
+        {
+          "name": "Complete job",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 19,
+          "started_at": "2026-11-22T02:04:47Z",
+          "completed_at": "2026-11-22T02:04:48Z"
+        }
+      ],
+      "check_run_url": "https://api.github.com/repos/xiaozhou26/Chromix/check-runs/137060205519",
+      "labels": [
+        "windows-11-arm"
+      ],
+      "runner_id": 1000008490,
+      "runner_name": "GitHub Actions 1000008490",
+      "runner_group_id": 0,
+      "runner_group_name": "GitHub Actions"
+    }
+  ],
+  "artifacts": [
+    {
+      "id": 14735195326,
+      "node_id": "MDg6QXJ0aWZhY3QxNDczNTE5NTMyNg==",
+      "name": "win-arm64",
+      "size_in_bytes": 211808704,
+      "url": "https://api.github.com/repos/xiaozhou26/Chromix/actions/artifacts/14735195326",
+      "archive_download_url": "https://api.github.com/repos/xiaozhou26/Chromix/actions/artifacts/14735195326/zip",
+      "expired": false,
+      "digest": "sha256:3cc27ebaa5c71921620d5f6b93a63b693d1f73d18b06e890f4f5596f9faabea5",
+      "created_at": "2026-11-22T02:01:46Z",
+      "updated_at": "2026-11-22T02:01:46Z",
+      "expires_at": "2026-11-29T02:01:42Z",
+      "workflow_run": {
+        "id": 44816651803,
+        "repository_id": 1342691290,
+        "head_repository_id": 1342691290,
+        "head_branch": "main",
+        "head_sha": "5d93c8bfe6b85f17112d138f8e25eabbab589266"
+      }
+    },
+    {
+      "id": 14734394816,
+      "node_id": "MDg6QXJ0aWZhY3QxNDczNDM5NDgxNg==",
+      "name": "chromix-win-arm64-source-receipt",
+      "size_in_bytes": 24719,
+      "url": "https://api.github.com/repos/xiaozhou26/Chromix/actions/artifacts/14734394816",
+      "archive_download_url": "https://api.github.com/repos/xiaozhou26/Chromix/actions/artifacts/14734394816/zip",
+      "expired": false,
+      "digest": "sha256:fc23940335191ccdcb5dbb98a0f02c726b104e50c6bb510ea9e8279c52a1d83d",
+      "created_at": "2026-11-22T02:01:49Z",
+      "updated_at": "2026-11-22T02:01:49Z",
+      "expires_at": "2026-11-29T02:01:48Z",
+      "workflow_run": {
+        "id": 44816651803,
+        "repository_id": 1342691290,
+        "head_repository_id": 1342691290,
+        "head_branch": "main",
+        "head_sha": "5d93c8bfe6b85f17112d138f8e25eabbab589266"
+      }
+    },
+    {
+      "id": 14734633750,
+      "node_id": "MDg6QXJ0aWZhY3QxNDczNDYzMzc1MA==",
+      "name": "compiled-admission-build-12-attempt-1",
+      "size_in_bytes": 28606,
+      "url": "https://api.github.com/repos/xiaozhou26/Chromix/actions/artifacts/14734633750",
+      "archive_download_url": "https://api.github.com/repos/xiaozhou26/Chromix/actions/artifacts/14734633750/zip",
+      "expired": false,
+      "digest": "sha256:4ecd38b5e604f13ab92c66328c535b4ff008f87b9e9cd7cfcfc9eefe3571c37e",
+      "created_at": "2026-11-22T02:01:47Z",
+      "updated_at": "2026-11-22T02:01:47Z",
+      "expires_at": "2026-12-06T02:01:46Z",
+      "workflow_run": {
+        "id": 44816651803,
+        "repository_id": 1342691290,
+        "head_repository_id": 1342691290,
+        "head_branch": "main",
+        "head_sha": "5d93c8bfe6b85f17112d138f8e25eabbab589266"
+      }
+    },
+    {
+      "id": 14734828422,
+      "node_id": "MDg6QXJ0aWZhY3QxNDczNDgyODQyMg==",
+      "name": "native-win-arm64-attempt-1",
+      "size_in_bytes": 27711,
+      "url": "https://api.github.com/repos/xiaozhou26/Chromix/actions/artifacts/14734828422",
+      "archive_download_url": "https://api.github.com/repos/xiaozhou26/Chromix/actions/artifacts/14734828422/zip",
+      "expired": false,
+      "digest": "sha256:0d6f7ab391914befcb43f29f3f9bb25f8c2a93b9f5d5f2ef2ce09469738afe71",
+      "created_at": "2026-11-22T02:04:43Z",
+      "updated_at": "2026-11-22T02:04:43Z",
+      "expires_at": "2026-11-29T02:04:42Z",
+      "workflow_run": {
+        "id": 44816651803,
+        "repository_id": 1342691290,
+        "head_repository_id": 1342691290,
+        "head_branch": "main",
+        "head_sha": "5d93c8bfe6b85f17112d138f8e25eabbab589266"
+      }
+    }
+  ],
+  "source_profile": {
+    "commit": "8147b39e782ed933ee2e9cb8b8e3fa734c53399b",
+    "platform": "windows",
+    "version": "157.0.8103.78",
+    "patch_count": 235,
+    "target_count": 172,
+    "series_sha256": "4a30cc2662be04335647ba2dc16da5c7c738da566571766584d9236eb53d481f",
+    "selection": {
+      "schema_version": 1,
+      "version": "157.0.8103.78",
+      "platform": "windows",
+      "core_commit": "8c886dffc6ade39d8f7df5d64ace5a8824b455e1",
+      "platform_commit": "20e9a348fc616bd73a366fbd5d8881613d6c5cb0",
+      "base_series_sha256": "71613faf45339ae3debd3dcf8afb95101989c4e6537d14dc7b0cebd1766f5863",
+      "manifest": {
+        "path": "build/patch-selection-157.json",
+        "sha256": "970b72c9273489e22d7840abf4fdf701ae19467b8d2e42d69da3db63e26931c6"
+      },
+      "review_manifest": {
+        "path": "patches/chromium157/manifest.json",
+        "sha256": "637e507bbd3b48ec5fe1bd89e9b2177097bdf9214cb70569ddfdb2fb96ca8dd0"
+      },
+      "core_gitlink": "8c886dffc6ade39d8f7df5d64ace5a8824b455e1",
+      "selection_status": "reviewed-patches",
+      "overrides": [
+        {
+          "path": "patches/chromium157/0004-components-embedder_support-user_agent_utils-cc.patch",
+          "original_sha256": "ceae3ac82abf8806d681ba219f2c414ff2a594fdebd5739ddc3f8478eac318c3",
+          "sha256": "48a4f4564482923d20c07b58e79370e9500f62e954cc214abf12b3f0083b4d05"
+        },
+        {
+          "path": "patches/chromium157/0005-content-browser-renderer_host-render_process_host_impl-cc.patch",
+          "original_sha256": "874031b6ec48d0ad2385ff0fe10db36f1f0132a4608d604e4d85fd19e291ff47",
+          "sha256": "959fe0096f2568381dbd6a9c90b6bd25aec25e6e57c2931549799d9a1c418bbd"
+        },
+        {
+          "path": "patches/chromium157/0020-third_party-blink-renderer-modules-canvas-canvas2d-base_rendering_context_2d-cc.patch",
+          "original_sha256": "84f2d3139cb9adfc70d2c073395fb939b5d59c2f22d5c46450e2586ccceba708",
+          "sha256": "7dbe6a9be26efe085724c764289a12937884c39f25502897736d6be454b29ea8"
+        },
+        {
+          "path": "patches/chromium157/0024-third_party-blink-renderer-modules-peerconnection-peer_connection_dependency_factory-cc.patch",
+          "original_sha256": "311671ff1e2a73fd7106cd790c35269e49039301791c818a9a8748946cc2324a",
+          "sha256": "2939611ab275ebce3b5838746f64d39be52de5907249ed15ae9254075f61b361"
+        },
+        {
+          "path": "patches/chromium157/0031-third_party-blink-renderer-platform-graphics-image_data_buffer-cc.patch",
+          "original_sha256": "8b86c52d9df1ba45db00a09b293070be90d9dbc7463244c8ddf525017d265b7f",
+          "sha256": "ead7bf77aa6e77c2f6537eda7b52e11f5e1df6fc2612d5d97158ced762371e9f"
+        },
+        {
+          "path": "patches/chromium157/0044-third_party-blink-renderer-modules-peerconnection-rtc_peer_connection-cc.patch",
+          "original_sha256": "7303736192ad27af857315a8cd60e440da23f26b323389bf04c9ceaf3e6ac240",
+          "sha256": "3986358a5341aaefc02bb79935362bc2e5135f6e44ae8caf230a8d7206fe29ad"
+        },
+        {
+          "path": "patches/chromium157/0049-third_party-blink-renderer-modules-plugins-dom_plugin_array-cc.patch",
+          "original_sha256": "4a454a46e7541c1526607206f492ee4b6f7f9db55ea5ba7e9f5899d213b915f3",
+          "sha256": "3799f3cf3e8c143da3675789b3431e6ba6151d58be9c2d348b95b3ffcb4969f0"
+        },
+        {
+          "path": "patches/chromium157/0057-content-browser-devtools-protocol-network_handler-cc.patch",
+          "original_sha256": "4634c05ef2703a40429cd651fc17e407548899198b186c8470e5be32aae964ba",
+          "sha256": "0cc50dfb305b0957aabd5bfb6ff394c3cda3a42fa1941d6e24175736bb998ac0"
+        },
+        {
+          "path": "patches/chromium157/0060-third_party-blink-renderer-modules-media_capabilities-media_capabilities-cc.patch",
+          "original_sha256": "e050effa3a2cc8e84809bf5184b6c18417718cb3f9f09a1aa63dadaaf14514bb",
+          "sha256": "f03940003568f0568c5b81b9fe94f4fce02209b55e6b7492bd7d8589927c5f28"
+        },
+        {
+          "path": "patches/chromium157/0061-third_party-blink-renderer-modules-media_capabilities-media_capabilities-h.patch",
+          "original_sha256": "59fe7e3903d37f1ac92bf5deeb7e22af87938494d02f8e6b89f6671340e5bf9c",
+          "sha256": "a939e7968448ee4179589a1653d921b38a6968026d8c150519a5575cf117ada9"
+        },
+        {
+          "path": "patches/chromium157/0066-content-browser-renderer_host-render_process_host_impl-cc.patch",
+          "original_sha256": "de1d1aac83365d6ebdcf391b44d8d5f92a61cfbaa350aef880265dd4c51e2522",
+          "sha256": "e288128cfa2aa40f3d990326a56723745a964d57be025fa63f1533f812218430"
+        },
+        {
+          "path": "patches/chromium157/0067-third_party-blink-renderer-platform-BUILD-gn.patch",
+          "original_sha256": "26c3cc834f7082c1adb2984d20a638437137603c4ad02d172e4a630ef87073c6",
+          "sha256": "65e190d8394df4e60cf3497a3415b6f9e2a8c755fdd137f356d2c1a46719ae38"
+        },
+        {
+          "path": "patches/chromium157/0074-third_party-blink-renderer-core-html-canvas-html_canvas_element-cc.patch",
+          "original_sha256": "1f027e86221793d79b06e68c91b34011ed3ae51fb63bfd365ffa09a595b519a8",
+          "sha256": "a19fd534370daa387b3018863966c30c7b5755b7751cdfbcad4f62955e546adc"
+        },
+        {
+          "path": "patches/chromium157/0076-third_party-blink-renderer-modules-canvas-canvas2d-base_rendering_context_2d-cc.patch",
+          "original_sha256": "f18f6e5e22be6541eef925774ac2055443f2c836627de7ac25b2fdfb7c3d9a3d",
+          "sha256": "2cbf7c923711c38e1b70965bd9bd0e0332068ab804f693f3de6a8d3281c82377"
+        },
+        {
+          "path": "patches/chromium157/0077-third_party-blink-renderer-modules-canvas-canvas2d-base_rendering_context_2d-h.patch",
+          "original_sha256": "4479b87f37067cecbbe29135af9c80e500bf1e5d068763fec99c5bab033878d5",
+          "sha256": "a1ba372a26a99ac6ad36654f2f304375893fbf08058822dc29f5131c051cdc51"
+        },
+        {
+          "path": "patches/chromium157/0078-third_party-blink-renderer-modules-canvas-canvas2d-canvas_2d_recorder_context-cc.patch",
+          "original_sha256": "6135ae8235cbdf4038fffeed516655a667110cd05a704c94128245da12d8c0a3",
+          "sha256": "25b2c7b6e586078d3f572f94f48441748c8333a44c12de2b470486c1ca088a17"
+        },
+        {
+          "path": "patches/chromium157/0082-third_party-blink-renderer-modules-webgl-webgl_rendering_context_base-cc.patch",
+          "original_sha256": "78da0f157e275f5c219e71b160db13a09c60aad0731b7f857d39c89bc9b0e2a4",
+          "sha256": "785ca10a8d8eda8847a4183af0ed97d059b3212cbd22804329a4f96b91088212"
+        },
+        {
+          "path": "patches/chromium157/0111-global-privacy-control.patch",
+          "original_sha256": "98af6f9657ebe1c92f2bbd170fa038d97389b6126a2962db50bf16129ab13b79",
+          "sha256": "0a7ef68eef8a51ebfbfb84ffd7775e56a43b8694feb7052b562ce3397e936040"
+        },
+        {
+          "path": "patches/chromium157/0124-third_party-blink-renderer-platform-image-encoders-image_encoder-cc.patch",
+          "original_sha256": "80549956ea96cd315045a2bdda8a6167b51c6a3e681d490604aa740e0bd54513",
+          "sha256": "d3d16b5fc59b9ae0941737e051d9b5ed0205fea6f141b006a326e184f459c5b9"
+        },
+        {
+          "path": "patches/chromium157/0140-webrtc-ip-stats.patch",
+          "original_sha256": "b8a7b27673a70cdaeab689b304d22efeee7735dec73b1ca1023c759fa734f82f",
+          "sha256": "732a2dc744819b78e0efd477fbe39b864372a241e85541cb0adcc080c5e7cb2f"
+        },
+        {
+          "path": "patches/chromium157/0141-webrtc-ip-offer-promises.patch",
+          "original_sha256": "7e3a5160d0f788c5ca2fcdcad2b323ba592278c0f02bda34096496c455e68f26",
+          "sha256": "b17b8272eb14f05c4b724b05ffcb653eab86a449726bc3a5720f8451cebecd24"
+        },
+        {
+          "path": "patches/chromium157/0142-webrtc-ip-offer-callbacks.patch",
+          "original_sha256": "9753eba611a55e2ead0f6e31c7e0014c2a7e9b3a9374281e3800804016832b2f",
+          "sha256": "2e7e1b69abee62c36b4e4104e5d9a6a068e84e50f1c334a6da58ad470052f5cd"
+        },
+        {
+          "path": "patches/chromium157/0149-canvas-opaque-image-data-upload.patch",
+          "original_sha256": "c1f76135e662408f5e070bef43e745eaf28af00c74d8c895aee6a16f4e29fec6",
+          "sha256": "8ce98e88eeff83f7c579679227c505a487d9a320eb79cd47659a0840236b2e84"
+        },
+        {
+          "path": "patches/chromium157/0150-canvas-mailbox-readback-geometry.patch",
+          "original_sha256": "af1568a2b75ff288bde5bb8526c902d60ef9a521c0f636b3a07abfcb942cb913",
+          "sha256": "9ebd78070c0762c1900483a76e72ec2d128f6d2371efdf5b87ab5cb92d388323"
+        },
+        {
+          "path": "patches/chromium157/0152-devtools-font-provenance-implementation.patch",
+          "original_sha256": "09ba768fcc600e5575f3ced0d4f779533441fec79a3000332b6b5919f631dfd9",
+          "sha256": "2daae85e7a9e3ed0957661f493313752518fd5f2a8bdfbcba3dbfd798c690c4f"
+        },
+        {
+          "path": "patches/chromium157/0160-canvas-shared-backend-policy.patch",
+          "original_sha256": "fed44ff89761f06b260d2b62f72886d26ba7029b7fe972cd5f55c9b60243ef69",
+          "sha256": "448fede880c3acbce793f088fec662d3e07e70761e6e9a221874bf1b1ba3c3e8"
+        },
+        {
+          "path": "patches/chromium157/0167-pdf-backend-capability.patch",
+          "original_sha256": "7d2ca45084a5a9b206a6d5e1a7a1e13d53999f1e9786ded9ff5ff657fa09379a",
+          "sha256": "fa05702f631f2bcdfe5783b0d0c8163a755ade728cc81d8e438f0e52575d476d"
+        },
+        {
+          "path": "patches/chromium157/0177-audio-graph-isolation.patch",
+          "original_sha256": "8afa9f8ee0b8b9f5895183279e99eaf661735fd78052c93143e8da1557918bfc",
+          "sha256": "0a79069deaeda83a20945f393a156c66de1b73ee54ae261f6c8661132bffd068"
+        },
+        {
+          "path": "patches/chromium157/0184-webrtc-codec-negotiation-policy.patch",
+          "original_sha256": "40420a008ece2d3106712dbe5a40f18634271436a3fb0ef86cf65ae69c31b6e3",
+          "sha256": "75d6bf97156721ff1d1c19a09a00eea5b4504fbb9a9c3ed9ef45a4b77695d6d1"
+        },
+        {
+          "path": "patches/chromium157/0209-display-native-screen-regressions.patch",
+          "original_sha256": "fb94be385764e9bc6836033744596be85805d44ac9132a113e770da27c723aa1",
+          "sha256": "c297fd47ee14feb5cdd69d428a5518a7da74e5718dfcdfbeda7be24330d54a7f"
+        },
+        {
+          "path": "patches/chromium157/0222-canvas-readback-shared-noise.patch",
+          "original_sha256": "b86ce9d384d17b0ba0d0d0ca4b9dec8b5b2341afccf821c269735cf301a8fd09",
+          "sha256": "2e147e0cc34f64374459e91fb8f0e25d1ca20ce72cc7cf52d05642231729a990"
+        }
+      ],
+      "additions": {
+        "schema_version": 1,
+        "kind": "chromium157-patch-selection",
+        "manifest": {
+          "path": "build/patch-selection-157.json",
+          "sha256": "970b72c9273489e22d7840abf4fdf701ae19467b8d2e42d69da3db63e26931c6"
+        },
+        "patches": [
+          {
+            "path": "patches/chromium157-additions/0225-managed-profile-controller-link.patch",
+            "sha256": "350b333232d5865d9dff93a32b1e7b9c2e16a0c1fd31479809a0fd9106db700a"
+          },
+          {
+            "path": "patches/chromium157-additions/0227-opaque-png-export-consistency.patch",
+            "sha256": "4c048a50930c3541a3bb9e4442ad7f18e94c04ebccf86c0cfbfc286b15a70751"
+          },
+          {
+            "path": "patches/chromium157-additions/0228-timezone-default-declaration.patch",
+            "sha256": "c750f8888d986d6fbbaea16f3ca37d1543625a1281f5bd1562563d496f0daf7d"
+          },
+          {
+            "path": "patches/chromium157-additions/0229-timezone-default-implementation.patch",
+            "sha256": "3d6dd6aa4d02ff005886f27e3312c083d5385511d3303b0184a520ca3e3f3006"
+          },
+          {
+            "path": "patches/chromium157-additions/0230-blink-default-timezone-api.patch",
+            "sha256": "0495c11554fc2dd6b2e1b0e2d058ee2e9995ba6f8ccec64c149b6fe62ebcbd43"
+          },
+          {
+            "path": "patches/chromium157-additions/0231-blink-default-timezone-bridge.patch",
+            "sha256": "00274260ba64724d5cae1222ff981dd45c177bad07a9ad7fbd675c7b08426836"
+          },
+          {
+            "path": "patches/chromium157-additions/0232-renderer-launch-timezone-install.patch",
+            "sha256": "345ef39c9cc6d987f59c44f3f4a46099391d6c629058f10c1151e02a654796a7"
+          },
+          {
+            "path": "patches/chromium157-additions/0233-renderer-timezone-webstring-api.patch",
+            "sha256": "7f7f691f2d744715e0d48a25dab5ff1e8ac793122657beacd0f99a3e7e8ba908"
+          },
+          {
+            "path": "patches/chromium157-additions/0236-timezone-default-locale-setter-key.patch",
+            "sha256": "aff87c11adaabdd3d3f832e7e175e878f416e60dce7390c6655d9314f7139b5a"
+          },
+          {
+            "path": "patches/chromium157-additions/0237-timezone-default-locale-api.patch",
+            "sha256": "e2ea0e503ad413a5a7ded2e06d3f9d49d48dc56b78d48937ad275e03aa3a9d1e"
+          },
+          {
+            "path": "patches/chromium157-additions/0238-user-agent-version-header.patch",
+            "sha256": "dd22d5decfdb675477ce8d1379b7b1eaf2153f5cd0fb6dbb2de47135fc8a9561"
+          }
+        ]
+      }
+    }
+  },
+  "files": {
+    "source-verification.json": {
+      "size": 83389,
+      "sha256": "848273606320abc1b92e2c2fb9ab2d45a0a4f86961f018df2053c6771f6dc359"
+    },
+    "compiled-continuation-28615c452bb34fe596b5bed8b3cbeb69.json": {
+      "size": 95068,
+      "sha256": "587f2fe004c249d9edc30e32ac58a8a9237f860e6a712f7a382bad51c3a2ebf2"
+    },
+    "fingerprint/acceptance.json": {
+      "size": 91233,
+      "sha256": "7e9059e4cc7f2b08abe5c378f22b53843dde4faf16d9ef8153b9ef7f8fc11927"
+    },
+    "native-smoke.json": {
+      "size": 3237,
+      "sha256": "c4ea8da50243f66d1c05c3debbab72dc1caa3ec61b48f2e8af611ba3bdd5163d"
+    }
+  },
+  "known_error": {
+    "job_id": 137060205519,
+    "step": "Verify native ARM64 fingerprint behavior",
+    "errors": [
+      "ValueError: source receipt was produced for a different patch stack"
+    ],
+    "status": "failed",
+    "ci_gate_passed": false,
+    "suites": [],
+    "browser": {
+      "path": "C:\\a\\Chromix\\Chromix\\smoke\\chromix\\chrome.exe",
+      "sha256": "824a5b0b7e479959e65e4579680ea456b5df372e0334821ae185f7397239cae8",
+      "size": 2984448
+    },
+    "source_profile_commit": "8147b39e782ed933ee2e9cb8b8e3fa734c53399b",
+    "validator_commit": "5d93c8bfe6b85f17112d138f8e25eabbab589266",
+    "producer_manifest": {
+      "path": "build/patch-selection-157.json",
+      "sha256": "970b72c9273489e22d7840abf4fdf701ae19467b8d2e42d69da3db63e26931c6"
+    },
+    "validator_manifest": {
+      "path": "build/patch-selection-157.json",
+      "sha256": "50661794f5bba0c7ba72c8c515b60886fd1b3261c5197f1f7a617d44d406e692"
+    },
+    "producer_review_manifest": {
+      "path": "patches/chromium157/manifest.json",
+      "sha256": "637e507bbd3b48ec5fe1bd89e9b2177097bdf9214cb70569ddfdb2fb96ca8dd0"
+    },
+    "validator_review_manifest": {
+      "path": "patches/chromium157/manifest.json",
+      "sha256": "dc5c555e6c1ab35c5368f274c3e2276179ddf54efa6ec0f0e4e2fdbb18c88537"
+    },
+    "cause": "Frozen compiled recipe versus run-head whole-manifest identity; identical ordered 235 patch hashes and effective series. Source outputs match compiled admission. No fingerprint suites ran.",
+    "original_result": "failure; never rewritten"
+  },
+  "bundle": {
+    "name": "chromix-win-arm64.zip",
+    "sha256": "3b8b93a5eae82e863a56ceb5ee9b29a106e520d58d0809fdb63fa167edd64149",
+    "size": 211808347
+  }
+}
